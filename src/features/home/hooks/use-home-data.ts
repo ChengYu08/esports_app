@@ -1,0 +1,20 @@
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { fetchBanners, fetchClubPage } from "@/features/home/api/home.api";
+import type { GameKey, HomeTab } from "@/features/home/api/home.types";
+
+export function useHomeBanners(tab: HomeTab) {
+  return useQuery({
+    queryKey: ["home-banners", tab],
+    queryFn: () => fetchBanners(tab),
+  });
+}
+
+export function useHomeClubs(tab: HomeTab, game: GameKey) {
+  return useInfiniteQuery({
+    queryKey: ["home-clubs", tab, game],
+    enabled: tab === "home",
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) => fetchClubPage(game, pageParam),
+    getNextPageParam: (last) => (last.hasMore ? last.nextPage : undefined),
+  });
+}

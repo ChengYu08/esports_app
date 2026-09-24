@@ -1,12 +1,7 @@
 import { HomeBackground } from "@/features/home/components/HomeBackground";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
-import {
-  Club,
-  GameKey,
-  fetchBanners,
-  fetchClubPage,
-} from "@/features/home/api/home.api";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useHomeBanners, useHomeClubs } from "@/features/home/hooks/use-home-data";
+import type { Club, GameKey, HomeTab } from "@/features/home/api/home.types";
 import { router } from "expo-router";
 import { Image } from "expo-image";
 import { useEffect, useMemo, useState } from "react";
@@ -32,7 +27,6 @@ const icons = {
   mine: require("../../../../assets/home/h_mine.svg"),
   publish: require("../../../../assets/home/h_publish.svg"),
 };
-type TopTab = "home" | "court";
 const games = [
   { key: "pc" as GameKey, label: "三角洲端游", color: "#3ec8a5" },
   { key: "mobile" as GameKey, label: "三角洲手游", color: "#ecb34f" },
@@ -40,20 +34,11 @@ const games = [
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const [topTab, setTopTab] = useState<TopTab>("home");
+  const [topTab, setTopTab] = useState<HomeTab>("home");
   const [game, setGame] = useState<GameKey>("pc");
   const [bannerIndex, setBannerIndex] = useState(0);
-  const banners = useQuery({
-    queryKey: ["home-banners", topTab],
-    queryFn: () => fetchBanners(topTab),
-  });
-  const clubs = useInfiniteQuery({
-    queryKey: ["home-clubs", topTab, game],
-    enabled: topTab === "home",
-    initialPageParam: 1,
-    queryFn: ({ pageParam }) => fetchClubPage(game, pageParam),
-    getNextPageParam: (last) => (last.hasMore ? last.nextPage : undefined),
-  });
+  const banners = useHomeBanners(topTab);
+  const clubs = useHomeClubs(topTab, game);
   const bannerItems = banners.data ?? [];
   useEffect(() => {
     if (bannerItems.length < 2) return undefined;
@@ -67,7 +52,7 @@ export default function HomeScreen() {
     () => clubs.data?.pages.flatMap((p) => p.items) ?? [],
     [clubs.data],
   );
-  const selectTopTab = (tab: TopTab) => {
+  const selectTopTab = (tab: HomeTab) => {
     setBannerIndex(0);
     setTopTab(tab);
   };
