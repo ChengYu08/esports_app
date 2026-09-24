@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "esports_app",
-    "slug": "esports_app",
+    "slug": "app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -37,6 +37,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "15231eb2-10b1-46ea-981b-67ec5fb980c5"
+      }
+    },
+    "owner": "chengyu08s-team"
   }
 }
