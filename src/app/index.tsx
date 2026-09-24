@@ -8,10 +8,10 @@ import {
 } from "@/services/home-service";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
+import { Image } from "expo-image";
 import { useEffect, useMemo, useState } from "react";
 import {
   FlatList,
-  Image,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -22,15 +22,15 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const banner = require("../../assets/home/h_banner.png");
 const icons = {
-  search: require("../../assets/home/h_search.png"),
-  filter: require("../../assets/home/h_filter_list.png"),
-  user: require("../../assets/home/h_user.png"),
-  id: require("../../assets/home/h_id.png"),
-  home: require("../../assets/home/h_home-selected.png"),
-  order: require("../../assets/home/h_order-selected.png"),
-  message: require("../../assets/home/h_message-selected.png"),
-  mine: require("../../assets/home/h_mine.png"),
-  publish: require("../../assets/home/h_publish.png"),
+  search: require("../../assets/home/h_search.svg"),
+  filter: require("../../assets/home/h_filter_list.svg"),
+  user: require("../../assets/home/h_user.svg"),
+  id: require("../../assets/home/h_id.svg"),
+  home: require("../../assets/home/h_home-selected.svg"),
+  order: require("../../assets/home/h_order-selected.svg"),
+  message: require("../../assets/home/h_message-selected.svg"),
+  mine: require("../../assets/home/h_mine.svg"),
+  publish: require("../../assets/home/h_publish.svg"),
 };
 type TopTab = "home" | "court";
 const games = [
@@ -102,7 +102,7 @@ export default function HomeScreen() {
               : banner
           }
           style={s.bannerImage}
-          resizeMode="cover"
+          contentFit="cover"
         />
       </View>
       {topTab === "home" && (
@@ -334,7 +334,7 @@ const s = StyleSheet.create({
   search: {
     paddingRight: 12,
   },
-  searchIcon: { width: 48, height: 48 },
+  searchIcon: { width: 24, height: 24, backgroundColor: "#FFC2C6" },
   banner: {
     marginHorizontal: 12,
     alignSelf: "stretch",
@@ -444,7 +444,11 @@ const s = StyleSheet.create({
     marginTop: 3,
   },
   metaRow: { flexDirection: "row", gap: 8, marginTop: 4 },
-  meta: { fontFamily: DOUYIN_SANS, color: "#999", fontSize: 11 },
+  meta: {
+    fontFamily: DOUYIN_SANS,
+    color: "#999",
+    fontSize: 11,
+  },
   metaIcon: { width: 12, height: 12 },
   empty: {
     fontFamily: DOUYIN_SANS,

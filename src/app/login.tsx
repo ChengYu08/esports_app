@@ -5,8 +5,8 @@ import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
-const topArt = require("../../assets/login/top-login.png");
-const backIcon = require("../../assets/login/back.svg");
+const topArt = require("../../assets/login/top-login.svg");
+const backIcon = require("../../assets/com/back.svg");
 const phoneIcon = require("../../assets/login/phone.svg");
 const lockIcon = require("../../assets/login/lock.svg");
 const wechatIcon = require("../../assets/login/wechat.svg");
@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     height: 24,
     justifyContent: "center",
   },
-  backImage: { width: 11, height: 18 },
+  backImage: { width: 24, height: 24 },
   content: {
     position: "absolute",
     top: 196,
