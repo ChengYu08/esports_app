@@ -1,5 +1,5 @@
 import Constants from 'expo-constants';
-import { env } from '@/lib/env';
+import { env } from '@/core/config/env';
 
 type LogContext = Record<string, string | number | boolean | null | undefined>;
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';

@@ -1,5 +1,5 @@
-import { env } from '@/lib/env';
-import { logger } from '@/lib/logger';
+import { env } from '@/core/config/env';
+import { logger } from '@/core/logging/logger';
 
 export class ApiError extends Error {
   constructor(

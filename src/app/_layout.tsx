@@ -4,11 +4,11 @@ import { Stack } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { DOUYIN_SANS } from "@/lib/fonts";
-import { queryClient } from "@/lib/query-client";
+import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { queryClient } from "@/core/query/query-client";
 
 const fonts = {
-  [DOUYIN_SANS]: require("../../Douyin Sans.otf"),
+  [DOUYIN_SANS]: require("../../assets/fonts/Douyin Sans.otf"),
 };
 
 export default function RootLayout() {

@@ -1,5 +1,5 @@
-import { env } from '@/lib/env';
-import { apiClient } from '@/services/api-client';
+import { env } from '@/core/config/env';
+import { apiClient } from '@/core/network/api-client';
 
 export type GameKey = 'pc' | 'mobile';
 
