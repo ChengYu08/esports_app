@@ -1,9 +1,10 @@
 import { HomeBackground } from "@/features/home/components/HomeBackground";
+import { ClubCard } from "@/features/home/components/ClubCard";
+import { HomeBottomNav } from "@/features/home/components/HomeBottomNav";
+import { HomeHeader } from "@/features/home/components/HomeHeader";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useHomeBanners, useHomeClubs } from "@/features/home/hooks/use-home-data";
-import type { Club, GameKey, HomeTab } from "@/features/home/api/home.types";
-import { router } from "expo-router";
-import { Image } from "expo-image";
+import type { GameKey, HomeTab } from "@/features/home/api/home.types";
 import { useEffect, useMemo, useState } from "react";
 import {
   FlatList,
@@ -15,22 +16,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const banner = require("../../../../assets/home/h_banner.png");
-const icons = {
-  search: require("../../../../assets/home/h_search.svg"),
-  filter: require("../../../../assets/home/h_filter_list.svg"),
-  user: require("../../../../assets/home/h_user.svg"),
-  id: require("../../../../assets/home/h_id.svg"),
-  home: require("../../../../assets/home/h_home-selected.svg"),
-  order: require("../../../../assets/home/h_order-selected.svg"),
-  message: require("../../../../assets/home/h_message-selected.svg"),
-  mine: require("../../../../assets/home/h_mine.svg"),
-  publish: require("../../../../assets/home/h_publish.svg"),
-};
-const games = [
-  { key: "pc" as GameKey, label: "三角洲端游", color: "#3ec8a5" },
-  { key: "mobile" as GameKey, label: "三角洲手游", color: "#ecb34f" },
-];
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -56,87 +41,7 @@ export default function HomeScreen() {
     setBannerIndex(0);
     setTopTab(tab);
   };
-  const header = (
-    <>
-      <View style={s.topBar}>
-        <View style={s.topTabs}>
-          <Tab
-            label="首页"
-            selected={topTab === "home"}
-            onPress={() => selectTopTab("home")}
-          />
-          <Tab
-            label="小法庭"
-            selected={topTab === "court"}
-            onPress={() => selectTopTab("court")}
-          />
-        </View>
-        <Pressable
-          accessibilityLabel="搜索"
-          style={s.search}
-          onPress={() => undefined}
-        >
-          <Image source={icons.search} style={[s.searchIcon]} />
-        </Pressable>
-      </View>
-      <View style={s.banner}>
-        <Image
-          source={
-            bannerItems[bannerIndex]?.imageUrl
-              ? { uri: bannerItems[bannerIndex].imageUrl }
-              : banner
-          }
-          style={s.bannerImage}
-          contentFit="cover"
-        />
-      </View>
-      {topTab === "home" && (
-        <>
-          <View style={s.gameTabs}>
-            {games.map((item) => (
-              <Pressable
-                key={item.key}
-                onPress={() => setGame(item.key)}
-                style={[
-                  s.gameTab,
-                  game === item.key && s.gameTabSelected,
-                  game === item.key && { position: "relative" },
-                ]}
-              >
-                <View style={[s.gameLogo, { backgroundColor: item.color }]}>
-                  <Text style={s.gameLogoText}>△</Text>
-                </View>
-                <Text
-                  style={[
-                    s.gameLabel,
-                    game === item.key && s.gameLabelSelected,
-                  ]}
-                >
-                  {item.label}
-                </Text>
-                {game === item.key && (
-                  <View
-                    style={{
-                      position: "absolute",
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      height: 4,
-                      backgroundColor: "#fff",
-                    }}
-                  />
-                )}
-              </Pressable>
-            ))}
-          </View>
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>热门俱乐部</Text>
-            <Image source={icons.filter} style={s.filter} />
-          </View>
-        </>
-      )}
-    </>
-  );
+  const header = <HomeHeader tab={topTab} game={game} bannerIndex={bannerIndex} banners={bannerItems} onTabChange={selectTopTab} onGameChange={setGame} />;
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <HomeBackground />
@@ -181,56 +86,8 @@ export default function HomeScreen() {
           }
         />
       )}
-      <Bottom insetsBottom={insets.bottom} />
+      <HomeBottomNav insetsBottom={insets.bottom} />
     </View>
-  );
-}
-function Tab({
-  label,
-  selected,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable onPress={onPress} style={s.tab}>
-      {selected && <View style={s.line} />}
-      <Text style={[s.tabText, selected && s.tabSelected]}>{label}</Text>
-    </Pressable>
-  );
-}
-function ClubCard({ club }: { club: Club }) {
-  const colors = ["#24354b", "#4a2637", "#2e4650", "#493e2e"];
-  const hue = colors[Number(club.id.match(/\d+$/)?.[0] ?? 0) % 4];
-  return (
-    <Pressable style={s.club} onPress={() => undefined}>
-      <View style={[s.cover, { backgroundColor: hue }]}>
-        <Text style={s.coverText}>{club.name.slice(0, 1)}</Text>
-      </View>
-      <View style={s.body}>
-        <View style={s.titleRow}>
-          {club.isSelfOperated && <Text style={s.self}>自营</Text>}
-          <Text numberOfLines={1} style={s.name}>
-            {club.name}
-          </Text>
-          <Text style={s.online}>• {club.onlineCount}人</Text>
-        </View>
-        <Text numberOfLines={2} style={s.desc}>
-          {club.description}
-        </Text>
-        <View style={s.metaRow}>
-          <Text style={s.meta}>
-            <Image source={icons.user} style={s.metaIcon} /> {club.memberCount}
-            人
-          </Text>
-          <Text style={s.meta}>
-            <Image source={icons.id} style={s.metaIcon} /> {club.clubCode}
-          </Text>
-        </View>
-      </View>
-    </Pressable>
   );
 }
 function Retry({ onRetry }: { onRetry: () => void }) {
@@ -240,47 +97,6 @@ function Retry({ onRetry }: { onRetry: () => void }) {
       <Pressable onPress={onRetry} style={s.retry}>
         <Text style={s.retryText}>重试</Text>
       </Pressable>
-    </View>
-  );
-}
-function Bottom({ insetsBottom }: { insetsBottom: number }) {
-  const items = [
-    { label: "首页", icon: icons.home, active: true },
-    { label: "订单", icon: icons.order },
-    { label: "消息", icon: icons.message },
-    { label: "我的", icon: icons.mine },
-  ];
-  return (
-    <View style={[s.bottom, { paddingBottom: Math.max(8, insetsBottom) }]}>
-      {items.slice(0, 2).map((x, i) => (
-        <Pressable
-          key={x.label}
-          style={s.bottomItem}
-          onPress={() => (i ? router.push("/login") : undefined)}
-        >
-          <Image source={x.icon} style={s.bottomIcon} />
-          <Text style={[s.bottomLabel, x.active && s.bottomActive]}>
-            {x.label}
-          </Text>
-        </Pressable>
-      ))}
-      <Pressable
-        accessibilityLabel="快速匹配"
-        style={s.match}
-        onPress={() => router.push("/match")}
-      >
-        <Image source={icons.publish} style={s.publish} />
-      </Pressable>
-      {items.slice(2).map((x) => (
-        <Pressable
-          key={x.label}
-          style={s.bottomItem}
-          onPress={() => router.push("/login")}
-        >
-          <Image source={x.icon} style={s.bottomIcon} />
-          <Text style={s.bottomLabel}>{x.label}</Text>
-        </Pressable>
-      ))}
     </View>
   );
 }
