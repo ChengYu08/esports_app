@@ -1,7 +1,15 @@
 export type PzOneClickModuleEvents = {
-  onChange: (params: ChangeEventPayload) => void;
+  onStateChange: (params: StateChangePayload) => void;
 };
 
-export type ChangeEventPayload = {
-  value: string;
+export type QuickLoginAuthToken = {
+  jwtToken: string;
+  accessToken: string;
 };
+
+export type QuickLoginResult = {
+  spToken: string;
+  phone?: string;
+};
+
+export type StateChangePayload = { state: "checking" | "authorizing" | "cancelled" | "unavailable" };

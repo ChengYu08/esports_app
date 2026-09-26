@@ -7,12 +7,19 @@ class PzOneClickModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("PzOneClick")
 
-    Events("onChange")
+    Events("onStateChange")
 
-    AsyncFunction("setValueAsync") { value: String ->
-      sendEvent("onChange", mapOf(
-        "value" to value
-      ))
+    AsyncFunction("checkLoginAvailableAsync") { _: Map<String, String> ->
+      sendEvent("onStateChange", mapOf("state" to "unavailable"))
+      false
+    }
+
+    AsyncFunction("authorizeAsync") { _: Map<String, String> ->
+      throw Exception("请先集成阿里云号码认证 Android SDK")
+    }
+
+    AsyncFunction("cancelAsync") {
+      sendEvent("onStateChange", mapOf("state" to "cancelled"))
     }
   }
 }
