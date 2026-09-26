@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "dependencies": {
     "@expo/ui": "~57.0.19",
+    "@esports/sso-sdk": "*",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@tanstack/react-query": "^5.103.2",
     "expo": "~57.0.24",
@@ -46,5 +47,6 @@
     "web": "expo start --web",
     "lint": "expo lint"
   },
-  "private": true
+  "private": true,
+  "workspaces": ["packages/*"]
 }

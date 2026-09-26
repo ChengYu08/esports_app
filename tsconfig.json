@@ -8,6 +8,12 @@
       ],
       "@/assets/*": [
         "./assets/*"
+      ],
+      "@esports/auth": [
+        "./packages/auth/src/index.ts"
+      ],
+      "@esports/sso-sdk": [
+        "./packages/sso-sdk/src/index.ts"
       ]
     }
   },

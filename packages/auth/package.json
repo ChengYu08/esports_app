@@ -1,0 +1,19 @@
+{
+  "name": "@esports/auth",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@esports/sso-sdk": "*"
+  },
+  "peerDependencies": {
+    "expo-image": "~57.0.5",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "zustand": "^5.0.15"
+  }
+}
