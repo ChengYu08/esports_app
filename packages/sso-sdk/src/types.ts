@@ -11,6 +11,15 @@ export type SsoToken = {
 
 export type SsoSourceType = "GUHAO_IOS" | "GUHAO_ANDROID";
 
+export type SsoRequestLog = {
+  method: HttpMethod;
+  path: string;
+  status?: number;
+  code?: string;
+  durationMs: number;
+  error?: string;
+};
+
 export type SsoClientConfig = {
   baseUrl: string;
   clientAppId: string;
@@ -19,6 +28,8 @@ export type SsoClientConfig = {
   os?: "Android" | "iOS" | "Harmony" | "Unknown";
   /** Backend application source identifier sent with every auth request. */
   sourceType?: SsoSourceType;
+  /** Optional diagnostic hook. It never receives request bodies or credentials. */
+  onRequestLog?: (log: SsoRequestLog) => void;
   fetch?: typeof globalThis.fetch;
   timeoutMs?: number;
 };

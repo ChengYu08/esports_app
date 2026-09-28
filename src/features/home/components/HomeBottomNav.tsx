@@ -5,18 +5,18 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const icons = {
   home: require("../../../../assets/home/h_home-selected.svg"),
-  order: require("../../../../assets/home/h_order-selected.svg"),
-  message: require("../../../../assets/home/h_message-selected.svg"),
-  mine: require("../../../../assets/home/h_mine.svg"),
+  order: require("../../../../assets/coms/tab-order-selected.svg"),
+  message: require("../../../../assets/coms/tab-message-selected.svg"),
+  mine: require("../../../../assets/coms/tab-mine-selected.svg"),
   publish: require("../../../../assets/home/h_publish.svg"),
 };
 
-export function HomeBottomNav({ insetsBottom }: { insetsBottom: number }) {
+export function HomeBottomNav({ insetsBottom, active = "home" }: { insetsBottom: number; active?: "home" | "mine" }) {
   const items = [
-    { label: "首页", icon: icons.home, active: true },
+    { label: "首页", icon: icons.home, active: active === "home" },
     { label: "订单", icon: icons.order },
     { label: "消息", icon: icons.message },
-    { label: "我的", icon: icons.mine },
+    { label: "我的", icon: icons.mine, active: active === "mine" },
   ];
 
   return (
@@ -31,9 +31,9 @@ export function HomeBottomNav({ insetsBottom }: { insetsBottom: number }) {
         <Image source={icons.publish} style={styles.publish} />
       </Pressable>
       {items.slice(2).map((item) => (
-        <Pressable key={item.label} style={styles.bottomItem} onPress={() => router.push("/login")}>
+        <Pressable key={item.label} style={styles.bottomItem} onPress={() => item.label === "我的" ? router.push("/mine") : router.push("/login")}>
           <Image source={item.icon} style={styles.bottomIcon} />
-          <Text style={styles.bottomLabel}>{item.label}</Text>
+          <Text style={[styles.bottomLabel, item.active && styles.bottomActive]}>{item.label}</Text>
         </Pressable>
       ))}
     </View>

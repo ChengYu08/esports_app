@@ -17,6 +17,7 @@ export default function LoginRoute() {
     clientSecret: env.ssoClientSecret,
     os: Platform.OS === "ios" ? "iOS" : "Android",
     sourceType: Platform.OS === "ios" ? "GUHAO_IOS" : "GUHAO_ANDROID",
+    onRequestLog: (log) => console.log("[SSO]", JSON.stringify(log)),
   }) : null, []);
   const adapter = sso ? createAuthSsoAdapter(sso) : null;
   const quickLoginProvider = useMemo(() => createNativeQuickLoginProvider(), []);

@@ -4,7 +4,7 @@ import {
   createPasswordLoginRequest,
 } from "./password-requests";
 import { SsoError } from "./types";
-import type { QuickLoginAuthToken, QuickLoginProvider, SsoClientConfig, SsoRequestOptions, SsoToken } from "./types";
+import type { QuickLoginAuthToken, QuickLoginProvider, SsoClientConfig, SsoRequestLog, SsoRequestOptions, SsoToken } from "./types";
 
 export class SsoClient {
   private readonly config: SsoClientConfig;
@@ -22,6 +22,10 @@ export class SsoClient {
   async request<T = unknown>(path: string, options: SsoRequestOptions = {}): Promise<T> {
     const method = options.method ?? "POST";
     const data = { ...(options.data ?? {}), sourceType: this.config.sourceType };
+    const startedAt = Date.now();
+    const log = (event: Omit<SsoRequestLog, "method" | "path" | "durationMs">) => {
+      this.config.onRequestLog?.({ method, path, durationMs: Date.now() - startedAt, ...event });
+    };
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs ?? 15_000);
     try {
@@ -31,6 +35,7 @@ export class SsoClient {
         : `${this.config.baseUrl}${path}`;
       const response = await this.fetcher(requestUrl, { method, headers, signal: controller.signal, body: method === "GET" ? undefined : JSON.stringify(data) });
       const body = await response.json().catch(() => ({}));
+      log({ status: response.status, code: typeof body?.code === "string" ? body.code : undefined });
       if (!response.ok) throw new SsoError(body?.info ?? body?.message ?? `请求失败: ${response.status}`, response.status, body?.code);
       if (path.includes("/oauth2/token")) {
         if (!body?.access_token) throw new SsoError(body?.info ?? body?.message ?? "获取 token 失败", response.status, body?.code);
@@ -38,6 +43,11 @@ export class SsoClient {
       }
       if (options.skipCodeCheck || body?.code === "SUCCESS") return body as T;
       throw new SsoError(body?.info ?? body?.message ?? "请求失败", response.status, body?.code);
+    } catch (error) {
+      if (!(error instanceof SsoError)) {
+        log({ error: error instanceof Error ? error.message : "网络请求失败" });
+      }
+      throw error;
     } finally { clearTimeout(timeout); }
   }
 

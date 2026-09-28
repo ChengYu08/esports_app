@@ -7,4 +7,4 @@ export {
   createPasswordLoginRequest,
 } from "./password-requests";
 export type { PasswordRequest } from "./password-requests";
-export type { HttpMethod, QuickLoginAuthToken, QuickLoginProvider, SsoClientConfig, SsoRequestOptions, SsoSourceType, SsoToken } from "./types";
+export type { HttpMethod, QuickLoginAuthToken, QuickLoginProvider, SsoClientConfig, SsoRequestLog, SsoRequestOptions, SsoSourceType, SsoToken } from "./types";
