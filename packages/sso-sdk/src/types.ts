@@ -9,12 +9,16 @@ export type SsoToken = {
   expires_in?: number;
 };
 
+export type SsoSourceType = "GUHAO_IOS" | "GUHAO_ANDROID";
+
 export type SsoClientConfig = {
   baseUrl: string;
   clientAppId: string;
   clientSecret: string;
   appVersion?: string;
   os?: "Android" | "iOS" | "Harmony" | "Unknown";
+  /** Backend application source identifier sent with every auth request. */
+  sourceType?: SsoSourceType;
   fetch?: typeof globalThis.fetch;
   timeoutMs?: number;
 };

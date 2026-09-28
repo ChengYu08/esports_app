@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useState } from "react";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { DOUYIN_SANS } from "./typography";
 
 const topArt = require("../assets/top-login.svg");
@@ -10,63 +10,150 @@ const lockIcon = require("../assets/lock.svg");
 const wechatIcon = require("../assets/wechat.svg");
 
 export type LoginPayload = { phone: string; code: string };
+export type PasswordLoginPayload = { username: string; password: string };
 
 export type LoginScreenProps = {
   onBack: () => void;
   onSkip: () => void;
   onLogin?: (payload: LoginPayload) => void | Promise<void>;
+  onPasswordLogin?: (payload: PasswordLoginPayload) => void | Promise<void>;
   onSendCode?: (phone: string) => void | Promise<void>;
   onQuickLogin?: () => void | Promise<void>;
 };
 
-export function LoginScreen({ onBack, onSkip, onLogin, onSendCode, onQuickLogin }: LoginScreenProps) {
+export function LoginScreen({
+  onBack,
+  onSkip,
+  onLogin,
+  onPasswordLogin,
+  onSendCode,
+  onQuickLogin,
+}: LoginScreenProps) {
+  const [mode, setMode] = useState<"sms" | "password">("sms");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
+  const isPasswordMode = mode === "password";
 
   return (
     <View style={styles.screen}>
       <View style={styles.canvas}>
         <View style={styles.top}>
           <Image source={topArt} style={styles.topArt} contentFit="fill" />
-          <Pressable accessibilityLabel="返回" onPress={onBack} style={styles.back}>
-            <Image source={backIcon} style={styles.backImage} contentFit="contain" />
+          <Pressable
+            accessibilityLabel="返回"
+            onPress={onBack}
+            style={styles.back}
+          >
+            <Image
+              source={backIcon}
+              style={styles.backImage}
+              contentFit="contain"
+            />
           </Pressable>
         </View>
         <View style={styles.content}>
           <View style={styles.fields}>
             <View style={styles.field}>
-              <Text style={styles.prefix}>+86</Text>
-              <TextInput value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="请输入手机号" placeholderTextColor="#ccc" style={styles.input} />
+              {!isPasswordMode && <Text style={styles.prefix}>+86</Text>}
+              <TextInput
+                value={phone}
+                onChangeText={setPhone}
+                autoCapitalize="none"
+                keyboardType={isPasswordMode ? "default" : "phone-pad"}
+                placeholder={isPasswordMode ? "请输入手机号/账号" : "请输入手机号"}
+                placeholderTextColor="#ccc"
+                style={styles.input}
+              />
             </View>
             <View style={styles.field}>
-              <TextInput value={code} onChangeText={setCode} keyboardType="number-pad" placeholder="请输入验证码" placeholderTextColor="#ccc" style={styles.input} />
-              <View style={styles.divider} />
-              <Pressable accessibilityLabel="获取验证码" onPress={() => void onSendCode?.(phone)}>
-                <Text style={styles.send}>获取验证码</Text>
-              </Pressable>
+              <TextInput
+                value={isPasswordMode ? password : code}
+                onChangeText={isPasswordMode ? setPassword : setCode}
+                keyboardType={isPasswordMode ? "default" : "number-pad"}
+                placeholder={isPasswordMode ? "请输入密码" : "请输入验证码"}
+                placeholderTextColor="#ccc"
+                secureTextEntry={isPasswordMode}
+                style={styles.input}
+              />
+              {!isPasswordMode && (
+                <>
+                  <View style={styles.divider} />
+                  <Pressable
+                    accessibilityLabel="获取验证码"
+                    onPress={() => void onSendCode?.(phone)}
+                  >
+                    <Text style={styles.send}>获取验证码</Text>
+                  </Pressable>
+                </>
+              )}
             </View>
           </View>
           <View style={styles.actions}>
-            <Pressable style={styles.submit} onPress={() => void onLogin?.({ phone, code })}>
-              <Text style={styles.submitText}>登录/注册</Text>
+            <Pressable
+              style={styles.submit}
+              onPress={() =>
+                void (isPasswordMode
+                  ? onPasswordLogin?.({ username: phone, password })
+                  : onLogin?.({ phone, code }))
+              }
+            >
+              <Text style={styles.submitText}>
+                {isPasswordMode ? "登录" : "登录/注册"}
+              </Text>
             </Pressable>
-            <Pressable onPress={onSkip}><Text style={styles.browse}>暂不登录，先去逛逛</Text></Pressable>
+            <Pressable onPress={onSkip}>
+              <Text style={styles.browse}>暂不登录，先去逛逛</Text>
+            </Pressable>
           </View>
         </View>
         <View style={styles.other}>
-          <LoginMethod icon={phoneIcon} label="一键登录" onPress={onQuickLogin} />
-          <LoginMethod icon={lockIcon} label="密码登录" />
-          <LoginMethod icon={wechatIcon} label="微信" />
+          <LoginMethod
+            icon={phoneIcon}
+            label="一键登录"
+            onPress={onQuickLogin}
+          />
+          <LoginMethod
+            icon={lockIcon}
+            label={isPasswordMode ? "验证码登录" : "密码登录"}
+            onPress={() =>
+              setMode((current) => current === "sms" ? "password" : "sms")
+            }
+          />
+          {/* <LoginMethod icon={wechatIcon} label="微信" /> */}
         </View>
-        <Text style={styles.agreementText}>◯ 已阅读并同意 <Text style={styles.link}>《用户协议》</Text>{" "}<Text style={styles.link}>《隐私政策》</Text>，未注册用户{"\n"}　　在登录成功后自动创建账号</Text>
+        <Text style={styles.agreementText}>
+          ◯ 已阅读并同意 <Text style={styles.link}>《用户协议》</Text>{" "}
+          <Text style={styles.link}>《隐私政策》</Text>，未注册用户
+          在登录成功后自动创建账号
+        </Text>
         <View style={styles.homeIndicator} />
       </View>
     </View>
   );
 }
 
-function LoginMethod({ icon, label, onPress }: { icon: number; label: string; onPress?: () => void | Promise<void> }) {
-  return <Pressable accessibilityLabel={label} style={styles.method} onPress={() => void onPress?.()}><View style={styles.circle}><Image source={icon} style={styles.methodIcon} contentFit="contain" /></View><Text style={styles.methodLabel}>{label}</Text></Pressable>;
+function LoginMethod({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: number;
+  label: string;
+  onPress?: () => void | Promise<void>;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      style={styles.method}
+      onPress={() => void onPress?.()}
+    >
+      <View style={styles.circle}>
+        <Image source={icon} style={styles.methodIcon} contentFit="contain" />
+      </View>
+      <Text style={styles.methodLabel}>{label}</Text>
+    </Pressable>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -74,25 +161,115 @@ const styles = StyleSheet.create({
   canvas: { flex: 1, width: "100%", minHeight: 812 },
   top: { height: 208, overflow: "hidden", backgroundColor: "#ffe5e7" },
   topArt: { position: "absolute", left: 0, top: 0, width: "100%", height: 208 },
-  back: { position: "absolute", top: 57, left: 20, width: 20, height: 24, justifyContent: "center" },
+  back: {
+    position: "absolute",
+    top: 57,
+    left: 20,
+    width: 20,
+    height: 24,
+    justifyContent: "center",
+  },
   backImage: { width: 24, height: 24 },
-  content: { position: "absolute", top: 196, left: 0, right: 0, minHeight: 616, paddingTop: 64, paddingHorizontal: 32, backgroundColor: "#fff", borderTopLeftRadius: 12, borderTopRightRadius: 12 },
+  content: {
+    position: "absolute",
+    top: 196,
+    left: 0,
+    right: 0,
+    minHeight: 616,
+    paddingTop: 64,
+    paddingHorizontal: 32,
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
   fields: { gap: 12 },
-  field: { height: 46, borderRadius: 8, backgroundColor: "#f7f7f7", padding: 12, flexDirection: "row", alignItems: "center", gap: 12 },
-  prefix: { paddingRight: 12, borderRightWidth: 1, borderRightColor: "#ddd", color: "#333", fontSize: 14, fontWeight: "600" },
-  input: { flex: 1, height: 22, padding: 0, color: "#333", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  field: {
+    height: 46,
+    borderRadius: 8,
+    backgroundColor: "#f7f7f7",
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  prefix: {
+    paddingRight: 12,
+    borderRightWidth: 1,
+    borderRightColor: "#ddd",
+    color: "#333",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  input: {
+    flex: 1,
+    height: 22,
+    padding: 0,
+    color: "#333",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 14,
+  },
   divider: { width: 1, height: 16, backgroundColor: "#ddd" },
   send: { color: "#e01b28", fontFamily: DOUYIN_SANS, fontSize: 14 },
   actions: { marginTop: 56, alignItems: "center" },
-  submit: { height: 42, width: "100%", borderRadius: 8, backgroundColor: "#ff99a0", alignItems: "center", justifyContent: "center" },
-  submitText: { color: "#fff", fontFamily: DOUYIN_SANS, fontSize: 14, fontWeight: "600" },
-  browse: { marginTop: 16, color: "#999", fontFamily: DOUYIN_SANS, fontSize: 12 },
-  other: { position: "absolute", left: 0, right: 0, top: 614, flexDirection: "row", justifyContent: "center", gap: 24 },
+  submit: {
+    height: 42,
+    width: "100%",
+    borderRadius: 8,
+    backgroundColor: "#ff99a0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  submitText: {
+    color: "#fff",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  browse: {
+    marginTop: 16,
+    color: "#999",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 12,
+  },
+  other: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 614,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 24,
+  },
   method: { width: 64, alignItems: "center" },
-  circle: { width: 40, height: 40, marginBottom: 8, borderRadius: 20, backgroundColor: "#f7f7f7", alignItems: "center", justifyContent: "center" },
+  circle: {
+    width: 40,
+    height: 40,
+    marginBottom: 8,
+    borderRadius: 20,
+    backgroundColor: "#f7f7f7",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   methodIcon: { width: 22, height: 22 },
   methodLabel: { color: "#808080", fontFamily: DOUYIN_SANS, fontSize: 12 },
-  agreementText: { position: "absolute", left: 32, right: 32, top: 722, color: "#999", fontFamily: DOUYIN_SANS, fontSize: 12, lineHeight: 20 },
+  agreementText: {
+    position: "absolute",
+    left: 32,
+    right: 32,
+    top: 722,
+    color: "#999",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 12,
+    lineHeight: 20,
+  },
   link: { color: "#4b8bd8" },
-  homeIndicator: { position: "absolute", bottom: 10, alignSelf: "center", width: 133, height: 5, borderRadius: 5, backgroundColor: "#000" },
+  homeIndicator: {
+    position: "absolute",
+    bottom: 10,
+    alignSelf: "center",
+    width: 133,
+    height: 5,
+    borderRadius: 5,
+    backgroundColor: "#000",
+  },
 });

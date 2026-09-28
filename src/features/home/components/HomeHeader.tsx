@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFC2C6",
   },
   search: { paddingRight: 12 },
-  searchIcon: { width: 24, height: 24 },
+  searchIcon: { width: 48, height: 48 },
   banner: {
     marginHorizontal: 12,
     alignSelf: "stretch",

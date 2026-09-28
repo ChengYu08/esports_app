@@ -8,7 +8,13 @@ import { Alert, Platform } from "react-native";
 
 export default function LoginRoute() {
   const setSession = useAuthStore((state) => state.setSession);
-  const sso = useMemo(() => env.ssoClientSecret ? new SsoClient({ baseUrl: env.apiBaseUrl, clientAppId: env.ssoClientAppId, clientSecret: env.ssoClientSecret, os: Platform.OS === "ios" ? "iOS" : "Android" }) : null, []);
+  const sso = useMemo(() => env.ssoClientSecret ? new SsoClient({
+    baseUrl: env.ssoBaseUrl,
+    clientAppId: env.ssoClientAppId,
+    clientSecret: env.ssoClientSecret,
+    os: Platform.OS === "ios" ? "iOS" : "Android",
+    sourceType: Platform.OS === "ios" ? "GUHAO_IOS" : "GUHAO_ANDROID",
+  }) : null, []);
   const adapter = sso ? createAuthSsoAdapter(sso) : null;
   const quickLoginProvider = useMemo(() => createNativeQuickLoginProvider(), []);
   return (
@@ -19,6 +25,17 @@ export default function LoginRoute() {
         onBack={() => router.back()}
         onSkip={() => router.replace("/")}
         onSendCode={adapter?.sendCode}
+        onPasswordLogin={async (payload) => {
+          if (!adapter) return;
+          const token = await adapter.passwordLogin(payload);
+          if (token.access_token) {
+            setSession({
+              accessToken: token.access_token,
+              user: { id: token.id_token ?? payload.username },
+            });
+          }
+          router.replace("/");
+        }}
         onQuickLogin={async () => {
           if (!adapter) {
             Alert.alert("暂无法一键登录", "请先配置 SSO client secret。");

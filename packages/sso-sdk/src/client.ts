@@ -7,18 +7,25 @@ export class SsoClient {
   private readonly fetcher: typeof globalThis.fetch;
 
   constructor(config: SsoClientConfig) {
-    this.config = { ...config, baseUrl: config.baseUrl.replace(/\/$/, "") };
+    this.config = {
+      ...config,
+      baseUrl: config.baseUrl.replace(/\/$/, ""),
+      sourceType: config.sourceType ?? (config.os === "iOS" ? "GUHAO_IOS" : "GUHAO_ANDROID"),
+    };
     this.fetcher = config.fetch ?? globalThis.fetch.bind(globalThis);
   }
 
   async request<T = unknown>(path: string, options: SsoRequestOptions = {}): Promise<T> {
     const method = options.method ?? "POST";
-    const data = options.data ?? {};
+    const data = { ...(options.data ?? {}), sourceType: this.config.sourceType };
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs ?? 15_000);
     try {
       const headers = { ...createSignature(data, method, this.config), AUTHORIZATION: `basic ${this.config.clientSecret}`, ...(options.headers ?? {}) };
-      const response = await this.fetcher(`${this.config.baseUrl}${path}`, { method, headers, signal: controller.signal, body: method === "GET" ? undefined : JSON.stringify(data) });
+      const requestUrl = method === "GET"
+        ? `${this.config.baseUrl}${path}${path.includes("?") ? "&" : "?"}${new URLSearchParams(Object.entries(data).map(([key, value]) => [key, String(value)]))}`
+        : `${this.config.baseUrl}${path}`;
+      const response = await this.fetcher(requestUrl, { method, headers, signal: controller.signal, body: method === "GET" ? undefined : JSON.stringify(data) });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new SsoError(body?.info ?? body?.message ?? `请求失败: ${response.status}`, response.status, body?.code);
       if (path.includes("/oauth2/token")) {
