@@ -1,7 +1,13 @@
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+
+type AppTabBarProps = {
+  state: { index: number; routes: Array<{ name: string }> };
+  navigation: { navigate: (name: string) => void };
+};
 
 const icons = {
   home: require("../../../assets/coms/tab-home.svg"),
@@ -15,7 +21,9 @@ const icons = {
   publish: require("../../../assets/home/h_publish.svg"),
 };
 
-export function AppTabBar({ insetsBottom, active = "home" }: { insetsBottom: number; active?: "home" | "order" | "message" | "mine" }) {
+export function AppTabBar({ state, navigation }: AppTabBarProps) {
+  const insets = useSafeAreaInsets();
+  const active = state.routes[state.index]?.name;
   const items = [
     { label: "首页", icon: active === "home" ? icons.homeSelected : icons.home, active: active === "home" },
     { label: "订单", icon: active === "order" ? icons.orderSelected : icons.order, active: active === "order" },
@@ -24,9 +32,9 @@ export function AppTabBar({ insetsBottom, active = "home" }: { insetsBottom: num
   ];
 
   return (
-    <View style={[styles.bottom, { height: 60 + Math.max(0, insetsBottom), paddingBottom: Math.max(0, insetsBottom) }]}>
+    <View style={[styles.bottom, { height: 60 + insets.bottom, paddingBottom: insets.bottom }]}>
       {items.slice(0, 2).map((item, index) => (
-        <Pressable key={item.label} style={styles.bottomItem} onPress={() => index ? router.replace("/order") : router.replace("/")}>
+        <Pressable key={item.label} style={styles.bottomItem} onPress={() => navigation.navigate(index ? "order" : "index")}>
           <Image source={item.icon} style={styles.bottomIcon} />
           <Text style={[styles.bottomLabel, item.active && styles.bottomActive]}>{item.label}</Text>
         </Pressable>
@@ -35,7 +43,7 @@ export function AppTabBar({ insetsBottom, active = "home" }: { insetsBottom: num
         <Image source={icons.publish} style={styles.publish} />
       </Pressable>
       {items.slice(2).map((item) => (
-        <Pressable key={item.label} style={styles.bottomItem} onPress={() => item.label === "我的" ? router.replace("/mine") : router.replace("/message")}>
+        <Pressable key={item.label} style={styles.bottomItem} onPress={() => navigation.navigate(item.label === "我的" ? "mine" : "message")}>
           <Image source={item.icon} style={styles.bottomIcon} />
           <Text style={[styles.bottomLabel, item.active && styles.bottomActive]}>{item.label}</Text>
         </Pressable>

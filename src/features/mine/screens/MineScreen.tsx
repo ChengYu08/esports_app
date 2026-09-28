@@ -5,7 +5,6 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "@esports/auth";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
-import { AppTabBar } from "@/shared/ui/AppTabBar";
 
 const avatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const female = require("../../../../assets/mine/figma/mine-female.svg");
@@ -46,7 +45,6 @@ export default function MineScreen() {
           <MenuRow icon={settings} title="基础设置" onPress={() => undefined} />
         </View>
       </ScrollView>
-      <AppTabBar insetsBottom={insets.bottom} active="mine" />
     </View>
   );
 }
