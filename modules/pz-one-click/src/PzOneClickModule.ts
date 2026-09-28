@@ -1,4 +1,4 @@
-import { NativeModule, requireNativeModule } from 'expo';
+import { NativeModule, requireOptionalNativeModule } from 'expo';
 
 import { PzOneClickModuleEvents, QuickLoginAuthToken, QuickLoginResult } from './PzOneClick.types';
 
@@ -8,4 +8,7 @@ declare class PzOneClickModule extends NativeModule<PzOneClickModuleEvents> {
   cancelAsync(): Promise<void>;
 }
 
-export default requireNativeModule<PzOneClickModule>('PzOneClick');
+// Expo Go does not bundle this app-specific native module. Keep the value
+// nullable so importing the login route does not crash before the screen can
+// explain that a development build is required.
+export default requireOptionalNativeModule<PzOneClickModule>('PzOneClick');
