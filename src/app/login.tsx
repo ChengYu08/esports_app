@@ -1,12 +1,15 @@
 import { createAuthSsoAdapter, LoginScreen, useAuthStore } from "@esports/auth";
 import { createNativeQuickLoginProvider, SsoClient } from "@esports/sso-sdk";
 import { env } from "@/core/config/env";
-import { Stack, router } from "expo-router";
+import { Stack, router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useMemo } from "react";
 import { Alert, Platform } from "react-native";
 
 export default function LoginRoute() {
+  const params = useLocalSearchParams<{ mode?: string; phone?: string }>();
+  const initialMode = params.mode === "password" ? "password" : "sms";
+  const initialPhone = typeof params.phone === "string" ? params.phone : "";
   const setSession = useAuthStore((state) => state.setSession);
   const sso = useMemo(() => env.ssoClientSecret ? new SsoClient({
     baseUrl: env.ssoBaseUrl,
@@ -22,20 +25,38 @@ export default function LoginRoute() {
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar hidden />
       <LoginScreen
+        initialMode={initialMode}
+        initialPhone={initialPhone}
         onBack={() => router.back()}
         onSkip={() => router.replace("/")}
         onSendCode={adapter?.sendCode}
         onPasswordLogin={async (payload) => {
-          if (!adapter) return;
-          const token = await adapter.passwordLogin(payload);
-          if (token.access_token) {
-            setSession({
-              accessToken: token.access_token,
-              user: { id: token.id_token ?? payload.username },
-            });
+          if (!adapter) {
+            Alert.alert("密码登录失败", "请先配置 SSO client secret。");
+            return;
           }
-          router.replace("/");
+          try {
+            const token = await adapter.passwordLogin(payload);
+            if (token.access_token) {
+              setSession({
+                accessToken: token.access_token,
+                user: {
+                  id: token.id_token ?? payload.username,
+                  phone: payload.username,
+                },
+              });
+            }
+            router.replace("/");
+          } catch (error) {
+            Alert.alert(
+              "密码登录失败",
+              error instanceof Error ? error.message : "请检查手机号和密码",
+            );
+          }
         }}
+        onForgotPassword={(phone) =>
+          router.push({ pathname: "/forgot-password", params: { phone } })
+        }
         onQuickLogin={async () => {
           if (!adapter) {
             Alert.alert("暂无法一键登录", "请先配置 SSO client secret。");

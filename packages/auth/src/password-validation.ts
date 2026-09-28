@@ -42,3 +42,23 @@ export function validatePasswordConfirmation(
   if (password !== confirmation) return "两次输入的密码不一致";
   return null;
 }
+
+export type ForgotPasswordFormValues = {
+  phone: string;
+  code: string;
+  password: string;
+  confirmation: string;
+};
+
+export function validateForgotPasswordForm(
+  values: ForgotPasswordFormValues,
+): string | null {
+  const phoneError = validatePhone(values.phone);
+  if (phoneError) return phoneError;
+  if (!values.code) return "请输入验证码";
+
+  const passwordError = validatePassword(values.password);
+  if (passwordError) return passwordError;
+
+  return validatePasswordConfirmation(values.password, values.confirmation);
+}

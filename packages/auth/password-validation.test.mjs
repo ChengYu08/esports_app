@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   sanitizeCode,
   sanitizePhone,
+  validateForgotPasswordForm,
   validatePassword,
   validatePasswordConfirmation,
   validatePhone,
@@ -42,4 +43,31 @@ test("password confirmation must be present and match", () => {
     validatePasswordConfirmation("Abc123!@", "Abc123!@"),
     null,
   );
+});
+
+test("forgot password form validates fields in submission order", () => {
+  const validForm = {
+    phone: "13800138000",
+    code: "123456",
+    password: "Abc123!@",
+    confirmation: "Abc123!@",
+  };
+
+  assert.equal(
+    validateForgotPasswordForm({ ...validForm, phone: "" }),
+    "请输入手机号",
+  );
+  assert.equal(
+    validateForgotPasswordForm({ ...validForm, code: "" }),
+    "请输入验证码",
+  );
+  assert.equal(
+    validateForgotPasswordForm({ ...validForm, password: "short" }),
+    "密码长度为8-16位",
+  );
+  assert.equal(
+    validateForgotPasswordForm({ ...validForm, confirmation: "Abc123!#" }),
+    "两次输入的密码不一致",
+  );
+  assert.equal(validateForgotPasswordForm(validForm), null);
 });

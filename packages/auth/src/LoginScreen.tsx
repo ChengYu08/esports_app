@@ -1,6 +1,7 @@
 import { Image } from "expo-image";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { sanitizePhone } from "./password-validation";
 import { DOUYIN_SANS } from "./typography";
 
 const topArt = require("../assets/top-login.svg");
@@ -8,31 +9,42 @@ const backIcon = require("../assets/back.svg");
 const phoneIcon = require("../assets/phone.svg");
 const lockIcon = require("../assets/lock.svg");
 const wechatIcon = require("../assets/wechat.svg");
+const eyeOpenIcon = require("../assets/eye-open.svg");
+const eyeClosedIcon = require("../assets/eye-closed.svg");
 
 export type LoginPayload = { phone: string; code: string };
 export type PasswordLoginPayload = { username: string; password: string };
 
 export type LoginScreenProps = {
+  initialMode?: "sms" | "password";
+  initialPhone?: string;
   onBack: () => void;
   onSkip: () => void;
   onLogin?: (payload: LoginPayload) => void | Promise<void>;
   onPasswordLogin?: (payload: PasswordLoginPayload) => void | Promise<void>;
   onSendCode?: (phone: string) => void | Promise<void>;
   onQuickLogin?: () => void | Promise<void>;
+  onForgotPassword?: (phone: string) => void;
 };
 
 export function LoginScreen({
+  initialMode,
+  initialPhone,
   onBack,
   onSkip,
   onLogin,
   onPasswordLogin,
   onSendCode,
   onQuickLogin,
+  onForgotPassword,
 }: LoginScreenProps) {
-  const [mode, setMode] = useState<"sms" | "password">("sms");
-  const [phone, setPhone] = useState("");
+  const [mode, setMode] = useState<"sms" | "password">(
+    initialMode ?? "sms",
+  );
+  const [phone, setPhone] = useState(() => sanitizePhone(initialPhone ?? ""));
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const isPasswordMode = mode === "password";
 
   return (
@@ -55,13 +67,14 @@ export function LoginScreen({
         <View style={styles.content}>
           <View style={styles.fields}>
             <View style={styles.field}>
-              {!isPasswordMode && <Text style={styles.prefix}>+86</Text>}
+              <Text style={styles.prefix}>+86</Text>
               <TextInput
                 value={phone}
-                onChangeText={setPhone}
+                onChangeText={(value) => setPhone(sanitizePhone(value))}
                 autoCapitalize="none"
-                keyboardType={isPasswordMode ? "default" : "phone-pad"}
-                placeholder={isPasswordMode ? "请输入手机号/账号" : "请输入手机号"}
+                keyboardType="phone-pad"
+                maxLength={11}
+                placeholder="请输入手机号"
                 placeholderTextColor="#ccc"
                 style={styles.input}
               />
@@ -71,12 +84,38 @@ export function LoginScreen({
                 value={isPasswordMode ? password : code}
                 onChangeText={isPasswordMode ? setPassword : setCode}
                 keyboardType={isPasswordMode ? "default" : "number-pad"}
+                maxLength={isPasswordMode ? 16 : 6}
                 placeholder={isPasswordMode ? "请输入密码" : "请输入验证码"}
                 placeholderTextColor="#ccc"
-                secureTextEntry={isPasswordMode}
+                secureTextEntry={isPasswordMode && !passwordVisible}
                 style={styles.input}
               />
-              {!isPasswordMode && (
+              {isPasswordMode ? (
+                <View style={styles.passwordActions}>
+                  <Pressable
+                    accessibilityLabel={passwordVisible ? "隐藏密码" : "显示密码"}
+                    accessibilityRole="button"
+                    hitSlop={8}
+                    onPress={() => setPasswordVisible((visible) => !visible)}
+                    style={styles.eyeButton}
+                  >
+                    <Image
+                      accessible={false}
+                      source={passwordVisible ? eyeOpenIcon : eyeClosedIcon}
+                      style={styles.eyeIcon}
+                      contentFit="contain"
+                    />
+                  </Pressable>
+                  <View style={styles.divider} />
+                  <Pressable
+                    accessibilityLabel="忘记密码"
+                    accessibilityRole="button"
+                    onPress={() => onForgotPassword?.(phone)}
+                  >
+                    <Text style={styles.forgotPassword}>忘记密码</Text>
+                  </Pressable>
+                </View>
+              ) : (
                 <>
                   <View style={styles.divider} />
                   <Pressable
@@ -210,6 +249,14 @@ const styles = StyleSheet.create({
   },
   divider: { width: 1, height: 16, backgroundColor: "#ddd" },
   send: { color: "#e01b28", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  passwordActions: { flexDirection: "row", alignItems: "center", gap: 10 },
+  eyeButton: { width: 24, height: 24, justifyContent: "center" },
+  eyeIcon: { width: 20, height: 20 },
+  forgotPassword: {
+    color: "#999",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 12,
+  },
   actions: { marginTop: 56, alignItems: "center" },
   submit: {
     height: 42,
