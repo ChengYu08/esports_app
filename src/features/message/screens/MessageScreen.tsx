@@ -1,4 +1,3 @@
-import { router } from "expo-router";
 import { FlatList, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -12,17 +11,11 @@ const doNothing = () => undefined;
 export default function MessageScreen() {
   const insets = useSafeAreaInsets();
 
-  const handleBack = () => {
-    if (router.canGoBack()) {
-      router.back();
-    }
-  };
-
   const handleMessagePress = (_item: MessageListItemModel) => undefined;
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <MessageHeader onBack={handleBack} onClear={doNothing} onSearch={doNothing} />
+      <MessageHeader onClear={doNothing} onSearch={doNothing} />
       <FlatList
         contentContainerStyle={{ paddingBottom: 80 + insets.bottom }}
         data={MESSAGE_ITEMS}

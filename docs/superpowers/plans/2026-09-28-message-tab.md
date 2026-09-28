@@ -25,7 +25,6 @@
 ### Task 1: 导出 Figma 消息页资源
 
 **Files:**
-- Create: `assets/message/message-back.svg`
 - Create: `assets/message/message-clear.svg`
 - Create: `assets/message/message-search.svg`
 - Create: `assets/message/message-system.svg`
@@ -36,7 +35,7 @@
 
 **Interfaces:**
 - Consumes: Figma 文件 `RiaC2pmggaf13Xisz9X0I2` 的节点 `13:8692`。
-- Produces: 可由 `expo-image` 静态 `require()` 的八个 SVG 文件。
+- Produces: 可由 `expo-image` 静态 `require()` 的七个 SVG 文件。
 
 - [ ] **Step 1: 读取 Expo 57 对 SVG 静态资源与 `expo-image` 的版本化文档**
 
@@ -46,13 +45,13 @@ Expected: 文档确认当前项目所用 `expo-image` 的静态资源用法；�
 
 - [ ] **Step 2: 使用 Figma MCP 导出顶部图标和完整头像节点**
 
-导出节点：返回 `I13:8697;3074:1162;3074:877`、清空 `I13:8699;3074:1097;3074:877`、搜索 `I13:8699;3074:1130;3074:877`、系统通知 `I13:8702;1835:16240`，以及四个普通头像 `I13:8703;1835:16240` 至 `I13:8706;1835:16240`。导出完整头像实例而不是内部栅格填充，以保留圆形遮罩并满足 SVG 格式要求。
+导出节点：清空 `I13:8699;3074:1097;3074:877`、搜索 `I13:8699;3074:1130;3074:877`、系统通知 `I13:8702;1835:16240`，以及四个普通头像 `I13:8703;1835:16240` 至 `I13:8706;1835:16240`。导出完整头像实例而不是内部栅格填充，以保留圆形遮罩并满足 SVG 格式要求。
 
 - [ ] **Step 3: 校验资源文件**
 
 Run: `file assets/message/*.svg`
 
-Expected: 八个文件均存在且可识别为 SVG/XML 文本，无 PNG 内容伪装为 `.svg`。
+Expected: 七个文件均存在且可识别为 SVG/XML 文本，无 PNG 内容伪装为 `.svg`。
 
 - [ ] **Step 4: 提交资源**
 
@@ -123,7 +122,7 @@ git commit -m "feat: add message list display data"
 
 **Interfaces:**
 - Consumes: `MessageListItemModel` 和 Task 1 的顶部 SVG。
-- Produces: `MessageHeader({ onBack, onClear, onSearch })` 与 `MessageListItem({ item, isLast, onPress })`。
+- Produces: `MessageHeader({ onClear, onSearch })` 与 `MessageListItem({ item, isLast, onPress })`。
 
 - [ ] **Step 1: 在临时引用文件中引用尚不存在的组件**
 
@@ -137,7 +136,7 @@ Expected: FAIL，提示 props 类型或导出未定义。
 
 - [ ] **Step 3: 实现 `MessageHeader`**
 
-使用 44 高的横向 `View`，左侧 44×44 返回按钮、右侧各 44×44 的清空和搜索按钮，中间弹性留白。三个 `Pressable` 分别设置 `accessibilityRole="button"` 和“返回”“清空消息”“搜索消息”标签；图标以 24×24 渲染，按压时透明度降至 0.6。
+使用 44 高的横向 `View`，左侧显示 20 像素半粗体标题“消息”，右侧各 44×44 的清空和搜索按钮，中间弹性留白。两个 `Pressable` 分别设置 `accessibilityRole="button"` 和“清空消息”“搜索消息”标签；图标以 24×24 渲染，按压时透明度降至 0.6。
 
 - [ ] **Step 4: 实现 `MessageListItem`**
 
@@ -186,7 +185,7 @@ Expected: FAIL，提示 `MessageScreen` 模块不存在。
 
 - [ ] **Step 3: 实现 `MessageScreen`**
 
-页面根节点 `flex: 1` 且背景 `#F7F7F7`，以 `paddingTop: insets.top` 避开真实状态栏。顶部栏位于列表之外；`FlatList` 使用 `MESSAGE_ITEMS`、稳定的 `keyExtractor`、`showsVerticalScrollIndicator={false}`，底部 padding 为 `80 + insets.bottom`，避免内容被绝对定位的 `AppTabBar` 遮挡。返回操作仅在 `router.canGoBack()` 为真时调用 `router.back()`；其余暂未落地业务回调用空函数并保持组件接口。
+页面根节点 `flex: 1` 且背景 `#F7F7F7`，以 `paddingTop: insets.top` 避开真实状态栏。顶部栏位于列表之外；`FlatList` 使用 `MESSAGE_ITEMS`、稳定的 `keyExtractor`、`showsVerticalScrollIndicator={false}`，底部 padding 为 `80 + insets.bottom`，避免内容被绝对定位的 `AppTabBar` 遮挡。清空、搜索及列表点击暂未落地业务回调用空函数并保持组件接口。
 
 - [ ] **Step 4: 运行 lint 与类型检查**
 
@@ -238,4 +237,3 @@ Expected: 两条命令均以 0 退出。
 git add assets/message src/features/message 'src/app/(tabs)/message.tsx'
 git commit -m "fix: polish message tab layout"
 ```
-

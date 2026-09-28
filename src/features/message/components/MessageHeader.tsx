@@ -1,22 +1,24 @@
 import { Image } from "expo-image";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+
+import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const icons = {
-  back: require("../../../../assets/message/message-back.svg"),
   clear: require("../../../../assets/message/message-clear.svg"),
   search: require("../../../../assets/message/message-search.svg"),
 };
 
 type MessageHeaderProps = {
-  onBack: () => void;
   onClear: () => void;
   onSearch: () => void;
 };
 
-export function MessageHeader({ onBack, onClear, onSearch }: MessageHeaderProps) {
+export function MessageHeader({ onClear, onSearch }: MessageHeaderProps) {
   return (
     <View style={styles.header}>
-      <IconButton accessibilityLabel="返回" icon={icons.back} onPress={onBack} />
+      <Text accessibilityRole="header" style={styles.title}>
+        消息
+      </Text>
       <View style={styles.spacer} />
       <IconButton accessibilityLabel="清空消息" icon={icons.clear} onPress={onClear} />
       <IconButton accessibilityLabel="搜索消息" icon={icons.search} onPress={onSearch} />
@@ -53,7 +55,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 6,
+    paddingLeft: 16,
+    paddingRight: 6,
+  },
+  title: {
+    fontFamily: DOUYIN_SANS,
+    color: "#333333",
+    fontSize: 20,
+    lineHeight: 28,
+    fontWeight: "600",
   },
   spacer: { flex: 1 },
   button: {
