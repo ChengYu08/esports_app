@@ -1,3 +1,5 @@
-import { TabPlaceholderScreen } from "@/features/navigation/screens/TabPlaceholderScreen";
+import OrderScreen from "@/features/order/screens/OrderScreen";
 
-export default function OrderRoute() { return <TabPlaceholderScreen title="订单" />; }
+export default function OrderRoute() {
+  return <OrderScreen />;
+}
