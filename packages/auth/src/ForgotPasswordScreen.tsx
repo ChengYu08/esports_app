@@ -151,6 +151,7 @@ export function ForgotPasswordScreen({
                 maxLength={11}
                 placeholder="请输入手机号"
                 placeholderTextColor="#ccc"
+                selectionColor="#e01b28"
                 style={styles.input}
               />
             </View>
@@ -167,6 +168,7 @@ export function ForgotPasswordScreen({
                 maxLength={6}
                 placeholder="请输入验证码"
                 placeholderTextColor="#ccc"
+                selectionColor="#e01b28"
                 style={styles.input}
               />
               <View style={styles.divider} />
@@ -196,6 +198,7 @@ export function ForgotPasswordScreen({
                 maxLength={16}
                 placeholder="请输入新密码"
                 placeholderTextColor="#ccc"
+                selectionColor="#e01b28"
                 secureTextEntry={!passwordVisible}
                 style={styles.input}
               />
@@ -227,6 +230,7 @@ export function ForgotPasswordScreen({
                 maxLength={16}
                 placeholder="请再次输入新密码"
                 placeholderTextColor="#ccc"
+                selectionColor="#e01b28"
                 secureTextEntry={!confirmationVisible}
                 style={styles.input}
               />

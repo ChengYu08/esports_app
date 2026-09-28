@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import * as passwordValidation from "./src/password-validation.ts";
 import {
   sanitizeCode,
   sanitizePhone,
@@ -70,4 +71,46 @@ test("forgot password form validates fields in submission order", () => {
     "两次输入的密码不一致",
   );
   assert.equal(validateForgotPasswordForm(validForm), null);
+});
+
+test("login button becomes ready only when the active form is complete", () => {
+  assert.equal(
+    passwordValidation.isLoginFormReady?.("password", "13800138000", "secret"),
+    true,
+  );
+  assert.equal(
+    passwordValidation.isLoginFormReady?.("password", "13800138000", ""),
+    false,
+  );
+  assert.equal(
+    passwordValidation.isLoginFormReady?.("sms", "13800138000", "123456"),
+    true,
+  );
+  assert.equal(
+    passwordValidation.isLoginFormReady?.("sms", "13800138000", "12345"),
+    false,
+  );
+  assert.equal(
+    passwordValidation.isLoginFormReady?.("sms", "23800138000", "123456"),
+    false,
+  );
+});
+
+test("SMS code action reflects sending and countdown states", () => {
+  assert.equal(passwordValidation.getSmsCodeActionLabel?.(true, 0), "发送中...");
+  assert.equal(passwordValidation.getSmsCodeActionLabel?.(false, 60), "重新获取(60s)");
+  assert.equal(passwordValidation.getSmsCodeActionLabel?.(false, 0), "获取验证码");
+  assert.equal(
+    passwordValidation.canSendSmsCode?.("13800138000", false, 0),
+    true,
+  );
+  assert.equal(
+    passwordValidation.canSendSmsCode?.("13800138000", true, 0),
+    false,
+  );
+  assert.equal(
+    passwordValidation.canSendSmsCode?.("13800138000", false, 12),
+    false,
+  );
+  assert.equal(passwordValidation.canSendSmsCode?.("1380013", false, 0), false);
 });

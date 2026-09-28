@@ -11,6 +11,9 @@ export type { AuthUser } from "./auth-store";
 export { createAuthSsoAdapter } from "./sso-adapter";
 export type { ForgotPasswordPayload } from "./sso-adapter";
 export {
+  canSendSmsCode,
+  getSmsCodeActionLabel,
+  isLoginFormReady,
   sanitizeCode,
   sanitizePhone,
   validateForgotPasswordForm,

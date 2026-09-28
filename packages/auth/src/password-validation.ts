@@ -15,6 +15,32 @@ export function validatePhone(phone: string): string | null {
   return null;
 }
 
+export function isLoginFormReady(
+  mode: "sms" | "password",
+  phone: string,
+  credential: string,
+): boolean {
+  if (validatePhone(phone)) return false;
+  return mode === "password" ? credential.length > 0 : /^\d{6}$/.test(credential);
+}
+
+export function getSmsCodeActionLabel(
+  isSending: boolean,
+  countdown: number,
+): string {
+  if (isSending) return "发送中...";
+  if (countdown > 0) return `重新获取(${countdown}s)`;
+  return "获取验证码";
+}
+
+export function canSendSmsCode(
+  phone: string,
+  isSending: boolean,
+  countdown: number,
+): boolean {
+  return !validatePhone(phone) && !isSending && countdown <= 0;
+}
+
 export function validatePassword(password: string): string | null {
   if (password.length < 8 || password.length > 16) {
     return "密码长度为8-16位";

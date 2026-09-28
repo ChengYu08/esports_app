@@ -29,7 +29,21 @@ export default function LoginRoute() {
         initialPhone={initialPhone}
         onBack={() => router.back()}
         onSkip={() => router.replace("/")}
-        onSendCode={adapter?.sendCode}
+        onSendCode={async (phone) => {
+          if (!adapter) {
+            Alert.alert("验证码发送失败", "请先配置 SSO client secret。");
+            throw new Error("SSO client secret is not configured");
+          }
+          try {
+            await adapter.sendCode(phone);
+          } catch (error) {
+            Alert.alert(
+              "验证码发送失败",
+              error instanceof Error ? error.message : "请稍后重试",
+            );
+            throw error;
+          }
+        }}
         onPasswordLogin={async (payload) => {
           if (!adapter) {
             Alert.alert("密码登录失败", "请先配置 SSO client secret。");
@@ -71,10 +85,20 @@ export default function LoginRoute() {
           }
         }}
         onLogin={async (payload) => {
-          if (!adapter) return;
-          const token = await adapter.login(payload);
-          if (token.access_token) setSession({ accessToken: token.access_token, user: { id: token.id_token ?? payload.phone, phone: payload.phone } });
-          router.replace("/");
+          if (!adapter) {
+            Alert.alert("登录失败", "请先配置 SSO client secret。");
+            return;
+          }
+          try {
+            const token = await adapter.login(payload);
+            if (token.access_token) setSession({ accessToken: token.access_token, user: { id: token.id_token ?? payload.phone, phone: payload.phone } });
+            router.replace("/");
+          } catch (error) {
+            Alert.alert(
+              "登录失败",
+              error instanceof Error ? error.message : "请检查手机号和验证码",
+            );
+          }
         }}
       />
     </>

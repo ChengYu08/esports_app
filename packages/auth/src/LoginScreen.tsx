@@ -1,7 +1,20 @@
 import { Image } from "expo-image";
-import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { sanitizePhone } from "./password-validation";
+import { useEffect, useState } from "react";
+import {
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import {
+  canSendSmsCode,
+  getSmsCodeActionLabel,
+  isLoginFormReady,
+  sanitizeCode,
+  sanitizePhone,
+} from "./password-validation";
 import { DOUYIN_SANS } from "./typography";
 
 const topArt = require("../assets/top-login.svg");
@@ -45,7 +58,70 @@ export function LoginScreen({
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [agreementAccepted, setAgreementAccepted] = useState(false);
+  const [agreementModalVisible, setAgreementModalVisible] = useState(false);
+  const [isSendingCode, setIsSendingCode] = useState(false);
+  const [codeCountdown, setCodeCountdown] = useState(0);
+  const [codeSentPhone, setCodeSentPhone] = useState("");
   const isPasswordMode = mode === "password";
+  const credential = isPasswordMode ? password : code;
+  const isSubmitReady = isLoginFormReady(mode, phone, credential);
+  const canSendCode = canSendSmsCode(phone, isSendingCode, codeCountdown);
+
+  useEffect(() => {
+    if (codeCountdown <= 0) return;
+    const timer = setTimeout(
+      () => setCodeCountdown((seconds) => Math.max(0, seconds - 1)),
+      1000,
+    );
+    return () => clearTimeout(timer);
+  }, [codeCountdown]);
+
+  const handlePhoneChange = (value: string) => {
+    const nextPhone = sanitizePhone(value);
+    setPhone(nextPhone);
+    if (codeSentPhone && nextPhone !== codeSentPhone) {
+      setCodeCountdown(0);
+      setCodeSentPhone("");
+    }
+  };
+
+  const performLogin = () => {
+    if (isPasswordMode) {
+      void onPasswordLogin?.({ username: phone, password });
+      return;
+    }
+    void onLogin?.({ phone, code });
+  };
+
+  const handleSubmit = () => {
+    if (!isSubmitReady) return;
+    if (!agreementAccepted) {
+      setAgreementModalVisible(true);
+      return;
+    }
+    performLogin();
+  };
+
+  const handleAgreeAndContinue = () => {
+    setAgreementAccepted(true);
+    setAgreementModalVisible(false);
+    performLogin();
+  };
+
+  const handleSendCode = async () => {
+    if (!canSendCode || !onSendCode) return;
+    setIsSendingCode(true);
+    try {
+      await onSendCode(phone);
+      setCodeSentPhone(phone);
+      setCodeCountdown(60);
+    } catch {
+      // The route owns API error presentation. A rejected request must not count down.
+    } finally {
+      setIsSendingCode(false);
+    }
+  };
 
   return (
     <View style={styles.screen}>
@@ -70,23 +146,25 @@ export function LoginScreen({
               <Text style={styles.prefix}>+86</Text>
               <TextInput
                 value={phone}
-                onChangeText={(value) => setPhone(sanitizePhone(value))}
+                onChangeText={handlePhoneChange}
                 autoCapitalize="none"
                 keyboardType="phone-pad"
                 maxLength={11}
                 placeholder="请输入手机号"
                 placeholderTextColor="#ccc"
+                selectionColor="#e01b28"
                 style={styles.input}
               />
             </View>
             <View style={styles.field}>
               <TextInput
                 value={isPasswordMode ? password : code}
-                onChangeText={isPasswordMode ? setPassword : setCode}
+                onChangeText={isPasswordMode ? setPassword : (value) => setCode(sanitizeCode(value))}
                 keyboardType={isPasswordMode ? "default" : "number-pad"}
                 maxLength={isPasswordMode ? 16 : 6}
                 placeholder={isPasswordMode ? "请输入密码" : "请输入验证码"}
                 placeholderTextColor="#ccc"
+                selectionColor="#e01b28"
                 secureTextEntry={isPasswordMode && !passwordVisible}
                 style={styles.input}
               />
@@ -120,9 +198,13 @@ export function LoginScreen({
                   <View style={styles.divider} />
                   <Pressable
                     accessibilityLabel="获取验证码"
-                    onPress={() => void onSendCode?.(phone)}
+                    accessibilityRole="button"
+                    disabled={!canSendCode}
+                    onPress={() => void handleSendCode()}
                   >
-                    <Text style={styles.send}>获取验证码</Text>
+                    <Text style={[styles.send, !canSendCode && styles.sendDisabled]}>
+                      {getSmsCodeActionLabel(isSendingCode, codeCountdown)}
+                    </Text>
                   </Pressable>
                 </>
               )}
@@ -130,12 +212,10 @@ export function LoginScreen({
           </View>
           <View style={styles.actions}>
             <Pressable
-              style={styles.submit}
-              onPress={() =>
-                void (isPasswordMode
-                  ? onPasswordLogin?.({ username: phone, password })
-                  : onLogin?.({ phone, code }))
-              }
+              accessibilityRole="button"
+              disabled={!isSubmitReady}
+              style={[styles.submit, isSubmitReady && styles.submitActive]}
+              onPress={handleSubmit}
             >
               <Text style={styles.submitText}>
                 {isPasswordMode ? "登录" : "登录/注册"}
@@ -161,13 +241,58 @@ export function LoginScreen({
           />
           {/* <LoginMethod icon={wechatIcon} label="微信" /> */}
         </View>
-        <Text style={styles.agreementText}>
-          ◯ 已阅读并同意 <Text style={styles.link}>《用户协议》</Text>{" "}
-          <Text style={styles.link}>《隐私政策》</Text>，未注册用户
-          在登录成功后自动创建账号
-        </Text>
+        <Pressable
+          accessibilityLabel="已阅读并同意用户协议和隐私政策"
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: agreementAccepted }}
+          hitSlop={8}
+          onPress={() => setAgreementAccepted((accepted) => !accepted)}
+          style={styles.agreement}
+        >
+          <View style={[styles.checkbox, agreementAccepted && styles.checkboxChecked]}>
+            {agreementAccepted ? <Text style={styles.checkmark}>✓</Text> : null}
+          </View>
+          <Text style={styles.agreementText}>
+            已阅读并同意 <Text style={styles.link}>《用户协议》</Text>{" "}
+            <Text style={styles.link}>《隐私政策》</Text>，未注册用户
+            在登录成功后自动创建账号
+          </Text>
+        </Pressable>
         <View style={styles.homeIndicator} />
       </View>
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setAgreementModalVisible(false)}
+        transparent
+        visible={agreementModalVisible}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>阅读并同意以下协议</Text>
+            <Text style={styles.modalText}>
+              已阅读并同意 <Text style={styles.link}>《用户协议》</Text>{" "}
+              <Text style={styles.link}>《隐私政策》</Text>
+              ，未注册用户在登录成功后自动创建账号
+            </Text>
+            <View style={styles.modalActions}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setAgreementModalVisible(false)}
+                style={styles.disagreeButton}
+              >
+                <Text style={styles.disagreeText}>不同意</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={handleAgreeAndContinue}
+                style={styles.agreeButton}
+              >
+                <Text style={styles.agreeText}>同意协议并继续</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -249,6 +374,7 @@ const styles = StyleSheet.create({
   },
   divider: { width: 1, height: 16, backgroundColor: "#ddd" },
   send: { color: "#e01b28", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  sendDisabled: { color: "#bbb" },
   passwordActions: { flexDirection: "row", alignItems: "center", gap: 10 },
   eyeButton: { width: 24, height: 24, justifyContent: "center" },
   eyeIcon: { width: 20, height: 20 },
@@ -266,6 +392,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  submitActive: { backgroundColor: "#e01b28" },
   submitText: {
     color: "#fff",
     fontFamily: DOUYIN_SANS,
@@ -299,17 +426,92 @@ const styles = StyleSheet.create({
   },
   methodIcon: { width: 22, height: 22 },
   methodLabel: { color: "#808080", fontFamily: DOUYIN_SANS, fontSize: 12 },
-  agreementText: {
+  agreement: {
     position: "absolute",
     left: 32,
     right: 32,
     top: 722,
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  checkbox: {
+    width: 16,
+    height: 16,
+    marginRight: 4,
+    marginTop: 2,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkboxChecked: { borderColor: "#e01b28", backgroundColor: "#e01b28" },
+  checkmark: { color: "#fff", fontSize: 11, fontWeight: "700", lineHeight: 14 },
+  agreementText: {
+    flex: 1,
     color: "#999",
     fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 20,
   },
   link: { color: "#4b8bd8" },
+  modalOverlay: {
+    flex: 1,
+    paddingHorizontal: 32,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 340,
+    paddingTop: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderRadius: 16,
+    backgroundColor: "#fff",
+  },
+  modalTitle: {
+    color: "#222",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 18,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  modalText: {
+    marginTop: 16,
+    color: "#666",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  modalActions: {
+    marginTop: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  disagreeButton: {
+    flex: 1,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  disagreeText: { color: "#999", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  agreeButton: {
+    flex: 2,
+    height: 42,
+    borderRadius: 8,
+    backgroundColor: "#e01b28",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  agreeText: {
+    color: "#fff",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 14,
+    fontWeight: "600",
+  },
   homeIndicator: {
     position: "absolute",
     bottom: 10,
