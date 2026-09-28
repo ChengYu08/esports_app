@@ -1,4 +1,8 @@
 import { createSignature } from "./signature";
+import {
+  createForgetPasswordRequest,
+  createPasswordLoginRequest,
+} from "./password-requests";
 import { SsoError } from "./types";
 import type { QuickLoginAuthToken, QuickLoginProvider, SsoClientConfig, SsoRequestOptions, SsoToken } from "./types";
 
@@ -44,7 +48,12 @@ export class SsoClient {
     return this.request<SsoToken>("/api/auth/oauth2/token", { data: { grant_type: "mobile", phone, code, scope: "openid" } });
   }
   passwordLogin(username: string, password: string) {
-    return this.request<SsoToken>("/api/auth/oauth2/token", { data: { grant_type: "password", username, password, scope: "openid" } });
+    const request = createPasswordLoginRequest(username, password);
+    return this.request<SsoToken>(request.path, { data: request.data });
+  }
+  forgetPassword(phone: string, smsCode: string, password: string) {
+    const request = createForgetPasswordRequest(phone, smsCode, password);
+    return this.request(request.path, { data: request.data });
   }
   refreshToken(refreshToken: string) {
     return this.request<SsoToken>("/api/auth/oauth2/token", { data: { grant_type: "refresh_token", refresh_token: refreshToken, scope: "openid" } });

@@ -23,3 +23,35 @@ test("password login sends username and password through the auth adapter", asyn
     password: "secret-password",
   }]);
 });
+
+test("forgot password adapter uses MOD SMS and forwards reset fields", async () => {
+  const resetCodeCalls = [];
+  const forgetCalls = [];
+  const client = {
+    getSmsCode: async (phone, smsTemplate) => {
+      resetCodeCalls.push({ phone, smsTemplate });
+    },
+    forgetPassword: async (phone, smsCode, password) => {
+      forgetCalls.push({ phone, smsCode, password });
+    },
+  };
+
+  const adapter = createAuthSsoAdapter(client);
+  await adapter.sendResetCode("13800138000");
+  await adapter.forgetPassword({
+    phone: "13800138000",
+    code: "123456",
+    password: "Abc123!@",
+  });
+
+  assert.deepEqual(resetCodeCalls, [
+    { phone: "13800138000", smsTemplate: "MOD" },
+  ]);
+  assert.deepEqual(forgetCalls, [
+    {
+      phone: "13800138000",
+      smsCode: "123456",
+      password: "Abc123!@",
+    },
+  ]);
+});
