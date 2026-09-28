@@ -56,7 +56,7 @@ export const HomeBottomNav = AppTabBar;
 
 const styles = StyleSheet.create({
   bottom: { position: "absolute", left: 0, right: 0, bottom: 0, minHeight: 60, backgroundColor: "#fff", borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "#EBEBEB", flexDirection: "row", alignItems: "flex-start", justifyContent: "space-around", paddingTop: 1 },
-  bottomItem: { width: 48, height: 48, alignItems: "center", gap: 1 },
+  bottomItem: { flex: 1, height: 48, alignItems: "center", paddingTop: 1, gap: 1 },
   bottomIcon: { width: 30, height: 30 },
   bottomLabel: { fontFamily: DOUYIN_SANS, color: "#c8c8cc", fontSize: 11 },
   bottomActive: { fontFamily: DOUYIN_SANS, color: "#333" },
