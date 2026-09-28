@@ -1,3 +1,5 @@
-import { TabPlaceholderScreen } from "@/features/navigation/screens/TabPlaceholderScreen";
+import MessageScreen from "@/features/message/screens/MessageScreen";
 
-export default function MessageRoute() { return <TabPlaceholderScreen title="消息" />; }
+export default function MessageRoute() {
+  return <MessageScreen />;
+}
