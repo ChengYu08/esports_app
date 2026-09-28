@@ -3,7 +3,7 @@ import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { HomeBackground } from "@/features/home/components/HomeBackground";
 import { ClubCard } from "@/features/home/components/ClubCard";
-import { HomeBottomNav } from "@/features/home/components/HomeBottomNav";
+import { AppTabBar } from "@/shared/ui/AppTabBar";
 import { HomeHeader } from "@/features/home/components/HomeHeader";
 import { useHomeBanners, useHomeClubs } from "@/features/home/hooks/use-home-data";
 import type { GameKey, HomeTab } from "@/features/home/api/home.types";
@@ -46,7 +46,7 @@ export default function HomeScreen() {
           ListEmptyComponent={clubs.isLoading ? <LoadingState /> : clubs.isError ? <ErrorState onRetry={() => void clubs.refetch()} /> : <EmptyState message="暂无俱乐部" />}
         />
       )}
-      <HomeBottomNav insetsBottom={insets.bottom} />
+      <AppTabBar insetsBottom={insets.bottom} active="home" />
     </View>
   );
 }
