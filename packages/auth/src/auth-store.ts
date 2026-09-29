@@ -1,6 +1,20 @@
 import { create } from "zustand";
 
-export type AuthUser = { id: string; phone?: string };
+export type AuthUser = {
+  id: string;
+  nickname?: string;
+  headImage?: string;
+  phone?: string;
+  gender?: number;
+  birth?: string;
+  signature?: string;
+  isRealName?: number;
+  realName?: string;
+  idCardNo?: string;
+  clubInfo?: { id: number; clubName: string; logoUrl: string; status: number; memberStatus: number } | null;
+  positions?: { code: string; description: string }[];
+  starBalance?: number | string;
+};
 
 type AuthState = {
   user: AuthUser | null;

@@ -12,7 +12,12 @@ export class ApiError extends Error {
   }
 }
 
-type RequestOptions = Omit<RequestInit, 'body'> & { body?: unknown; timeoutMs?: number };
+export type RequestOptions = Omit<RequestInit, 'body'> & {
+  body?: unknown;
+  timeoutMs?: number;
+  /** C 端业务 token，后端约定请求头名称为 `token`。 */
+  token?: string;
+};
 
 export async function apiClient<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const controller = new AbortController();
@@ -20,10 +25,16 @@ export async function apiClient<T>(path: string, options: RequestOptions = {}): 
   const startedAt = Date.now();
 
   try {
+    const { token, timeoutMs: _timeoutMs, ...requestOptions } = options;
     const response = await fetch(`${env.apiBaseUrl}${path}`, {
-      ...options,
+      ...requestOptions,
       signal: controller.signal,
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...options.headers },
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        ...(token ? { token } : {}),
+        ...options.headers,
+      },
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
     });
     const payload = (await response.json().catch(() => null)) as { message?: string; code?: string } | T | null;

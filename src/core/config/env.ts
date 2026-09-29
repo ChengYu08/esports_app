@@ -2,7 +2,7 @@ import Constants from 'expo-constants';
 import { z } from 'zod';
 
 const envSchema = z.object({
-  apiBaseUrl: z.string().url().default('https://api.example.com'),
+  apiBaseUrl: z.string().url().default('https://djapi.yingbowl.com'),
   ssoBaseUrl: z.string().url().default('https://auth.yingbowl.com'),
   environment: z.enum(['development', 'preview', 'production']).default('development'),
   ssoClientAppId: z.string().default('android'),

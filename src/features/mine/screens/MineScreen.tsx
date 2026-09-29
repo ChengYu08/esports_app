@@ -19,22 +19,22 @@ const settings = require("../../../../assets/mine/figma/mine-settings-figma.svg"
 export default function MineScreen() {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
-  const displayName = useMemo(() => user?.phone ? `${user.phone.slice(0, 3)}****${user.phone.slice(-4)}` : "登录 / 注册", [user]);
+  const displayName = useMemo(() => user?.nickname || (user?.phone ? `${user.phone.slice(0, 3)}****${user.phone.slice(-4)}` : "登录 / 注册"), [user]);
 
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 60 + insets.bottom }} showsVerticalScrollIndicator={false}>
         <Pressable style={styles.profile} onPress={() => !user && router.push("/login")}>
-          <Image source={avatar} style={styles.avatar} />
+          <Image source={user?.headImage ? { uri: user.headImage } : avatar} style={styles.avatar} />
           <View style={styles.profileCopy}>
-            <Text style={styles.name}>{user ? displayName : "嘎叽嘎叽嘎叽哒"}</Text>
-            <View style={styles.detailLine}><Image source={female} style={styles.tinyIcon} /><Text style={styles.age}>24</Text><Image source={clubFlag} style={styles.tinyIcon} /><Text style={styles.club}>盼之电竞自营俱乐部</Text></View>
-            <View style={styles.detailLine}><Text style={styles.uid}>{user ? `ID: ${user.id}` : "ID: 136749520"}</Text><Image source={copyIcon} style={styles.copyIcon} /></View>
+            <Text style={styles.name}>{displayName}</Text>
+            <View style={styles.detailLine}>{user?.gender === 2 ? <Image source={female} style={styles.tinyIcon} /> : null}{user?.clubInfo ? <><Image source={clubFlag} style={styles.tinyIcon} /><Text style={styles.club}>{user.clubInfo.clubName}</Text></> : null}</View>
+            <View style={styles.detailLine}><Text style={styles.uid}>{user ? `ID: ${user.id}` : "登录后查看 ID"}</Text>{user ? <Image source={copyIcon} style={styles.copyIcon} /> : null}</View>
           </View>
           <Pressable style={styles.homepage} onPress={() => undefined}><Text style={styles.homepageText}>个人主页</Text><Image source={arrow} style={styles.arrow} /></Pressable>
         </Pressable>
         <View style={styles.statsCard}>
-          <View style={styles.stat}><Text style={styles.statValue}>100</Text><Text style={styles.statLabel}>星钻</Text></View>
+          <View style={styles.stat}><Text style={styles.statValue}>{user?.starBalance ?? "--"}</Text><Text style={styles.statLabel}>星钻</Text></View>
           <View style={styles.stat}><Text style={styles.statValue}>12</Text><Text style={styles.statLabel}>关注</Text></View>
           <View style={styles.stat}><Text style={styles.statValue}>2000</Text><Text style={styles.statLabel}>粉丝</Text></View>
         </View>

@@ -1,6 +1,7 @@
 import { createAuthSsoAdapter, LoginScreen, useAuthStore } from "@esports/auth";
 import { createNativeQuickLoginProvider, SsoClient } from "@esports/sso-sdk";
 import { env } from "@/core/config/env";
+import { completeClientLogin } from "@/features/auth/client-auth-flow";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useMemo } from "react";
@@ -52,15 +53,7 @@ export default function LoginRoute() {
           }
           try {
             const token = await adapter.passwordLogin(payload);
-            if (token.access_token) {
-              setSession({
-                accessToken: token.access_token,
-                user: {
-                  id: token.id_token ?? payload.username,
-                  phone: payload.username,
-                },
-              });
-            }
+            await completeClientLogin(token, "PASSWORD", setSession);
             router.replace("/");
           } catch (error) {
             Alert.alert(
@@ -79,7 +72,7 @@ export default function LoginRoute() {
           }
           try {
             const token = await adapter.quickLogin(quickLoginProvider);
-            if (token.access_token) setSession({ accessToken: token.access_token, user: { id: token.id_token ?? token.phone ?? "unknown", phone: token.phone } });
+            await completeClientLogin(token, "ONE_CLICK_LOGIN", setSession);
             router.replace("/");
           } catch (error) {
             Alert.alert("一键登录不可用", error instanceof Error ? error.message : "请使用验证码登录");
@@ -92,7 +85,7 @@ export default function LoginRoute() {
           }
           try {
             const token = await adapter.login(payload);
-            if (token.access_token) setSession({ accessToken: token.access_token, user: { id: token.id_token ?? payload.phone, phone: payload.phone } });
+            await completeClientLogin(token, "SMS_CODE", setSession);
             router.replace("/");
           } catch (error) {
             Alert.alert(
