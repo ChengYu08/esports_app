@@ -6,6 +6,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 const banner = require("../../../../assets/home/h_banner.png");
 const searchIcon = require("../../../../assets/home/h_search.svg");
 const filterIcon = require("../../../../assets/home/h_filter_list.svg");
+const tabLeftCorner = require("../../../../assets/home/h_tab_left.svg");
+const tabRightCorner = require("../../../../assets/home/h_tab_right.svg");
 type HomeHeaderProps = {
   tab: HomeTab;
   game: GameKey;
@@ -89,7 +91,13 @@ export function HomeHeader({
                 >
                   {item.name}
                 </Text>
-                {game === String(item.id) && <View style={styles.gameIndicator} />}
+                {game === String(item.id) && (
+                  <>
+                    <View style={styles.gameIndicator} />
+                    <Image source={tabLeftCorner} style={[styles.tabCorner, styles.tabCornerLeft]} pointerEvents="none" />
+                    <Image source={tabRightCorner} style={[styles.tabCorner, styles.tabCornerRight]} pointerEvents="none" />
+                  </>
+                )}
               </Pressable>
             ))}
           </ScrollView>
@@ -175,7 +183,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   gameTab: {
-    width: 112,
+    flexShrink: 0,
     height: 38,
     paddingHorizontal: 12,
     flexDirection: "row",
@@ -202,7 +210,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   gameIcon: { width: 16, height: 16, borderRadius: 4 },
-  gameLabel: { fontFamily: DOUYIN_SANS, color: "#999", fontSize: 13 },
+  gameLabel: { fontFamily: DOUYIN_SANS, color: "#999", fontSize: 13, flexShrink: 0 },
   gameLabelSelected: { fontFamily: DOUYIN_SANS, color: "#333" },
   gameIndicator: {
     position: "absolute",
@@ -212,6 +220,9 @@ const styles = StyleSheet.create({
     height: 4,
     backgroundColor: "#fff",
   },
+  tabCorner: { position: "absolute", width: 17, height: 17, bottom: -1 },
+  tabCornerLeft: { left: -17 },
+  tabCornerRight: { right: -17 },
   section: {
     height: 50,
     paddingHorizontal: 16,
