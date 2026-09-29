@@ -1,19 +1,15 @@
-import type { Banner, GameKey, HomeTab } from "@/features/home/api/home.types";
+import type { Banner, Game, GameKey, HomeTab } from "@/features/home/api/home.types";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { Image } from "expo-image";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 const banner = require("../../../../assets/home/h_banner.png");
 const searchIcon = require("../../../../assets/home/h_search.svg");
 const filterIcon = require("../../../../assets/home/h_filter_list.svg");
-const games = [
-  { key: "pc" as GameKey, label: "三角洲端游", color: "#3ec8a5" },
-  { key: "mobile" as GameKey, label: "三角洲手游", color: "#ecb34f" },
-];
-
 type HomeHeaderProps = {
   tab: HomeTab;
   game: GameKey;
+  games: Game[];
   bannerIndex: number;
   banners: Banner[];
   onTabChange: (tab: HomeTab) => void;
@@ -23,6 +19,7 @@ type HomeHeaderProps = {
 export function HomeHeader({
   tab,
   game,
+  games,
   bannerIndex,
   banners,
   onTabChange,
@@ -64,33 +61,38 @@ export function HomeHeader({
       </View>
       {tab === "home" && (
         <>
-          <View style={styles.gameTabs}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.gameTabsContent}
+            style={styles.gameTabs}
+          >
             {games.map((item) => (
               <Pressable
-                key={item.key}
-                onPress={() => onGameChange(item.key)}
+                key={item.id}
+                onPress={() => onGameChange(String(item.id))}
                 style={[
                   styles.gameTab,
-                  game === item.key && styles.gameTabSelected,
+                  game === String(item.id) && styles.gameTabSelected,
                 ]}
               >
                 <View
-                  style={[styles.gameLogo, { backgroundColor: item.color }]}
+                  style={[styles.gameLogo, { backgroundColor: item.category === 1 ? "#3ec8a5" : "#ecb34f" }]}
                 >
-                  <Text style={styles.gameLogoText}>△</Text>
+                  {item.iconUrl ? <Image source={{ uri: item.iconUrl }} style={styles.gameIcon} /> : <Text style={styles.gameLogoText}>△</Text>}
                 </View>
                 <Text
                   style={[
                     styles.gameLabel,
-                    game === item.key && styles.gameLabelSelected,
+                    game === String(item.id) && styles.gameLabelSelected,
                   ]}
                 >
-                  {item.label}
+                  {item.name}
                 </Text>
-                {game === item.key && <View style={styles.gameIndicator} />}
+                {game === String(item.id) && <View style={styles.gameIndicator} />}
               </Pressable>
             ))}
-          </View>
+          </ScrollView>
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>热门俱乐部</Text>
             <Image source={filterIcon} style={styles.filter} />
@@ -165,6 +167,8 @@ const styles = StyleSheet.create({
   bannerImage: { width: "100%", height: "100%" },
   gameTabs: {
     height: 55,
+  },
+  gameTabsContent: {
     paddingHorizontal: 16,
     flexDirection: "row",
     alignItems: "flex-end",
@@ -197,6 +201,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
   },
+  gameIcon: { width: 16, height: 16, borderRadius: 4 },
   gameLabel: { fontFamily: DOUYIN_SANS, color: "#999", fontSize: 13 },
   gameLabelSelected: { fontFamily: DOUYIN_SANS, color: "#333" },
   gameIndicator: {

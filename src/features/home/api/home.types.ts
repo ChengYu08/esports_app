@@ -1,5 +1,13 @@
 export type HomeTab = "home" | "court";
-export type GameKey = "pc" | "mobile";
+export type GameKey = string;
+
+export type Game = {
+  id: number;
+  name: string;
+  iconUrl?: string;
+  backgroundUrl?: string;
+  category?: number;
+};
 
 export type Banner = {
   id: string;

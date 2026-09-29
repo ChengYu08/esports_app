@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
+import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DOUYIN_SANS } from "@/shared/theme/typography";
@@ -49,7 +50,7 @@ export default function OrderScreen() {
           </View>
         }
         renderItem={({ item }) => (
-          <OrderCard item={item} onAction={handleOrderAction} />
+          <OrderCard item={item} onAction={handleOrderAction} onPress={(order) => router.push(`/order/${order.id}`)} />
         )}
         showsVerticalScrollIndicator={false}
       />

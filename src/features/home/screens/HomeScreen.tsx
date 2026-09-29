@@ -4,17 +4,19 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { HomeBackground } from "@/features/home/components/HomeBackground";
 import { ClubCard } from "@/features/home/components/ClubCard";
 import { HomeHeader } from "@/features/home/components/HomeHeader";
-import { useHomeBanners, useHomeClubs } from "@/features/home/hooks/use-home-data";
+import { useHomeBanners, useHomeClubs, useHomeGames } from "@/features/home/hooks/use-home-data";
 import type { GameKey, HomeTab } from "@/features/home/api/home.types";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [topTab, setTopTab] = useState<HomeTab>("home");
-  const [game, setGame] = useState<GameKey>("pc");
+  const [game, setGame] = useState<GameKey>("");
+  const games = useHomeGames();
+  const selectedGame = game || String(games.data?.[0]?.id ?? "");
   const [bannerIndex, setBannerIndex] = useState(0);
   const banners = useHomeBanners(topTab);
-  const clubs = useHomeClubs(topTab, game);
+  const clubs = useHomeClubs(topTab, selectedGame);
   const bannerItems = banners.data ?? [];
 
   useEffect(() => {
@@ -25,7 +27,7 @@ export default function HomeScreen() {
 
   const clubItems = useMemo(() => clubs.data?.pages.flatMap((page) => page.items) ?? [], [clubs.data]);
   const selectTopTab = (tab: HomeTab) => { setBannerIndex(0); setTopTab(tab); };
-  const header = <HomeHeader tab={topTab} game={game} bannerIndex={bannerIndex} banners={bannerItems} onTabChange={selectTopTab} onGameChange={setGame} />;
+  const header = <HomeHeader tab={topTab} game={selectedGame} games={games.data ?? []} bannerIndex={bannerIndex} banners={bannerItems} onTabChange={selectTopTab} onGameChange={setGame} />;
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>

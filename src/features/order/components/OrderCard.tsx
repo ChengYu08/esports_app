@@ -23,14 +23,21 @@ const STATUS_COLORS: Record<OrderStatus, string> = {
 type OrderCardProps = {
   item: OrderItemModel;
   onAction: (item: OrderItemModel, action: OrderActionKey) => void;
+  onPress?: (item: OrderItemModel) => void;
 };
 
 export const OrderCard = memo(function OrderCard({
   item,
   onAction,
+  onPress,
 }: OrderCardProps) {
   return (
     <View style={styles.card}>
+      <Pressable
+        accessibilityRole={onPress ? "button" : undefined}
+        onPress={() => onPress?.(item)}
+        style={({ pressed }) => pressed && styles.cardPressed}
+      >
       <View style={styles.sellerRow}>
         <View style={styles.seller}>
           <Image
@@ -67,6 +74,7 @@ export const OrderCard = memo(function OrderCard({
           <Text style={styles.totalPrice}>{item.totalPrice}</Text>
         </View>
       </View>
+      </Pressable>
 
       <View style={styles.actions}>
         {item.actions.map((action) => (
@@ -248,4 +256,5 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   buttonPressed: { opacity: 0.65 },
+  cardPressed: { opacity: 0.72 },
 });
