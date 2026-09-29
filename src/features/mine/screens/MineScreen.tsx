@@ -24,15 +24,17 @@ export default function MineScreen() {
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 60 + insets.bottom }} showsVerticalScrollIndicator={false}>
-        <Pressable style={styles.profile} onPress={() => !user && router.push("/login")}>
-          <Image source={user?.headImage ? { uri: user.headImage } : avatar} style={styles.avatar} />
-          <View style={styles.profileCopy}>
-            <Text style={styles.name}>{displayName}</Text>
-            <View style={styles.detailLine}>{user?.gender === 2 ? <Image source={female} style={styles.tinyIcon} /> : null}{user?.clubInfo ? <><Image source={clubFlag} style={styles.tinyIcon} /><Text style={styles.club}>{user.clubInfo.clubName}</Text></> : null}</View>
-            <View style={styles.detailLine}><Text style={styles.uid}>{user ? `ID: ${user.id}` : "登录后查看 ID"}</Text>{user ? <Image source={copyIcon} style={styles.copyIcon} /> : null}</View>
-          </View>
-          <Pressable style={styles.homepage} onPress={() => undefined}><Text style={styles.homepageText}>个人主页</Text><Image source={arrow} style={styles.arrow} /></Pressable>
-        </Pressable>
+        <View style={styles.profile}>
+          <Pressable style={styles.profileMain} onPress={() => !user && router.push("/login")}>
+            <Image source={user?.headImage ? { uri: user.headImage } : avatar} style={styles.avatar} />
+            <View style={styles.profileCopy}>
+              <Text style={styles.name}>{displayName}</Text>
+              <View style={styles.detailLine}>{user?.gender === 2 ? <Image source={female} style={styles.tinyIcon} /> : null}{user?.clubInfo ? <><Image source={clubFlag} style={styles.tinyIcon} /><Text style={styles.club}>{user.clubInfo.clubName}</Text></> : null}</View>
+              <View style={styles.detailLine}><Text style={styles.uid}>{user ? `ID: ${user.id}` : "登录后查看 ID"}</Text>{user ? <Image source={copyIcon} style={styles.copyIcon} /> : null}</View>
+            </View>
+          </Pressable>
+          <Pressable accessibilityRole="link" accessibilityLabel="个人主页" hitSlop={10} style={styles.homepage} onPress={() => router.push("/profile")}><Text style={styles.homepageText}>个人主页</Text><Image source={arrow} style={styles.arrow} /></Pressable>
+        </View>
         <View style={styles.statsCard}>
           <View style={styles.stat}><Text style={styles.statValue}>{user?.starBalance ?? "--"}</Text><Text style={styles.statLabel}>星钻</Text></View>
           <View style={styles.stat}><Text style={styles.statValue}>12</Text><Text style={styles.statLabel}>关注</Text></View>
@@ -54,7 +56,7 @@ function MenuRow({ icon, title, subtitle, onPress }: { icon: number; title: stri
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#F7F7F7" }, profile: { minHeight: 80, paddingHorizontal: 16, paddingVertical: 12, flexDirection: "row", alignItems: "center", gap: 12 }, avatar: { width: 56, height: 56, borderRadius: 28 }, profileCopy: { flex: 1, gap: 4 }, name: { fontFamily: DOUYIN_SANS, color: "#0A0A0A", fontSize: 16, lineHeight: 24, fontWeight: "500" }, detailLine: { flexDirection: "row", alignItems: "center", gap: 4 }, tinyIcon: { width: 12, height: 12 }, age: { fontFamily: DOUYIN_SANS, color: "#FF4D70", fontSize: 12 }, club: { fontFamily: DOUYIN_SANS, color: "#666", fontSize: 11 }, uid: { fontFamily: DOUYIN_SANS, color: "#999", fontSize: 11 }, copyIcon: { width: 14, height: 14 }, homepage: { flexDirection: "row", alignItems: "center", gap: 2 }, homepageText: { fontFamily: DOUYIN_SANS, color: "#0A0A0A", fontSize: 11 }, arrow: { width: 16, height: 16 },
+  screen: { flex: 1, backgroundColor: "#F7F7F7" }, profile: { minHeight: 80, paddingHorizontal: 16, paddingVertical: 12, flexDirection: "row", alignItems: "center", gap: 12 }, profileMain: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 }, avatar: { width: 56, height: 56, borderRadius: 28 }, profileCopy: { flex: 1, gap: 4 }, name: { fontFamily: DOUYIN_SANS, color: "#0A0A0A", fontSize: 16, lineHeight: 24, fontWeight: "500" }, detailLine: { flexDirection: "row", alignItems: "center", gap: 4 }, tinyIcon: { width: 12, height: 12 }, age: { fontFamily: DOUYIN_SANS, color: "#FF4D70", fontSize: 12 }, club: { fontFamily: DOUYIN_SANS, color: "#666", fontSize: 11 }, uid: { fontFamily: DOUYIN_SANS, color: "#999", fontSize: 11 }, copyIcon: { width: 14, height: 14 }, homepage: { flexDirection: "row", alignItems: "center", gap: 2 }, homepageText: { fontFamily: DOUYIN_SANS, color: "#0A0A0A", fontSize: 11 }, arrow: { width: 16, height: 16 },
   statsCard: { marginHorizontal: 12, paddingHorizontal: 12, paddingVertical: 16, borderRadius: 8, backgroundColor: "#fff", flexDirection: "row", alignItems: "center", gap: 12 }, stat: { flex: 1, alignItems: "center", gap: 2 }, statValue: { fontFamily: DOUYIN_SANS, color: "#0A0A0A", fontSize: 16, lineHeight: 24, fontWeight: "500" }, statLabel: { fontFamily: DOUYIN_SANS, color: "#999", fontSize: 11, lineHeight: 16 },
   sectionCard: { marginHorizontal: 12, marginTop: 12, padding: 12, borderRadius: 8, backgroundColor: "#fff", gap: 12 }, menuRow: { minHeight: 32, flexDirection: "row", alignItems: "center", gap: 2 }, menuIcon: { width: 32, height: 32, marginRight: 2 }, menuCopy: { flex: 1 }, menuTitle: { fontFamily: DOUYIN_SANS, color: "#0A0A0A", fontSize: 11, lineHeight: 16 }, menuSubtitle: { marginTop: 3, fontFamily: DOUYIN_SANS, color: "#aaa", fontSize: 11 }, chevron: { color: "#b6b6b6", fontSize: 28, fontWeight: "300" },
 });

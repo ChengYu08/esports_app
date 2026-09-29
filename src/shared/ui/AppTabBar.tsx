@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 type AppTabBarProps = {
-  state: { index: number; routes: Array<{ name: string }> };
+  state: { index: number; routes: { name: string }[] };
   navigation: { navigate: (name: string) => void };
 };
 
@@ -23,7 +23,10 @@ const icons = {
 
 export function AppTabBar({ state, navigation }: AppTabBarProps) {
   const insets = useSafeAreaInsets();
-  const active = state.routes[state.index]?.name;
+  // Expo Router names the home tab route "index", while the visual tab key is "home".
+  // Normalize it so the selected home asset is used when the index screen is active.
+  const activeRoute = state.routes[state.index]?.name;
+  const active = activeRoute === "index" ? "home" : activeRoute;
   const items = [
     { label: "首页", icon: active === "home" ? icons.homeSelected : icons.home, active: active === "home" },
     { label: "订单", icon: active === "order" ? icons.orderSelected : icons.order, active: active === "order" },
