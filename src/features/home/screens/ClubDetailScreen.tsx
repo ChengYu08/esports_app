@@ -5,6 +5,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
 import {
   Alert,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,50 +13,52 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { demoClubs } from "../api/home.mock";
-import type { GameKey } from "../api/home.types";
-import { useHomeGames } from "../hooks/use-home-data";
+import type { CompanionFilters, GameKey } from "../api/home.types";
+import { useClubCompanions, useClubDetail, useClubGameModes } from "../hooks/use-home-data";
 
-const clubLogo = require("../../../../assets/home/club-detail/member-1.jpg");
 const tabLeftCorner = require("../../../../assets/home/h_tab_left.svg");
 const tabRightCorner = require("../../../../assets/home/h_tab_right.svg");
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const searchIcon = require("../../../../assets/home/club-detail/icon-search.svg");
 const maleIcon = require("../../../../assets/home/club-detail/male.svg");
 const femaleIcon = require("../../../../assets/home/club-detail/female.svg");
-const memberIcon = require("../../../../assets/home/club-detail/icon_user.svg");
+const memberIcon = require("../../../../assets/home/h_user.svg");
 const filterArrowIcon = require("../../../../assets/home/club-detail/arrow-fill-down.svg");
 const idleIcon = require("../../../../assets/home/club-detail/status-idle.svg");
 const playingIcon = require("../../../../assets/home/club-detail/status-playing.svg");
 const diamondIcon = require("../../../../assets/home/club-detail/icon-diamond.svg");
 const playIcon = require("../../../../assets/home/club-detail/icon-play.svg");
-const memberImages = [
-  require("../../../../assets/home/club-detail/member-2.jpg"),
-  require("../../../../assets/home/club-detail/member-3.jpg"),
-  require("../../../../assets/home/club-detail/member-4.jpg"),
-  require("../../../../assets/home/club-detail/member-5.jpg"),
+
+type FilterKey = "gender" | "mode" | "status" | "price";
+const filterDefinitions: { key: FilterKey; label: string }[] = [
+  { key: "gender", label: "性别" },
+  { key: "mode", label: "模式" },
+  { key: "status", label: "状态" },
+  { key: "price", label: "价格" },
 ];
 
 export default function ClubDetailScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const [game, setGame] = useState<GameKey>("");
-  const [activeFilter, setActiveFilter] = useState<string | null>(null);
-  const gamesQuery = useHomeGames();
-  const games = gamesQuery.data?.length
-    ? gamesQuery.data
-    : [
-        { id: 1, name: "三角洲端游", category: 1 },
-        { id: 2, name: "三角洲手游", category: 2 },
-      ];
-  const selectedGame = game || String(games[0].id);
-  const club = useMemo(
-    () =>
-      Object.values(demoClubs)
-        .flat()
-        .find((item) => item.id === id) ?? demoClubs.pc[0],
-    [id],
-  );
+  const [openFilter, setOpenFilter] = useState<FilterKey | null>(null);
+  const [priceSort, setPriceSort] = useState<CompanionFilters["priceSort"]>("DEFAULT");
+  const [selectedSex, setSelectedSex] = useState<CompanionFilters["sex"]>();
+  const [selectedStatus, setSelectedStatus] = useState<CompanionFilters["gameStatus"]>();
+  const [selectedMode, setSelectedMode] = useState<number>();
+  const clubQuery = useClubDetail(id);
+  const club = clubQuery.data;
+  const games = club?.games ?? [];
+  const selectedGame = game || String(games[0]?.id ?? "");
+  const modesQuery = useClubGameModes(selectedGame);
+  const companionFilters = useMemo<CompanionFilters | null>(() => (
+    club && selectedGame ? { clubId: club.id, gameId: selectedGame, priceSort, sex: selectedSex, gameStatus: selectedStatus, gameModeId: selectedMode } : null
+  ), [club, priceSort, selectedGame, selectedMode, selectedSex, selectedStatus]);
+  const companionsQuery = useClubCompanions(companionFilters);
+  const members = companionsQuery.data?.pages.flatMap((page) => page.items) ?? [];
+
+  if (clubQuery.isLoading) return <View style={styles.state}><Text style={styles.stateText}>加载中...</Text></View>;
+  if (clubQuery.isError || !club) return <View style={styles.state}><Text style={styles.stateText}>俱乐部详情加载失败</Text><Pressable onPress={() => void clubQuery.refetch()}><Text style={styles.retryText}>重试</Text></Pressable></View>;
   return (
     <View style={styles.screen}>
       <LinearGradient
@@ -84,7 +87,7 @@ export default function ClubDetailScreen() {
           </View>
         </View>
         <View style={styles.clubInfo}>
-          <Image source={clubLogo} style={styles.clubLogo} contentFit="cover" />
+          <Image source={club.logoUrl ? { uri: club.logoUrl } : undefined} style={styles.clubLogo} contentFit="cover" />
           <View style={styles.clubCopy}>
             <View style={styles.titleLine}>
               <Text style={styles.selfTag}>自营</Text>
@@ -98,7 +101,7 @@ export default function ClubDetailScreen() {
             </View>
 
             <Text numberOfLines={1} style={styles.clubDescription}>
-              这是一段俱乐部简介，这是一段俱乐部简介，这是一...
+              {club.intro}
             </Text>
           </View>
         </View>
@@ -115,44 +118,59 @@ export default function ClubDetailScreen() {
               iconUrl={item.iconUrl}
               first={index === 0}
               active={selectedGame === String(item.id)}
-              onPress={() => setGame(String(item.id))}
+              onPress={() => { setGame(String(item.id)); setSelectedMode(undefined); }}
             />
           ))}
         </ScrollView>
       </LinearGradient>
       <View style={styles.filterRow}>
-        {["模式", "等级", "性别", "筛选"].map((label) => (
+        {filterDefinitions.map(({ key, label }) => (
           <Pressable
-            key={label}
+            key={key}
             accessibilityLabel={`筛选${label}`}
             style={[
               styles.filterItem,
-              activeFilter === label && styles.filterItemActive,
+              openFilter === key && styles.filterItemActive,
             ]}
-            onPress={() =>
-              setActiveFilter((value) => (value === label ? null : label))
-            }
+            onPress={() => setOpenFilter(key)}
           >
             <Text style={styles.filterText}>{label}</Text>
             <Image source={filterArrowIcon} style={styles.filterArrowIcon} />
           </Pressable>
         ))}
       </View>
+      <Modal transparent visible={openFilter !== null} animationType="slide" onRequestClose={() => setOpenFilter(null)}>
+        <Pressable style={styles.filterBackdrop} onPress={() => setOpenFilter(null)}>
+          <Pressable style={styles.filterSheet} onPress={() => undefined}>
+            <View style={styles.filterSheetHeader}><Text style={styles.filterSheetTitle}>{filterDefinitions.find((item) => item.key === openFilter)?.label}</Text><Pressable onPress={() => setOpenFilter(null)}><Text style={styles.filterClose}>×</Text></Pressable></View>
+            {openFilter === "gender" && <><FilterOption label="不限" selected={!selectedSex} onPress={() => { setSelectedSex(undefined); setOpenFilter(null); }} /><FilterOption label="男" selected={selectedSex === 1} onPress={() => { setSelectedSex(1); setOpenFilter(null); }} /><FilterOption label="女" selected={selectedSex === 2} onPress={() => { setSelectedSex(2); setOpenFilter(null); }} /></>}
+            {openFilter === "mode" && <><FilterOption label="不限" selected={!selectedMode} onPress={() => { setSelectedMode(undefined); setOpenFilter(null); }} />{modesQuery.data?.map((mode) => <FilterOption key={mode.id} label={mode.modeName} selected={selectedMode === mode.id} onPress={() => { setSelectedMode(mode.id); setOpenFilter(null); }} />)}</>}
+            {openFilter === "status" && <><FilterOption label="不限" selected={selectedStatus === undefined} onPress={() => { setSelectedStatus(undefined); setOpenFilter(null); }} /><FilterOption label="空闲中" selected={selectedStatus === 0} onPress={() => { setSelectedStatus(0); setOpenFilter(null); }} /><FilterOption label="游戏中" selected={selectedStatus === 1} onPress={() => { setSelectedStatus(1); setOpenFilter(null); }} /></>}
+            {openFilter === "price" && <><FilterOption label="默认排序" selected={priceSort === "DEFAULT"} onPress={() => { setPriceSort("DEFAULT"); setOpenFilter(null); }} /><FilterOption label="从高到低" selected={priceSort === "DESC"} onPress={() => { setPriceSort("DESC"); setOpenFilter(null); }} /><FilterOption label="从低到高" selected={priceSort === "ASC"} onPress={() => { setPriceSort("ASC"); setOpenFilter(null); }} /></>}
+          </Pressable>
+        </Pressable>
+      </Modal>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 92 + insets.bottom }}
         style={styles.listScroll}
       >
         <View style={styles.list}>
-          {memberImages.map((image, index) => (
+          {members.map((member) => (
             <MemberCard
-              key={index}
-              image={image}
-              gender={index === 1 ? "male" : "female"}
-              status={index === 1 ? "游戏中" : "空闲中"}
-              statusColor={index === 1 ? "#4a7fff" : "#16c978"}
+              key={member.profileId}
+              image={member.headImage}
+              name={member.nickname}
+              description={member.signature}
+              gender={member.sex === 1 ? "male" : "female"}
+              price={member.price}
+              orderCount={member.orderCount}
+              voiceDuration={member.voiceDurationSeconds}
+              status={member.gameStatus === 1 ? "游戏中" : member.onlineStatus === 1 ? "空闲中" : "离线"}
+              statusColor={member.gameStatus === 1 ? "#1e5eff" : member.onlineStatus === 1 ? "#16c978" : "#999"}
             />
           ))}
+          {!companionsQuery.isLoading && members.length === 0 && <Text style={styles.stateText}>暂无陪玩</Text>}
         </View>
       </ScrollView>
       <View
@@ -236,14 +254,42 @@ function GameTab({
     </Pressable>
   );
 }
+
+function FilterOption({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable accessibilityRole="radio" accessibilityState={{ selected }} onPress={onPress} style={styles.filterOption}>
+      <Text style={[styles.filterOptionText, selected && styles.filterOptionTextSelected]}>{label}</Text>
+      {selected && <Text style={styles.filterCheck}>✓</Text>}
+    </Pressable>
+  );
+}
+
 function MemberCard({
   image,
+  name,
+  description,
   gender,
+  price,
+  orderCount,
+  voiceDuration,
   status,
   statusColor,
 }: {
-  image: number;
+  image?: string;
+  name: string;
+  description?: string;
   gender: "male" | "female";
+  price: number;
+  orderCount: number;
+  voiceDuration?: number;
   status: string;
   statusColor: string;
 }) {
@@ -251,15 +297,15 @@ function MemberCard({
   return (
     <Pressable style={styles.memberCard} onPress={() => undefined}>
       <View style={styles.avatarWrap}>
-        <Image source={image} contentFit="cover" style={styles.avatar} />
+        <Image source={image ? { uri: image } : undefined} contentFit="cover" style={styles.avatar} />
         <View style={styles.voice}>
           <Image source={playIcon} style={styles.playIcon} />
-          <Text style={styles.voiceText}>12&apos;&apos;</Text>
+          <Text style={styles.voiceText}>{voiceDuration ?? 0}&apos;&apos;</Text>
         </View>
       </View>
       <View style={styles.memberBody}>
         <View style={styles.memberTitle}>
-          <Text style={styles.memberName}>小非-认证野王</Text>
+          <Text numberOfLines={1} style={styles.memberName}>{name}</Text>
           <View style={styles.genderGroup}>
             <Image
               source={gender === "male" ? maleIcon : femaleIcon}
@@ -287,12 +333,12 @@ function MemberCard({
           </View>
         </View>
         <Text numberOfLines={2} style={styles.memberDesc}>
-          清一色暖男声线，情绪价值拉满，你的日常陪伴，情绪价值拉满
+          {description || "暂无个人简介"}
         </Text>
         <View style={styles.priceRow}>
-          <Text style={styles.price}>300</Text>
+          <Text style={styles.price}>{price}</Text>
           <Image source={diamondIcon} style={styles.diamondIcon} />
-          <Text style={styles.orders}>2010订单</Text>
+          <Text style={styles.orders}>{orderCount}订单</Text>
         </View>
       </View>
     </Pressable>
@@ -300,6 +346,9 @@ function MemberCard({
 }
 
 const styles = StyleSheet.create({
+  state: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, backgroundColor: "#fff" },
+  stateText: { color: "#999", fontFamily: DOUYIN_SANS, fontSize: 14, textAlign: "center", padding: 24 },
+  retryText: { color: "#ff3158", fontFamily: DOUYIN_SANS, fontSize: 14 },
   gameTabsContent: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -441,6 +490,15 @@ const styles = StyleSheet.create({
   filterItemActive: { backgroundColor: "#f5f5f5" },
   filterText: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 12 },
   filterArrowIcon: { width: 12, height: 12 },
+  filterBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,.35)" },
+  filterSheet: { maxHeight: "65%", paddingBottom: 28, backgroundColor: "#fff", borderTopLeftRadius: 12, borderTopRightRadius: 12 },
+  filterSheetHeader: { height: 52, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#ebebeb" },
+  filterSheetTitle: { color: "#111", fontFamily: DOUYIN_SANS, fontSize: 16, fontWeight: "600" },
+  filterClose: { width: 32, color: "#666", fontSize: 26, lineHeight: 32, textAlign: "center" },
+  filterOption: { height: 48, paddingHorizontal: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  filterOptionText: { color: "#333", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  filterOptionTextSelected: { color: "#ff3158", fontWeight: "600" },
+  filterCheck: { color: "#ff3158", fontSize: 17, fontWeight: "700" },
   listScroll: { flex: 1 },
   list: { paddingHorizontal: 0 },
   memberCard: {
