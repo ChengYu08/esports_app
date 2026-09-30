@@ -11,6 +11,7 @@
     "@types/crypto-js": "^4.2.2",
     "crypto-js": "^4.1.1",
     "expo": "~57.0.24",
+    "expo-audio": "~57.0.5",
     "expo-clipboard": "~57.0.2",
     "expo-constants": "~57.0.19",
     "expo-device": "~57.0.2",

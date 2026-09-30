@@ -2,9 +2,29 @@ import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  Animated,
+  Easing,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { queryClient } from "@/core/query/query-client";
+import {
+  buildCreateOrderAction,
+  createCompanionOrder,
+  fetchCompanionServices,
+  fetchStarBalance,
+  payCompanionOrder,
+  type CompanionOrderContext,
+  type CompanionServiceOption,
+} from "@/features/mine/api/companion-order.api";
 import {
   getFirstProfileGameId,
   getProfileRouteParams,
@@ -21,19 +41,10 @@ import {
   useProfileGameDetail,
   useProfileReviews,
 } from "@/features/mine/hooks/use-profile-data";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
-import { queryClient } from "@/core/query/query-client";
-import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
-import {
-  buildCreateOrderAction,
-  createCompanionOrder,
-  fetchCompanionServices,
-  fetchStarBalance,
-  payCompanionOrder,
-  type CompanionOrderContext,
-  type CompanionServiceOption,
-} from "@/features/mine/api/companion-order.api";
+import { useVoicePlayer } from "@/shared/audio/use-voice-player";
+import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { AppPrompt } from "@/shared/ui/AppPrompt";
 
 const fallbackAvatar = require("../../../../assets/mine/figma/profile-avatar.png");
 const background = require("../../../../assets/mine/figma/profile-bg.png");
@@ -41,7 +52,9 @@ const femaleIcon = require("../../../../assets/mine/figma/mine-female.svg");
 const clubIcon = require("../../../../assets/mine/figma/mine-club-flag.svg");
 const settingsIcon = require("../../../../assets/mine/figma/mine-settings.svg");
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
-
+const diamondIcon = require("../../../../assets/home/club-detail/icon-diamond.svg");
+const idleStatusIcon = require("../../../../assets/home/club-detail/status-idle.svg");
+const playingStatusIcon = require("../../../../assets/home/club-detail/status-playing.svg");
 type ProfileTab = "技能" | "评价";
 
 export default function ProfileScreen() {
@@ -57,7 +70,10 @@ export default function ProfileScreen() {
   const [selectedGameId, setSelectedGameId] = useState("");
   const [orderCard, setOrderCard] = useState<ProfileSkillCard | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [paymentOrder, setPaymentOrder] = useState<{ orderId: number; total: number } | null>(null);
+  const [paymentOrder, setPaymentOrder] = useState<{
+    orderId: number;
+    total: number;
+  } | null>(null);
   const [paymentSheetVisible, setPaymentSheetVisible] = useState(false);
   const detailQuery = useProfileDetail(routeParams);
   const detail = detailQuery.data;
@@ -185,7 +201,11 @@ export default function ProfileScreen() {
 
           {games.length > 0 ? (
             tab === "技能" ? (
-              <SkillsContent query={gameDetailQuery} detail={gameDetail} onOrder={setOrderCard} />
+              <SkillsContent
+                query={gameDetailQuery}
+                detail={gameDetail}
+                onOrder={setOrderCard}
+              />
             ) : (
               <ReviewsContent
                 query={reviewQuery}
@@ -284,13 +304,19 @@ function ProfileIdentity({ profile }: { profile: ProfileDetail }) {
           ) : null}
           {age ? (
             <Text style={profile.sex === 2 ? styles.femaleAge : styles.male}>
-              {profile.sex === 2 ? "♀" : "♂"} {age}
+              {age}
             </Text>
           ) : null}
           {status ? (
             <View
               style={[styles.online, { backgroundColor: `${status.color}24` }]}
             >
+              <Image
+                source={
+                  status.label === "游戏中" ? playingStatusIcon : idleStatusIcon
+                }
+                style={styles.onlineIcon}
+              />
               <Text style={[styles.onlineText, { color: status.color }]}>
                 {status.label}
               </Text>
@@ -362,6 +388,22 @@ function SkillsContent({
   detail?: ProfileGameDetail;
   onOrder: (card: ProfileSkillCard) => void;
 }) {
+  const voicePlayer = useVoicePlayer();
+  const voicePlaying = Boolean(detail?.voiceUrl && voicePlayer.playingUrl === detail.voiceUrl);
+  const voiceAnimation = useRef(new Animated.Value(0.35)).current;
+  useEffect(() => {
+    if (!voicePlaying) {
+      voiceAnimation.stopAnimation();
+      voiceAnimation.setValue(0.35);
+      return;
+    }
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(voiceAnimation, { toValue: 1, duration: 450, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(voiceAnimation, { toValue: 0.35, duration: 450, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [voiceAnimation, voicePlaying]);
   if (query.isLoading) return <InlineState text="游戏技能加载中..." />;
   if (query.isError || !detail) {
     return (
@@ -378,12 +420,22 @@ function SkillsContent({
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>能力介绍</Text>
         {detail.voiceUrl ? (
-          <View style={styles.voice}>
-            <Text style={styles.play}>▶</Text>
+          <Pressable
+            accessibilityLabel={
+              voicePlayer.playingUrl === detail.voiceUrl
+                ? "停止语音"
+                : "播放语音"
+            }
+            onPress={() => voicePlayer.toggle(detail.voiceUrl as string)}
+            style={styles.voice}
+          >
+            <Animated.View style={{ opacity: voicePlaying ? voiceAnimation : 1 }}>
+              <Text style={styles.play}>▶</Text>
+            </Animated.View>
             <Text style={styles.voiceText}>
               {detail.voiceDurationSeconds}&quot;
             </Text>
-          </View>
+          </Pressable>
         ) : null}
       </View>
       <Text style={styles.description}>
@@ -450,7 +502,12 @@ function ImageGallery({ images }: { images: string[] }) {
         <Pressable
           key={`${image}-${index}`}
           accessibilityLabel={`预览技能图片 ${index + 1}`}
-          onPress={() => router.push({ pathname: "/image-preview", params: createImagePreviewParams(images, index) })}
+          onPress={() =>
+            router.push({
+              pathname: "/image-preview",
+              params: createImagePreviewParams(images, index),
+            })
+          }
           style={styles.galleryItem}
         >
           <Image
@@ -469,7 +526,13 @@ function ImageGallery({ images }: { images: string[] }) {
   );
 }
 
-function ServiceCard({ card, onOrder }: { card: ProfileSkillCard; onOrder: () => void }) {
+function ServiceCard({
+  card,
+  onOrder,
+}: {
+  card: ProfileSkillCard;
+  onOrder: () => void;
+}) {
   return (
     <View style={styles.serviceCard}>
       <View style={styles.serviceCopy}>
@@ -478,7 +541,8 @@ function ServiceCard({ card, onOrder }: { card: ProfileSkillCard; onOrder: () =>
         </Text>
         <View style={styles.serviceMeta}>
           <Text style={styles.price}>{card.price}</Text>
-          <Text style={styles.diamond}>◇</Text>
+          {/* <Text style={styles.diamond}>◇</Text> */}
+          <Image source={diamondIcon} style={styles.gameLogo} />
           <Text style={styles.metaText}>订单{card.orderCount}</Text>
           {card.goodRate !== null && card.goodRate !== undefined ? (
             <Text style={styles.metaText}>{card.goodRate}%好评</Text>
@@ -506,21 +570,36 @@ function CompanionOrderSheet({
   onOrderCreated: (order: { orderId: number; total: number }) => void;
 }) {
   const [services, setServices] = useState<CompanionServiceOption[]>([]);
-  const [selectedServiceId, setSelectedServiceId] = useState(card.companionServiceId);
+  const [selectedServiceId, setSelectedServiceId] = useState(
+    card.companionServiceId,
+  );
   const [quantity, setQuantity] = useState("1");
   const [remark, setRemark] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(Boolean(token));
   const [submitting, setSubmitting] = useState(false);
-  const [prompt, setPrompt] = useState<{ title?: string; message: string } | null>(null);
+  const [prompt, setPrompt] = useState<{
+    title?: string;
+    message: string;
+  } | null>(null);
   const [sheetY] = useState(() => new Animated.Value(420));
   const [backdropOpacity] = useState(() => new Animated.Value(0));
   const closing = useRef(false);
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(sheetY, { toValue: 0, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      Animated.timing(backdropOpacity, { toValue: 1, duration: 220, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(sheetY, {
+        toValue: 0,
+        duration: 260,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(backdropOpacity, {
+        toValue: 1,
+        duration: 220,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
     ]).start();
     return () => {
       sheetY.stopAnimation();
@@ -530,47 +609,80 @@ function CompanionOrderSheet({
 
   useEffect(() => {
     if (!token) return;
-    void fetchCompanionServices({
-      clubId: context.clubId,
-      serviceUserId: context.serviceUserId,
-      gameLevelId: context.gameLevelId,
-    }, token)
+    void fetchCompanionServices(
+      {
+        clubId: context.clubId,
+        serviceUserId: context.serviceUserId,
+        gameLevelId: context.gameLevelId,
+      },
+      token,
+    )
       .then((items) => {
         setServices(items);
-        if (!items.some((item) => item.companionServiceId === selectedServiceId)) {
+        if (
+          !items.some((item) => item.companionServiceId === selectedServiceId)
+        ) {
           setSelectedServiceId(items[0]?.companionServiceId ?? 0);
         }
       })
       .catch((error: Error) => setPrompt({ message: error.message }))
       .finally(() => setLoading(false));
-  }, [context.clubId, context.gameLevelId, context.serviceUserId, selectedServiceId, token]);
+  }, [
+    context.clubId,
+    context.gameLevelId,
+    context.serviceUserId,
+    selectedServiceId,
+    token,
+  ]);
 
-  const selectedService = services.find((item) => item.companionServiceId === selectedServiceId);
+  const selectedService = services.find(
+    (item) => item.companionServiceId === selectedServiceId,
+  );
   const count = Math.max(1, Number.parseInt(quantity, 10) || 1);
   const total = (selectedService?.price ?? card.price) * count;
 
   async function submitOrder() {
     if (!token) return setPrompt({ message: "请先登录" });
-    if (!selectedService || !agreed) return setPrompt({ message: "请选择服务并同意服务协议" });
+    if (!selectedService || !agreed)
+      return setPrompt({ message: "请选择服务并同意服务协议" });
     setSubmitting(true);
     try {
-      const action = buildCreateOrderAction(context, selectedService, count, remark);
+      const action = buildCreateOrderAction(
+        context,
+        selectedService,
+        count,
+        remark,
+      );
       const order = await createCompanionOrder(action, token);
-      onOrderCreated({ orderId: order.orderId, total: Number(order.totalPrice) || action.total });
+      onOrderCreated({
+        orderId: order.orderId,
+        total: Number(order.totalPrice) || action.total,
+      });
     } catch (error) {
-      setPrompt({ message: error instanceof Error ? error.message : "创建订单失败" });
+      setPrompt({
+        message: error instanceof Error ? error.message : "创建订单失败",
+      });
     } finally {
       setSubmitting(false);
     }
   }
 
-
   function closeSheet(afterClose?: () => void) {
     if (closing.current) return;
     closing.current = true;
     Animated.parallel([
-      Animated.timing(sheetY, { toValue: 420, duration: 210, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
-      Animated.timing(backdropOpacity, { toValue: 0, duration: 170, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      Animated.timing(sheetY, {
+        toValue: 420,
+        duration: 210,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: 170,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
     ]).start(({ finished }) => {
       if (finished) {
         onClose();
@@ -579,35 +691,103 @@ function CompanionOrderSheet({
     });
   }
 
-
   return (
-    <Modal animationType="none" transparent visible onRequestClose={() => closeSheet()}>
-      <Animated.View style={[styles.orderModalBackdrop, { opacity: backdropOpacity }]}> 
+    <Modal
+      animationType="none"
+      transparent
+      visible
+      onRequestClose={() => closeSheet()}
+    >
+      <Animated.View
+        style={[styles.orderModalBackdrop, { opacity: backdropOpacity }]}
+      >
         <>
-          <Pressable accessibilityLabel="关闭下单弹窗" onPress={() => closeSheet()} style={StyleSheet.absoluteFill} />
-          <Animated.View style={[styles.orderModal, { transform: [{ translateY: sheetY }] }]}> 
-          <View style={styles.orderModalHeader}>
-            <Text style={styles.orderModalTitle}>陪玩下单</Text>
-            <Pressable onPress={() => closeSheet()}><Text style={styles.orderClose}>×</Text></Pressable>
-          </View>
-          <>
-              <Text style={styles.orderLocked}>{card.modeName}-{card.levelName}</Text>
-              {loading ? <Text style={styles.orderHint}>服务加载中...</Text> : services.map((service) => (
-                <Pressable key={service.companionServiceId} onPress={() => setSelectedServiceId(service.companionServiceId)} style={[styles.serviceOption, selectedServiceId === service.companionServiceId && styles.serviceOptionActive]}>
-                  <Text style={styles.serviceOptionName}>{service.name}</Text>
-                  <Text style={styles.serviceOptionPrice}>{service.price} 星钻</Text>
-                </Pressable>
-              ))}
-              <View style={styles.quantityRow}><Text style={styles.orderLabel}>数量</Text><TextInput keyboardType="number-pad" value={quantity} onChangeText={setQuantity} style={styles.quantityInput} /></View>
-              <TextInput placeholder="备注（选填）" value={remark} onChangeText={setRemark} style={styles.remarkInput} />
-              <Pressable onPress={() => setAgreed((value) => !value)} style={styles.agreementRow}><Text style={styles.checkbox}>{agreed ? "✓" : ""}</Text><Text style={styles.agreementText}>我已阅读并同意服务协议</Text></Pressable>
+          <Pressable
+            accessibilityLabel="关闭下单弹窗"
+            onPress={() => closeSheet()}
+            style={StyleSheet.absoluteFill}
+          />
+          <Animated.View
+            style={[styles.orderModal, { transform: [{ translateY: sheetY }] }]}
+          >
+            <View style={styles.orderModalHeader}>
+              <Text style={styles.orderModalTitle}>陪玩下单</Text>
+              <Pressable onPress={() => closeSheet()}>
+                <Text style={styles.orderClose}>×</Text>
+              </Pressable>
+            </View>
+            <>
+              <Text style={styles.orderLocked}>
+                {card.modeName}-{card.levelName}
+              </Text>
+              {loading ? (
+                <Text style={styles.orderHint}>服务加载中...</Text>
+              ) : (
+                services.map((service) => (
+                  <Pressable
+                    key={service.companionServiceId}
+                    onPress={() =>
+                      setSelectedServiceId(service.companionServiceId)
+                    }
+                    style={[
+                      styles.serviceOption,
+                      selectedServiceId === service.companionServiceId &&
+                        styles.serviceOptionActive,
+                    ]}
+                  >
+                    <Text style={styles.serviceOptionName}>{service.name}</Text>
+                    <Text style={styles.serviceOptionPrice}>
+                      {service.price} 星钻
+                    </Text>
+                  </Pressable>
+                ))
+              )}
+              <View style={styles.quantityRow}>
+                <Text style={styles.orderLabel}>数量</Text>
+                <TextInput
+                  keyboardType="number-pad"
+                  value={quantity}
+                  onChangeText={setQuantity}
+                  style={styles.quantityInput}
+                />
+              </View>
+              <TextInput
+                placeholder="备注（选填）"
+                value={remark}
+                onChangeText={setRemark}
+                style={styles.remarkInput}
+              />
+              <Pressable
+                onPress={() => setAgreed((value) => !value)}
+                style={styles.agreementRow}
+              >
+                <Text style={styles.checkbox}>{agreed ? "✓" : ""}</Text>
+                <Text style={styles.agreementText}>我已阅读并同意服务协议</Text>
+              </Pressable>
               <Text style={styles.orderTotal}>合计：{total} 星钻</Text>
-              <Pressable style={[styles.orderSubmit, (!agreed || submitting || !selectedService) && styles.orderSubmitDisabled]} onPress={() => void submitOrder()} disabled={!agreed || submitting || !selectedService}><Text style={styles.orderSubmitText}>{submitting ? "提交中..." : "确认下单"}</Text></Pressable>
-          </>
+              <Pressable
+                style={[
+                  styles.orderSubmit,
+                  (!agreed || submitting || !selectedService) &&
+                    styles.orderSubmitDisabled,
+                ]}
+                onPress={() => void submitOrder()}
+                disabled={!agreed || submitting || !selectedService}
+              >
+                <Text style={styles.orderSubmitText}>
+                  {submitting ? "提交中..." : "确认下单"}
+                </Text>
+              </Pressable>
+            </>
           </Animated.View>
         </>
       </Animated.View>
-      <AppPrompt visible={Boolean(prompt)} title={prompt?.title} message={prompt?.message ?? ""} onConfirm={() => setPrompt(null)} />
+      <AppPrompt
+        visible={Boolean(prompt)}
+        title={prompt?.title}
+        message={prompt?.message ?? ""}
+        onConfirm={() => setPrompt(null)}
+      />
     </Modal>
   );
 }
@@ -627,7 +807,10 @@ function StarPaymentSheet({
 }) {
   const [balance, setBalance] = useState<number | null>(null);
   const [paying, setPaying] = useState(false);
-  const [prompt, setPrompt] = useState<{ title?: string; message: string } | null>(null);
+  const [prompt, setPrompt] = useState<{
+    title?: string;
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -638,34 +821,60 @@ function StarPaymentSheet({
 
   async function pay() {
     if (!token) return setPrompt({ message: "请先登录" });
-    if ((balance ?? 0) < order.total) return setPrompt({ title: "余额不足", message: "当前星钻余额不足，请充值后再支付" });
+    if ((balance ?? 0) < order.total)
+      return setPrompt({
+        title: "余额不足",
+        message: "当前星钻余额不足，请充值后再支付",
+      });
     setPaying(true);
     try {
       await payCompanionOrder(order.orderId, token);
       onPaid();
     } catch (error) {
-      setPrompt({ message: error instanceof Error ? error.message : "支付失败" });
+      setPrompt({
+        message: error instanceof Error ? error.message : "支付失败",
+      });
     } finally {
       setPaying(false);
     }
   }
 
   return (
-    <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
+    <Modal
+      animationType="slide"
+      transparent
+      visible={visible}
+      onRequestClose={onClose}
+    >
       <View style={styles.orderModalBackdrop}>
         <View style={styles.orderModal}>
           <View style={styles.orderModalHeader}>
             <Text style={styles.orderModalTitle}>星钻支付</Text>
-            <Pressable onPress={onClose}><Text style={styles.orderClose}>×</Text></Pressable>
+            <Pressable onPress={onClose}>
+              <Text style={styles.orderClose}>×</Text>
+            </Pressable>
           </View>
           <Text style={styles.orderPayAmount}>支付 {order.total} 星钻</Text>
-          <Text style={styles.orderBalance}>当前余额：{balance ?? "加载中..."} 星钻</Text>
-          <Pressable style={styles.orderSubmit} onPress={() => void pay()} disabled={paying || balance === null}>
-            <Text style={styles.orderSubmitText}>{paying ? "支付中..." : "确认支付"}</Text>
+          <Text style={styles.orderBalance}>
+            当前余额：{balance ?? "加载中..."} 星钻
+          </Text>
+          <Pressable
+            style={styles.orderSubmit}
+            onPress={() => void pay()}
+            disabled={paying || balance === null}
+          >
+            <Text style={styles.orderSubmitText}>
+              {paying ? "支付中..." : "确认支付"}
+            </Text>
           </Pressable>
         </View>
       </View>
-      <AppPrompt visible={Boolean(prompt)} title={prompt?.title} message={prompt?.message ?? ""} onConfirm={() => setPrompt(null)} />
+      <AppPrompt
+        visible={Boolean(prompt)}
+        title={prompt?.title}
+        message={prompt?.message ?? ""}
+        onConfirm={() => setPrompt(null)}
+      />
     </Modal>
   );
 }
@@ -707,7 +916,12 @@ function ReviewCard({ review }: { review: ProfileReview }) {
               <Pressable
                 key={`${image}-${index}`}
                 accessibilityLabel={`预览评价图片 ${index + 1}`}
-                onPress={() => router.push({ pathname: "/image-preview", params: createImagePreviewParams(review.imageUrls, index) })}
+                onPress={() =>
+                  router.push({
+                    pathname: "/image-preview",
+                    params: createImagePreviewParams(review.imageUrls, index),
+                  })
+                }
                 style={styles.reviewImage}
               >
                 <Image
@@ -800,7 +1014,7 @@ function toLocalProfile(
 
 function getStatus(onlineStatus: number, gameStatus: number) {
   if (gameStatus === 1) return { label: "游戏中", color: "#1E5EFF" };
-  if (onlineStatus === 1) return { label: "空闲中", color: "#19D58B" };
+  if (onlineStatus === 1) return { label: "空闲中", color: "#16C978" };
   return null;
 }
 
@@ -886,29 +1100,29 @@ const styles = StyleSheet.create({
   gender: { width: 15, height: 15 },
   male: {
     flexShrink: 0,
-    color: "#1AA9FF",
-    backgroundColor: "rgba(28,78,108,0.5)",
-    borderRadius: 10,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
     fontSize: 12,
+    color: "#0095EE",
+    fontWeight: 500,
   },
   femaleAge: {
     flexShrink: 0,
     color: "#FF4770",
-    backgroundColor: "rgba(108,28,63,0.5)",
-    borderRadius: 10,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
     fontSize: 12,
+    fontWeight: 500,
   },
   online: {
     flexShrink: 0,
-    borderRadius: 10,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    minHeight: 14,
+    maxHeight: 14,
+    borderRadius: 3,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
   },
-  onlineText: { fontFamily: DOUYIN_SANS, fontSize: 12 },
+  onlineIcon: { width: 12, height: 12 },
+  onlineText: { fontFamily: DOUYIN_SANS, fontSize: 10 },
   clubLine: { flexDirection: "row", alignItems: "center", gap: 6 },
   clubIcon: { width: 14, height: 14, tintColor: "#D7DCE2" },
   club: {
@@ -983,7 +1197,7 @@ const styles = StyleSheet.create({
     borderColor: "#FF3158",
     backgroundColor: "#fff",
   },
-  gameLogo: { width: 20, height: 20, borderRadius: 4 },
+  gameLogo: { width: 15, height: 15 },
   gameText: { color: "#777", fontFamily: DOUYIN_SANS, fontSize: 14 },
   gameTextActive: { color: "#111" },
   sectionHeader: {
@@ -1040,38 +1254,185 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   moreText: { color: "#fff", fontSize: 18, fontWeight: "600" },
-  orderModalBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" },
-  orderModal: { backgroundColor: "#fff", borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: 20, paddingBottom: 30, gap: 14 },
-  orderModalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  orderModalTitle: { color: "#111", fontFamily: DOUYIN_SANS, fontSize: 18, fontWeight: "600" },
+  orderModalBackdrop: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  orderModal: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    padding: 20,
+    paddingBottom: 30,
+    gap: 14,
+  },
+  orderModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  orderModalTitle: {
+    color: "#111",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 18,
+    fontWeight: "600",
+  },
   orderClose: { color: "#777", fontSize: 28, lineHeight: 28 },
   orderLocked: { color: "#333", fontFamily: DOUYIN_SANS, fontSize: 15 },
   orderHint: { color: "#999", fontFamily: DOUYIN_SANS, fontSize: 14 },
-  serviceOption: { minHeight: 48, paddingHorizontal: 12, borderRadius: 8, flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "#F6F6F6" },
-  serviceOptionActive: { backgroundColor: "#FFF0F3", borderWidth: 1, borderColor: "#FF3158" },
-  serviceOptionName: { flex: 1, color: "#222", fontFamily: DOUYIN_SANS, fontSize: 14 },
-  serviceOptionPrice: { color: "#FF3158", fontFamily: DOUYIN_SANS, fontSize: 14, fontWeight: "600" },
-  quantityRow: { height: 46, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  serviceOption: {
+    minHeight: 48,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#F6F6F6",
+  },
+  serviceOptionActive: {
+    backgroundColor: "#FFF0F3",
+    borderWidth: 1,
+    borderColor: "#FF3158",
+  },
+  serviceOptionName: {
+    flex: 1,
+    color: "#222",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 14,
+  },
+  serviceOptionPrice: {
+    color: "#FF3158",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  quantityRow: {
+    height: 46,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   orderLabel: { color: "#222", fontFamily: DOUYIN_SANS, fontSize: 15 },
-  quantityInput: { width: 92, height: 38, borderRadius: 6, backgroundColor: "#F6F6F6", color: "#222", fontFamily: DOUYIN_SANS, fontSize: 15, textAlign: "center" },
-  remarkInput: { minHeight: 48, paddingHorizontal: 12, borderRadius: 8, backgroundColor: "#F6F6F6", color: "#222", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  quantityInput: {
+    width: 92,
+    height: 38,
+    borderRadius: 6,
+    backgroundColor: "#F6F6F6",
+    color: "#222",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 15,
+    textAlign: "center",
+  },
+  remarkInput: {
+    minHeight: 48,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: "#F6F6F6",
+    color: "#222",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 14,
+  },
   agreementRow: { flexDirection: "row", alignItems: "center", gap: 7 },
-  checkbox: { width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: "#FF3158", color: "#FF3158", fontSize: 12, lineHeight: 14, textAlign: "center" },
+  checkbox: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#FF3158",
+    color: "#FF3158",
+    fontSize: 12,
+    lineHeight: 14,
+    textAlign: "center",
+  },
   agreementText: { color: "#777", fontFamily: DOUYIN_SANS, fontSize: 12 },
-  orderTotal: { color: "#111", fontFamily: DOUYIN_SANS, fontSize: 17, fontWeight: "600", textAlign: "right" },
-  orderSubmit: { height: 48, borderRadius: 24, backgroundColor: "#FF3158", alignItems: "center", justifyContent: "center" },
+  orderTotal: {
+    color: "#111",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 17,
+    fontWeight: "600",
+    textAlign: "right",
+  },
+  orderSubmit: {
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#FF3158",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   orderSubmitDisabled: { backgroundColor: "#F4A8B7" },
-  orderSubmitText: { color: "#fff", fontFamily: DOUYIN_SANS, fontSize: 16, fontWeight: "600" },
-  orderPayAmount: { color: "#111", fontFamily: DOUYIN_SANS, fontSize: 20, fontWeight: "600", textAlign: "center", marginTop: 12 },
-  orderBalance: { color: "#777", fontFamily: DOUYIN_SANS, fontSize: 14, textAlign: "center", marginBottom: 12 },
-  successBackdrop: { flex: 1, paddingHorizontal: 36, justifyContent: "center", backgroundColor: "rgba(0,0,0,0.48)" },
-  successDialog: { borderRadius: 20, backgroundColor: "#fff", alignItems: "center", padding: 28 },
-  successMark: { width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", backgroundColor: "#E8FFF3" },
+  orderSubmitText: {
+    color: "#fff",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  orderPayAmount: {
+    color: "#111",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 20,
+    fontWeight: "600",
+    textAlign: "center",
+    marginTop: 12,
+  },
+  orderBalance: {
+    color: "#777",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  successBackdrop: {
+    flex: 1,
+    paddingHorizontal: 36,
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.48)",
+  },
+  successDialog: {
+    borderRadius: 20,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    padding: 28,
+  },
+  successMark: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#E8FFF3",
+  },
   successMarkText: { color: "#19B879", fontSize: 30, fontWeight: "700" },
-  successTitle: { marginTop: 16, color: "#111", fontFamily: DOUYIN_SANS, fontSize: 20, fontWeight: "600" },
-  successHint: { marginTop: 8, color: "#888", fontFamily: DOUYIN_SANS, fontSize: 13, lineHeight: 20, textAlign: "center" },
-  successButton: { alignSelf: "stretch", height: 46, marginTop: 24, borderRadius: 23, alignItems: "center", justifyContent: "center", backgroundColor: "#FF3158" },
-  successButtonText: { color: "#fff", fontFamily: DOUYIN_SANS, fontSize: 16, fontWeight: "600" },
+  successTitle: {
+    marginTop: 16,
+    color: "#111",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 20,
+    fontWeight: "600",
+  },
+  successHint: {
+    marginTop: 8,
+    color: "#888",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: "center",
+  },
+  successButton: {
+    alignSelf: "stretch",
+    height: 46,
+    marginTop: 24,
+    borderRadius: 23,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FF3158",
+  },
+  successButtonText: {
+    color: "#fff",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 16,
+    fontWeight: "600",
+  },
   serviceTitle: { marginTop: 28 },
   serviceCard: {
     minHeight: 67,

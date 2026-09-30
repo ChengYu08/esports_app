@@ -23,7 +23,7 @@ type ApiClubDetail = {
   clubGames?: { id: number; clubId: number; gameId: number; gameName?: string; iconUrl?: string; backgroundUrl?: string; gameCategory?: number; status?: number }[];
 };
 type ApiMode = { id: number; clubId?: number; gameId?: number; modeName?: string; status?: number };
-type ApiCompanion = { profileId: number; userId?: number; nickname?: string; headImage?: string; sex?: number; signature?: string; voiceDurationSeconds?: number; orderCount?: number; onlineStatus?: number; gameStatus?: number; price?: number };
+type ApiCompanion = { profileId: number; userId?: number; nickname?: string; headImage?: string; sex?: number; signature?: string; voiceUrl?: string; voiceDurationSeconds?: number; orderCount?: number; onlineStatus?: number; gameStatus?: number; price?: number };
 type ApiCompanionPage = { page?: number; totalPages?: number; records?: ApiCompanion[] };
 type ApiPriceConfig = { linkName?: string; groupId?: string; tabs?: { menuTitle?: string; imageUrl?: string; sortNo?: number }[] };
 type ApiResponse<T> = ApiEnvelope<T>;
@@ -66,7 +66,7 @@ export async function fetchCompanionPage(filters: CompanionFilters, page = 1, pa
     method: "POST", body: { page, pageSize, action: { ...filters, clubId: Number(filters.clubId), gameId: Number(filters.gameId) } },
   });
   const data = requireSuccess(response, "陪玩列表加载失败");
-  return { items: (data.records ?? []).map((item) => ({ profileId: item.profileId, userId: item.userId ?? item.profileId, nickname: item.nickname || "未命名陪玩", headImage: item.headImage, sex: item.sex, signature: item.signature, voiceDurationSeconds: item.voiceDurationSeconds, orderCount: item.orderCount ?? 0, onlineStatus: item.onlineStatus ?? 0, gameStatus: item.gameStatus ?? 0, price: item.price ?? 0 })), hasMore: (data.page ?? page) < (data.totalPages ?? page), nextPage: page + 1 };
+  return { items: (data.records ?? []).map((item) => ({ profileId: item.profileId, userId: item.userId ?? item.profileId, nickname: item.nickname || "未命名陪玩", headImage: item.headImage, sex: item.sex, signature: item.signature, voiceUrl: item.voiceUrl, voiceDurationSeconds: item.voiceDurationSeconds, orderCount: item.orderCount ?? 0, onlineStatus: item.onlineStatus ?? 0, gameStatus: item.gameStatus ?? 0, price: item.price ?? 0 })), hasMore: (data.page ?? page) < (data.totalPages ?? page), nextPage: page + 1 };
 }
 
 export async function fetchGames(): Promise<Game[]> {

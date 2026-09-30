@@ -2,7 +2,7 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
+import { Animated, Easing, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Modal,
@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import type { CompanionFilters, GameKey } from "../api/home.types";
 import { useClubCompanions, useClubDetail, useClubGameModes } from "../hooks/use-home-data";
 
@@ -57,6 +58,7 @@ export default function ClubDetailScreen() {
   ), [club, priceSort, selectedGame, selectedMode, selectedSex, selectedStatus]);
   const companionsQuery = useClubCompanions(companionFilters);
   const members = companionsQuery.data?.pages.flatMap((page) => page.items) ?? [];
+  const voicePlayer = useVoicePlayer();
 
   if (clubQuery.isLoading) return <View style={styles.state}><Text style={styles.stateText}>加载中...</Text></View>;
   if (clubQuery.isError || !club) return <View style={styles.state}><Text style={styles.stateText}>俱乐部详情加载失败</Text><Pressable onPress={() => void clubQuery.refetch()}><Text style={styles.retryText}>重试</Text></Pressable></View>;
@@ -178,6 +180,9 @@ export default function ClubDetailScreen() {
               price={member.price}
               orderCount={member.orderCount}
               voiceDuration={member.voiceDurationSeconds}
+              voiceUrl={member.voiceUrl}
+              playingVoiceUrl={voicePlayer.playingUrl}
+              onToggleVoice={voicePlayer.toggle}
               status={member.gameStatus === 1 ? "游戏中" : member.onlineStatus === 1 ? "空闲中" : undefined}
               statusColor={member.gameStatus === 1 ? "#1e5eff" : member.onlineStatus === 1 ? "#16c978" : undefined}
             />
@@ -300,6 +305,9 @@ function MemberCard({
   price,
   orderCount,
   voiceDuration,
+  voiceUrl,
+  playingVoiceUrl,
+  onToggleVoice,
   status,
   statusColor,
 }: {
@@ -312,10 +320,28 @@ function MemberCard({
   price: number;
   orderCount: number;
   voiceDuration?: number;
+  voiceUrl?: string;
+  playingVoiceUrl: string | null;
+  onToggleVoice: (voiceUrl: string) => void;
   status?: string;
   statusColor?: string;
 }) {
   const isPlaying = status === "游戏中";
+  const voicePlaying = Boolean(voiceUrl && playingVoiceUrl === voiceUrl);
+  const animation = useRef(new Animated.Value(0.35)).current;
+  useEffect(() => {
+    if (!voicePlaying) {
+      animation.stopAnimation();
+      animation.setValue(0.35);
+      return;
+    }
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(animation, { toValue: 1, duration: 450, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(animation, { toValue: 0.35, duration: 450, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [animation, voicePlaying]);
   return (
     <Pressable
       style={styles.memberCard}
@@ -326,10 +352,17 @@ function MemberCard({
     >
       <View style={styles.avatarWrap}>
         <Image source={image ? { uri: image } : undefined} contentFit="cover" style={styles.avatar} />
-        <View style={styles.voice}>
-          <Image source={playIcon} style={styles.playIcon} />
+        <Pressable
+          accessibilityLabel={voiceUrl ? `${playingVoiceUrl === voiceUrl ? "停止" : "播放"}语音` : "无语音"}
+          disabled={!voiceUrl}
+          onPress={(event) => { event.stopPropagation(); if (voiceUrl) onToggleVoice(voiceUrl); }}
+          style={styles.voice}
+        >
+          <Animated.View style={{ opacity: voicePlaying ? animation : 1 }}>
+            <Image source={playIcon} style={styles.playIcon} />
+          </Animated.View>
           <Text style={styles.voiceText}>{voiceDuration ?? 0}&apos;&apos;</Text>
-        </View>
+        </Pressable>
       </View>
       <View style={styles.memberBody}>
         <View style={styles.memberTitle}>

@@ -64,6 +64,7 @@ export type Companion = {
   sex?: number;
   signature?: string;
   voiceDurationSeconds?: number;
+  voiceUrl?: string;
   orderCount: number;
   onlineStatus: number;
   gameStatus: number;
