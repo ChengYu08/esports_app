@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { fetchBanners, fetchClubDetail, fetchClubGameModes, fetchClubPage, fetchCompanionPage, fetchGames } from "@/features/home/api/home.api";
+import { fetchBanners, fetchClubDetail, fetchClubGameModes, fetchClubPage, fetchCompanionPage, fetchGames, fetchPriceList } from "@/features/home/api/home.api";
 import type { CompanionFilters, GameKey, HomeTab } from "@/features/home/api/home.types";
 
 export function useHomeBanners(tab: HomeTab) {
@@ -38,4 +38,8 @@ export function useClubCompanions(filters: CompanionFilters | null) {
     enabled: Boolean(filters), initialPageParam: 1,
     getNextPageParam: (last) => last.hasMore ? last.nextPage : undefined,
   });
+}
+
+export function usePriceList(groupId?: string) {
+  return useQuery({ queryKey: ["club-price-list", groupId], queryFn: () => fetchPriceList(groupId as string), enabled: Boolean(groupId) });
 }

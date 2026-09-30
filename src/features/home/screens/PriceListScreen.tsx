@@ -1,0 +1,86 @@
+import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { Image } from "expo-image";
+import { router, useLocalSearchParams } from "expo-router";
+import { useMemo, useRef, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { usePriceList } from "../hooks/use-home-data";
+
+const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
+
+export default function PriceListScreen() {
+  const insets = useSafeAreaInsets();
+  const { groupId } = useLocalSearchParams<{ groupId?: string }>();
+  const query = usePriceList(groupId);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const contentRef = useRef<ScrollView>(null);
+  const tabs = query.data ?? [];
+  const selectedTab = tabs[selectedIndex] ?? tabs[0];
+
+  const content = useMemo(() => {
+    if (query.isLoading) return <Text style={styles.stateText}>加载中...</Text>;
+    if (query.isError) return <View style={styles.state}><Text style={styles.stateText}>价目表加载失败</Text><Pressable onPress={() => void query.refetch()}><Text style={styles.retryText}>重试</Text></Pressable></View>;
+    if (!selectedTab) return <Text style={styles.stateText}>暂无价目表</Text>;
+    return <PriceImage uri={selectedTab.imageUrl} />;
+  }, [query, selectedTab]);
+
+  return (
+    <View style={styles.screen}>
+      <View style={[styles.nav, { paddingTop: insets.top, height: insets.top + 44 }]}>
+        <Pressable accessibilityLabel="返回" hitSlop={10} onPress={() => router.back()} style={styles.navSide}>
+          <Image source={backIcon} style={styles.backIcon} />
+        </Pressable>
+        <Text style={styles.navTitle}>价目表</Text>
+        <View style={styles.navSide} />
+      </View>
+      {tabs.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabs}>
+          {tabs.map((tab, index) => (
+            <Pressable key={`${tab.menuTitle}-${tab.sortNo}`} onPress={() => { setSelectedIndex(index); contentRef.current?.scrollTo({ y: 0, animated: false }); }} style={styles.tab}>
+              <Text numberOfLines={1} style={[styles.tabText, index === selectedIndex && styles.tabTextActive]}>{tab.menuTitle}</Text>
+              {index === selectedIndex && <View style={styles.tabIndicator} />}
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+      <ScrollView ref={contentRef} showsVerticalScrollIndicator={false} style={styles.content} contentContainerStyle={styles.contentContainer}>
+        {content}
+      </ScrollView>
+    </View>
+  );
+}
+
+function PriceImage({ uri }: { uri: string }) {
+  const [ratio, setRatio] = useState(1);
+  return (
+    <Image
+      source={{ uri }}
+      contentFit="contain"
+      style={[styles.priceImage, { aspectRatio: ratio }]}
+      onLoad={(event) => {
+        const { width, height } = event.source;
+        if (width > 0 && height > 0) setRatio(width / height);
+      }}
+    />
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: "#fff" },
+  nav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#fff" },
+  navSide: { width: 56, height: 44, paddingLeft: 12, justifyContent: "center" },
+  backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
+  navTitle: { flex: 1, color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 16, lineHeight: 24, fontWeight: "500", textAlign: "center" },
+  tabsScroll: { flexGrow: 0, height: 54, backgroundColor: "#fff" },
+  tabs: { minWidth: "100%", paddingHorizontal: 16, justifyContent: "space-around", backgroundColor: "#fff" },
+  tab: { minWidth: 96, height: 54, paddingHorizontal: 16, alignItems: "center", justifyContent: "center", position: "relative" },
+  tabText: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 14, lineHeight: 22 },
+  tabTextActive: { color: "#333", fontSize: 16, fontWeight: "600" },
+  tabIndicator: { position: "absolute", bottom: 9, width: 12, height: 3, borderRadius: 2, backgroundColor: "#E01B28" },
+  content: { flex: 1, backgroundColor: "#E6E6E6" },
+  contentContainer: { minHeight: "100%", alignItems: "center" },
+  priceImage: { width: "100%", backgroundColor: "#E6E6E6" },
+  state: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 100 },
+  stateText: { padding: 32, color: "rgba(0,0,0,.35)", fontFamily: DOUYIN_SANS, fontSize: 14, textAlign: "center" },
+  retryText: { color: "#E01B28", fontFamily: DOUYIN_SANS, fontSize: 14 },
+});

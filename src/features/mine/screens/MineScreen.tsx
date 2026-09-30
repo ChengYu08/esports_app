@@ -1,10 +1,10 @@
-import { useMemo } from "react";
+import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { router } from "expo-router";
+import { useMemo } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useAuthStore } from "@esports/auth";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const avatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const female = require("../../../../assets/mine/figma/mine-female.svg");
@@ -14,23 +14,59 @@ const arrow = require("../../../../assets/mine/figma/mine-arrow-right.svg");
 const room = require("../../../../assets/mine/figma/mine-room-figma.svg");
 const playCenter = require("../../../../assets/mine/figma/mine-play-center.svg");
 const building = require("../../../../assets/mine/figma/mine-club-entry.svg");
-const settings = require("../../../../assets/mine/figma/mine-settings-figma.svg");
+const settings = require("../../../../assets/mine/figma/mine-settings.svg");
 
 export default function MineScreen() {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
-  const displayName = useMemo(() => user?.nickname || (user?.phone ? `${user.phone.slice(0, 3)}****${user.phone.slice(-4)}` : "登录 / 注册"), [user]);
+  const displayName = useMemo(
+    () =>
+      user?.nickname ||
+      (user?.phone
+        ? `${user.phone.slice(0, 3)}****${user.phone.slice(-4)}`
+        : "登录 / 注册"),
+    [user],
+  );
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 60 + insets.bottom }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={{
+          paddingTop: insets.top,
+          paddingBottom: 60 + insets.bottom,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.profile}>
-          <Pressable style={styles.profileMain} onPress={() => !user && router.push("/login")}>
-            <Image source={user?.headImage ? { uri: user.headImage } : avatar} style={styles.avatar} />
+          <Pressable
+            style={styles.profileMain}
+            onPress={() => !user && router.push("/login")}
+          >
+            <Image
+              source={user?.headImage ? { uri: user.headImage } : avatar}
+              style={styles.avatar}
+            />
             <View style={styles.profileCopy}>
               <Text style={styles.name}>{displayName}</Text>
-              <View style={styles.detailLine}>{user?.gender === 2 ? <Image source={female} style={styles.tinyIcon} /> : null}{user?.clubInfo ? <><Image source={clubFlag} style={styles.tinyIcon} /><Text style={styles.club}>{user.clubInfo.clubName}</Text></> : null}</View>
-              <View style={styles.detailLine}><Text style={styles.uid}>{user ? `ID: ${user.id}` : "登录后查看 ID"}</Text>{user ? <Image source={copyIcon} style={styles.copyIcon} /> : null}</View>
+              <View style={styles.detailLine}>
+                {user?.gender === 2 ? (
+                  <Image source={female} style={styles.tinyIcon} />
+                ) : null}
+                {user?.clubInfo ? (
+                  <>
+                    <Image source={clubFlag} style={styles.tinyIcon} />
+                    <Text style={styles.club}>{user.clubInfo.clubName}</Text>
+                  </>
+                ) : null}
+              </View>
+              <View style={styles.detailLine}>
+                <Text style={styles.uid}>
+                  {user ? `ID: ${user.id}` : "登录后查看 ID"}
+                </Text>
+                {user ? (
+                  <Image source={copyIcon} style={styles.copyIcon} />
+                ) : null}
+              </View>
             </View>
           </Pressable>
           <Pressable
@@ -42,7 +78,10 @@ export default function MineScreen() {
               if (user?.clubInfo?.id && user.id) {
                 router.push({
                   pathname: "/profile",
-                  params: { clubId: String(user.clubInfo.id), userId: String(user.id) },
+                  params: {
+                    clubId: String(user.clubInfo.id),
+                    userId: String(user.id),
+                  },
                 });
                 return;
               }
@@ -54,14 +93,31 @@ export default function MineScreen() {
           </Pressable>
         </View>
         <View style={styles.statsCard}>
-          <View style={styles.stat}><Text style={styles.statValue}>{user?.starBalance ?? "--"}</Text><Text style={styles.statLabel}>星钻</Text></View>
-          <View style={styles.stat}><Text style={styles.statValue}>12</Text><Text style={styles.statLabel}>关注</Text></View>
-          <View style={styles.stat}><Text style={styles.statValue}>2000</Text><Text style={styles.statLabel}>粉丝</Text></View>
+          <View style={styles.stat}>
+            <Text style={styles.statValue}>{user?.starBalance ?? "--"}</Text>
+            <Text style={styles.statLabel}>星钻</Text>
+          </View>
+          <View style={styles.stat}>
+            <Text style={styles.statValue}>12</Text>
+            <Text style={styles.statLabel}>关注</Text>
+          </View>
+          <View style={styles.stat}>
+            <Text style={styles.statValue}>2000</Text>
+            <Text style={styles.statLabel}>粉丝</Text>
+          </View>
         </View>
         <View style={styles.sectionCard}>
           <MenuRow icon={room} title="我的房间" onPress={() => undefined} />
-          <MenuRow icon={playCenter} title="陪玩中心" onPress={() => undefined} />
-          <MenuRow icon={building} title="俱乐部入驻" onPress={() => undefined} />
+          <MenuRow
+            icon={playCenter}
+            title="陪玩中心"
+            onPress={() => undefined}
+          />
+          <MenuRow
+            icon={building}
+            title="俱乐部入驻"
+            onPress={() => undefined}
+          />
           <MenuRow icon={settings} title="基础设置" onPress={() => undefined} />
         </View>
       </ScrollView>
@@ -69,12 +125,109 @@ export default function MineScreen() {
   );
 }
 
-function MenuRow({ icon, title, subtitle, onPress }: { icon: number; title: string; subtitle?: string; onPress: () => void }) {
-  return <Pressable style={styles.menuRow} onPress={onPress}><Image source={icon} style={styles.menuIcon} /><View style={styles.menuCopy}><Text style={styles.menuTitle}>{title}</Text>{subtitle && <Text style={styles.menuSubtitle}>{subtitle}</Text>}</View><Text style={styles.chevron}>›</Text></Pressable>;
+function MenuRow({
+  icon,
+  title,
+  subtitle,
+  onPress,
+}: {
+  icon: number;
+  title: string;
+  subtitle?: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable style={styles.menuRow} onPress={onPress}>
+      <Image source={icon} style={styles.menuIcon} />
+      <View style={styles.menuCopy}>
+        <Text style={styles.menuTitle}>{title}</Text>
+        {subtitle && <Text style={styles.menuSubtitle}>{subtitle}</Text>}
+      </View>
+      <Text style={styles.chevron}>›</Text>
+    </Pressable>
+  );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#F7F7F7" }, profile: { minHeight: 80, paddingHorizontal: 16, paddingVertical: 12, flexDirection: "row", alignItems: "center", gap: 12 }, profileMain: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 }, avatar: { width: 56, height: 56, borderRadius: 28 }, profileCopy: { flex: 1, gap: 4 }, name: { fontFamily: DOUYIN_SANS, color: "#0A0A0A", fontSize: 16, lineHeight: 24, fontWeight: "500" }, detailLine: { flexDirection: "row", alignItems: "center", gap: 4 }, tinyIcon: { width: 12, height: 12 }, age: { fontFamily: DOUYIN_SANS, color: "#FF4D70", fontSize: 12 }, club: { fontFamily: DOUYIN_SANS, color: "#666", fontSize: 11 }, uid: { fontFamily: DOUYIN_SANS, color: "#999", fontSize: 11 }, copyIcon: { width: 14, height: 14 }, homepage: { flexDirection: "row", alignItems: "center", gap: 2 }, homepageText: { fontFamily: DOUYIN_SANS, color: "#0A0A0A", fontSize: 11 }, arrow: { width: 16, height: 16 },
-  statsCard: { marginHorizontal: 12, paddingHorizontal: 12, paddingVertical: 16, borderRadius: 8, backgroundColor: "#fff", flexDirection: "row", alignItems: "center", gap: 12 }, stat: { flex: 1, alignItems: "center", gap: 2 }, statValue: { fontFamily: DOUYIN_SANS, color: "#0A0A0A", fontSize: 16, lineHeight: 24, fontWeight: "500" }, statLabel: { fontFamily: DOUYIN_SANS, color: "#999", fontSize: 11, lineHeight: 16 },
-  sectionCard: { marginHorizontal: 12, marginTop: 12, padding: 12, borderRadius: 8, backgroundColor: "#fff", gap: 12 }, menuRow: { minHeight: 32, flexDirection: "row", alignItems: "center", gap: 2 }, menuIcon: { width: 32, height: 32, marginRight: 2 }, menuCopy: { flex: 1 }, menuTitle: { fontFamily: DOUYIN_SANS, color: "#0A0A0A", fontSize: 11, lineHeight: 16 }, menuSubtitle: { marginTop: 3, fontFamily: DOUYIN_SANS, color: "#aaa", fontSize: 11 }, chevron: { color: "#b6b6b6", fontSize: 28, fontWeight: "300" },
+  screen: { flex: 1, backgroundColor: "#F7F7F7" },
+  profile: {
+    minHeight: 80,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  profileMain: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 },
+  avatar: { width: 56, height: 56, borderRadius: 28 },
+  profileCopy: { flex: 1, gap: 4 },
+  name: {
+    fontFamily: DOUYIN_SANS,
+    color: "#0A0A0A",
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: "500",
+  },
+  detailLine: { flexDirection: "row", alignItems: "center", gap: 4 },
+  tinyIcon: { width: 12, height: 12 },
+  age: { fontFamily: DOUYIN_SANS, color: "#FF4D70", fontSize: 12 },
+  club: { fontFamily: DOUYIN_SANS, color: "#666", fontSize: 11 },
+  uid: { fontFamily: DOUYIN_SANS, color: "#999", fontSize: 11 },
+  copyIcon: { width: 14, height: 14 },
+  homepage: { flexDirection: "row", alignItems: "center", gap: 2 },
+  homepageText: { fontFamily: DOUYIN_SANS, color: "#0A0A0A", fontSize: 11 },
+  arrow: { width: 16, height: 16 },
+  statsCard: {
+    marginHorizontal: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 16,
+    borderRadius: 8,
+    backgroundColor: "#fff",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  stat: { flex: 1, alignItems: "center", gap: 2 },
+  statValue: {
+    fontFamily: DOUYIN_SANS,
+    color: "#0A0A0A",
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: "500",
+  },
+  statLabel: {
+    fontFamily: DOUYIN_SANS,
+    color: "#999",
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  sectionCard: {
+    marginHorizontal: 12,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: "#fff",
+    gap: 12,
+  },
+  menuRow: {
+    minHeight: 32,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  menuIcon: { width: 32, height: 32, marginRight: 2 },
+  menuCopy: { flex: 1 },
+  menuTitle: {
+    fontFamily: DOUYIN_SANS,
+    color: "#0A0A0A",
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  menuSubtitle: {
+    marginTop: 3,
+    fontFamily: DOUYIN_SANS,
+    color: "#aaa",
+    fontSize: 11,
+  },
+  chevron: { color: "#b6b6b6", fontSize: 28, fontWeight: "300" },
 });

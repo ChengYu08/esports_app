@@ -193,7 +193,13 @@ export default function ClubDetailScreen() {
       >
         <Pressable
           style={styles.priceButton}
-          onPress={() => Alert.alert("价目表", "价目表功能即将开放")}
+          onPress={() => {
+            if (!club.pageConfigGroupId) {
+              Alert.alert("价目表", "暂无价目表");
+              return;
+            }
+            router.push({ pathname: "/club/price-list", params: { groupId: club.pageConfigGroupId } });
+          }}
         >
           <Text style={styles.priceText}>价目表</Text>
         </Pressable>

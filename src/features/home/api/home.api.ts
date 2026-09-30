@@ -1,6 +1,6 @@
 import { apiClient } from '@/core/network/api-client';
 import { demoBanners } from "./home.mock";
-import type { Banner, ClubDetail, ClubDetailGame, ClubGameMode, ClubPage, CompanionFilters, CompanionPage, Game, GameKey, HomeTab } from "./home.types";
+import type { Banner, ClubDetail, ClubDetailGame, ClubGameMode, ClubPage, CompanionFilters, CompanionPage, Game, GameKey, HomeTab, PriceListTab } from "./home.types";
 
 export type { Banner, Club, ClubPage, Game, GameKey, HomeTab } from "./home.types";
 
@@ -25,6 +25,7 @@ type ApiClubDetail = {
 type ApiMode = { id: number; clubId?: number; gameId?: number; modeName?: string; status?: number };
 type ApiCompanion = { profileId: number; userId?: number; nickname?: string; headImage?: string; sex?: number; signature?: string; voiceDurationSeconds?: number; orderCount?: number; onlineStatus?: number; gameStatus?: number; price?: number };
 type ApiCompanionPage = { page?: number; totalPages?: number; records?: ApiCompanion[] };
+type ApiPriceConfig = { linkName?: string; groupId?: string; tabs?: { menuTitle?: string; imageUrl?: string; sortNo?: number }[] };
 type ApiResponse<T> = ApiEnvelope<T>;
 
 function requireSuccess<T>(response: ApiResponse<T>, fallback: string): T {
@@ -49,6 +50,15 @@ export async function fetchClubDetail(id: string): Promise<ClubDetail> {
 export async function fetchClubGameModes(gameId: string): Promise<ClubGameMode[]> {
   const response = await apiClient<ApiResponse<ApiMode[]>>(`/client/v1/club/public/getGameModeList?id=${encodeURIComponent(gameId)}`);
   return requireSuccess(response, "游戏模式加载失败").filter((item) => item.status !== 0).map((item) => ({ id: item.id, gameId: item.gameId ?? Number(gameId), modeName: item.modeName || `模式${item.id}` }));
+}
+
+export async function fetchPriceList(groupId: string): Promise<PriceListTab[]> {
+  const response = await apiClient<ApiResponse<ApiPriceConfig>>(`/client/v1/clubPageConfig/public/detail?groupId=${encodeURIComponent(groupId)}`);
+  const data = requireSuccess(response, "价目表加载失败");
+  return (data.tabs ?? [])
+    .filter((tab) => Boolean(tab.imageUrl))
+    .sort((a, b) => (a.sortNo ?? 0) - (b.sortNo ?? 0))
+    .map((tab, index) => ({ menuTitle: tab.menuTitle || `分类${index + 1}`, imageUrl: tab.imageUrl as string, sortNo: tab.sortNo ?? index }));
 }
 
 export async function fetchCompanionPage(filters: CompanionFilters, page = 1, pageSize = 50): Promise<CompanionPage> {

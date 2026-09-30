@@ -86,3 +86,9 @@ export type CompanionPage = {
   hasMore: boolean;
   nextPage: number;
 };
+
+export type PriceListTab = {
+  menuTitle: string;
+  imageUrl: string;
+  sortNo: number;
+};
