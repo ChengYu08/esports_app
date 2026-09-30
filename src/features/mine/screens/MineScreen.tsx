@@ -14,7 +14,7 @@ const arrow = require("../../../../assets/mine/figma/mine-arrow-right.svg");
 const room = require("../../../../assets/mine/figma/mine-room-figma.svg");
 const playCenter = require("../../../../assets/mine/figma/mine-play-center.svg");
 const building = require("../../../../assets/mine/figma/mine-club-entry.svg");
-const settings = require("../../../../assets/mine/figma/mine-settings.svg");
+const settings = require("../../../../assets/mine/figma/mine-setting-entry.svg");
 
 export default function MineScreen() {
   const insets = useSafeAreaInsets();

@@ -29,6 +29,7 @@ const background = require("../../../../assets/mine/figma/profile-bg.png");
 const femaleIcon = require("../../../../assets/mine/figma/mine-female.svg");
 const clubIcon = require("../../../../assets/mine/figma/mine-club-flag.svg");
 const settingsIcon = require("../../../../assets/mine/figma/mine-settings.svg");
+const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 
 type ProfileTab = "技能" | "评价";
 
@@ -101,14 +102,26 @@ export default function ProfileScreen() {
           />
           <View style={styles.coverShade} />
           <View style={[styles.navbar, { paddingTop: insets.top }]}>
-            <View style={styles.navSpacer} />
             <Pressable
-              accessibilityLabel="设置"
+              accessibilityLabel="返回"
               hitSlop={12}
-              onPress={() => undefined}
+              onPress={() => router.back()}
+              style={styles.navButton}
             >
-              <Image source={settingsIcon} style={styles.settingsIcon} />
+              <Image source={backIcon} style={styles.backIcon} />
             </Pressable>
+            {isMine ? (
+              <Pressable
+                accessibilityLabel="设置"
+                hitSlop={12}
+                onPress={() => undefined}
+                style={styles.navButton}
+              >
+                <Image source={settingsIcon} style={styles.settingsIcon} />
+              </Pressable>
+            ) : (
+              <View style={styles.navButton} />
+            )}
           </View>
           <ProfileIdentity profile={profile} />
         </View>
@@ -440,12 +453,18 @@ function ReviewCard({ review }: { review: ProfileReview }) {
         {review.imageUrls.length > 0 ? (
           <View style={styles.reviewImages}>
             {review.imageUrls.slice(0, 3).map((image, index) => (
-              <Image
+              <Pressable
                 key={`${image}-${index}`}
-                source={{ uri: image }}
-                contentFit="cover"
+                accessibilityLabel={`预览评价图片 ${index + 1}`}
+                onPress={() => router.push({ pathname: "/image-preview", params: createImagePreviewParams(review.imageUrls, index) })}
                 style={styles.reviewImage}
-              />
+              >
+                <Image
+                  source={{ uri: image }}
+                  contentFit="cover"
+                  style={StyleSheet.absoluteFill}
+                />
+              </Pressable>
             ))}
           </View>
         ) : null}
@@ -583,7 +602,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
-  navSpacer: { width: 24, height: 24 },
+  navButton: { width: 24, height: 24 },
+  backIcon: { width: 24, height: 24, tintColor: "#fff" },
   settingsIcon: { width: 24, height: 24, tintColor: "#fff" },
   identity: {
     position: "absolute",
@@ -844,7 +864,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   reviewImages: { flexDirection: "row", gap: 4 },
-  reviewImage: { width: 64, height: 64, borderRadius: 8 },
+  reviewImage: { width: 64, height: 64, borderRadius: 8, overflow: "hidden" },
   reviewDate: {
     color: "#999",
     fontFamily: DOUYIN_SANS,
