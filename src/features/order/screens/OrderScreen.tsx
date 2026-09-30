@@ -1,29 +1,53 @@
-import { useState } from "react";
-import { FlatList, StyleSheet, View } from "react-native";
+import { useEffect, useState } from "react";
+import { FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAuthStore } from "@esports/auth";
+import { AppPrompt } from "@/shared/ui/AppPrompt";
 
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
 import { OrderCard } from "../components/OrderCard";
 import { OrderHeader } from "../components/OrderHeader";
 import { OrderTabs } from "../components/OrderTabs";
 import { useOrderPage } from "../hooks/use-order-page";
+import { cancelOrder as cancelOrderRequest } from "../order.api";
+import { fetchStarBalance, payCompanionOrder } from "@/features/mine/api/companion-order.api";
 import type {
   OrderActionKey,
   OrderFilter,
   OrderItemModel,
 } from "../order.types";
 
-const handleOrderAction = (
-  _item: OrderItemModel,
-  _action: OrderActionKey,
-) => undefined;
-
 export default function OrderScreen() {
   const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<OrderFilter>("all");
   const orders = useOrderPage(filter);
+  const token = useAuthStore((state) => state.accessToken);
+  const [cancelTarget, setCancelTarget] = useState<OrderItemModel | null>(null);
+  const [payTarget, setPayTarget] = useState<OrderItemModel | null>(null);
+  const [prompt, setPrompt] = useState<{ title: string; message: string; confirmText?: string } | null>(null);
   const items = orders.data?.items ?? [];
+
+  const handleOrderAction = async (item: OrderItemModel, action: OrderActionKey) => {
+    if (action === "pay") {
+      setPayTarget(item);
+      return;
+    }
+    if (action !== "cancel") return;
+    setCancelTarget(item);
+  };
+
+  const confirmCancel = async () => {
+    if (!cancelTarget || !token) return;
+    const target = cancelTarget;
+    setCancelTarget(null);
+    try {
+      await cancelOrderRequest(target.id, token);
+      await orders.refetch();
+    } catch (error) {
+      setPrompt({ title: "取消订单失败", message: error instanceof Error ? error.message : "请稍后重试" });
+    }
+  };
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -43,8 +67,88 @@ export default function OrderScreen() {
         )}
         showsVerticalScrollIndicator={false}
       />
+      <AppPrompt
+        visible={Boolean(cancelTarget)}
+        title="提示"
+        message={`确定取消订单吗，订单号：${cancelTarget?.orderNo ?? cancelTarget?.id ?? ""}`}
+        cancelText="取消"
+        confirmText="确认"
+        onCancel={() => setCancelTarget(null)}
+        onConfirm={() => void confirmCancel()}
+      />
+      <StarPaymentPrompt
+        key={payTarget?.id ?? "none"}
+        item={payTarget}
+        token={token}
+        onClose={() => setPayTarget(null)}
+        onPaid={async () => {
+          setPayTarget(null);
+          await orders.refetch();
+        }}
+      />
+      <AppPrompt
+        visible={Boolean(prompt)}
+        title={prompt?.title}
+        message={prompt?.message ?? ""}
+        onConfirm={() => setPrompt(null)}
+      />
     </View>
   );
+}
+
+function StarPaymentPrompt({
+  item,
+  token,
+  onClose,
+  onPaid,
+}: {
+  item: OrderItemModel | null;
+  token: string | null;
+  onClose: () => void;
+  onPaid: () => void;
+}) {
+  const [balance, setBalance] = useState<number | null>(null);
+  const [paying, setPaying] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (item && token) void fetchStarBalance(token).then(setBalance).catch((error: Error) => setMessage(error.message));
+  }, [item, token]);
+
+  const pay = async () => {
+    if (!item || !token) return;
+    const total = Number(item.totalPrice) || 0;
+    if ((balance ?? 0) < total) {
+      setMessage("当前星钻余额不足，请充值后再支付");
+      return;
+    }
+    setPaying(true);
+    try {
+      await payCompanionOrder(Number(item.id), token);
+      onPaid();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "支付失败");
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  return <>
+    <Modal animationType="slide" transparent visible={Boolean(item)} onRequestClose={onClose}>
+      <View style={styles.paymentBackdrop}>
+        <View style={styles.paymentSheet}>
+          <Text style={styles.paymentTitle}>星钻支付</Text>
+          <Text style={styles.paymentAmount}>支付 {item?.totalPrice ?? 0} 星钻</Text>
+          <Text style={styles.paymentBalance}>当前余额：{balance === null ? "加载中..." : `${balance} 星钻`}</Text>
+          <View style={styles.paymentActions}>
+            <Pressable style={styles.paymentCancel} onPress={onClose}><Text>取消</Text></Pressable>
+            <Pressable style={styles.paymentConfirm} disabled={paying || balance === null} onPress={() => void pay()}><Text style={styles.paymentConfirmText}>{paying ? "支付中..." : "确认支付"}</Text></Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+    <AppPrompt visible={Boolean(message)} title="支付提示" message={message ?? ""} onConfirm={() => setMessage(null)} />
+  </>;
 }
 
 function OrderSeparator() {
@@ -56,4 +160,13 @@ const styles = StyleSheet.create({
   content: { flexGrow: 1, paddingTop: 8 },
   separator: { height: 8 },
   empty: { flex: 1, minHeight: 320, alignItems: "center", justifyContent: "center" },
+  paymentBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.48)" },
+  paymentSheet: { padding: 24, borderTopLeftRadius: 20, borderTopRightRadius: 20, backgroundColor: "#fff" },
+  paymentTitle: { color: "#111", fontSize: 18, fontWeight: "600", textAlign: "center" },
+  paymentAmount: { marginTop: 24, color: "#111", fontSize: 22, fontWeight: "700", textAlign: "center" },
+  paymentBalance: { marginTop: 12, color: "#777", fontSize: 14, textAlign: "center" },
+  paymentActions: { flexDirection: "row", gap: 12, marginTop: 24 },
+  paymentCancel: { flex: 1, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "#F5F5F5" },
+  paymentConfirm: { flex: 1, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "#FF3158" },
+  paymentConfirmText: { color: "#fff", fontWeight: "600" },
 });

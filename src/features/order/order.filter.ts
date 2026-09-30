@@ -8,8 +8,16 @@ export function filterOrders(
 
   if (filter === "inProgress") {
     return items.filter(
-      ({ status }) => status === "pendingPayment" || status === "paid",
+      ({ status }) =>
+        status === "pendingPayment" ||
+        status === "paid" ||
+        status === "waitingService" ||
+        status === "inService",
     );
+  }
+
+  if (filter === "cancelled") {
+    return items.filter(({ status }) => status === "cancelled" || status === "refunded");
   }
 
   return items.filter(({ status }) => status === filter);

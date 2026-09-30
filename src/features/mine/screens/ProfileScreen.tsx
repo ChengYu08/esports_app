@@ -57,6 +57,8 @@ export default function ProfileScreen() {
   const [selectedGameId, setSelectedGameId] = useState("");
   const [orderCard, setOrderCard] = useState<ProfileSkillCard | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [paymentOrder, setPaymentOrder] = useState<{ orderId: number; total: number } | null>(null);
+  const [paymentSheetVisible, setPaymentSheetVisible] = useState(false);
   const detailQuery = useProfileDetail(routeParams);
   const detail = detailQuery.data;
   const firstGameId = getFirstProfileGameId(detail?.games ?? []);
@@ -223,9 +225,26 @@ export default function ProfileScreen() {
           }}
           token={useAuthStore.getState().accessToken}
           onClose={() => setOrderCard(null)}
-          onPaid={() => {
-            void queryClient.invalidateQueries({ queryKey: ["orders"] });
+          onOrderCreated={(order) => {
             setOrderCard(null);
+            setPaymentOrder(order);
+            setPaymentSheetVisible(true);
+          }}
+        />
+      ) : null}
+      {paymentOrder ? (
+        <StarPaymentSheet
+          order={paymentOrder}
+          visible={paymentSheetVisible}
+          token={useAuthStore.getState().accessToken}
+          onClose={() => {
+            setPaymentSheetVisible(false);
+            setPaymentOrder(null);
+          }}
+          onPaid={() => {
+            setPaymentSheetVisible(false);
+            setPaymentOrder(null);
+            void queryClient.invalidateQueries({ queryKey: ["orders"] });
             setPaymentSuccess(true);
           }}
         />
@@ -234,7 +253,11 @@ export default function ProfileScreen() {
         visible={paymentSuccess}
         title="操作成功"
         message="订单已支付，可在订单页面查看进度"
-        onConfirm={() => setPaymentSuccess(false)}
+        onConfirm={() => {
+          setPaymentSuccess(false);
+          setPaymentSheetVisible(false);
+          setPaymentOrder(null);
+        }}
       />
     </View>
   );
@@ -474,13 +497,13 @@ function CompanionOrderSheet({
   context,
   token,
   onClose,
-  onPaid,
+  onOrderCreated,
 }: {
   card: ProfileSkillCard;
   context: CompanionOrderContext;
   token: string | null;
   onClose: () => void;
-  onPaid: () => void;
+  onOrderCreated: (order: { orderId: number; total: number }) => void;
 }) {
   const [services, setServices] = useState<CompanionServiceOption[]>([]);
   const [selectedServiceId, setSelectedServiceId] = useState(card.companionServiceId);
@@ -489,9 +512,6 @@ function CompanionOrderSheet({
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(Boolean(token));
   const [submitting, setSubmitting] = useState(false);
-  const [paying, setPaying] = useState(false);
-  const [balance, setBalance] = useState<number | null>(null);
-  const [createdOrder, setCreatedOrder] = useState<{ orderId: number; total: number } | null>(null);
   const [prompt, setPrompt] = useState<{ title?: string; message: string } | null>(null);
   const [sheetY] = useState(() => new Animated.Value(420));
   const [backdropOpacity] = useState(() => new Animated.Value(0));
@@ -536,8 +556,7 @@ function CompanionOrderSheet({
     try {
       const action = buildCreateOrderAction(context, selectedService, count, remark);
       const order = await createCompanionOrder(action, token);
-      setCreatedOrder({ orderId: order.orderId, total: Number(order.totalPrice) || action.total });
-      setBalance(await fetchStarBalance(token));
+      onOrderCreated({ orderId: order.orderId, total: Number(order.totalPrice) || action.total });
     } catch (error) {
       setPrompt({ message: error instanceof Error ? error.message : "创建订单失败" });
     } finally {
@@ -545,19 +564,6 @@ function CompanionOrderSheet({
     }
   }
 
-  async function pay() {
-    if (!token || !createdOrder) return;
-    if ((balance ?? 0) < createdOrder.total) return setPrompt({ title: "余额不足", message: "当前星钻余额不足，请充值后再支付" });
-    setPaying(true);
-    try {
-      await payCompanionOrder(createdOrder.orderId, token);
-      closeSheet(onPaid);
-    } catch (error) {
-      setPrompt({ message: error instanceof Error ? error.message : "支付失败" });
-    } finally {
-      setPaying(false);
-    }
-  }
 
   function closeSheet(afterClose?: () => void) {
     if (closing.current) return;
@@ -581,19 +587,10 @@ function CompanionOrderSheet({
           <Pressable accessibilityLabel="关闭下单弹窗" onPress={() => closeSheet()} style={StyleSheet.absoluteFill} />
           <Animated.View style={[styles.orderModal, { transform: [{ translateY: sheetY }] }]}> 
           <View style={styles.orderModalHeader}>
-            <Text style={styles.orderModalTitle}>{createdOrder ? "星钻支付" : "陪玩下单"}</Text>
+            <Text style={styles.orderModalTitle}>陪玩下单</Text>
             <Pressable onPress={() => closeSheet()}><Text style={styles.orderClose}>×</Text></Pressable>
           </View>
-          {createdOrder ? (
-            <>
-              <Text style={styles.orderPayAmount}>支付 {createdOrder.total} 星钻</Text>
-              <Text style={styles.orderBalance}>当前余额：{balance ?? "加载中..."} 星钻</Text>
-              <Pressable style={styles.orderSubmit} onPress={() => void pay()} disabled={paying}>
-                <Text style={styles.orderSubmitText}>{paying ? "支付中..." : "确认支付"}</Text>
-              </Pressable>
-            </>
-          ) : (
-            <>
+          <>
               <Text style={styles.orderLocked}>{card.modeName}-{card.levelName}</Text>
               {loading ? <Text style={styles.orderHint}>服务加载中...</Text> : services.map((service) => (
                 <Pressable key={service.companionServiceId} onPress={() => setSelectedServiceId(service.companionServiceId)} style={[styles.serviceOption, selectedServiceId === service.companionServiceId && styles.serviceOptionActive]}>
@@ -606,11 +603,68 @@ function CompanionOrderSheet({
               <Pressable onPress={() => setAgreed((value) => !value)} style={styles.agreementRow}><Text style={styles.checkbox}>{agreed ? "✓" : ""}</Text><Text style={styles.agreementText}>我已阅读并同意服务协议</Text></Pressable>
               <Text style={styles.orderTotal}>合计：{total} 星钻</Text>
               <Pressable style={[styles.orderSubmit, (!agreed || submitting || !selectedService) && styles.orderSubmitDisabled]} onPress={() => void submitOrder()} disabled={!agreed || submitting || !selectedService}><Text style={styles.orderSubmitText}>{submitting ? "提交中..." : "确认下单"}</Text></Pressable>
-            </>
-          )}
+          </>
           </Animated.View>
         </>
       </Animated.View>
+      <AppPrompt visible={Boolean(prompt)} title={prompt?.title} message={prompt?.message ?? ""} onConfirm={() => setPrompt(null)} />
+    </Modal>
+  );
+}
+
+function StarPaymentSheet({
+  order,
+  visible,
+  token,
+  onClose,
+  onPaid,
+}: {
+  order: { orderId: number; total: number };
+  visible: boolean;
+  token: string | null;
+  onClose: () => void;
+  onPaid: () => void;
+}) {
+  const [balance, setBalance] = useState<number | null>(null);
+  const [paying, setPaying] = useState(false);
+  const [prompt, setPrompt] = useState<{ title?: string; message: string } | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    void fetchStarBalance(token)
+      .then(setBalance)
+      .catch((error: Error) => setPrompt({ message: error.message }));
+  }, [token]);
+
+  async function pay() {
+    if (!token) return setPrompt({ message: "请先登录" });
+    if ((balance ?? 0) < order.total) return setPrompt({ title: "余额不足", message: "当前星钻余额不足，请充值后再支付" });
+    setPaying(true);
+    try {
+      await payCompanionOrder(order.orderId, token);
+      onPaid();
+    } catch (error) {
+      setPrompt({ message: error instanceof Error ? error.message : "支付失败" });
+    } finally {
+      setPaying(false);
+    }
+  }
+
+  return (
+    <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
+      <View style={styles.orderModalBackdrop}>
+        <View style={styles.orderModal}>
+          <View style={styles.orderModalHeader}>
+            <Text style={styles.orderModalTitle}>星钻支付</Text>
+            <Pressable onPress={onClose}><Text style={styles.orderClose}>×</Text></Pressable>
+          </View>
+          <Text style={styles.orderPayAmount}>支付 {order.total} 星钻</Text>
+          <Text style={styles.orderBalance}>当前余额：{balance ?? "加载中..."} 星钻</Text>
+          <Pressable style={styles.orderSubmit} onPress={() => void pay()} disabled={paying || balance === null}>
+            <Text style={styles.orderSubmitText}>{paying ? "支付中..." : "确认支付"}</Text>
+          </Pressable>
+        </View>
+      </View>
       <AppPrompt visible={Boolean(prompt)} title={prompt?.title} message={prompt?.message ?? ""} onConfirm={() => setPrompt(null)} />
     </Modal>
   );

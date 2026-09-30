@@ -16,8 +16,11 @@ const PRIMARY_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
 const STATUS_COLORS: Record<OrderStatus, string> = {
   pendingPayment: "#FF943D",
   paid: "#14A357",
+  waitingService: "#FF943D",
+  inService: "#FF943D",
   completed: "#808080",
   cancelled: "#808080",
+  refunded: "#808080",
 };
 
 type OrderCardProps = {
@@ -76,15 +79,11 @@ export const OrderCard = memo(function OrderCard({
       </View>
       </Pressable>
 
-      <View style={styles.actions}>
+      {item.actions.length > 0 && <View style={styles.actions}>
         {item.actions.map((action) => (
-          <ActionButton
-            action={action}
-            key={action.key}
-            onPress={() => onAction(item, action.key)}
-          />
+          <ActionButton action={action} key={action.key} onPress={() => onAction(item, action.key)} />
         ))}
-      </View>
+      </View>}
     </View>
   );
 });

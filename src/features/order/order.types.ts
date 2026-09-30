@@ -5,15 +5,19 @@ export type OrderFilter = "all" | "inProgress" | "completed" | "cancelled";
 export type OrderStatus =
   | "pendingPayment"
   | "paid"
+  | "waitingService"
+  | "inService"
   | "completed"
-  | "cancelled";
+  | "cancelled"
+  | "refunded";
 
 export type OrderActionKey =
   | "cancel"
   | "pay"
   | "afterSales"
   | "review"
-  | "reorder";
+  | "reorder"
+  | "complete";
 
 export type OrderAction = {
   key: OrderActionKey;
@@ -23,6 +27,7 @@ export type OrderAction = {
 
 export type OrderItemModel = {
   id: string;
+  orderNo?: string;
   status: OrderStatus;
   statusLabel: string;
   sellerName: string;
@@ -32,6 +37,11 @@ export type OrderItemModel = {
   unitPrice: string;
   quantity: number;
   totalPrice: string;
+  createTime?: string;
+  paidTime?: string;
+  acceptedTime?: string;
+  serviceStartTime?: string;
+  completedTime?: string;
   actions: readonly OrderAction[];
 };
 
