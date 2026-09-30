@@ -51,6 +51,7 @@ export default function ClubDetailScreen() {
   const games = club?.games ?? [];
   const selectedGame = game || String(games[0]?.id ?? "");
   const modesQuery = useClubGameModes(selectedGame);
+  const selectedModeLabel = modesQuery.data?.find((mode) => mode.id === selectedMode)?.modeName;
   const companionFilters = useMemo<CompanionFilters | null>(() => (
     club && selectedGame ? { clubId: club.id, gameId: selectedGame, priceSort, sex: selectedSex, gameStatus: selectedStatus, gameModeId: selectedMode } : null
   ), [club, priceSort, selectedGame, selectedMode, selectedSex, selectedStatus]);
@@ -124,7 +125,15 @@ export default function ClubDetailScreen() {
         </ScrollView>
       </LinearGradient>
       <View style={styles.filterRow}>
-        {filterDefinitions.map(({ key, label }) => (
+        {filterDefinitions.map(({ key, label }) => {
+          const displayLabel = key === "gender"
+            ? selectedSex === 1 ? "男" : selectedSex === 2 ? "女" : label
+            : key === "mode" ? selectedModeLabel || label
+            : key === "status" ? selectedStatus === 0 ? "空闲中" : selectedStatus === 1 ? "游戏中" : label
+            : priceSort === "ASC" ? "从低到高" : priceSort === "DESC" ? "从高到低" : label;
+          const hasSelection = displayLabel !== label;
+          const filterDisplay = hasSelection ? `${label} ${displayLabel}` : label;
+          return (
           <Pressable
             key={key}
             accessibilityLabel={`筛选${label}`}
@@ -134,10 +143,11 @@ export default function ClubDetailScreen() {
             ]}
             onPress={() => setOpenFilter(key)}
           >
-            <Text style={styles.filterText}>{label}</Text>
+            <Text numberOfLines={1} style={[styles.filterText, hasSelection && styles.filterTextSelected]}>{filterDisplay}</Text>
             <Image source={filterArrowIcon} style={styles.filterArrowIcon} />
           </Pressable>
-        ))}
+          );
+        })}
       </View>
       <Modal transparent visible={openFilter !== null} animationType="slide" onRequestClose={() => setOpenFilter(null)}>
         <Pressable style={styles.filterBackdrop} onPress={() => setOpenFilter(null)}>
@@ -159,6 +169,8 @@ export default function ClubDetailScreen() {
           {members.map((member) => (
             <MemberCard
               key={member.profileId}
+              clubId={club.id}
+              userId={member.userId}
               image={member.headImage}
               name={member.nickname}
               description={member.signature}
@@ -166,8 +178,8 @@ export default function ClubDetailScreen() {
               price={member.price}
               orderCount={member.orderCount}
               voiceDuration={member.voiceDurationSeconds}
-              status={member.gameStatus === 1 ? "游戏中" : member.onlineStatus === 1 ? "空闲中" : "离线"}
-              statusColor={member.gameStatus === 1 ? "#1e5eff" : member.onlineStatus === 1 ? "#16c978" : "#999"}
+              status={member.gameStatus === 1 ? "游戏中" : member.onlineStatus === 1 ? "空闲中" : undefined}
+              statusColor={member.gameStatus === 1 ? "#1e5eff" : member.onlineStatus === 1 ? "#16c978" : undefined}
             />
           ))}
           {!companionsQuery.isLoading && members.length === 0 && <Text style={styles.stateText}>暂无陪玩</Text>}
@@ -273,6 +285,8 @@ function FilterOption({
 }
 
 function MemberCard({
+  clubId,
+  userId,
   image,
   name,
   description,
@@ -283,6 +297,8 @@ function MemberCard({
   status,
   statusColor,
 }: {
+  clubId: string;
+  userId: number;
   image?: string;
   name: string;
   description?: string;
@@ -290,12 +306,18 @@ function MemberCard({
   price: number;
   orderCount: number;
   voiceDuration?: number;
-  status: string;
-  statusColor: string;
+  status?: string;
+  statusColor?: string;
 }) {
   const isPlaying = status === "游戏中";
   return (
-    <Pressable style={styles.memberCard} onPress={() => undefined}>
+    <Pressable
+      style={styles.memberCard}
+      onPress={() => router.push({
+        pathname: "/profile",
+        params: { clubId, userId: String(userId) },
+      })}
+    >
       <View style={styles.avatarWrap}>
         <Image source={image ? { uri: image } : undefined} contentFit="cover" style={styles.avatar} />
         <View style={styles.voice}>
@@ -317,20 +339,12 @@ function MemberCard({
               24
             </Text>
           </View>
-          <View
-            style={[styles.status, { backgroundColor: `${statusColor}20` }]}
-          >
-            <Image
-              source={isPlaying ? playingIcon : idleIcon}
-              style={styles.statusIcon}
-            />
-            <Text
-              numberOfLines={1}
-              style={[styles.statusText, { color: statusColor }]}
-            >
-              {status}
-            </Text>
-          </View>
+          {status && statusColor && (
+            <View style={[styles.status, { backgroundColor: `${statusColor}20` }] }>
+              <Image source={isPlaying ? playingIcon : idleIcon} style={styles.statusIcon} />
+              <Text numberOfLines={1} style={[styles.statusText, { color: statusColor }]}>{status}</Text>
+            </View>
+          )}
         </View>
         <Text numberOfLines={2} style={styles.memberDesc}>
           {description || "暂无个人简介"}
@@ -472,10 +486,8 @@ const styles = StyleSheet.create({
   gameLabelActive: { color: "#111", fontWeight: "600" },
   filterRow: {
     height: 42,
-    paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     backgroundColor: "#fff",
   },
   filterItem: {
@@ -486,9 +498,12 @@ const styles = StyleSheet.create({
     gap: 2,
     minHeight: 34,
     borderRadius: 4,
+    minWidth: 0,
+    paddingHorizontal: 4,
   },
   filterItemActive: { backgroundColor: "#f5f5f5" },
-  filterText: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 12 },
+  filterText: { flexShrink: 1, color: "#666", fontFamily: DOUYIN_SANS, fontSize: 12 },
+  filterTextSelected: { color: "#0A0A0A", fontWeight: "600" },
   filterArrowIcon: { width: 12, height: 12 },
   filterBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,.35)" },
   filterSheet: { maxHeight: "65%", paddingBottom: 28, backgroundColor: "#fff", borderTopLeftRadius: 12, borderTopRightRadius: 12 },

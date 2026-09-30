@@ -1,26 +1,18 @@
-import { useMemo, useState } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { FlatList, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
 import { OrderCard } from "../components/OrderCard";
 import { OrderHeader } from "../components/OrderHeader";
 import { OrderTabs } from "../components/OrderTabs";
-import { ORDER_ITEMS } from "../order.data";
-import { filterOrders } from "../order.filter";
+import { useOrderPage } from "../hooks/use-order-page";
 import type {
   OrderActionKey,
   OrderFilter,
   OrderItemModel,
 } from "../order.types";
-
-const EMPTY_LABELS: Record<OrderFilter, string> = {
-  all: "暂无订单",
-  inProgress: "暂无进行中订单",
-  completed: "暂无已完成订单",
-  cancelled: "暂无已取消订单",
-};
 
 const handleOrderAction = (
   _item: OrderItemModel,
@@ -30,7 +22,8 @@ const handleOrderAction = (
 export default function OrderScreen() {
   const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<OrderFilter>("all");
-  const orders = useMemo(() => filterOrders(ORDER_ITEMS, filter), [filter]);
+  const orders = useOrderPage(filter);
+  const items = orders.data?.items ?? [];
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -41,14 +34,10 @@ export default function OrderScreen() {
           styles.content,
           { paddingBottom: 80 + insets.bottom },
         ]}
-        data={orders}
+        data={items}
         ItemSeparatorComponent={OrderSeparator}
         keyExtractor={(item) => item.id}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyText}>{EMPTY_LABELS[filter]}</Text>
-          </View>
-        }
+        ListEmptyComponent={orders.isLoading ? <LoadingState /> : orders.isError ? <ErrorState onRetry={() => void orders.refetch()} /> : <View style={styles.empty}><EmptyState message={filter === "all" ? "暂无订单" : `暂无${filter === "inProgress" ? "进行中" : filter === "completed" ? "已完成" : "已取消"}订单`} /></View>}
         renderItem={({ item }) => (
           <OrderCard item={item} onAction={handleOrderAction} onPress={(order) => router.push(`/order/${order.id}`)} />
         )}
@@ -67,10 +56,4 @@ const styles = StyleSheet.create({
   content: { flexGrow: 1, paddingTop: 8 },
   separator: { height: 8 },
   empty: { flex: 1, minHeight: 320, alignItems: "center", justifyContent: "center" },
-  emptyText: {
-    fontFamily: DOUYIN_SANS,
-    color: "#999999",
-    fontSize: 14,
-    lineHeight: 22,
-  },
 });

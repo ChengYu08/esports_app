@@ -58,6 +58,7 @@ export type ClubGameMode = {
 
 export type Companion = {
   profileId: number;
+  userId: number;
   nickname: string;
   headImage?: string;
   sex?: number;

@@ -33,7 +33,25 @@ export default function MineScreen() {
               <View style={styles.detailLine}><Text style={styles.uid}>{user ? `ID: ${user.id}` : "登录后查看 ID"}</Text>{user ? <Image source={copyIcon} style={styles.copyIcon} /> : null}</View>
             </View>
           </Pressable>
-          <Pressable accessibilityRole="link" accessibilityLabel="个人主页" hitSlop={10} style={styles.homepage} onPress={() => router.push("/profile")}><Text style={styles.homepageText}>个人主页</Text><Image source={arrow} style={styles.arrow} /></Pressable>
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel="个人主页"
+            hitSlop={10}
+            style={styles.homepage}
+            onPress={() => {
+              if (user?.clubInfo?.id && user.id) {
+                router.push({
+                  pathname: "/profile",
+                  params: { clubId: String(user.clubInfo.id), userId: String(user.id) },
+                });
+                return;
+              }
+              router.push("/profile");
+            }}
+          >
+            <Text style={styles.homepageText}>个人主页</Text>
+            <Image source={arrow} style={styles.arrow} />
+          </Pressable>
         </View>
         <View style={styles.statsCard}>
           <View style={styles.stat}><Text style={styles.statValue}>{user?.starBalance ?? "--"}</Text><Text style={styles.statLabel}>星钻</Text></View>

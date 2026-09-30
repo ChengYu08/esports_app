@@ -34,3 +34,5 @@ export type OrderItemModel = {
   totalPrice: string;
   actions: readonly OrderAction[];
 };
+
+export type OrderQueryStatus = "PROCESSING" | "FINISHED" | "CANCELED";
