@@ -84,49 +84,51 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.screen}>
+      <View style={styles.cover}>
+        <Image
+          source={
+            gameDetail?.backgroundUrl
+              ? { uri: gameDetail.backgroundUrl }
+              : background
+          }
+          contentFit="cover"
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={styles.coverShade} />
+        <View style={[styles.navbar, { paddingTop: insets.top }]}>
+          <Pressable
+            accessibilityLabel="返回"
+            hitSlop={12}
+            onPress={() => router.back()}
+            style={styles.navButton}
+          >
+            <Image source={backIcon} style={styles.backIcon} />
+          </Pressable>
+          {isMine ? (
+            <Pressable
+              accessibilityLabel="设置"
+              hitSlop={12}
+              onPress={() => undefined}
+              style={styles.navButton}
+            >
+              <Image source={settingsIcon} style={styles.settingsIcon} />
+            </Pressable>
+          ) : (
+            <View style={styles.navButton} />
+          )}
+        </View>
+        <ProfileIdentity profile={profile} />
+      </View>
+
       <ScrollView
+        style={styles.scrollView}
+        stickyHeaderIndices={[1]}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           paddingBottom: isMine ? 24 + insets.bottom : 88 + insets.bottom,
         }}
       >
-        <View style={styles.cover}>
-          <Image
-            source={
-              gameDetail?.backgroundUrl
-                ? { uri: gameDetail.backgroundUrl }
-                : background
-            }
-            contentFit="cover"
-            style={StyleSheet.absoluteFill}
-          />
-          <View style={styles.coverShade} />
-          <View style={[styles.navbar, { paddingTop: insets.top }]}>
-            <Pressable
-              accessibilityLabel="返回"
-              hitSlop={12}
-              onPress={() => router.back()}
-              style={styles.navButton}
-            >
-              <Image source={backIcon} style={styles.backIcon} />
-            </Pressable>
-            {isMine ? (
-              <Pressable
-                accessibilityLabel="设置"
-                hitSlop={12}
-                onPress={() => undefined}
-                style={styles.navButton}
-              >
-                <Image source={settingsIcon} style={styles.settingsIcon} />
-              </Pressable>
-            ) : (
-              <View style={styles.navButton} />
-            )}
-          </View>
-          <ProfileIdentity profile={profile} />
-        </View>
-
-        <View style={styles.content}>
+        <View style={styles.scrollIntro}>
           <View style={styles.stats}>
             <Stat value={profile.followCount} label="关注" />
             <Stat value={profile.fansCount} label="粉丝" />
@@ -134,6 +136,9 @@ export default function ProfileScreen() {
           <Text style={styles.signature}>
             {profile.signature || "暂无个人简介"}
           </Text>
+        </View>
+
+        <View style={styles.stickyTabs}>
           <View style={styles.tabs}>
             {(["技能", "评价"] as ProfileTab[]).map((item) => (
               <Pressable
@@ -150,7 +155,9 @@ export default function ProfileScreen() {
               </Pressable>
             ))}
           </View>
+        </View>
 
+        <View style={styles.scrollBody}>
           {games.length > 0 ? (
             <GameSelector
               games={games}
@@ -591,6 +598,7 @@ const styles = StyleSheet.create({
   },
   retryText: { color: "#FF3158", fontFamily: DOUYIN_SANS, fontSize: 14 },
   cover: { height: 185, overflow: "hidden", backgroundColor: "#617181" },
+  scrollView: { flex: 1, backgroundColor: "#fff" },
   coverShade: {
     ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(24,35,47,0.52)",
@@ -665,13 +673,18 @@ const styles = StyleSheet.create({
     fontFamily: DOUYIN_SANS,
     fontSize: 12,
   },
-  content: {
-    marginTop: -1,
+  scrollIntro: {
     paddingHorizontal: 16,
     backgroundColor: "#fff",
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
     paddingTop: 16,
+  },
+  stickyTabs: {
+    paddingHorizontal: 16,
+    backgroundColor: "#fff",
+  },
+  scrollBody: {
+    paddingHorizontal: 16,
+    backgroundColor: "#fff",
   },
   stats: { flexDirection: "row", gap: 16 },
   stat: { flexDirection: "row", alignItems: "baseline", gap: 5 },

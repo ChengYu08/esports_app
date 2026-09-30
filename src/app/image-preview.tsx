@@ -1,9 +1,13 @@
-import ImageViewing from "react-native-image-viewing";
+import { ImageZoom } from "@likashefqet/react-native-image-zoom";
 import { router, useLocalSearchParams } from "expo-router";
-import { StyleSheet, View } from "react-native";
 import { useEffect } from "react";
+import { Dimensions, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { parseImagePreviewParams } from "@/features/mine/image-preview.params";
+import { IMAGE_PREVIEW_ZOOM } from "@/features/mine/image-preview.zoom";
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export default function ImagePreviewScreen() {
   const params = useLocalSearchParams<{ images?: string | string[]; index?: string | string[] }>();
@@ -18,19 +22,60 @@ export default function ImagePreviewScreen() {
   }
 
   return (
-    <View style={styles.screen}>
-      <ImageViewing
-        images={images.map((uri) => ({ uri }))}
-        imageIndex={index}
-        visible
-        onRequestClose={() => router.back()}
-        presentationStyle="overFullScreen"
+    <GestureHandlerRootView style={styles.screen}>
+      <FlatList
+        data={images}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        initialScrollIndex={index}
+        keyExtractor={(uri, itemIndex) => `${uri}-${itemIndex}`}
+        getItemLayout={(_, itemIndex) => ({
+          length: SCREEN_WIDTH,
+          offset: SCREEN_WIDTH * itemIndex,
+          index: itemIndex,
+        })}
+        renderItem={({ item }) => (
+          <View style={styles.page}>
+            <ImageZoom
+              uri={item}
+              maxScale={IMAGE_PREVIEW_ZOOM.maxScale}
+              doubleTapScale={IMAGE_PREVIEW_ZOOM.doubleTapScale}
+              isDoubleTapEnabled
+              isPinchEnabled
+              style={styles.zoomImage}
+            />
+          </View>
+        )}
       />
-    </View>
+      <Pressable accessibilityLabel="关闭图片预览" hitSlop={12} onPress={() => router.back()} style={styles.closeButton}>
+        <Text style={styles.closeText}>×</Text>
+      </Pressable>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#000" },
+  page: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#000",
+  },
+  zoomImage: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT },
+  closeButton: {
+    position: "absolute",
+    top: 56,
+    left: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  closeText: { color: "#fff", fontSize: 32, fontWeight: "300", lineHeight: 36 },
   empty: { flex: 1, backgroundColor: "#000" },
 });

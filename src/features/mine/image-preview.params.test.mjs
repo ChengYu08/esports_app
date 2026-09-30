@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { createImagePreviewParams, parseImagePreviewParams } from "./image-preview.params.ts";
+import { IMAGE_PREVIEW_ZOOM } from "./image-preview.zoom.ts";
 
 test("round trips preview images and clamps an invalid index", () => {
   const params = createImagePreviewParams(["https://cdn.test/a.jpg", "https://cdn.test/b.jpg"], 9);
@@ -23,4 +24,8 @@ test("keeps the selected image index within a review gallery", () => {
     images: ["review-a.png", "review-b.png", "review-c.png"],
     index: 1,
   });
+});
+
+test("allows a short image to zoom beyond its intrinsic size", () => {
+  assert.deepEqual(IMAGE_PREVIEW_ZOOM, { maxScale: 5, doubleTapScale: 3 });
 });

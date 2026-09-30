@@ -118,7 +118,11 @@ export default function MineScreen() {
             title="俱乐部入驻"
             onPress={() => undefined}
           />
-          <MenuRow icon={settings} title="基础设置" onPress={() => undefined} />
+          <MenuRow
+            icon={settings}
+            title="基础设置"
+            onPress={() => router.push("/account-settings")}
+          />
         </View>
       </ScrollView>
     </View>

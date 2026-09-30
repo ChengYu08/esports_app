@@ -5,6 +5,7 @@ import { useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { usePriceList } from "../hooks/use-home-data";
+import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 
@@ -14,15 +15,26 @@ export default function PriceListScreen() {
   const query = usePriceList(groupId);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const contentRef = useRef<ScrollView>(null);
-  const tabs = query.data ?? [];
+  const tabs = useMemo(() => query.data ?? [], [query.data]);
   const selectedTab = tabs[selectedIndex] ?? tabs[0];
 
   const content = useMemo(() => {
     if (query.isLoading) return <Text style={styles.stateText}>加载中...</Text>;
     if (query.isError) return <View style={styles.state}><Text style={styles.stateText}>价目表加载失败</Text><Pressable onPress={() => void query.refetch()}><Text style={styles.retryText}>重试</Text></Pressable></View>;
     if (!selectedTab) return <Text style={styles.stateText}>暂无价目表</Text>;
-    return <PriceImage uri={selectedTab.imageUrl} />;
-  }, [query, selectedTab]);
+    return (
+      <PriceImage
+        uri={selectedTab.imageUrl}
+        onPress={() => {
+          const images = tabs.map((tab) => tab.imageUrl);
+          router.push({
+            pathname: "/image-preview",
+            params: createImagePreviewParams(images, selectedIndex),
+          });
+        }}
+      />
+    );
+  }, [query, selectedIndex, selectedTab, tabs]);
 
   return (
     <View style={styles.screen}>
@@ -50,18 +62,20 @@ export default function PriceListScreen() {
   );
 }
 
-function PriceImage({ uri }: { uri: string }) {
+function PriceImage({ uri, onPress }: { uri: string; onPress: () => void }) {
   const [ratio, setRatio] = useState(1);
   return (
-    <Image
-      source={{ uri }}
-      contentFit="contain"
-      style={[styles.priceImage, { aspectRatio: ratio }]}
-      onLoad={(event) => {
-        const { width, height } = event.source;
-        if (width > 0 && height > 0) setRatio(width / height);
-      }}
-    />
+    <Pressable accessibilityLabel="预览价目表图片" onPress={onPress}>
+      <Image
+        source={{ uri }}
+        contentFit="contain"
+        style={[styles.priceImage, { aspectRatio: ratio }]}
+        onLoad={(event) => {
+          const { width, height } = event.source;
+          if (width > 0 && height > 0) setRatio(width / height);
+        }}
+      />
+    </Pressable>
   );
 }
 

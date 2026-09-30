@@ -23,6 +23,14 @@ export type ClientUserInfo = {
   starBalance?: number | string;
 };
 
+export type ClientProfileUpdate = {
+  nickname?: string;
+  headImage?: string;
+  gender?: number;
+  birth?: string;
+  signature?: string;
+};
+
 export type AuthRequestOptions = {
   method: 'POST';
   body?: unknown;
@@ -45,6 +53,21 @@ export function createClientAuthContract(requester: AuthRequester) {
     },
     async fetchCurrentUser(token: string) {
       return unwrap(await requester<ClientUserInfo>('/client/v1/user/login/info', {
+        method: 'POST', token,
+      }));
+    },
+    async updateProfile(token: string, data: ClientProfileUpdate) {
+      return unwrap(await requester<ClientUserInfo>('/client/v1/user/update/profile', {
+        method: 'POST', token, body: { action: data },
+      }));
+    },
+    async realNameVerify(token: string, data: { name: string; num: string }) {
+      return unwrap(await requester<unknown>('/client/v1/user/elementSmartVerify', {
+        method: 'POST', token, body: { action: data },
+      }));
+    },
+    async logout(token: string) {
+      return unwrap(await requester<unknown>('/client/v1/user/logout', {
         method: 'POST', token,
       }));
     },

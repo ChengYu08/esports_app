@@ -41,3 +41,35 @@ test("loads the current C端 user with the business token header", async () => {
     options: { method: "POST", token: "business-token" },
   }]);
 });
+
+test("updates profile using the PC account settings endpoint", async () => {
+  const requests = [];
+  const api = createClientAuthContract(async (path, options) => {
+    requests.push({ path, options });
+    return { success: true, code: "SUCCESS", data: { id: 42, nickname: "新昵称", headImage: "" } };
+  });
+
+  const result = await api.updateProfile("business-token", { nickname: "新昵称" });
+
+  assert.equal(result.nickname, "新昵称");
+  assert.deepEqual(requests, [{
+    path: "/client/v1/user/update/profile",
+    options: { method: "POST", token: "business-token", body: { action: { nickname: "新昵称" } } },
+  }]);
+});
+
+test("verifies real name and logs out with the business token", async () => {
+  const requests = [];
+  const api = createClientAuthContract(async (path, options) => {
+    requests.push({ path, options });
+    return { success: true, code: "SUCCESS", data: true };
+  });
+
+  await api.realNameVerify("business-token", { name: "测试", num: "110101199001011234" });
+  await api.logout("business-token");
+
+  assert.deepEqual(requests, [
+    { path: "/client/v1/user/elementSmartVerify", options: { method: "POST", token: "business-token", body: { action: { name: "测试", num: "110101199001011234" } } } },
+    { path: "/client/v1/user/logout", options: { method: "POST", token: "business-token" } },
+  ]);
+});
