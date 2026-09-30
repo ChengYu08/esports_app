@@ -145,11 +145,31 @@ export default function AccountSettingsScreen() {
     setAvatarUploading(true);
     try {
       const fileName = selected.fileName || `avatar-${Date.now()}.jpg`;
-      const sts = await clientAuthApi.getOssSts(token, "101", [fileName]);
-      const objectKey = sts.objectList?.[0];
-      if (!objectKey) throw new Error("上传凭证无效");
-      const imageUrl = await uploadClientObject(sts, objectKey, selected);
-      const profile = await clientAuthApi.updateProfile(token, { headImage: imageUrl });
+      let imageUrl = "";
+      let lastUploadError: unknown;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        let sts;
+        try {
+          sts = await clientAuthApi.getOssSts(token, "101", [fileName]);
+        } catch (error) {
+          throw new Error(`获取上传凭证失败：${error instanceof Error ? error.message : "请稍后重试"}`);
+        }
+        const objectKey = sts.objectList?.[0];
+        if (!objectKey) throw new Error("上传凭证无效：缺少 objectList[0]");
+        try {
+          imageUrl = await uploadClientObject(sts, objectKey, selected);
+          break;
+        } catch (error) {
+          lastUploadError = error;
+        }
+      }
+      if (!imageUrl) throw new Error(`上传图片失败：${lastUploadError instanceof Error ? lastUploadError.message : "请稍后重试"}`);
+      let profile;
+      try {
+        profile = await clientAuthApi.updateProfile(token, { headImage: imageUrl });
+      } catch (error) {
+        throw new Error(`保存头像失败：${error instanceof Error ? error.message : "请稍后重试"}`);
+      }
       const session = { accessToken: token, user: toAuthUser(profile, user.phone) };
       await saveAuthSession(session);
       setSession(session);

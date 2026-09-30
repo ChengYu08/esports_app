@@ -12,6 +12,8 @@ import { ApiError } from "@/core/network/api-client";
 import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { toAuthUser } from "@/features/auth/client-auth-flow";
 import { clearAuthSession, readAuthSession, saveAuthSession } from "@/features/auth/session-persistence";
+import { PrivacyConsentGate } from "@/features/privacy/components/PrivacyConsentGate";
+import { readPrivacyConsent } from "@/features/privacy/privacy-consent";
 
 const fonts = {
   [DOUYIN_SANS]: require("../../assets/fonts/Douyin Sans.otf"),
@@ -20,12 +22,23 @@ const fonts = {
 export default function RootLayout() {
   const [loaded, error] = useFonts(fonts);
   const [sessionReady, setSessionReady] = useState(false);
+  const [privacyReady, setPrivacyReady] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const setSession = useAuthStore((state) => state.setSession);
   const clearSession = useAuthStore((state) => state.clearSession);
 
   useEffect(() => {
     let active = true;
     void (async () => {
+      const hasPrivacyConsent = await readPrivacyConsent();
+      if (active) {
+        setPrivacyAccepted(hasPrivacyConsent);
+        setPrivacyReady(true);
+      }
+      if (!hasPrivacyConsent) {
+        if (active) setSessionReady(true);
+        return;
+      }
       const session = await readAuthSession();
       if (!session) {
         if (active) setSessionReady(true);
@@ -50,7 +63,7 @@ export default function RootLayout() {
     return () => { active = false; };
   }, [clearSession, setSession]);
 
-  if ((!loaded && !error) || !sessionReady) {
+  if ((!loaded && !error) || !sessionReady || !privacyReady) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
         <ActivityIndicator />
@@ -61,11 +74,15 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="login" options={{ animation: "none" }} />
-          <Stack.Screen name="account-settings" />
-        </Stack>
+        {privacyAccepted ? (
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="login" options={{ animation: "none" }} />
+            <Stack.Screen name="account-settings" />
+          </Stack>
+        ) : (
+          <PrivacyConsentGate onAccepted={() => setPrivacyAccepted(true)} />
+        )}
       </SafeAreaProvider>
     </QueryClientProvider>
   );

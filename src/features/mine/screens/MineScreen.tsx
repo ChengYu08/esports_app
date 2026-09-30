@@ -1,9 +1,10 @@
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useAuthStore } from "@esports/auth";
+import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useMemo } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const avatar = require("../../../../assets/mine/figma/mine-avatar.png");
@@ -27,6 +28,11 @@ export default function MineScreen() {
         : "登录 / 注册"),
     [user],
   );
+  const copyUserId = async () => {
+    if (!user?.id) return;
+    await Clipboard.setStringAsync(String(user.id));
+    Alert.alert("复制成功", "ID 已复制到剪贴板");
+  };
 
   return (
     <View style={styles.screen}>
@@ -59,14 +65,20 @@ export default function MineScreen() {
                   </>
                 ) : null}
               </View>
-              <View style={styles.detailLine}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="复制用户 ID"
+                hitSlop={8}
+                onPress={() => void copyUserId()}
+                style={styles.detailLine}
+              >
                 <Text style={styles.uid}>
                   {user ? `ID: ${user.id}` : "登录后查看 ID"}
                 </Text>
                 {user ? (
                   <Image source={copyIcon} style={styles.copyIcon} />
                 ) : null}
-              </View>
+              </Pressable>
             </View>
           </Pressable>
           <Pressable

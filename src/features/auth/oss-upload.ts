@@ -1,4 +1,5 @@
 import CryptoJS from "crypto-js";
+import { File } from "expo-file-system";
 
 import type { ClientOssSts } from "./client-auth.api";
 
@@ -8,7 +9,9 @@ type UploadInput = {
 };
 
 function normalizeEndpoint(endpoint: string) {
-  return endpoint.replace(/\/$/, "").replace(/^http:\/\//, "https://");
+  const value = endpoint.trim().replace(/\/$/, "");
+  if (/^https?:\/\//i.test(value)) return value.replace(/^http:\/\//i, "https://");
+  return `https://${value}`;
 }
 
 export async function uploadClientObject(sts: ClientOssSts, objectKey: string, input: UploadInput) {
@@ -28,19 +31,21 @@ export async function uploadClientObject(sts: ClientOssSts, objectKey: string, i
     [securityTokenHeader]: sts.securityToken,
     [overwriteHeader]: "true",
   };
-  const canonicalizedHeaders = `${securityTokenHeader}:${sts.securityToken}\n${overwriteHeader}:true\n`;
+  const canonicalizedHeaders = `${overwriteHeader}:true\n${securityTokenHeader}:${sts.securityToken}\n`;
   const canonicalizedResource = `/${sts.bucketName}/${objectKey}`;
   const stringToSign = `PUT\n\n${contentType}\n${date}\n${canonicalizedHeaders}${canonicalizedResource}`;
   const signature = CryptoJS.HmacSHA1(stringToSign, sts.accessKeySecret).toString(CryptoJS.enc.Base64);
 
+  const localFile = new File(input.uri);
+  if (!localFile.exists) throw new Error("读取图片失败：本地图片文件不存在");
   const response = await fetch(uploadUrl, {
     method: "PUT",
-    headers: {
-      ...headers,
-      Authorization: `OSS ${sts.accessKeyId}:${signature}`,
-    },
-    body: await (await fetch(input.uri)).blob(),
+    headers: { ...headers, Authorization: `OSS ${sts.accessKeyId}:${signature}` },
+    body: localFile,
   });
-  if (!response.ok) throw new Error(`OSS 上传失败（${response.status}）`);
+  if (!response.ok) {
+    const detail = (await response.text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    throw new Error(`OSS 上传失败（${response.status}${detail ? `：${detail.slice(0, 160)}` : ""}）`);
+  }
   return `${sts.domain.replace(/\/$/, "")}/${objectKey}`;
 }

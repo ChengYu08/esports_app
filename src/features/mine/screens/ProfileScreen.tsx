@@ -1,8 +1,8 @@
 import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -23,6 +23,7 @@ import {
 } from "@/features/mine/hooks/use-profile-data";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { queryClient } from "@/core/query/query-client";
+import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import {
   buildCreateOrderAction,
@@ -55,6 +56,7 @@ export default function ProfileScreen() {
   const [tab, setTab] = useState<ProfileTab>("技能");
   const [selectedGameId, setSelectedGameId] = useState("");
   const [orderCard, setOrderCard] = useState<ProfileSkillCard | null>(null);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
   const detailQuery = useProfileDetail(routeParams);
   const detail = detailQuery.data;
   const firstGameId = getFirstProfileGameId(detail?.games ?? []);
@@ -224,9 +226,16 @@ export default function ProfileScreen() {
           onPaid={() => {
             void queryClient.invalidateQueries({ queryKey: ["orders"] });
             setOrderCard(null);
+            setPaymentSuccess(true);
           }}
         />
       ) : null}
+      <AppPrompt
+        visible={paymentSuccess}
+        title="操作成功"
+        message="订单已支付，可在订单页面查看进度"
+        onConfirm={() => setPaymentSuccess(false)}
+      />
     </View>
   );
 }
@@ -483,6 +492,21 @@ function CompanionOrderSheet({
   const [paying, setPaying] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
   const [createdOrder, setCreatedOrder] = useState<{ orderId: number; total: number } | null>(null);
+  const [prompt, setPrompt] = useState<{ title?: string; message: string } | null>(null);
+  const [sheetY] = useState(() => new Animated.Value(420));
+  const [backdropOpacity] = useState(() => new Animated.Value(0));
+  const closing = useRef(false);
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(sheetY, { toValue: 0, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(backdropOpacity, { toValue: 1, duration: 220, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+    ]).start();
+    return () => {
+      sheetY.stopAnimation();
+      backdropOpacity.stopAnimation();
+    };
+  }, [backdropOpacity, sheetY]);
 
   useEffect(() => {
     if (!token) return;
@@ -497,7 +521,7 @@ function CompanionOrderSheet({
           setSelectedServiceId(items[0]?.companionServiceId ?? 0);
         }
       })
-      .catch((error: Error) => Alert.alert("提示", error.message))
+      .catch((error: Error) => setPrompt({ message: error.message }))
       .finally(() => setLoading(false));
   }, [context.clubId, context.gameLevelId, context.serviceUserId, selectedServiceId, token]);
 
@@ -506,8 +530,8 @@ function CompanionOrderSheet({
   const total = (selectedService?.price ?? card.price) * count;
 
   async function submitOrder() {
-    if (!token) return Alert.alert("提示", "请先登录");
-    if (!selectedService || !agreed) return Alert.alert("提示", "请选择服务并同意服务协议");
+    if (!token) return setPrompt({ message: "请先登录" });
+    if (!selectedService || !agreed) return setPrompt({ message: "请选择服务并同意服务协议" });
     setSubmitting(true);
     try {
       const action = buildCreateOrderAction(context, selectedService, count, remark);
@@ -515,7 +539,7 @@ function CompanionOrderSheet({
       setCreatedOrder({ orderId: order.orderId, total: Number(order.totalPrice) || action.total });
       setBalance(await fetchStarBalance(token));
     } catch (error) {
-      Alert.alert("提示", error instanceof Error ? error.message : "创建订单失败");
+      setPrompt({ message: error instanceof Error ? error.message : "创建订单失败" });
     } finally {
       setSubmitting(false);
     }
@@ -523,25 +547,42 @@ function CompanionOrderSheet({
 
   async function pay() {
     if (!token || !createdOrder) return;
-    if ((balance ?? 0) < createdOrder.total) return Alert.alert("提示", "星钻余额不足");
+    if ((balance ?? 0) < createdOrder.total) return setPrompt({ title: "余额不足", message: "当前星钻余额不足，请充值后再支付" });
     setPaying(true);
     try {
       await payCompanionOrder(createdOrder.orderId, token);
-      Alert.alert("支付成功", "订单已提交", [{ text: "知道了", onPress: onPaid }]);
+      closeSheet(onPaid);
     } catch (error) {
-      Alert.alert("提示", error instanceof Error ? error.message : "支付失败");
+      setPrompt({ message: error instanceof Error ? error.message : "支付失败" });
     } finally {
       setPaying(false);
     }
   }
 
+  function closeSheet(afterClose?: () => void) {
+    if (closing.current) return;
+    closing.current = true;
+    Animated.parallel([
+      Animated.timing(sheetY, { toValue: 420, duration: 210, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(backdropOpacity, { toValue: 0, duration: 170, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+    ]).start(({ finished }) => {
+      if (finished) {
+        onClose();
+        afterClose?.();
+      }
+    });
+  }
+
+
   return (
-    <Modal animationType="slide" transparent visible onRequestClose={onClose}>
-      <View style={styles.orderModalBackdrop}>
-        <View style={styles.orderModal}>
+    <Modal animationType="none" transparent visible onRequestClose={() => closeSheet()}>
+      <Animated.View style={[styles.orderModalBackdrop, { opacity: backdropOpacity }]}> 
+        <>
+          <Pressable accessibilityLabel="关闭下单弹窗" onPress={() => closeSheet()} style={StyleSheet.absoluteFill} />
+          <Animated.View style={[styles.orderModal, { transform: [{ translateY: sheetY }] }]}> 
           <View style={styles.orderModalHeader}>
             <Text style={styles.orderModalTitle}>{createdOrder ? "星钻支付" : "陪玩下单"}</Text>
-            <Pressable onPress={onClose}><Text style={styles.orderClose}>×</Text></Pressable>
+            <Pressable onPress={() => closeSheet()}><Text style={styles.orderClose}>×</Text></Pressable>
           </View>
           {createdOrder ? (
             <>
@@ -564,11 +605,13 @@ function CompanionOrderSheet({
               <TextInput placeholder="备注（选填）" value={remark} onChangeText={setRemark} style={styles.remarkInput} />
               <Pressable onPress={() => setAgreed((value) => !value)} style={styles.agreementRow}><Text style={styles.checkbox}>{agreed ? "✓" : ""}</Text><Text style={styles.agreementText}>我已阅读并同意服务协议</Text></Pressable>
               <Text style={styles.orderTotal}>合计：{total} 星钻</Text>
-              <Pressable style={styles.orderSubmit} onPress={() => void submitOrder()} disabled={submitting}><Text style={styles.orderSubmitText}>{submitting ? "提交中..." : "确认下单"}</Text></Pressable>
+              <Pressable style={[styles.orderSubmit, (!agreed || submitting || !selectedService) && styles.orderSubmitDisabled]} onPress={() => void submitOrder()} disabled={!agreed || submitting || !selectedService}><Text style={styles.orderSubmitText}>{submitting ? "提交中..." : "确认下单"}</Text></Pressable>
             </>
           )}
-        </View>
-      </View>
+          </Animated.View>
+        </>
+      </Animated.View>
+      <AppPrompt visible={Boolean(prompt)} title={prompt?.title} message={prompt?.message ?? ""} onConfirm={() => setPrompt(null)} />
     </Modal>
   );
 }
@@ -963,9 +1006,18 @@ const styles = StyleSheet.create({
   agreementText: { color: "#777", fontFamily: DOUYIN_SANS, fontSize: 12 },
   orderTotal: { color: "#111", fontFamily: DOUYIN_SANS, fontSize: 17, fontWeight: "600", textAlign: "right" },
   orderSubmit: { height: 48, borderRadius: 24, backgroundColor: "#FF3158", alignItems: "center", justifyContent: "center" },
+  orderSubmitDisabled: { backgroundColor: "#F4A8B7" },
   orderSubmitText: { color: "#fff", fontFamily: DOUYIN_SANS, fontSize: 16, fontWeight: "600" },
   orderPayAmount: { color: "#111", fontFamily: DOUYIN_SANS, fontSize: 20, fontWeight: "600", textAlign: "center", marginTop: 12 },
   orderBalance: { color: "#777", fontFamily: DOUYIN_SANS, fontSize: 14, textAlign: "center", marginBottom: 12 },
+  successBackdrop: { flex: 1, paddingHorizontal: 36, justifyContent: "center", backgroundColor: "rgba(0,0,0,0.48)" },
+  successDialog: { borderRadius: 20, backgroundColor: "#fff", alignItems: "center", padding: 28 },
+  successMark: { width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", backgroundColor: "#E8FFF3" },
+  successMarkText: { color: "#19B879", fontSize: 30, fontWeight: "700" },
+  successTitle: { marginTop: 16, color: "#111", fontFamily: DOUYIN_SANS, fontSize: 20, fontWeight: "600" },
+  successHint: { marginTop: 8, color: "#888", fontFamily: DOUYIN_SANS, fontSize: 13, lineHeight: 20, textAlign: "center" },
+  successButton: { alignSelf: "stretch", height: 46, marginTop: 24, borderRadius: 23, alignItems: "center", justifyContent: "center", backgroundColor: "#FF3158" },
+  successButtonText: { color: "#fff", fontFamily: DOUYIN_SANS, fontSize: 16, fontWeight: "600" },
   serviceTitle: { marginTop: 28 },
   serviceCard: {
     minHeight: 67,
