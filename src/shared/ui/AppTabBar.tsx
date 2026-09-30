@@ -3,6 +3,13 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAuthStore } from "@esports/auth";
+
+import {
+  getProtectedNavigationAction,
+  getTabPressAction,
+  type AppTab,
+} from "@/shared/navigation/tab-access";
 
 type AppTabBarProps = {
   state: { index: number; routes: { name: string }[] };
@@ -23,6 +30,9 @@ const icons = {
 
 export function AppTabBar({ state, navigation }: AppTabBarProps) {
   const insets = useSafeAreaInsets();
+  const isAuthenticated = useAuthStore(
+    (authState) => Boolean(authState.accessToken && authState.user),
+  );
   // Expo Router names the home tab route "index", while the visual tab key is "home".
   // Normalize it so the selected home asset is used when the index screen is active.
   const activeRoute = state.routes[state.index]?.name;
@@ -50,6 +60,24 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
     },
   ];
 
+  const handleTabPress = (tab: AppTab) => {
+    const action = getTabPressAction(tab, isAuthenticated);
+    if (action.type === "login") {
+      router.replace("/login");
+      return;
+    }
+    navigation.navigate(action.tab);
+  };
+
+  const handleMatchPress = () => {
+    const action = getProtectedNavigationAction("match", isAuthenticated);
+    if (action.type === "login") {
+      router.replace("/login");
+      return;
+    }
+    router.push("/match");
+  };
+
   return (
     <View
       style={[
@@ -61,7 +89,7 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
         <Pressable
           key={item.label}
           style={styles.bottomItem}
-          onPress={() => navigation.navigate(index ? "order" : "index")}
+          onPress={() => handleTabPress(index ? "order" : "index")}
         >
           <Image source={item.icon} style={styles.bottomIcon} />
           <Text
@@ -74,7 +102,7 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
       <Pressable
         accessibilityLabel="快速匹配"
         style={styles.match}
-        onPress={() => router.push("/match")}
+        onPress={handleMatchPress}
       >
         <Image source={icons.publish} style={styles.publish} />
       </Pressable>
@@ -82,9 +110,7 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
         <Pressable
           key={item.label}
           style={styles.bottomItem}
-          onPress={() =>
-            navigation.navigate(item.label === "我的" ? "mine" : "message")
-          }
+          onPress={() => handleTabPress(item.label === "我的" ? "mine" : "message")}
         >
           <Image source={item.icon} style={styles.bottomIcon} />
           <Text

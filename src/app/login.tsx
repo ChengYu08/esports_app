@@ -29,7 +29,7 @@ export default function LoginRoute() {
       <LoginScreen
         initialMode={initialMode}
         initialPhone={initialPhone}
-        onBack={() => router.back()}
+        onBack={() => router.replace("/")}
         onSkip={() => router.replace("/")}
         onSendCode={async (phone) => {
           if (!adapter) {

@@ -3,7 +3,11 @@ import { AppTabBar } from "@/shared/ui/AppTabBar";
 
 export default function TabsLayout() {
   return (
-    <Tabs tabBar={(props) => <AppTabBar {...props} />} screenOptions={{ headerShown: false }}>
+    <Tabs
+      initialRouteName="index"
+      tabBar={(props) => <AppTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
+    >
       <Tabs.Screen name="index" />
       <Tabs.Screen name="order" />
       <Tabs.Screen name="message" />

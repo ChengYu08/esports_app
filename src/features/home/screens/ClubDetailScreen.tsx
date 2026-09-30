@@ -1,8 +1,16 @@
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { demoClubs } from "../api/home.mock";
 import type { GameKey } from "../api/home.types";
@@ -13,8 +21,12 @@ const tabLeftCorner = require("../../../../assets/home/h_tab_left.svg");
 const tabRightCorner = require("../../../../assets/home/h_tab_right.svg");
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const searchIcon = require("../../../../assets/home/club-detail/icon-search.svg");
-const genderIcon = require("../../../../assets/home/club-detail/icon-gender-figma.svg");
-const onlineIcon = require("../../../../assets/home/club-detail/icon-online.svg");
+const maleIcon = require("../../../../assets/home/club-detail/male.svg");
+const femaleIcon = require("../../../../assets/home/club-detail/female.svg");
+const memberIcon = require("../../../../assets/home/h_user.svg");
+const filterArrowIcon = require("../../../../assets/home/club-detail/arrow-fill-down.svg");
+const idleIcon = require("../../../../assets/home/club-detail/status-idle.svg");
+const playingIcon = require("../../../../assets/home/club-detail/status-playing.svg");
 const diamondIcon = require("../../../../assets/home/club-detail/icon-diamond.svg");
 const playIcon = require("../../../../assets/home/club-detail/icon-play.svg");
 const memberImages = [
@@ -28,6 +40,7 @@ export default function ClubDetailScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const [game, setGame] = useState<GameKey>("");
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const gamesQuery = useHomeGames();
   const games = gamesQuery.data?.length
     ? gamesQuery.data
@@ -45,13 +58,13 @@ export default function ClubDetailScreen() {
   );
   return (
     <View style={styles.screen}>
-      <View style={[styles.header, { height: 155 + insets.top }]}>
-        <View
-          style={[
-            styles.nav,
-            { height: 44 + insets.top, paddingTop: insets.top },
-          ]}
-        >
+      <LinearGradient
+        colors={["#3b6f75", "#2a6681"]}
+        end={{ x: 1, y: 0.8 }}
+        start={{ x: 0, y: 0 }}
+        style={[styles.header, { paddingTop: insets.top }]}
+      >
+        <View style={[styles.nav, { height: 44 }]}>
           <Pressable
             accessibilityLabel="返回"
             hitSlop={10}
@@ -59,7 +72,7 @@ export default function ClubDetailScreen() {
           >
             <Image source={backIcon} style={styles.navIconImage} />
           </Pressable>
-          <Text style={styles.navTitle}>俱乐部详情</Text>
+          <View style={styles.navTitleSpacer} />
           <View style={styles.navActions}>
             <Pressable
               accessibilityLabel="搜索"
@@ -80,12 +93,12 @@ export default function ClubDetailScreen() {
               </Text>
             </View>
             <View style={styles.clubMeta}>
-              <Text style={styles.metaIcon}>♙</Text>
+              <Image source={memberIcon} style={styles.clubMetaIcon} />
               <Text style={styles.metaText}>{club.memberCount}</Text>
-              <View style={styles.divider} />
-              <Text style={styles.metaIcon}>▣</Text>
-              <Text style={styles.metaText}>{club.clubCode}</Text>
             </View>
+            <Text numberOfLines={1} style={styles.clubDescription}>
+              这是一段俱乐部简介，这是一段俱乐部简介，这是一...
+            </Text>
           </View>
         </View>
         <ScrollView
@@ -94,26 +107,33 @@ export default function ClubDetailScreen() {
           style={styles.gameTabs}
           contentContainerStyle={styles.gameTabsContent}
         >
-          {games.map((item) => (
+          {games.map((item, index) => (
             <GameTab
               key={item.id}
               label={item.name}
               iconUrl={item.iconUrl}
+              first={index === 0}
               active={selectedGame === String(item.id)}
               onPress={() => setGame(String(item.id))}
             />
           ))}
         </ScrollView>
-      </View>
+      </LinearGradient>
       <View style={styles.filterRow}>
         {["模式", "等级", "性别", "筛选"].map((label) => (
           <Pressable
             key={label}
-            style={styles.filterItem}
-            onPress={() => undefined}
+            accessibilityLabel={`筛选${label}`}
+            style={[
+              styles.filterItem,
+              activeFilter === label && styles.filterItemActive,
+            ]}
+            onPress={() =>
+              setActiveFilter((value) => (value === label ? null : label))
+            }
           >
             <Text style={styles.filterText}>{label}</Text>
-            <Text style={styles.down}>▾</Text>
+            <Image source={filterArrowIcon} style={styles.filterArrowIcon} />
           </Pressable>
         ))}
       </View>
@@ -127,6 +147,7 @@ export default function ClubDetailScreen() {
             <MemberCard
               key={index}
               image={image}
+              gender={index === 1 ? "male" : "female"}
               status={index === 1 ? "游戏中" : "空闲中"}
               statusColor={index === 1 ? "#4a7fff" : "#16c978"}
             />
@@ -139,11 +160,24 @@ export default function ClubDetailScreen() {
           { paddingBottom: Math.max(insets.bottom, 12) },
         ]}
       >
-        <Pressable style={styles.priceButton} onPress={() => undefined}>
+        <Pressable
+          style={styles.priceButton}
+          onPress={() => Alert.alert("价目表", "价目表功能即将开放")}
+        >
           <Text style={styles.priceText}>价目表</Text>
         </Pressable>
-        <Pressable style={styles.matchButton} onPress={() => undefined}>
-          <Text style={styles.matchText}>一键匹配</Text>
+        <Pressable
+          style={styles.matchButton}
+          onPress={() => Alert.alert("一键匹配", "正在为你匹配合适的陪玩")}
+        >
+          <LinearGradient
+            colors={["#ff1f2e", "#ff1f69"]}
+            end={{ x: 1, y: 1 }}
+            start={{ x: 0, y: 0 }}
+            style={styles.matchButtonGradient}
+          >
+            <Text style={styles.matchText}>一键匹配</Text>
+          </LinearGradient>
         </Pressable>
       </View>
     </View>
@@ -153,18 +187,25 @@ export default function ClubDetailScreen() {
 function GameTab({
   label,
   iconUrl,
+  first,
   active,
   onPress,
 }: {
   label: string;
   iconUrl?: string;
+  first: boolean;
   active: boolean;
   onPress: () => void;
 }) {
   return (
     <Pressable
       onPress={onPress}
-      style={[styles.gameTab, active && styles.gameTabActive]}
+      style={[
+        styles.gameTab,
+        first && styles.gameTabFirst,
+        active && styles.gameTabActive,
+        active && !first && styles.gameTabActiveAfterFirst,
+      ]}
     >
       <View style={styles.gameLogo}>
         {iconUrl ? (
@@ -196,32 +237,50 @@ function GameTab({
 }
 function MemberCard({
   image,
+  gender,
   status,
   statusColor,
 }: {
   image: number;
+  gender: "male" | "female";
   status: string;
   statusColor: string;
 }) {
+  const isPlaying = status === "游戏中";
   return (
     <Pressable style={styles.memberCard} onPress={() => undefined}>
       <View style={styles.avatarWrap}>
         <Image source={image} contentFit="cover" style={styles.avatar} />
         <View style={styles.voice}>
           <Image source={playIcon} style={styles.playIcon} />
-          <Text style={styles.voiceText}>12″</Text>
+          <Text style={styles.voiceText}>12&apos;&apos;</Text>
         </View>
       </View>
       <View style={styles.memberBody}>
         <View style={styles.memberTitle}>
           <Text style={styles.memberName}>小非-认证野王</Text>
-          <Image source={genderIcon} style={styles.genderIcon} />
-          <Text style={styles.gender}>24</Text>
+          <View style={styles.genderGroup}>
+            <Image
+              source={gender === "male" ? maleIcon : femaleIcon}
+              style={styles.genderIcon}
+            />
+            <Text
+              style={[styles.gender, gender === "male" && styles.maleGender]}
+            >
+              24
+            </Text>
+          </View>
           <View
             style={[styles.status, { backgroundColor: `${statusColor}20` }]}
           >
-            <Image source={onlineIcon} style={styles.statusIcon} />
-            <Text style={[styles.statusText, { color: statusColor }]}>
+            <Image
+              source={isPlaying ? playingIcon : idleIcon}
+              style={styles.statusIcon}
+            />
+            <Text
+              numberOfLines={1}
+              style={[styles.statusText, { color: statusColor }]}
+            >
               {status}
             </Text>
           </View>
@@ -259,11 +318,18 @@ const styles = StyleSheet.create({
   tabCornerRight: { right: -15 },
   navIconImage: { width: 24, height: 24 },
   playIcon: { width: 16, height: 16 },
-  genderIcon: { width: 15, height: 15 },
-  statusIcon: { width: 15, height: 15 },
+  genderIcon: { width: 12, height: 12 },
+  genderGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    flexShrink: 0,
+  },
+  maleGender: { color: "#0095ee" },
+  statusIcon: { width: 12, height: 12 },
   diamondIcon: { width: 20, height: 20, marginLeft: 5 },
   screen: { flex: 1, backgroundColor: "#fff" },
-  header: { backgroundColor: "#2e7185" },
+  header: { width: "100%" },
   nav: {
     paddingHorizontal: 16,
     flexDirection: "row",
@@ -271,16 +337,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   back: { color: "#fff", fontSize: 44, fontWeight: "200", lineHeight: 38 },
-  navTitle: {
-    color: "#fff",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 17,
-    fontWeight: "600",
-  },
+  navTitleSpacer: { flex: 1 },
   navActions: { width: 32, alignItems: "flex-end" },
   navIcon: { color: "#fff", fontSize: 29, lineHeight: 26 },
   clubInfo: {
-    height: 78,
+    minHeight: 104,
+    paddingTop: 8,
+    paddingBottom: 24,
     paddingHorizontal: 16,
     flexDirection: "row",
     alignItems: "center",
@@ -292,7 +355,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: "#162a36",
   },
-  clubCopy: { flex: 1, minWidth: 0, gap: 10 },
+  clubCopy: { flex: 1, minWidth: 0, gap: 6 },
   titleLine: { flexDirection: "row", alignItems: "center", gap: 6 },
   selfTag: {
     paddingHorizontal: 5,
@@ -308,30 +371,35 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     color: "#fff",
     fontFamily: DOUYIN_SANS,
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: "600",
   },
-  clubMeta: { flexDirection: "row", alignItems: "center", gap: 4 },
-  metaIcon: { color: "#b5ced3", fontSize: 17 },
-  metaText: { color: "#b5ced3", fontFamily: DOUYIN_SANS, fontSize: 16 },
-  divider: {
-    width: 1,
-    height: 14,
-    marginHorizontal: 5,
-    backgroundColor: "#82a9b1",
+  clubMeta: { flexDirection: "row", alignItems: "center", gap: 2 },
+  clubMetaIcon: { width: 14, height: 14, opacity: 0.65 },
+  metaText: {
+    color: "rgba(255,255,255,.6)",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 12,
+    lineHeight: 18,
   },
-  gameTabs: { height: 33, flexDirection: "row" },
+  clubDescription: {
+    color: "rgba(255,255,255,.6)",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  gameTabs: { height: 40, flexDirection: "row" },
   gameTab: {
-    minWidth: 130,
-    height: 33,
+    height: 40,
     paddingHorizontal: 16,
     flexDirection: "row",
     alignItems: "center",
     gap: 7,
-    borderTopLeftRadius: 15,
-    borderTopRightRadius: 15,
+    borderTopRightRadius: 12,
   },
+  gameTabFirst: { borderTopLeftRadius: 0 },
   gameTabActive: { backgroundColor: "#fff" },
+  gameTabActiveAfterFirst: { borderTopLeftRadius: 12 },
   gameLogo: {
     width: 16,
     height: 16,
@@ -343,30 +411,35 @@ const styles = StyleSheet.create({
   gameTriangle: { color: "#19e5a5", fontSize: 15, lineHeight: 16 },
   gameLabel: {
     flexShrink: 0,
-    color: "#d9eef0",
+    color: "#fff",
     fontFamily: DOUYIN_SANS,
-    fontSize: 16,
+    fontSize: 12,
   },
   gameLabelActive: { color: "#111", fontWeight: "600" },
   filterRow: {
     height: 42,
+    paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-around",
+    justifyContent: "space-between",
+    backgroundColor: "#fff",
   },
   filterItem: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: 2,
+    minHeight: 34,
+    borderRadius: 4,
   },
-  filterText: { color: "#777", fontFamily: DOUYIN_SANS, fontSize: 16 },
-  down: { color: "#777", fontSize: 15 },
+  filterItemActive: { backgroundColor: "#f5f5f5" },
+  filterText: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 12 },
+  filterArrowIcon: { width: 12, height: 12 },
   listScroll: { flex: 1 },
   list: { paddingHorizontal: 0 },
   memberCard: {
-    height: 144,
+    minHeight: 124,
     paddingHorizontal: 16,
     paddingVertical: 12,
     flexDirection: "row",
@@ -398,7 +471,12 @@ const styles = StyleSheet.create({
   },
   voiceText: { color: "#fff", fontFamily: DOUYIN_SANS, fontSize: 12 },
   memberBody: { flex: 1, minWidth: 0 },
-  memberTitle: { flexDirection: "row", alignItems: "center", gap: 5 },
+  memberTitle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    minWidth: 0,
+  },
   memberName: {
     flexShrink: 1,
     color: "#111",
@@ -415,11 +493,16 @@ const styles = StyleSheet.create({
   status: {
     marginLeft: "auto",
     flexShrink: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    minHeight: 14,
+    maxHeight: 14,
     paddingHorizontal: 4,
     paddingVertical: 2,
     borderRadius: 3,
   },
-  statusText: { fontFamily: DOUYIN_SANS, fontSize: 12 },
+  statusText: { fontFamily: DOUYIN_SANS, fontSize: 10 },
   memberDesc: {
     marginTop: 5,
     color: "#777",
@@ -446,7 +529,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    minHeight: 84,
+    minHeight: 76,
     paddingHorizontal: 12,
     paddingTop: 8,
     backgroundColor: "#fff",
@@ -465,21 +548,24 @@ const styles = StyleSheet.create({
   priceText: {
     color: "#111",
     fontFamily: DOUYIN_SANS,
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: "600",
   },
   matchButton: {
     flex: 1,
     height: 42,
     borderRadius: 9,
-    backgroundColor: "#ff3158",
+    overflow: "hidden",
+  },
+  matchButtonGradient: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
   },
   matchText: {
     color: "#fff",
     fontFamily: DOUYIN_SANS,
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: "600",
   },
 });
