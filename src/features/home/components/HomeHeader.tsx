@@ -2,6 +2,7 @@ import type { Banner, Game, GameKey, HomeTab } from "@/features/home/api/home.ty
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { Image } from "expo-image";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { router } from "expo-router";
 
 const banner = require("../../../../assets/home/h_banner.png");
 const searchIcon = require("../../../../assets/home/h_search.svg");
@@ -45,7 +46,7 @@ export function HomeHeader({
         <Pressable
           accessibilityLabel="搜索"
           style={styles.search}
-          onPress={() => undefined}
+          onPress={() => router.push({ pathname: "/search", params: { type: "club" } })}
         >
           <Image source={searchIcon} style={styles.searchIcon} />
         </Pressable>

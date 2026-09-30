@@ -31,6 +31,17 @@ export type ClientProfileUpdate = {
   signature?: string;
 };
 
+export type ClientOssSts = {
+  endpoint: string;
+  bucketName: string;
+  accessKeyId: string;
+  accessKeySecret: string;
+  securityToken: string;
+  regionId: string;
+  domain: string;
+  objectList?: string[];
+};
+
 export type AuthRequestOptions = {
   method: 'POST';
   body?: unknown;
@@ -59,6 +70,11 @@ export function createClientAuthContract(requester: AuthRequester) {
     async updateProfile(token: string, data: ClientProfileUpdate) {
       return unwrap(await requester<ClientUserInfo>('/client/v1/user/update/profile', {
         method: 'POST', token, body: { action: data },
+      }));
+    },
+    async getOssSts(token: string, bizType: string, objectNames: string[]) {
+      return unwrap(await requester<ClientOssSts>('/client/v1/oss/sts', {
+        method: 'POST', token, body: { action: { bizType, objectNames } },
       }));
     },
     async realNameVerify(token: string, data: { name: string; num: string }) {

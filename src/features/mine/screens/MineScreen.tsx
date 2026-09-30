@@ -98,11 +98,11 @@ export default function MineScreen() {
             <Text style={styles.statLabel}>星钻</Text>
           </View>
           <View style={styles.stat}>
-            <Text style={styles.statValue}>12</Text>
+            <Text style={styles.statValue}>0</Text>
             <Text style={styles.statLabel}>关注</Text>
           </View>
           <View style={styles.stat}>
-            <Text style={styles.statValue}>2000</Text>
+            <Text style={styles.statValue}>0</Text>
             <Text style={styles.statLabel}>粉丝</Text>
           </View>
         </View>

@@ -1,8 +1,8 @@
 import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -22,7 +22,17 @@ import {
   useProfileReviews,
 } from "@/features/mine/hooks/use-profile-data";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { queryClient } from "@/core/query/query-client";
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
+import {
+  buildCreateOrderAction,
+  createCompanionOrder,
+  fetchCompanionServices,
+  fetchStarBalance,
+  payCompanionOrder,
+  type CompanionOrderContext,
+  type CompanionServiceOption,
+} from "@/features/mine/api/companion-order.api";
 
 const fallbackAvatar = require("../../../../assets/mine/figma/profile-avatar.png");
 const background = require("../../../../assets/mine/figma/profile-bg.png");
@@ -44,6 +54,7 @@ export default function ProfileScreen() {
   const isMine = !routeParams || String(user?.id ?? "") === routeParams.userId;
   const [tab, setTab] = useState<ProfileTab>("技能");
   const [selectedGameId, setSelectedGameId] = useState("");
+  const [orderCard, setOrderCard] = useState<ProfileSkillCard | null>(null);
   const detailQuery = useProfileDetail(routeParams);
   const detail = detailQuery.data;
   const firstGameId = getFirstProfileGameId(detail?.games ?? []);
@@ -108,7 +119,7 @@ export default function ProfileScreen() {
             <Pressable
               accessibilityLabel="设置"
               hitSlop={12}
-              onPress={() => undefined}
+              onPress={() => router.push("/account-settings")}
               style={styles.navButton}
             >
               <Image source={settingsIcon} style={styles.settingsIcon} />
@@ -170,7 +181,7 @@ export default function ProfileScreen() {
 
           {games.length > 0 ? (
             tab === "技能" ? (
-              <SkillsContent query={gameDetailQuery} detail={gameDetail} />
+              <SkillsContent query={gameDetailQuery} detail={gameDetail} onOrder={setOrderCard} />
             ) : (
               <ReviewsContent
                 query={reviewQuery}
@@ -195,6 +206,26 @@ export default function ProfileScreen() {
             <Text style={styles.chatText}>聊一聊</Text>
           </Pressable>
         </View>
+      ) : null}
+      {orderCard && gameDetail ? (
+        <CompanionOrderSheet
+          card={orderCard}
+          context={{
+            serviceUserId: profile.userId,
+            clubId: profile.clubId,
+            gameId: gameDetail.gameId,
+            gameLevelId: orderCard.gameLevelId,
+            gameModeName: orderCard.modeName,
+            gameLevelName: orderCard.levelName,
+            buyerUserId: Number(user?.id) || 0,
+          }}
+          token={useAuthStore.getState().accessToken}
+          onClose={() => setOrderCard(null)}
+          onPaid={() => {
+            void queryClient.invalidateQueries({ queryKey: ["orders"] });
+            setOrderCard(null);
+          }}
+        />
       ) : null}
     </View>
   );
@@ -293,9 +324,11 @@ function GameSelector({
 function SkillsContent({
   query,
   detail,
+  onOrder,
 }: {
   query: { isLoading: boolean; isError: boolean; refetch: () => unknown };
   detail?: ProfileGameDetail;
+  onOrder: (card: ProfileSkillCard) => void;
 }) {
   if (query.isLoading) return <InlineState text="游戏技能加载中..." />;
   if (query.isError || !detail) {
@@ -331,6 +364,7 @@ function SkillsContent({
           <ServiceCard
             key={`${card.companionServiceId}-${card.gameLevelId}`}
             card={card}
+            onOrder={() => onOrder(card)}
           />
         ))
       ) : (
@@ -403,7 +437,7 @@ function ImageGallery({ images }: { images: string[] }) {
   );
 }
 
-function ServiceCard({ card }: { card: ProfileSkillCard }) {
+function ServiceCard({ card, onOrder }: { card: ProfileSkillCard; onOrder: () => void }) {
   return (
     <View style={styles.serviceCard}>
       <View style={styles.serviceCopy}>
@@ -419,10 +453,123 @@ function ServiceCard({ card }: { card: ProfileSkillCard }) {
           ) : null}
         </View>
       </View>
-      <Pressable style={styles.orderButton} onPress={() => undefined}>
+      <Pressable style={styles.orderButton} onPress={onOrder}>
         <Text style={styles.orderText}>下单</Text>
       </Pressable>
     </View>
+  );
+}
+
+function CompanionOrderSheet({
+  card,
+  context,
+  token,
+  onClose,
+  onPaid,
+}: {
+  card: ProfileSkillCard;
+  context: CompanionOrderContext;
+  token: string | null;
+  onClose: () => void;
+  onPaid: () => void;
+}) {
+  const [services, setServices] = useState<CompanionServiceOption[]>([]);
+  const [selectedServiceId, setSelectedServiceId] = useState(card.companionServiceId);
+  const [quantity, setQuantity] = useState("1");
+  const [remark, setRemark] = useState("");
+  const [agreed, setAgreed] = useState(false);
+  const [loading, setLoading] = useState(Boolean(token));
+  const [submitting, setSubmitting] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [balance, setBalance] = useState<number | null>(null);
+  const [createdOrder, setCreatedOrder] = useState<{ orderId: number; total: number } | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    void fetchCompanionServices({
+      clubId: context.clubId,
+      serviceUserId: context.serviceUserId,
+      gameLevelId: context.gameLevelId,
+    }, token)
+      .then((items) => {
+        setServices(items);
+        if (!items.some((item) => item.companionServiceId === selectedServiceId)) {
+          setSelectedServiceId(items[0]?.companionServiceId ?? 0);
+        }
+      })
+      .catch((error: Error) => Alert.alert("提示", error.message))
+      .finally(() => setLoading(false));
+  }, [context.clubId, context.gameLevelId, context.serviceUserId, selectedServiceId, token]);
+
+  const selectedService = services.find((item) => item.companionServiceId === selectedServiceId);
+  const count = Math.max(1, Number.parseInt(quantity, 10) || 1);
+  const total = (selectedService?.price ?? card.price) * count;
+
+  async function submitOrder() {
+    if (!token) return Alert.alert("提示", "请先登录");
+    if (!selectedService || !agreed) return Alert.alert("提示", "请选择服务并同意服务协议");
+    setSubmitting(true);
+    try {
+      const action = buildCreateOrderAction(context, selectedService, count, remark);
+      const order = await createCompanionOrder(action, token);
+      setCreatedOrder({ orderId: order.orderId, total: Number(order.totalPrice) || action.total });
+      setBalance(await fetchStarBalance(token));
+    } catch (error) {
+      Alert.alert("提示", error instanceof Error ? error.message : "创建订单失败");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function pay() {
+    if (!token || !createdOrder) return;
+    if ((balance ?? 0) < createdOrder.total) return Alert.alert("提示", "星钻余额不足");
+    setPaying(true);
+    try {
+      await payCompanionOrder(createdOrder.orderId, token);
+      Alert.alert("支付成功", "订单已提交", [{ text: "知道了", onPress: onPaid }]);
+    } catch (error) {
+      Alert.alert("提示", error instanceof Error ? error.message : "支付失败");
+    } finally {
+      setPaying(false);
+    }
+  }
+
+  return (
+    <Modal animationType="slide" transparent visible onRequestClose={onClose}>
+      <View style={styles.orderModalBackdrop}>
+        <View style={styles.orderModal}>
+          <View style={styles.orderModalHeader}>
+            <Text style={styles.orderModalTitle}>{createdOrder ? "星钻支付" : "陪玩下单"}</Text>
+            <Pressable onPress={onClose}><Text style={styles.orderClose}>×</Text></Pressable>
+          </View>
+          {createdOrder ? (
+            <>
+              <Text style={styles.orderPayAmount}>支付 {createdOrder.total} 星钻</Text>
+              <Text style={styles.orderBalance}>当前余额：{balance ?? "加载中..."} 星钻</Text>
+              <Pressable style={styles.orderSubmit} onPress={() => void pay()} disabled={paying}>
+                <Text style={styles.orderSubmitText}>{paying ? "支付中..." : "确认支付"}</Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <Text style={styles.orderLocked}>{card.modeName}-{card.levelName}</Text>
+              {loading ? <Text style={styles.orderHint}>服务加载中...</Text> : services.map((service) => (
+                <Pressable key={service.companionServiceId} onPress={() => setSelectedServiceId(service.companionServiceId)} style={[styles.serviceOption, selectedServiceId === service.companionServiceId && styles.serviceOptionActive]}>
+                  <Text style={styles.serviceOptionName}>{service.name}</Text>
+                  <Text style={styles.serviceOptionPrice}>{service.price} 星钻</Text>
+                </Pressable>
+              ))}
+              <View style={styles.quantityRow}><Text style={styles.orderLabel}>数量</Text><TextInput keyboardType="number-pad" value={quantity} onChangeText={setQuantity} style={styles.quantityInput} /></View>
+              <TextInput placeholder="备注（选填）" value={remark} onChangeText={setRemark} style={styles.remarkInput} />
+              <Pressable onPress={() => setAgreed((value) => !value)} style={styles.agreementRow}><Text style={styles.checkbox}>{agreed ? "✓" : ""}</Text><Text style={styles.agreementText}>我已阅读并同意服务协议</Text></Pressable>
+              <Text style={styles.orderTotal}>合计：{total} 星钻</Text>
+              <Pressable style={styles.orderSubmit} onPress={() => void submitOrder()} disabled={submitting}><Text style={styles.orderSubmitText}>{submitting ? "提交中..." : "确认下单"}</Text></Pressable>
+            </>
+          )}
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -674,8 +821,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   scrollIntro: {
+    marginTop: -1,
     paddingHorizontal: 16,
     backgroundColor: "#fff",
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
     paddingTop: 16,
   },
   stickyTabs: {
@@ -793,6 +943,29 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   moreText: { color: "#fff", fontSize: 18, fontWeight: "600" },
+  orderModalBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" },
+  orderModal: { backgroundColor: "#fff", borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: 20, paddingBottom: 30, gap: 14 },
+  orderModalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  orderModalTitle: { color: "#111", fontFamily: DOUYIN_SANS, fontSize: 18, fontWeight: "600" },
+  orderClose: { color: "#777", fontSize: 28, lineHeight: 28 },
+  orderLocked: { color: "#333", fontFamily: DOUYIN_SANS, fontSize: 15 },
+  orderHint: { color: "#999", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  serviceOption: { minHeight: 48, paddingHorizontal: 12, borderRadius: 8, flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "#F6F6F6" },
+  serviceOptionActive: { backgroundColor: "#FFF0F3", borderWidth: 1, borderColor: "#FF3158" },
+  serviceOptionName: { flex: 1, color: "#222", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  serviceOptionPrice: { color: "#FF3158", fontFamily: DOUYIN_SANS, fontSize: 14, fontWeight: "600" },
+  quantityRow: { height: 46, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  orderLabel: { color: "#222", fontFamily: DOUYIN_SANS, fontSize: 15 },
+  quantityInput: { width: 92, height: 38, borderRadius: 6, backgroundColor: "#F6F6F6", color: "#222", fontFamily: DOUYIN_SANS, fontSize: 15, textAlign: "center" },
+  remarkInput: { minHeight: 48, paddingHorizontal: 12, borderRadius: 8, backgroundColor: "#F6F6F6", color: "#222", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  agreementRow: { flexDirection: "row", alignItems: "center", gap: 7 },
+  checkbox: { width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: "#FF3158", color: "#FF3158", fontSize: 12, lineHeight: 14, textAlign: "center" },
+  agreementText: { color: "#777", fontFamily: DOUYIN_SANS, fontSize: 12 },
+  orderTotal: { color: "#111", fontFamily: DOUYIN_SANS, fontSize: 17, fontWeight: "600", textAlign: "right" },
+  orderSubmit: { height: 48, borderRadius: 24, backgroundColor: "#FF3158", alignItems: "center", justifyContent: "center" },
+  orderSubmitText: { color: "#fff", fontFamily: DOUYIN_SANS, fontSize: 16, fontWeight: "600" },
+  orderPayAmount: { color: "#111", fontFamily: DOUYIN_SANS, fontSize: 20, fontWeight: "600", textAlign: "center", marginTop: 12 },
+  orderBalance: { color: "#777", fontFamily: DOUYIN_SANS, fontSize: 14, textAlign: "center", marginBottom: 12 },
   serviceTitle: { marginTop: 28 },
   serviceCard: {
     minHeight: 67,

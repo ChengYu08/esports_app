@@ -64,7 +64,7 @@ export default function RootLayout() {
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="login" options={{ animation: "none" }} />
-          <Stack.Screen name="account-settings" options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="account-settings" />
         </Stack>
       </SafeAreaProvider>
     </QueryClientProvider>

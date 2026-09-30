@@ -81,7 +81,7 @@ export default function ClubDetailScreen() {
             <Pressable
               accessibilityLabel="搜索"
               hitSlop={10}
-              onPress={() => undefined}
+              onPress={() => router.push({ pathname: "/search", params: { type: "user", clubId: club.id } })}
             >
               <Image source={searchIcon} style={styles.navIconImage} />
             </Pressable>

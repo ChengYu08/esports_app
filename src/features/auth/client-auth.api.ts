@@ -6,4 +6,4 @@ const request: AuthRequester = <T>(path: string, options?: AuthRequestOptions) =
 
 export const createClientAuthApi = (requester: AuthRequester = request) => createClientAuthContract(requester);
 export const clientAuthApi = createClientAuthApi();
-export type { ClientApiResponse, ClientLoginResult, ClientUserInfo, ClientProfileUpdate } from './client-auth.contract';
+export type { ClientApiResponse, ClientLoginResult, ClientUserInfo, ClientProfileUpdate, ClientOssSts } from './client-auth.contract';
