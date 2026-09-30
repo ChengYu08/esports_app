@@ -3,7 +3,6 @@ import { createNativeQuickLoginProvider, SsoClient } from "@esports/sso-sdk";
 import { env } from "@/core/config/env";
 import { completeClientLogin } from "@/features/auth/client-auth-flow";
 import { Stack, router, useLocalSearchParams } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import { useMemo } from "react";
 import { Alert, Platform } from "react-native";
 
@@ -25,7 +24,6 @@ export default function LoginRoute() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <StatusBar hidden />
       <LoginScreen
         initialMode={initialMode}
         initialPhone={initialPhone}

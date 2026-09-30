@@ -23,7 +23,7 @@ const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const searchIcon = require("../../../../assets/home/club-detail/icon-search.svg");
 const maleIcon = require("../../../../assets/home/club-detail/male.svg");
 const femaleIcon = require("../../../../assets/home/club-detail/female.svg");
-const memberIcon = require("../../../../assets/home/h_user.svg");
+const memberIcon = require("../../../../assets/home/club-detail/icon_user.svg");
 const filterArrowIcon = require("../../../../assets/home/club-detail/arrow-fill-down.svg");
 const idleIcon = require("../../../../assets/home/club-detail/status-idle.svg");
 const playingIcon = require("../../../../assets/home/club-detail/status-playing.svg");
@@ -91,11 +91,12 @@ export default function ClubDetailScreen() {
               <Text numberOfLines={1} style={styles.clubName}>
                 {club.name}
               </Text>
+              <View style={styles.clubMeta}>
+                <Image source={memberIcon} style={styles.clubMetaIcon} />
+                <Text style={styles.metaText}>{club.memberCount}</Text>
+              </View>
             </View>
-            <View style={styles.clubMeta}>
-              <Image source={memberIcon} style={styles.clubMetaIcon} />
-              <Text style={styles.metaText}>{club.memberCount}</Text>
-            </View>
+
             <Text numberOfLines={1} style={styles.clubDescription}>
               这是一段俱乐部简介，这是一段俱乐部简介，这是一...
             </Text>
@@ -327,7 +328,7 @@ const styles = StyleSheet.create({
   },
   maleGender: { color: "#0095ee" },
   statusIcon: { width: 12, height: 12 },
-  diamondIcon: { width: 20, height: 20, marginLeft: 5 },
+  diamondIcon: { width: 15, height: 15, marginLeft: 4 },
   screen: { flex: 1, backgroundColor: "#fff" },
   header: { width: "100%" },
   nav: {
@@ -356,7 +357,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#162a36",
   },
   clubCopy: { flex: 1, minWidth: 0, gap: 6 },
-  titleLine: { flexDirection: "row", alignItems: "center", gap: 6 },
+  titleLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   selfTag: {
     paddingHorizontal: 5,
     paddingVertical: 3,
@@ -446,7 +451,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   avatarWrap: { width: 100, height: 100, position: "relative" },
-  avatar: { width: 100, height: 100, borderRadius: 8 },
+  avatar: { width: 106, height: 106, borderRadius: 8 },
   voice: {
     position: "absolute",
     left: 6,
@@ -470,7 +475,7 @@ const styles = StyleSheet.create({
     fontSize: 8,
   },
   voiceText: { color: "#fff", fontFamily: DOUYIN_SANS, fontSize: 12 },
-  memberBody: { flex: 1, minWidth: 0 },
+  memberBody: { flex: 1, minWidth: 0, marginLeft: 8 },
   memberTitle: {
     flexDirection: "row",
     alignItems: "center",
@@ -481,14 +486,14 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     color: "#111",
     fontFamily: DOUYIN_SANS,
-    fontSize: 15,
-    fontWeight: "600",
+    fontSize: 14,
+    fontWeight: "500",
   },
   gender: {
     flexShrink: 0,
     color: "#ff4770",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 14,
+    fontSize: 12,
+    fontWeight: 500,
   },
   status: {
     marginLeft: "auto",
@@ -504,25 +509,25 @@ const styles = StyleSheet.create({
   },
   statusText: { fontFamily: DOUYIN_SANS, fontSize: 10 },
   memberDesc: {
-    marginTop: 5,
+    marginTop: 4,
     color: "#777",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
+    fontWeight: 400,
     lineHeight: 19,
   },
-  priceRow: { marginTop: 8, flexDirection: "row", alignItems: "center" },
+  priceRow: { marginTop: 17, flexDirection: "row", alignItems: "center" },
   price: {
     color: "#ff3158",
     fontFamily: DOUYIN_SANS,
-    fontSize: 22,
-    fontWeight: "600",
+    fontSize: 20,
+    fontWeight: "700",
   },
   diamond: { marginLeft: 5, color: "#ff3158", fontSize: 15 },
   orders: {
     marginLeft: "auto",
     color: "#999",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 13,
+    fontSize: 12,
+    fontWeight: 400,
   },
   bottomBar: {
     position: "absolute",
