@@ -390,7 +390,7 @@ function SkillsContent({
 }) {
   const voicePlayer = useVoicePlayer();
   const voicePlaying = Boolean(detail?.voiceUrl && voicePlayer.playingUrl === detail.voiceUrl);
-  const voiceAnimation = useRef(new Animated.Value(0.35)).current;
+  const [voiceAnimation] = useState(() => new Animated.Value(0.35));
   useEffect(() => {
     if (!voicePlaying) {
       voiceAnimation.stopAnimation();

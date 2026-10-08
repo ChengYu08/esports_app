@@ -2,9 +2,11 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import { Animated, Easing, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  Animated,
+  Easing,
   Modal,
   Pressable,
   ScrollView,
@@ -328,7 +330,7 @@ function MemberCard({
 }) {
   const isPlaying = status === "游戏中";
   const voicePlaying = Boolean(voiceUrl && playingVoiceUrl === voiceUrl);
-  const animation = useRef(new Animated.Value(0.35)).current;
+  const [animation] = useState(() => new Animated.Value(0.35));
   useEffect(() => {
     if (!voicePlaying) {
       animation.stopAnimation();
@@ -352,17 +354,18 @@ function MemberCard({
     >
       <View style={styles.avatarWrap}>
         <Image source={image ? { uri: image } : undefined} contentFit="cover" style={styles.avatar} />
-        <Pressable
-          accessibilityLabel={voiceUrl ? `${playingVoiceUrl === voiceUrl ? "停止" : "播放"}语音` : "无语音"}
-          disabled={!voiceUrl}
-          onPress={(event) => { event.stopPropagation(); if (voiceUrl) onToggleVoice(voiceUrl); }}
-          style={styles.voice}
-        >
-          <Animated.View style={{ opacity: voicePlaying ? animation : 1 }}>
-            <Image source={playIcon} style={styles.playIcon} />
-          </Animated.View>
-          <Text style={styles.voiceText}>{voiceDuration ?? 0}&apos;&apos;</Text>
-        </Pressable>
+        {voiceUrl ? (
+          <Pressable
+            accessibilityLabel={`${voicePlaying ? "停止" : "播放"}语音`}
+            onPress={(event) => { event.stopPropagation(); onToggleVoice(voiceUrl); }}
+            style={styles.voice}
+          >
+            <Animated.View style={{ opacity: voicePlaying ? animation : 1 }}>
+              <Image source={playIcon} style={styles.playIcon} />
+            </Animated.View>
+            <Text style={styles.voiceText}>{voiceDuration ?? 0}&apos;&apos;</Text>
+          </Pressable>
+        ) : null}
       </View>
       <View style={styles.memberBody}>
         <View style={styles.memberTitle}>
