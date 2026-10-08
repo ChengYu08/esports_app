@@ -27,10 +27,7 @@ export function OrderTabs({ value, onChange }: OrderTabsProps) {
             accessibilityState={{ selected }}
             key={filter.value}
             onPress={() => onChange(filter.value)}
-            style={({ pressed }) => [
-              styles.tab,
-              pressed && styles.tabPressed,
-            ]}
+            style={({ pressed }) => [styles.tab, pressed && styles.tabPressed]}
           >
             <Text style={[styles.label, selected && styles.labelSelected]}>
               {filter.label}
@@ -51,9 +48,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16,
   },
   tab: {
-    flex: 1,
+    minWidth: 48,
+    paddingHorizontal: 8,
     height: 46,
     alignItems: "center",
     justifyContent: "center",

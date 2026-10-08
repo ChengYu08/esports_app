@@ -58,6 +58,7 @@ const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const diamondIcon = require("../../../../assets/home/club-detail/icon-diamond.svg");
 const idleStatusIcon = require("../../../../assets/home/club-detail/status-idle.svg");
 const playingStatusIcon = require("../../../../assets/home/club-detail/status-playing.svg");
+const paymentCloseIcon = require("../../../../assets/mine/payment-close.svg");
 type ProfileTab = "技能" | "评价";
 
 export default function ProfileScreen() {
@@ -865,6 +866,7 @@ function StarPaymentSheet({
   onClose: () => void | Promise<void>;
   onPaid: () => void;
 }) {
+  const insets = useSafeAreaInsets();
   const [balance, setBalance] = useState<number | null>(null);
   const [paying, setPaying] = useState(false);
   const settledRef = useRef(false);
@@ -910,26 +912,38 @@ function StarPaymentSheet({
       onRequestClose={() => void onClose()}
     >
       <View style={styles.orderModalBackdrop}>
-        <View style={styles.orderModal}>
+        <View style={[styles.orderModal, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <View style={styles.orderModalHeader}>
-            <Text style={styles.orderModalTitle}>星钻支付</Text>
-            <Pressable onPress={() => void onClose()}>
-              <Text style={styles.orderClose}>×</Text>
+            <View style={styles.orderModalHeading}>
+              <Text style={styles.orderModalTitle}>星钻支付</Text>
+              <Text style={styles.orderModalHint}>
+                请在5分钟内支付，否则订单自动取消
+              </Text>
+            </View>
+            <Pressable
+              accessibilityLabel="关闭星钻支付"
+              hitSlop={8}
+              onPress={() => void onClose()}
+              style={styles.orderClose}
+            >
+              <Image source={paymentCloseIcon} style={styles.orderCloseIcon} />
             </Pressable>
           </View>
-          <Text style={styles.orderPayAmount}>支付 {order.total} 星钻</Text>
-          <Text style={styles.orderBalance}>
-            当前余额：{balance ?? "加载中..."} 星钻
-          </Text>
-          <Pressable
-            style={styles.orderSubmit}
-            onPress={() => void pay()}
-            disabled={paying || balance === null}
-          >
-            <Text style={styles.orderSubmitText}>
-              {paying ? "支付中..." : "确认支付"}
+          <View style={styles.orderPaymentContent}>
+            <Text style={styles.orderPayAmount}>支付 {order.total} 星钻</Text>
+            <Text style={styles.orderBalance}>
+              当前余额：{balance ?? "加载中..."} 星钻
             </Text>
-          </Pressable>
+            <Pressable
+              style={styles.orderSubmit}
+              onPress={() => void pay()}
+              disabled={paying || balance === null}
+            >
+              <Text style={styles.orderSubmitText}>
+                {paying ? "支付中..." : "确认支付"}
+              </Text>
+            </Pressable>
+          </View>
         </View>
       </View>
       <AppPrompt
@@ -1315,24 +1329,40 @@ const styles = StyleSheet.create({
   },
   orderModal: {
     backgroundColor: "#fff",
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    padding: 20,
-    paddingBottom: 30,
-    gap: 14,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
   },
   orderModalHeader: {
+    minHeight: 74,
+    paddingLeft: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
   },
+  orderModalHeading: { flex: 1, minWidth: 0, gap: 8 },
   orderModalTitle: {
-    color: "#111",
+    color: "#0A0A0A",
     fontFamily: DOUYIN_SANS,
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: 16,
+    fontWeight: "500",
+    lineHeight: 24,
   },
-  orderClose: { color: "#777", fontSize: 28, lineHeight: 28 },
+  orderModalHint: {
+    color: "#808080",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  orderClose: {
+    width: 32,
+    height: 32,
+    marginRight: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  orderCloseIcon: { width: 32, height: 32 },
+  orderPaymentContent: { paddingHorizontal: 16, gap: 12 },
   orderLocked: { color: "#333", fontFamily: DOUYIN_SANS, fontSize: 15 },
   orderHint: { color: "#999", fontFamily: DOUYIN_SANS, fontSize: 14 },
   serviceOption: {

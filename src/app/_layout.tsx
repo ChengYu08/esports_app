@@ -3,6 +3,7 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import Toast from "react-native-toast-message";
 import { useEffect, useState } from "react";
 import { useAuthStore } from "@esports/auth";
 
@@ -86,6 +87,7 @@ export default function RootLayout() {
         ) : (
           <PrivacyConsentGate onAccepted={() => setPrivacyAccepted(true)} />
         )}
+        <Toast />
       </SafeAreaProvider>
     </QueryClientProvider>
   );
