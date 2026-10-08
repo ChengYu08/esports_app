@@ -42,6 +42,9 @@ export type ClientOssSts = {
   objectList?: string[];
 };
 
+export type ClientImToken = { token: string };
+export type ClientUserProfile = { id: string; nickname: string; headImage: string };
+
 export type AuthRequestOptions = {
   method: 'POST';
   body?: unknown;
@@ -84,6 +87,16 @@ export function createClientAuthContract(requester: AuthRequester) {
     },
     async logout(token: string) {
       return unwrap(await requester<unknown>('/client/v1/user/logout', {
+        method: 'POST', token,
+      }));
+    },
+    async getImToken(token: string) {
+      return unwrap(await requester<ClientImToken>('/client/v1/im/token', {
+        method: 'POST', token,
+      }));
+    },
+    async getUserProfile(token: string, userId: string) {
+      return unwrap(await requester<ClientUserProfile>(`/client/v1/user/profile/${encodeURIComponent(userId)}`, {
         method: 'POST', token,
       }));
     },

@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { parseImagePreviewParams } from "@/features/mine/image-preview.params";
 import { IMAGE_PREVIEW_ZOOM } from "@/features/mine/image-preview.zoom";
+import { EmptyState } from "@/shared/ui/AsyncStates";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -18,7 +19,7 @@ export default function ImagePreviewScreen() {
   }, [images.length]);
 
   if (images.length === 0) {
-    return <View style={styles.empty} />;
+    return <View style={styles.empty}><EmptyState message="暂无图片" /></View>;
   }
 
   return (
@@ -77,5 +78,5 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.45)",
   },
   closeText: { color: "#fff", fontSize: 32, fontWeight: "300", lineHeight: 36 },
-  empty: { flex: 1, backgroundColor: "#000" },
+  empty: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#000" },
 });

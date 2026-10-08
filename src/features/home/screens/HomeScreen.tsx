@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { HomeBackground } from "@/features/home/components/HomeBackground";
 import { ClubCard } from "@/features/home/components/ClubCard";
@@ -33,14 +33,14 @@ export default function HomeScreen() {
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <HomeBackground />
       {topTab === "court" ? (
-        <FlatList data={[]} ListHeaderComponent={header} renderItem={null} ListEmptyComponent={<View style={styles.emptyCourt}><Text>小法庭</Text></View>} />
+        <FlatList data={[]} ListHeaderComponent={header} renderItem={null} ListEmptyComponent={<View style={styles.emptyCourt}><EmptyState message="小法庭功能即将上线" /></View>} />
       ) : (
         <FlatList
           data={clubItems}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <ClubCard club={item} />}
           ListHeaderComponent={header}
-          contentContainerStyle={{ paddingBottom: 100 + insets.bottom }}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: 100 + insets.bottom }}
           refreshControl={<RefreshControl refreshing={clubs.isRefetching && !clubs.isFetchingNextPage} onRefresh={() => void clubs.refetch()} tintColor="#ff214b" />}
           onEndReached={() => { if (clubs.hasNextPage && !clubs.isFetchingNextPage) void clubs.fetchNextPage(); }}
           onEndReachedThreshold={0.3}

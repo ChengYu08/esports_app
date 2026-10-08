@@ -7,6 +7,7 @@ const envSchema = z.object({
   environment: z.enum(['development', 'preview', 'production']).default('development'),
   ssoClientAppId: z.string().default('android'),
   ssoClientSecret: z.string().default(''),
+  rongCloudAppKey: z.string().default(''),
 });
 
 const extra = (Constants.expoConfig?.extra ?? {}) as Record<string, unknown>;
@@ -17,4 +18,5 @@ export const env = envSchema.parse({
   environment: extra.environment ?? process.env.EXPO_PUBLIC_ENVIRONMENT,
   ssoClientAppId: extra.ssoClientAppId ?? process.env.EXPO_PUBLIC_SSO_CLIENT_APP_ID,
   ssoClientSecret: extra.ssoClientSecret ?? process.env.EXPO_PUBLIC_SSO_CLIENT_SECRET,
+  rongCloudAppKey: extra.rongCloudAppKey ?? process.env.EXPO_PUBLIC_RONGCLOUD_APP_KEY,
 });

@@ -88,7 +88,7 @@ export default function ClubSearchScreen() {
       ) : (
         <View style={styles.historyWrap}>
           <View style={styles.historyHeader}><Text style={styles.title}>搜索历史</Text>{history.length > 0 && <Pressable onPress={clearHistory}><Text style={styles.clear}>清空</Text></Pressable>}</View>
-          {history.length > 0 ? <View style={styles.historyList}>{history.map((item) => <Pressable key={item} onPress={() => submit(item)} style={styles.historyItem}><Text style={styles.historyText}>{item}</Text></Pressable>)}</View> : <Text style={styles.noHistory}>暂无搜索历史</Text>}
+          {history.length > 0 ? <View style={styles.historyList}>{history.map((item) => <Pressable key={item} onPress={() => submit(item)} style={styles.historyItem}><Text style={styles.historyText}>{item}</Text></Pressable>)}</View> : <EmptyState message="暂无搜索历史" />}
         </View>
       )}
     </View>
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
   input: { flex: 1, height: 36, paddingHorizontal: 12, paddingVertical: 0, borderRadius: 8, backgroundColor: "#F7F7F7", fontFamily: DOUYIN_SANS, color: "#111", fontSize: 14 },
   submit: { width: 44, alignItems: "flex-end" },
   submitText: { fontFamily: DOUYIN_SANS, color: "#FF708D", fontSize: 14, lineHeight: 22 },
-  historyWrap: { paddingHorizontal: 16, paddingTop: 20 },
+  historyWrap: { flex: 1, paddingHorizontal: 16, paddingTop: 20 },
   historyHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   title: { fontFamily: DOUYIN_SANS, color: "#111", fontSize: 16, fontWeight: "600" },
   clear: { fontFamily: DOUYIN_SANS, color: "#999", fontSize: 13 },
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
   historyItem: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, backgroundColor: "#F7F7F7" },
   historyText: { fontFamily: DOUYIN_SANS, color: "#666", fontSize: 13 },
   noHistory: { marginTop: 80, textAlign: "center", fontFamily: DOUYIN_SANS, color: "#999", fontSize: 13 },
-  results: { paddingTop: 16, paddingBottom: 24 },
+  results: { flexGrow: 1, paddingTop: 16, paddingBottom: 24 },
   separator: { height: 8, backgroundColor: "#F7F7F7", marginVertical: 8 },
   userCard: { minHeight: 76, marginHorizontal: 16, paddingVertical: 10, flexDirection: "row", alignItems: "center", gap: 12 },
   userAvatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: "#EDEDED", alignItems: "center", justifyContent: "center", overflow: "hidden" },

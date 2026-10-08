@@ -1,4 +1,6 @@
+import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
@@ -15,9 +17,12 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import type { CompanionFilters, GameKey } from "../api/home.types";
-import { useClubCompanions, useClubDetail, useClubGameModes } from "../hooks/use-home-data";
+import {
+  useClubCompanions,
+  useClubDetail,
+  useClubGameModes,
+} from "../hooks/use-home-data";
 
 const tabLeftCorner = require("../../../../assets/home/h_tab_left.svg");
 const tabRightCorner = require("../../../../assets/home/h_tab_right.svg");
@@ -31,6 +36,7 @@ const idleIcon = require("../../../../assets/home/club-detail/status-idle.svg");
 const playingIcon = require("../../../../assets/home/club-detail/status-playing.svg");
 const diamondIcon = require("../../../../assets/home/club-detail/icon-diamond.svg");
 const playIcon = require("../../../../assets/home/club-detail/icon-play.svg");
+const emptyStateIllustration = require("../../../../assets/coms/empty-state-illustration.svg");
 
 type FilterKey = "gender" | "mode" | "status" | "price";
 const filterDefinitions: { key: FilterKey; label: string }[] = [
@@ -45,25 +51,43 @@ export default function ClubDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const [game, setGame] = useState<GameKey>("");
   const [openFilter, setOpenFilter] = useState<FilterKey | null>(null);
-  const [priceSort, setPriceSort] = useState<CompanionFilters["priceSort"]>("DEFAULT");
+  const [showPriceEmptyModal, setShowPriceEmptyModal] = useState(false);
+  const [priceSort, setPriceSort] =
+    useState<CompanionFilters["priceSort"]>("DEFAULT");
   const [selectedSex, setSelectedSex] = useState<CompanionFilters["sex"]>();
-  const [selectedStatus, setSelectedStatus] = useState<CompanionFilters["gameStatus"]>();
+  const [selectedStatus, setSelectedStatus] =
+    useState<CompanionFilters["gameStatus"]>();
   const [selectedMode, setSelectedMode] = useState<number>();
   const clubQuery = useClubDetail(id);
   const club = clubQuery.data;
   const games = club?.games ?? [];
   const selectedGame = game || String(games[0]?.id ?? "");
   const modesQuery = useClubGameModes(selectedGame);
-  const selectedModeLabel = modesQuery.data?.find((mode) => mode.id === selectedMode)?.modeName;
-  const companionFilters = useMemo<CompanionFilters | null>(() => (
-    club && selectedGame ? { clubId: club.id, gameId: selectedGame, priceSort, sex: selectedSex, gameStatus: selectedStatus, gameModeId: selectedMode } : null
-  ), [club, priceSort, selectedGame, selectedMode, selectedSex, selectedStatus]);
+  const selectedModeLabel = modesQuery.data?.find(
+    (mode) => mode.id === selectedMode,
+  )?.modeName;
+  const companionFilters = useMemo<CompanionFilters | null>(
+    () =>
+      club && selectedGame
+        ? {
+            clubId: club.id,
+            gameId: selectedGame,
+            priceSort,
+            sex: selectedSex,
+            gameStatus: selectedStatus,
+            gameModeId: selectedMode,
+          }
+        : null,
+    [club, priceSort, selectedGame, selectedMode, selectedSex, selectedStatus],
+  );
   const companionsQuery = useClubCompanions(companionFilters);
-  const members = companionsQuery.data?.pages.flatMap((page) => page.items) ?? [];
+  const members =
+    companionsQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const voicePlayer = useVoicePlayer();
 
-  if (clubQuery.isLoading) return <View style={styles.state}><Text style={styles.stateText}>加载中...</Text></View>;
-  if (clubQuery.isError || !club) return <View style={styles.state}><Text style={styles.stateText}>俱乐部详情加载失败</Text><Pressable onPress={() => void clubQuery.refetch()}><Text style={styles.retryText}>重试</Text></Pressable></View>;
+  if (clubQuery.isLoading) return <LoadingState />;
+  if (clubQuery.isError || !club)
+    return <ErrorState onRetry={() => void clubQuery.refetch()} />;
   return (
     <View style={styles.screen}>
       <LinearGradient
@@ -85,14 +109,23 @@ export default function ClubDetailScreen() {
             <Pressable
               accessibilityLabel="搜索"
               hitSlop={10}
-              onPress={() => router.push({ pathname: "/search", params: { type: "user", clubId: club.id } })}
+              onPress={() =>
+                router.push({
+                  pathname: "/search",
+                  params: { type: "user", clubId: club.id },
+                })
+              }
             >
               <Image source={searchIcon} style={styles.navIconImage} />
             </Pressable>
           </View>
         </View>
         <View style={styles.clubInfo}>
-          <Image source={club.logoUrl ? { uri: club.logoUrl } : undefined} style={styles.clubLogo} contentFit="cover" />
+          <Image
+            source={club.logoUrl ? { uri: club.logoUrl } : undefined}
+            style={styles.clubLogo}
+            contentFit="cover"
+          />
           <View style={styles.clubCopy}>
             <View style={styles.titleLine}>
               <Text style={styles.selfTag}>自营</Text>
@@ -123,44 +156,238 @@ export default function ClubDetailScreen() {
               iconUrl={item.iconUrl}
               first={index === 0}
               active={selectedGame === String(item.id)}
-              onPress={() => { setGame(String(item.id)); setSelectedMode(undefined); }}
+              onPress={() => {
+                setGame(String(item.id));
+                setSelectedMode(undefined);
+              }}
             />
           ))}
         </ScrollView>
       </LinearGradient>
       <View style={styles.filterRow}>
         {filterDefinitions.map(({ key, label }) => {
-          const displayLabel = key === "gender"
-            ? selectedSex === 1 ? "男" : selectedSex === 2 ? "女" : label
-            : key === "mode" ? selectedModeLabel || label
-            : key === "status" ? selectedStatus === 0 ? "空闲中" : selectedStatus === 1 ? "游戏中" : label
-            : priceSort === "ASC" ? "从低到高" : priceSort === "DESC" ? "从高到低" : label;
+          const displayLabel =
+            key === "gender"
+              ? selectedSex === 1
+                ? "男"
+                : selectedSex === 2
+                  ? "女"
+                  : label
+              : key === "mode"
+                ? selectedModeLabel || label
+                : key === "status"
+                  ? selectedStatus === 0
+                    ? "空闲中"
+                    : selectedStatus === 1
+                      ? "游戏中"
+                      : label
+                  : priceSort === "ASC"
+                    ? "从低到高"
+                    : priceSort === "DESC"
+                      ? "从高到低"
+                      : label;
           const hasSelection = displayLabel !== label;
-          const filterDisplay = hasSelection ? `${label} ${displayLabel}` : label;
+          const filterDisplay = hasSelection
+            ? `${label} ${displayLabel}`
+            : label;
           return (
-          <Pressable
-            key={key}
-            accessibilityLabel={`筛选${label}`}
-            style={[
-              styles.filterItem,
-              openFilter === key && styles.filterItemActive,
-            ]}
-            onPress={() => setOpenFilter(key)}
-          >
-            <Text numberOfLines={1} style={[styles.filterText, hasSelection && styles.filterTextSelected]}>{filterDisplay}</Text>
-            <Image source={filterArrowIcon} style={styles.filterArrowIcon} />
-          </Pressable>
+            <Pressable
+              key={key}
+              accessibilityLabel={`筛选${label}`}
+              style={[
+                styles.filterItem,
+                openFilter === key && styles.filterItemActive,
+              ]}
+              onPress={() => setOpenFilter(key)}
+            >
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.filterText,
+                  hasSelection && styles.filterTextSelected,
+                ]}
+              >
+                {filterDisplay}
+              </Text>
+              <Image source={filterArrowIcon} style={styles.filterArrowIcon} />
+            </Pressable>
           );
         })}
       </View>
-      <Modal transparent visible={openFilter !== null} animationType="slide" onRequestClose={() => setOpenFilter(null)}>
-        <Pressable style={styles.filterBackdrop} onPress={() => setOpenFilter(null)}>
+      <Modal
+        transparent
+        visible={openFilter !== null}
+        animationType="slide"
+        onRequestClose={() => setOpenFilter(null)}
+      >
+        <Pressable
+          style={styles.filterBackdrop}
+          onPress={() => setOpenFilter(null)}
+        >
           <Pressable style={styles.filterSheet} onPress={() => undefined}>
-            <View style={styles.filterSheetHeader}><Text style={styles.filterSheetTitle}>{filterDefinitions.find((item) => item.key === openFilter)?.label}</Text><Pressable onPress={() => setOpenFilter(null)}><Text style={styles.filterClose}>×</Text></Pressable></View>
-            {openFilter === "gender" && <><FilterOption label="不限" selected={!selectedSex} onPress={() => { setSelectedSex(undefined); setOpenFilter(null); }} /><FilterOption label="男" selected={selectedSex === 1} onPress={() => { setSelectedSex(1); setOpenFilter(null); }} /><FilterOption label="女" selected={selectedSex === 2} onPress={() => { setSelectedSex(2); setOpenFilter(null); }} /></>}
-            {openFilter === "mode" && <><FilterOption label="不限" selected={!selectedMode} onPress={() => { setSelectedMode(undefined); setOpenFilter(null); }} />{modesQuery.data?.map((mode) => <FilterOption key={mode.id} label={mode.modeName} selected={selectedMode === mode.id} onPress={() => { setSelectedMode(mode.id); setOpenFilter(null); }} />)}</>}
-            {openFilter === "status" && <><FilterOption label="不限" selected={selectedStatus === undefined} onPress={() => { setSelectedStatus(undefined); setOpenFilter(null); }} /><FilterOption label="空闲中" selected={selectedStatus === 0} onPress={() => { setSelectedStatus(0); setOpenFilter(null); }} /><FilterOption label="游戏中" selected={selectedStatus === 1} onPress={() => { setSelectedStatus(1); setOpenFilter(null); }} /></>}
-            {openFilter === "price" && <><FilterOption label="默认排序" selected={priceSort === "DEFAULT"} onPress={() => { setPriceSort("DEFAULT"); setOpenFilter(null); }} /><FilterOption label="从高到低" selected={priceSort === "DESC"} onPress={() => { setPriceSort("DESC"); setOpenFilter(null); }} /><FilterOption label="从低到高" selected={priceSort === "ASC"} onPress={() => { setPriceSort("ASC"); setOpenFilter(null); }} /></>}
+            <View style={styles.filterSheetHeader}>
+              <Text style={styles.filterSheetTitle}>
+                {
+                  filterDefinitions.find((item) => item.key === openFilter)
+                    ?.label
+                }
+              </Text>
+              <Pressable onPress={() => setOpenFilter(null)}>
+                <Text style={styles.filterClose}>×</Text>
+              </Pressable>
+            </View>
+            {openFilter === "gender" && (
+              <>
+                <FilterOption
+                  label="不限"
+                  selected={!selectedSex}
+                  onPress={() => {
+                    setSelectedSex(undefined);
+                    setOpenFilter(null);
+                  }}
+                />
+                <FilterOption
+                  label="男"
+                  selected={selectedSex === 1}
+                  onPress={() => {
+                    setSelectedSex(1);
+                    setOpenFilter(null);
+                  }}
+                />
+                <FilterOption
+                  label="女"
+                  selected={selectedSex === 2}
+                  onPress={() => {
+                    setSelectedSex(2);
+                    setOpenFilter(null);
+                  }}
+                />
+              </>
+            )}
+            {openFilter === "mode" && (
+              <>
+                <FilterOption
+                  label="不限"
+                  selected={!selectedMode}
+                  onPress={() => {
+                    setSelectedMode(undefined);
+                    setOpenFilter(null);
+                  }}
+                />
+                {modesQuery.data?.map((mode) => (
+                  <FilterOption
+                    key={mode.id}
+                    label={mode.modeName}
+                    selected={selectedMode === mode.id}
+                    onPress={() => {
+                      setSelectedMode(mode.id);
+                      setOpenFilter(null);
+                    }}
+                  />
+                ))}
+              </>
+            )}
+            {openFilter === "status" && (
+              <>
+                <FilterOption
+                  label="不限"
+                  selected={selectedStatus === undefined}
+                  onPress={() => {
+                    setSelectedStatus(undefined);
+                    setOpenFilter(null);
+                  }}
+                />
+                <FilterOption
+                  label="空闲中"
+                  selected={selectedStatus === 0}
+                  onPress={() => {
+                    setSelectedStatus(0);
+                    setOpenFilter(null);
+                  }}
+                />
+                <FilterOption
+                  label="游戏中"
+                  selected={selectedStatus === 1}
+                  onPress={() => {
+                    setSelectedStatus(1);
+                    setOpenFilter(null);
+                  }}
+                />
+              </>
+            )}
+            {openFilter === "price" && (
+              <>
+                <FilterOption
+                  label="默认排序"
+                  selected={priceSort === "DEFAULT"}
+                  onPress={() => {
+                    setPriceSort("DEFAULT");
+                    setOpenFilter(null);
+                  }}
+                />
+                <FilterOption
+                  label="从高到低"
+                  selected={priceSort === "DESC"}
+                  onPress={() => {
+                    setPriceSort("DESC");
+                    setOpenFilter(null);
+                  }}
+                />
+                <FilterOption
+                  label="从低到高"
+                  selected={priceSort === "ASC"}
+                  onPress={() => {
+                    setPriceSort("ASC");
+                    setOpenFilter(null);
+                  }}
+                />
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+      <Modal
+        transparent
+        visible={showPriceEmptyModal}
+        animationType="fade"
+        onRequestClose={() => setShowPriceEmptyModal(false)}
+      >
+        <Pressable
+          accessibilityLabel="关闭暂无价目表提示"
+          accessibilityRole="button"
+          onPress={() => setShowPriceEmptyModal(false)}
+          style={styles.priceEmptyBackdrop}
+        >
+          <Pressable style={styles.priceEmptyCard} onPress={() => undefined}>
+            <Pressable
+              accessibilityLabel="关闭"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() => setShowPriceEmptyModal(false)}
+              style={styles.priceEmptyClose}
+            >
+              <Text style={styles.priceEmptyCloseText}>×</Text>
+            </Pressable>
+            <Image
+              accessibilityIgnoresInvertColors
+              contentFit="contain"
+              source={emptyStateIllustration}
+              style={styles.priceEmptyIllustration}
+            />
+            <Text style={styles.priceEmptyTitle}>暂无价目表</Text>
+            <Text style={styles.priceEmptyHint}>
+              该俱乐部暂未发布价目表，请稍后再来看看
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setShowPriceEmptyModal(false)}
+              style={({ pressed }) => [
+                styles.priceEmptyButton,
+                pressed && styles.priceEmptyButtonPressed,
+              ]}
+            >
+              <Text style={styles.priceEmptyButtonText}>知道了</Text>
+            </Pressable>
           </Pressable>
         </Pressable>
       </Modal>
@@ -185,11 +412,25 @@ export default function ClubDetailScreen() {
               voiceUrl={member.voiceUrl}
               playingVoiceUrl={voicePlayer.playingUrl}
               onToggleVoice={voicePlayer.toggle}
-              status={member.gameStatus === 1 ? "游戏中" : member.onlineStatus === 1 ? "空闲中" : undefined}
-              statusColor={member.gameStatus === 1 ? "#1e5eff" : member.onlineStatus === 1 ? "#16c978" : undefined}
+              status={
+                member.gameStatus === 1
+                  ? "游戏中"
+                  : member.onlineStatus === 1
+                    ? "空闲中"
+                    : undefined
+              }
+              statusColor={
+                member.gameStatus === 1
+                  ? "#1e5eff"
+                  : member.onlineStatus === 1
+                    ? "#16c978"
+                    : undefined
+              }
             />
           ))}
-          {!companionsQuery.isLoading && members.length === 0 && <Text style={styles.stateText}>暂无陪玩</Text>}
+          {!companionsQuery.isLoading && members.length === 0 && (
+            <EmptyState message="暂无陪玩" style={styles.memberEmpty} />
+          )}
         </View>
       </ScrollView>
       <View
@@ -202,10 +443,13 @@ export default function ClubDetailScreen() {
           style={styles.priceButton}
           onPress={() => {
             if (!club.pageConfigGroupId) {
-              Alert.alert("价目表", "暂无价目表");
+              setShowPriceEmptyModal(true);
               return;
             }
-            router.push({ pathname: "/club/price-list", params: { groupId: club.pageConfigGroupId } });
+            router.push({
+              pathname: "/club/price-list",
+              params: { groupId: club.pageConfigGroupId },
+            });
           }}
         >
           <Text style={styles.priceText}>价目表</Text>
@@ -290,8 +534,20 @@ function FilterOption({
   onPress: () => void;
 }) {
   return (
-    <Pressable accessibilityRole="radio" accessibilityState={{ selected }} onPress={onPress} style={styles.filterOption}>
-      <Text style={[styles.filterOptionText, selected && styles.filterOptionTextSelected]}>{label}</Text>
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={styles.filterOption}
+    >
+      <Text
+        style={[
+          styles.filterOptionText,
+          selected && styles.filterOptionTextSelected,
+        ]}
+      >
+        {label}
+      </Text>
       {selected && <Text style={styles.filterCheck}>✓</Text>}
     </Pressable>
   );
@@ -337,54 +593,84 @@ function MemberCard({
       animation.setValue(0.35);
       return;
     }
-    const loop = Animated.loop(Animated.sequence([
-      Animated.timing(animation, { toValue: 1, duration: 450, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-      Animated.timing(animation, { toValue: 0.35, duration: 450, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-    ]));
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(animation, {
+          toValue: 1,
+          duration: 450,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(animation, {
+          toValue: 0.35,
+          duration: 450,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
     loop.start();
     return () => loop.stop();
   }, [animation, voicePlaying]);
   return (
     <Pressable
       style={styles.memberCard}
-      onPress={() => router.push({
-        pathname: "/profile",
-        params: { clubId, userId: String(userId) },
-      })}
+      onPress={() =>
+        router.push({
+          pathname: "/profile",
+          params: { clubId, userId: String(userId) },
+        })
+      }
     >
       <View style={styles.avatarWrap}>
-        <Image source={image ? { uri: image } : undefined} contentFit="cover" style={styles.avatar} />
+        <Image
+          source={image ? { uri: image } : undefined}
+          contentFit="cover"
+          style={styles.avatar}
+        />
         {voiceUrl ? (
           <Pressable
             accessibilityLabel={`${voicePlaying ? "停止" : "播放"}语音`}
-            onPress={(event) => { event.stopPropagation(); onToggleVoice(voiceUrl); }}
+            onPress={(event) => {
+              event.stopPropagation();
+              onToggleVoice(voiceUrl);
+            }}
             style={styles.voice}
           >
             <Animated.View style={{ opacity: voicePlaying ? animation : 1 }}>
               <Image source={playIcon} style={styles.playIcon} />
             </Animated.View>
-            <Text style={styles.voiceText}>{voiceDuration ?? 0}&apos;&apos;</Text>
+            <Text style={styles.voiceText}>
+              {voiceDuration ?? 0}&apos;&apos;
+            </Text>
           </Pressable>
         ) : null}
       </View>
       <View style={styles.memberBody}>
         <View style={styles.memberTitle}>
-          <Text numberOfLines={1} style={styles.memberName}>{name}</Text>
+          <Text numberOfLines={1} style={styles.memberName}>
+            {name}
+          </Text>
           <View style={styles.genderGroup}>
             <Image
               source={gender === "male" ? maleIcon : femaleIcon}
               style={styles.genderIcon}
             />
-            <Text
-              style={[styles.gender, gender === "male" && styles.maleGender]}
-            >
-              24
-            </Text>
           </View>
           {status && statusColor && (
-            <View style={[styles.status, { backgroundColor: `${statusColor}20` }] }>
-              <Image source={isPlaying ? playingIcon : idleIcon} style={styles.statusIcon} />
-              <Text numberOfLines={1} style={[styles.statusText, { color: statusColor }]}>{status}</Text>
+            <View
+              style={[styles.status, { backgroundColor: `${statusColor}20` }]}
+            >
+              <Image
+                source={isPlaying ? playingIcon : idleIcon}
+                style={styles.statusIcon}
+              />
+              <Text
+                numberOfLines={1}
+                style={[styles.statusText, { color: statusColor }]}
+              >
+                {status}
+              </Text>
             </View>
           )}
         </View>
@@ -402,8 +688,20 @@ function MemberCard({
 }
 
 const styles = StyleSheet.create({
-  state: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, backgroundColor: "#fff" },
-  stateText: { color: "#999", fontFamily: DOUYIN_SANS, fontSize: 14, textAlign: "center", padding: 24 },
+  state: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    backgroundColor: "#fff",
+  },
+  stateText: {
+    color: "#999",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 14,
+    textAlign: "center",
+    padding: 24,
+  },
   retryText: { color: "#ff3158", fontFamily: DOUYIN_SANS, fontSize: 14 },
   gameTabsContent: {
     flexDirection: "row",
@@ -544,20 +842,133 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   filterItemActive: { backgroundColor: "#f5f5f5" },
-  filterText: { flexShrink: 1, color: "#666", fontFamily: DOUYIN_SANS, fontSize: 12 },
+  filterText: {
+    flexShrink: 1,
+    color: "#666",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 12,
+  },
   filterTextSelected: { color: "#0A0A0A", fontWeight: "600" },
   filterArrowIcon: { width: 12, height: 12 },
-  filterBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,.35)" },
-  filterSheet: { maxHeight: "65%", paddingBottom: 28, backgroundColor: "#fff", borderTopLeftRadius: 12, borderTopRightRadius: 12 },
-  filterSheetHeader: { height: 52, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#ebebeb" },
-  filterSheetTitle: { color: "#111", fontFamily: DOUYIN_SANS, fontSize: 16, fontWeight: "600" },
-  filterClose: { width: 32, color: "#666", fontSize: 26, lineHeight: 32, textAlign: "center" },
-  filterOption: { height: 48, paddingHorizontal: 20, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  filterBackdrop: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,.35)",
+  },
+  filterSheet: {
+    maxHeight: "65%",
+    paddingBottom: 28,
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  filterSheetHeader: {
+    height: 52,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#ebebeb",
+  },
+  filterSheetTitle: {
+    color: "#111",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  filterClose: {
+    width: 32,
+    color: "#666",
+    fontSize: 26,
+    lineHeight: 32,
+    textAlign: "center",
+  },
+  filterOption: {
+    height: 48,
+    paddingHorizontal: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   filterOptionText: { color: "#333", fontFamily: DOUYIN_SANS, fontSize: 14 },
   filterOptionTextSelected: { color: "#ff3158", fontWeight: "600" },
   filterCheck: { color: "#ff3158", fontSize: 17, fontWeight: "700" },
+  priceEmptyBackdrop: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+    backgroundColor: "rgba(12, 18, 28, .52)",
+  },
+  priceEmptyCard: {
+    width: "100%",
+    maxWidth: 340,
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 24,
+    borderRadius: 20,
+    backgroundColor: "#fff",
+    shadowColor: "#101828",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  priceEmptyClose: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 16,
+    backgroundColor: "#f6f7f9",
+  },
+  priceEmptyCloseText: {
+    color: "#8d95a3",
+    fontSize: 23,
+    fontWeight: "300",
+    lineHeight: 25,
+  },
+  priceEmptyIllustration: { width: 112, height: 112, marginBottom: 8 },
+  priceEmptyTitle: {
+    color: "#171a21",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 18,
+    lineHeight: 26,
+    fontWeight: "600",
+  },
+  priceEmptyHint: {
+    marginTop: 6,
+    color: "#8b929e",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: "center",
+  },
+  priceEmptyButton: {
+    width: "100%",
+    height: 44,
+    marginTop: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 22,
+    backgroundColor: "#ff3158",
+  },
+  priceEmptyButtonPressed: { opacity: 0.82 },
+  priceEmptyButtonText: {
+    color: "#fff",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: "600",
+  },
   listScroll: { flex: 1 },
   list: { paddingHorizontal: 0 },
+  memberEmpty: { alignSelf: "center", marginTop: 24 },
   memberCard: {
     minHeight: 124,
     paddingHorizontal: 16,

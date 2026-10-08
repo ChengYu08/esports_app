@@ -6,6 +6,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { usePriceList } from "../hooks/use-home-data";
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
+import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
 
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 
@@ -19,9 +20,9 @@ export default function PriceListScreen() {
   const selectedTab = tabs[selectedIndex] ?? tabs[0];
 
   const content = useMemo(() => {
-    if (query.isLoading) return <Text style={styles.stateText}>加载中...</Text>;
-    if (query.isError) return <View style={styles.state}><Text style={styles.stateText}>价目表加载失败</Text><Pressable onPress={() => void query.refetch()}><Text style={styles.retryText}>重试</Text></Pressable></View>;
-    if (!selectedTab) return <Text style={styles.stateText}>暂无价目表</Text>;
+    if (query.isLoading) return <LoadingState />;
+    if (query.isError) return <ErrorState onRetry={() => void query.refetch()} />;
+    if (!selectedTab) return <EmptyState message="暂无价目表" />;
     return (
       <PriceImage
         uri={selectedTab.imageUrl}

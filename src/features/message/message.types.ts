@@ -7,4 +7,5 @@ export type MessageListItemModel = {
   preview: string;
   time: string;
   avatar: ImageSource | number;
+  unreadCount?: number;
 };

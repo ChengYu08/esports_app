@@ -14,6 +14,7 @@ import { toAuthUser } from "@/features/auth/client-auth-flow";
 import { clearAuthSession, readAuthSession, saveAuthSession } from "@/features/auth/session-persistence";
 import { PrivacyConsentGate } from "@/features/privacy/components/PrivacyConsentGate";
 import { readPrivacyConsent } from "@/features/privacy/privacy-consent";
+import { disconnectRongCloud } from "@/features/message/rongcloud-im";
 
 const fonts = {
   [DOUYIN_SANS]: require("../../assets/fonts/Douyin Sans.otf"),
@@ -62,6 +63,8 @@ export default function RootLayout() {
     })();
     return () => { active = false; };
   }, [clearSession, setSession]);
+
+  useEffect(() => () => { void disconnectRongCloud(); }, []);
 
   if ((!loaded && !error) || !sessionReady || !privacyReady) {
     return (

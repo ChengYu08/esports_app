@@ -25,6 +25,7 @@ import {
   type CompanionOrderContext,
   type CompanionServiceOption,
 } from "@/features/mine/api/companion-order.api";
+import { cancelOrder } from "@/features/order/order.api";
 import {
   getFirstProfileGameId,
   getProfileRouteParams,
@@ -45,9 +46,11 @@ import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
+import { EmptyState } from "@/shared/ui/AsyncStates";
 
 const fallbackAvatar = require("../../../../assets/mine/figma/profile-avatar.png");
 const background = require("../../../../assets/mine/figma/profile-bg.png");
+const maleIcon = require("../../../../assets/home/club-detail/male.svg");
 const femaleIcon = require("../../../../assets/mine/figma/mine-female.svg");
 const clubIcon = require("../../../../assets/mine/figma/mine-club-flag.svg");
 const settingsIcon = require("../../../../assets/mine/figma/mine-settings.svg");
@@ -75,6 +78,7 @@ export default function ProfileScreen() {
     total: number;
   } | null>(null);
   const [paymentSheetVisible, setPaymentSheetVisible] = useState(false);
+  const [paymentCancelError, setPaymentCancelError] = useState<string | null>(null);
   const detailQuery = useProfileDetail(routeParams);
   const detail = detailQuery.data;
   const firstGameId = getFirstProfileGameId(detail?.games ?? []);
@@ -196,7 +200,7 @@ export default function ProfileScreen() {
               onSelect={setSelectedGameId}
             />
           ) : (
-            <EmptyState text="暂无支持的游戏" />
+            <EmptyState message="暂无支持的游戏" />
           )}
 
           {games.length > 0 ? (
@@ -258,8 +262,7 @@ export default function ProfileScreen() {
           visible={paymentSheetVisible}
           token={useAuthStore.getState().accessToken}
           onClose={() => {
-            setPaymentSheetVisible(false);
-            setPaymentOrder(null);
+            void cancelPendingPaymentOrder();
           }}
           onPaid={() => {
             setPaymentSheetVisible(false);
@@ -279,8 +282,34 @@ export default function ProfileScreen() {
           setPaymentOrder(null);
         }}
       />
+      <AppPrompt
+        visible={Boolean(paymentCancelError)}
+        title="订单取消失败"
+        message={paymentCancelError ?? ""}
+        onConfirm={() => setPaymentCancelError(null)}
+      />
     </View>
   );
+
+  async function cancelPendingPaymentOrder() {
+    const pendingOrder = paymentOrder;
+    const token = useAuthStore.getState().accessToken;
+    setPaymentSheetVisible(false);
+    setPaymentOrder(null);
+    if (!pendingOrder || !token) return;
+    try {
+      await cancelOrder(String(pendingOrder.orderId), token);
+      void queryClient.invalidateQueries({ queryKey: ["orders"] });
+    } catch (error) {
+      setPaymentSuccess(false);
+      setPaymentOrder(null);
+      // The payment sheet is already dismissed; surface a cancellation error
+      // without allowing the user to retry payment for the same order.
+      setPaymentCancelError(
+        error instanceof Error ? error.message : "订单取消失败",
+      );
+    }
+  }
 }
 
 function ProfileIdentity({ profile }: { profile: ProfileDetail }) {
@@ -299,13 +328,16 @@ function ProfileIdentity({ profile }: { profile: ProfileDetail }) {
           <Text numberOfLines={1} style={styles.name}>
             {profile.nickname}
           </Text>
-          {profile.sex === 2 ? (
-            <Image source={femaleIcon} style={styles.gender} />
-          ) : null}
           {age ? (
             <Text style={profile.sex === 2 ? styles.femaleAge : styles.male}>
               {age}
             </Text>
+          ) : null}
+          {profile.sex === 1 || profile.sex === 2 ? (
+            <Image
+              source={profile.sex === 1 ? maleIcon : femaleIcon}
+              style={styles.gender}
+            />
           ) : null}
           {status ? (
             <View
@@ -452,7 +484,7 @@ function SkillsContent({
           />
         ))
       ) : (
-        <EmptyState text="暂无陪玩服务" />
+        <EmptyState message="暂无陪玩服务" />
       )}
     </>
   );
@@ -481,7 +513,7 @@ function ReviewsContent({
     );
   }
   if (reviews.length === 0) {
-    return <EmptyState text="暂无评价" hint="完成订单后会显示评价内容" />;
+    return <EmptyState message="暂无评价" hint="完成订单后会显示评价内容" />;
   }
   return (
     <View style={styles.reviewList}>
@@ -493,7 +525,7 @@ function ReviewsContent({
 }
 
 function ImageGallery({ images }: { images: string[] }) {
-  if (images.length === 0) return <EmptyState text="暂无技能图片" />;
+  if (images.length === 0) return <EmptyState message="暂无技能图片" />;
   const visibleImages = images.slice(0, 5);
 
   return (
@@ -802,11 +834,12 @@ function StarPaymentSheet({
   order: { orderId: number; total: number };
   visible: boolean;
   token: string | null;
-  onClose: () => void;
+  onClose: () => void | Promise<void>;
   onPaid: () => void;
 }) {
   const [balance, setBalance] = useState<number | null>(null);
   const [paying, setPaying] = useState(false);
+  const settledRef = useRef(false);
   const [prompt, setPrompt] = useState<{
     title?: string;
     message: string;
@@ -829,8 +862,13 @@ function StarPaymentSheet({
     setPaying(true);
     try {
       await payCompanionOrder(order.orderId, token);
+      settledRef.current = true;
       onPaid();
     } catch (error) {
+      if (!settledRef.current) {
+        settledRef.current = true;
+        await onClose();
+      }
       setPrompt({
         message: error instanceof Error ? error.message : "支付失败",
       });
@@ -844,13 +882,13 @@ function StarPaymentSheet({
       animationType="slide"
       transparent
       visible={visible}
-      onRequestClose={onClose}
+      onRequestClose={() => void onClose()}
     >
       <View style={styles.orderModalBackdrop}>
         <View style={styles.orderModal}>
           <View style={styles.orderModalHeader}>
             <Text style={styles.orderModalTitle}>星钻支付</Text>
-            <Pressable onPress={onClose}>
+            <Pressable onPress={() => void onClose()}>
               <Text style={styles.orderClose}>×</Text>
             </Pressable>
           </View>
@@ -979,15 +1017,6 @@ function InlineState({
           <Text style={styles.retryText}>{actionLabel}</Text>
         </Pressable>
       ) : null}
-    </View>
-  );
-}
-
-function EmptyState({ text, hint }: { text: string; hint?: string }) {
-  return (
-    <View style={styles.empty}>
-      <Text style={styles.emptyText}>{text}</Text>
-      {hint ? <Text style={styles.emptyHint}>{hint}</Text> : null}
     </View>
   );
 }
