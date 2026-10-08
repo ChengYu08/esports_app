@@ -429,7 +429,7 @@ export default function ClubDetailScreen() {
             />
           ))}
           {!companionsQuery.isLoading && members.length === 0 && (
-            <EmptyState message="暂无陪玩" style={styles.memberEmpty} />
+            <EmptyState message="暂无大神" style={styles.memberEmpty} />
           )}
         </View>
       </ScrollView>

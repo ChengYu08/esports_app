@@ -25,7 +25,6 @@ import {
   type CompanionOrderContext,
   type CompanionServiceOption,
 } from "@/features/mine/api/companion-order.api";
-import { cancelOrder } from "@/features/order/order.api";
 import {
   getFirstProfileGameId,
   getProfileRouteParams,
@@ -43,6 +42,7 @@ import {
   useProfileReviews,
 } from "@/features/mine/hooks/use-profile-data";
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
+import { cancelOrder } from "@/features/order/order.api";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
@@ -78,7 +78,9 @@ export default function ProfileScreen() {
     total: number;
   } | null>(null);
   const [paymentSheetVisible, setPaymentSheetVisible] = useState(false);
-  const [paymentCancelError, setPaymentCancelError] = useState<string | null>(null);
+  const [paymentCancelError, setPaymentCancelError] = useState<string | null>(
+    null,
+  );
   const paymentCancelingRef = useRef(false);
   const detailQuery = useProfileDetail(routeParams);
   const detail = detailQuery.data;
@@ -333,16 +335,18 @@ function ProfileIdentity({ profile }: { profile: ProfileDetail }) {
           <Text numberOfLines={1} style={styles.name}>
             {profile.nickname}
           </Text>
-          {age ? (
-            <Text style={profile.sex === 2 ? styles.femaleAge : styles.male}>
-              {age}
-            </Text>
-          ) : null}
+
           {profile.sex === 1 || profile.sex === 2 ? (
             <Image
               source={profile.sex === 1 ? maleIcon : femaleIcon}
               style={styles.gender}
             />
+          ) : null}
+
+          {age ? (
+            <Text style={profile.sex === 2 ? styles.femaleAge : styles.male}>
+              {age}
+            </Text>
           ) : null}
           {status ? (
             <View
@@ -426,7 +430,9 @@ function SkillsContent({
   onOrder: (card: ProfileSkillCard) => void;
 }) {
   const voicePlayer = useVoicePlayer();
-  const voicePlaying = Boolean(detail?.voiceUrl && voicePlayer.playingUrl === detail.voiceUrl);
+  const voicePlaying = Boolean(
+    detail?.voiceUrl && voicePlayer.playingUrl === detail.voiceUrl,
+  );
   const [voiceAnimation] = useState(() => new Animated.Value(0.35));
   useEffect(() => {
     if (!voicePlaying) {
@@ -434,10 +440,22 @@ function SkillsContent({
       voiceAnimation.setValue(0.35);
       return;
     }
-    const loop = Animated.loop(Animated.sequence([
-      Animated.timing(voiceAnimation, { toValue: 1, duration: 450, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-      Animated.timing(voiceAnimation, { toValue: 0.35, duration: 450, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-    ]));
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(voiceAnimation, {
+          toValue: 1,
+          duration: 450,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(voiceAnimation, {
+          toValue: 0.35,
+          duration: 450,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
     loop.start();
     return () => loop.stop();
   }, [voiceAnimation, voicePlaying]);
@@ -466,7 +484,9 @@ function SkillsContent({
             onPress={() => voicePlayer.toggle(detail.voiceUrl as string)}
             style={styles.voice}
           >
-            <Animated.View style={{ opacity: voicePlaying ? voiceAnimation : 1 }}>
+            <Animated.View
+              style={{ opacity: voicePlaying ? voiceAnimation : 1 }}
+            >
               <Text style={styles.play}>▶</Text>
             </Animated.View>
             <Text style={styles.voiceText}>
@@ -489,7 +509,7 @@ function SkillsContent({
           />
         ))
       ) : (
-        <EmptyState message="暂无陪玩服务" />
+        <EmptyState message="暂无大神服务" />
       )}
     </>
   );
@@ -679,7 +699,10 @@ function CompanionOrderSheet({
   const total = (selectedService?.price ?? card.price) * count;
 
   async function submitOrder() {
-    if (!token) return setPrompt({ message: "请先登录" });
+    if (!token) {
+      router.push("/login");
+      return;
+    }
     if (!selectedService || !agreed)
       return setPrompt({ message: "请选择服务并同意服务协议" });
     setSubmitting(true);
@@ -805,11 +828,11 @@ function CompanionOrderSheet({
               <Pressable
                 style={[
                   styles.orderSubmit,
-                  (!agreed || submitting || !selectedService) &&
+                  (!agreed || submitting || (Boolean(token) && !selectedService)) &&
                     styles.orderSubmitDisabled,
                 ]}
                 onPress={() => void submitOrder()}
-                disabled={!agreed || submitting || !selectedService}
+                disabled={!agreed || submitting || (Boolean(token) && !selectedService)}
               >
                 <Text style={styles.orderSubmitText}>
                   {submitting ? "提交中..." : "确认下单"}

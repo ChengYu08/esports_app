@@ -1,8 +1,13 @@
-import type { Banner, Game, GameKey, HomeTab } from "@/features/home/api/home.types";
+import type {
+  Banner,
+  Game,
+  GameKey,
+  HomeTab,
+} from "@/features/home/api/home.types";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { Image } from "expo-image";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 const banner = require("../../../../assets/home/h_banner.png");
 const searchIcon = require("../../../../assets/home/h_search.svg");
@@ -46,7 +51,9 @@ export function HomeHeader({
         <Pressable
           accessibilityLabel="搜索"
           style={styles.search}
-          onPress={() => router.push({ pathname: "/search", params: { type: "club" } })}
+          onPress={() =>
+            router.push({ pathname: "/search", params: { type: "club" } })
+          }
         >
           <Image source={searchIcon} style={styles.searchIcon} />
         </Pressable>
@@ -80,9 +87,22 @@ export function HomeHeader({
                 ]}
               >
                 <View
-                  style={[styles.gameLogo, { backgroundColor: item.category === 1 ? "#3ec8a5" : "#ecb34f" }]}
+                  style={[
+                    styles.gameLogo,
+                    {
+                      backgroundColor:
+                        item.category === 1 ? "#3ec8a5" : "#ecb34f",
+                    },
+                  ]}
                 >
-                  {item.iconUrl ? <Image source={{ uri: item.iconUrl }} style={styles.gameIcon} /> : <Text style={styles.gameLogoText}>△</Text>}
+                  {item.iconUrl ? (
+                    <Image
+                      source={{ uri: item.iconUrl }}
+                      style={styles.gameIcon}
+                    />
+                  ) : (
+                    <Text style={styles.gameLogoText}>△</Text>
+                  )}
                 </View>
                 <Text
                   style={[
@@ -95,8 +115,16 @@ export function HomeHeader({
                 {game === String(item.id) && (
                   <>
                     <View style={styles.gameIndicator} />
-                    <Image source={tabLeftCorner} style={[styles.tabCorner, styles.tabCornerLeft]} pointerEvents="none" />
-                    <Image source={tabRightCorner} style={[styles.tabCorner, styles.tabCornerRight]} pointerEvents="none" />
+                    <Image
+                      source={tabLeftCorner}
+                      style={[styles.tabCorner, styles.tabCornerLeft]}
+                      pointerEvents="none"
+                    />
+                    <Image
+                      source={tabRightCorner}
+                      style={[styles.tabCorner, styles.tabCornerRight]}
+                      pointerEvents="none"
+                    />
                   </>
                 )}
               </Pressable>
@@ -104,7 +132,7 @@ export function HomeHeader({
           </ScrollView>
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>热门俱乐部</Text>
-            <Image source={filterIcon} style={styles.filter} />
+            {/* <Image source={filterIcon} style={styles.filter} /> */}
           </View>
         </>
       )}
@@ -211,7 +239,12 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   gameIcon: { width: 16, height: 16, borderRadius: 4 },
-  gameLabel: { fontFamily: DOUYIN_SANS, color: "#999", fontSize: 13, flexShrink: 0 },
+  gameLabel: {
+    fontFamily: DOUYIN_SANS,
+    color: "#999",
+    fontSize: 13,
+    flexShrink: 0,
+  },
   gameLabelSelected: { fontFamily: DOUYIN_SANS, color: "#333" },
   gameIndicator: {
     position: "absolute",
