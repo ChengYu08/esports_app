@@ -27,6 +27,12 @@ function requireSuccess<T>(response: ApiEnvelope<T>, fallback: string): T {
   return response.data;
 }
 
+function requireVoidSuccess(response: ApiEnvelope<unknown>, fallback: string) {
+  if (response.code !== "SUCCESS") {
+    throw new Error(response.info || fallback);
+  }
+}
+
 export async function fetchCompanionServices(
   context: Pick<CompanionOrderContext, "clubId" | "serviceUserId" | "gameLevelId">,
   token: string,
@@ -78,5 +84,5 @@ export async function payCompanionOrder(orderId: number, token: string): Promise
     token,
     body: { action: { orderId } },
   });
-  requireSuccess(response, "支付失败");
+  requireVoidSuccess(response, "支付失败");
 }

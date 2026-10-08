@@ -5,10 +5,12 @@ import { clientAuthApi } from '@/features/auth/client-auth.api';
 import { env } from '@/core/config/env';
 
 export type RongConversation = { id: string; title: string; preview: string; time: string; avatar?: string; unreadCount?: number };
+export type RongTextMessage = { id: string; text: string; time: string; isMine: boolean };
 
 let engine: RCIMIWEngine | null = null;
 let connected = false;
 let messageHandler: ((conversation: RongConversation) => void) | null = null;
+let conversationMessageHandlers = new Map<string, (message: RongTextMessage) => void>();
 let businessToken = '';
 const PRIVATE = 1;
 const IMAGE = 4;
@@ -21,6 +23,23 @@ function mapMessage(message?: RCIMIWMessage): Pick<RongConversation, 'preview' |
 function mapConversation(conversation: RCIMIWConversation): RongConversation {
   const last = mapMessage(conversation.lastMessage);
   return { id: String(conversation.targetId || ''), title: String(conversation.targetId || '消息'), preview: last.preview, time: last.time, unreadCount: conversation.unreadCount };
+}
+
+function mapTextMessage(message: RCIMIWMessage): RongTextMessage | null {
+  const content = message as RCIMIWMessage & {
+    content?: string;
+    messageId?: number;
+    messageUId?: string;
+    text?: string;
+  };
+  const text = content.text || content.content;
+  if (!text) return null;
+  return {
+    id: content.messageUId || String(content.messageId || `${message.sentTime}-${message.senderUserId}`),
+    text,
+    time: message.sentTime ? new Date(message.sentTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '',
+    isMine: message.direction === 0,
+  };
 }
 
 async function hydrateConversation(conversation: RongConversation) {
@@ -53,7 +72,11 @@ export async function connectRongCloud(accessToken: string) {
     }
     engine.setOnMessageReceivedListener((message) => {
       const peerId = message.senderUserId || message.targetId;
-      if (message.conversationType === PRIVATE && peerId) void hydrateConversation(mapConversation({ targetId: peerId, conversationType: message.conversationType, lastMessage: message })).then((conversation) => messageHandler?.(conversation));
+      if (message.conversationType === PRIVATE && peerId) {
+        void hydrateConversation(mapConversation({ targetId: peerId, conversationType: message.conversationType, lastMessage: message })).then((conversation) => messageHandler?.(conversation));
+        const mappedMessage = mapTextMessage(message);
+        if (mappedMessage) conversationMessageHandlers.get(peerId)?.(mappedMessage);
+      }
     });
     engine.setOnConnectionStatusChangedListener((status) => { connected = status === 1; });
   }
@@ -79,6 +102,31 @@ export function subscribeRongMessages(onMessage: (conversation: RongConversation
   return () => { if (messageHandler === onMessage) messageHandler = null; };
 }
 
+export function subscribeRongConversationMessages(targetId: string, onMessage: (message: RongTextMessage) => void) {
+  conversationMessageHandlers.set(targetId, onMessage);
+  return () => {
+    if (conversationMessageHandlers.get(targetId) === onMessage) conversationMessageHandlers.delete(targetId);
+  };
+}
+
+export async function getRongMessages(targetId: string): Promise<RongTextMessage[]> {
+  if (!engine || !connected || !targetId) return [];
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (messages: RongTextMessage[]) => {
+      if (settled) return;
+      settled = true;
+      resolve(messages);
+    };
+    void engine?.getMessages(PRIVATE, targetId, '', 0, 0, 2, 20, {
+      onSuccess: (messages) => finish((messages || []).map(mapTextMessage).filter((message): message is RongTextMessage => Boolean(message)).reverse()),
+      onError: () => finish([]),
+    }).then((code) => {
+      if (code !== 0) finish([]);
+    }).catch(() => finish([]));
+  });
+}
+
 export async function sendRongText(targetId: string, text: string) {
   if (!engine || !connected) throw new Error('融云尚未连接');
   const message = await engine.createTextMessage(PRIVATE, targetId, '', text);
@@ -91,4 +139,5 @@ export async function disconnectRongCloud() {
   connected = false;
   businessToken = '';
   messageHandler = null;
+  conversationMessageHandlers.clear();
 }

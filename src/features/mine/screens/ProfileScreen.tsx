@@ -44,6 +44,7 @@ import {
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import { cancelOrder } from "@/features/order/order.api";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
+import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { EmptyState } from "@/shared/ui/AsyncStates";
@@ -74,6 +75,7 @@ export default function ProfileScreen() {
   const [selectedGameId, setSelectedGameId] = useState("");
   const [orderCard, setOrderCard] = useState<ProfileSkillCard | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
   const [paymentOrder, setPaymentOrder] = useState<{
     orderId: number;
     total: number;
@@ -255,6 +257,8 @@ export default function ProfileScreen() {
           onClose={() => setOrderCard(null)}
           onOrderCreated={(order) => {
             setOrderCard(null);
+            setPaymentSuccess(false);
+            setPaymentError(null);
             setPaymentOrder(order);
             setPaymentSheetVisible(true);
           }}
@@ -271,9 +275,11 @@ export default function ProfileScreen() {
           onPaid={() => {
             setPaymentSheetVisible(false);
             setPaymentOrder(null);
+            setPaymentError(null);
             void queryClient.invalidateQueries({ queryKey: ["orders"] });
             setPaymentSuccess(true);
           }}
+          onPaymentFailed={(message) => setPaymentError(message)}
         />
       ) : null}
       <AppPrompt
@@ -285,6 +291,12 @@ export default function ProfileScreen() {
           setPaymentSheetVisible(false);
           setPaymentOrder(null);
         }}
+      />
+      <AppPrompt
+        visible={Boolean(paymentError)}
+        title="支付失败"
+        message={paymentError ?? ""}
+        onConfirm={() => setPaymentError(null)}
       />
       <AppPrompt
         visible={Boolean(paymentCancelError)}
@@ -431,35 +443,6 @@ function SkillsContent({
   onOrder: (card: ProfileSkillCard) => void;
 }) {
   const voicePlayer = useVoicePlayer();
-  const voicePlaying = Boolean(
-    detail?.voiceUrl && voicePlayer.playingUrl === detail.voiceUrl,
-  );
-  const [voiceAnimation] = useState(() => new Animated.Value(0.35));
-  useEffect(() => {
-    if (!voicePlaying) {
-      voiceAnimation.stopAnimation();
-      voiceAnimation.setValue(0.35);
-      return;
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(voiceAnimation, {
-          toValue: 1,
-          duration: 450,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(voiceAnimation, {
-          toValue: 0.35,
-          duration: 450,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [voiceAnimation, voicePlaying]);
   if (query.isLoading) return <InlineState text="游戏技能加载中..." />;
   if (query.isError || !detail) {
     return (
@@ -476,24 +459,13 @@ function SkillsContent({
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>能力介绍</Text>
         {detail.voiceUrl ? (
-          <Pressable
-            accessibilityLabel={
-              voicePlayer.playingUrl === detail.voiceUrl
-                ? "停止语音"
-                : "播放语音"
-            }
-            onPress={() => voicePlayer.toggle(detail.voiceUrl as string)}
-            style={styles.voice}
-          >
-            <Animated.View
-              style={{ opacity: voicePlaying ? voiceAnimation : 1 }}
-            >
-              <Text style={styles.play}>▶</Text>
-            </Animated.View>
-            <Text style={styles.voiceText}>
-              {detail.voiceDurationSeconds}&quot;
-            </Text>
-          </Pressable>
+          <VoicePlayButton
+            duration={detail.voiceDurationSeconds}
+            inline
+            onToggleVoice={voicePlayer.toggle}
+            playingUrl={voicePlayer.playingUrl}
+            url={detail.voiceUrl}
+          />
         ) : null}
       </View>
       <Text style={styles.description}>
@@ -859,12 +831,14 @@ function StarPaymentSheet({
   token,
   onClose,
   onPaid,
+  onPaymentFailed,
 }: {
   order: { orderId: number; total: number };
   visible: boolean;
   token: string | null;
   onClose: () => void | Promise<void>;
   onPaid: () => void;
+  onPaymentFailed: (message: string) => void;
 }) {
   const insets = useSafeAreaInsets();
   const [balance, setBalance] = useState<number | null>(null);
@@ -894,7 +868,8 @@ function StarPaymentSheet({
       await payCompanionOrder(order.orderId, token);
       settledRef.current = true;
       onPaid();
-    } catch {
+    } catch (error) {
+      onPaymentFailed(error instanceof Error ? error.message : "支付失败");
       if (!settledRef.current) {
         settledRef.current = true;
         await onClose();
@@ -912,11 +887,11 @@ function StarPaymentSheet({
       onRequestClose={() => void onClose()}
     >
       <View style={styles.orderModalBackdrop}>
-        <View style={[styles.orderModal, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-          <View style={styles.orderModalHeader}>
-            <View style={styles.orderModalHeading}>
-              <Text style={styles.orderModalTitle}>星钻支付</Text>
-              <Text style={styles.orderModalHint}>
+        <View style={[styles.paymentModal, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <View style={styles.paymentModalHeader}>
+            <View style={styles.paymentModalHeading}>
+              <Text style={styles.paymentModalTitle}>星钻支付</Text>
+              <Text style={styles.paymentModalHint}>
                 请在5分钟内支付，否则订单自动取消
               </Text>
             </View>
@@ -924,9 +899,9 @@ function StarPaymentSheet({
               accessibilityLabel="关闭星钻支付"
               hitSlop={8}
               onPress={() => void onClose()}
-              style={styles.orderClose}
+              style={styles.paymentClose}
             >
-              <Image source={paymentCloseIcon} style={styles.orderCloseIcon} />
+              <Image source={paymentCloseIcon} style={styles.paymentCloseIcon} />
             </Pressable>
           </View>
           <View style={styles.orderPaymentContent}>
@@ -1280,26 +1255,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
-  voice: {
-    height: 24,
-    paddingHorizontal: 6,
-    borderRadius: 12,
-    backgroundColor: "#FF3158",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  play: {
-    color: "#FF3158",
-    backgroundColor: "#fff",
-    width: 17,
-    height: 17,
-    borderRadius: 9,
-    textAlign: "center",
-    lineHeight: 17,
-    fontSize: 8,
-  },
-  voiceText: { color: "#fff", fontSize: 12 },
   description: {
     marginTop: 14,
     color: "#222",
@@ -1329,10 +1284,30 @@ const styles = StyleSheet.create({
   },
   orderModal: {
     backgroundColor: "#fff",
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    padding: 20,
+    paddingBottom: 30,
+    gap: 14,
+  },
+  orderModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  orderModalTitle: {
+    color: "#111",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  orderClose: { color: "#777", fontSize: 28, lineHeight: 28 },
+  paymentModal: {
+    backgroundColor: "#fff",
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
   },
-  orderModalHeader: {
+  paymentModalHeader: {
     minHeight: 74,
     paddingLeft: 16,
     paddingTop: 16,
@@ -1340,28 +1315,28 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  orderModalHeading: { flex: 1, minWidth: 0, gap: 8 },
-  orderModalTitle: {
+  paymentModalHeading: { flex: 1, minWidth: 0, gap: 8 },
+  paymentModalTitle: {
     color: "#0A0A0A",
     fontFamily: DOUYIN_SANS,
     fontSize: 16,
     fontWeight: "500",
     lineHeight: 24,
   },
-  orderModalHint: {
+  paymentModalHint: {
     color: "#808080",
     fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
-  orderClose: {
+  paymentClose: {
     width: 32,
     height: 32,
     marginRight: 12,
     alignItems: "center",
     justifyContent: "center",
   },
-  orderCloseIcon: { width: 32, height: 32 },
+  paymentCloseIcon: { width: 32, height: 32 },
   orderPaymentContent: { paddingHorizontal: 16, gap: 12 },
   orderLocked: { color: "#333", fontFamily: DOUYIN_SANS, fontSize: 15 },
   orderHint: { color: "#999", fontFamily: DOUYIN_SANS, fontSize: 14 },

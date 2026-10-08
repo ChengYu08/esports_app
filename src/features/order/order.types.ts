@@ -41,6 +41,7 @@ export type OrderItemModel = {
   paidTime?: string;
   acceptedTime?: string;
   serviceStartTime?: string;
+  serviceEndTime?: string;
   completedTime?: string;
   actions: readonly OrderAction[];
 };

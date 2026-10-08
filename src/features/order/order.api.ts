@@ -1,5 +1,6 @@
 import { apiClient } from "@/core/network/api-client";
 import type { OrderFilter, OrderItemModel, OrderQueryStatus } from "./order.types";
+import { readOrderTimeFields } from "./order-time-fields";
 
 type ApiEnvelope<T> = { code?: string; info?: string; data?: T };
 type ApiPage<T> = { records?: T[]; list?: T[]; page?: number; totalPages?: number; total?: number } | T[];
@@ -67,11 +68,7 @@ export function mapOrder(item: ApiOrder, index = 0): OrderItemModel {
     unitPrice: stringValue(item, "unitPrice", "price") ?? total,
     quantity: numberValue(item, "quantity", "count", "num") ?? 1,
     totalPrice: total,
-    createTime: stringValue(item, "createTime"),
-    paidTime: stringValue(item, "paidTime"),
-    acceptedTime: stringValue(item, "acceptedTime"),
-    serviceStartTime: stringValue(item, "serviceStartTime"),
-    completedTime: stringValue(item, "completedTime"),
+    ...readOrderTimeFields(item),
     actions,
   };
 }

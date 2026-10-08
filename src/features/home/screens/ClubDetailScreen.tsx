@@ -1,14 +1,13 @@
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
+import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Alert,
-  Animated,
-  Easing,
   Modal,
   Pressable,
   ScrollView,
@@ -35,7 +34,6 @@ const filterArrowIcon = require("../../../../assets/home/club-detail/arrow-fill-
 const idleIcon = require("../../../../assets/home/club-detail/status-idle.svg");
 const playingIcon = require("../../../../assets/home/club-detail/status-playing.svg");
 const diamondIcon = require("../../../../assets/home/club-detail/icon-diamond.svg");
-const playIcon = require("../../../../assets/home/club-detail/icon-play.svg");
 const emptyStateIllustration = require("../../../../assets/coms/empty-state-illustration.svg");
 
 type FilterKey = "gender" | "mode" | "status" | "price";
@@ -586,32 +584,6 @@ function MemberCard({
 }) {
   const isPlaying = status === "游戏中";
   const voicePlaying = Boolean(voiceUrl && playingVoiceUrl === voiceUrl);
-  const [animation] = useState(() => new Animated.Value(0.35));
-  useEffect(() => {
-    if (!voicePlaying) {
-      animation.stopAnimation();
-      animation.setValue(0.35);
-      return;
-    }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(animation, {
-          toValue: 1,
-          duration: 450,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(animation, {
-          toValue: 0.35,
-          duration: 450,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [animation, voicePlaying]);
   return (
     <Pressable
       style={styles.memberCard}
@@ -629,21 +601,12 @@ function MemberCard({
           style={styles.avatar}
         />
         {voiceUrl ? (
-          <Pressable
-            accessibilityLabel={`${voicePlaying ? "停止" : "播放"}语音`}
-            onPress={(event) => {
-              event.stopPropagation();
-              onToggleVoice(voiceUrl);
-            }}
-            style={styles.voice}
-          >
-            <Animated.View style={{ opacity: voicePlaying ? animation : 1 }}>
-              <Image source={playIcon} style={styles.playIcon} />
-            </Animated.View>
-            <Text style={styles.voiceText}>
-              {voiceDuration ?? 0}&apos;&apos;
-            </Text>
-          </Pressable>
+          <VoicePlayButton
+            duration={voiceDuration}
+            onToggleVoice={onToggleVoice}
+            playingUrl={voicePlaying ? voiceUrl : null}
+            url={voiceUrl}
+          />
         ) : null}
       </View>
       <View style={styles.memberBody}>
@@ -721,7 +684,6 @@ const styles = StyleSheet.create({
   tabCornerLeft: { left: -15 },
   tabCornerRight: { right: -15 },
   navIconImage: { width: 24, height: 24 },
-  playIcon: { width: 16, height: 16 },
   genderIcon: { width: 12, height: 12 },
   genderGroup: {
     flexDirection: "row",
@@ -978,31 +940,6 @@ const styles = StyleSheet.create({
   },
   avatarWrap: { width: 100, height: 100, position: "relative" },
   avatar: { width: 106, height: 106, borderRadius: 8 },
-  voice: {
-    position: "absolute",
-    left: 6,
-    bottom: 6,
-    paddingLeft: 6,
-    paddingTop: 4,
-    paddingRight: 6,
-    paddingBottom: 4,
-    borderRadius: 12,
-    backgroundColor: "#ff3158",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-  },
-  play: {
-    color: "#ff3158",
-    backgroundColor: "#fff",
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    textAlign: "center",
-    lineHeight: 16,
-    fontSize: 8,
-  },
-  voiceText: { color: "#fff", fontFamily: DOUYIN_SANS, fontSize: 12 },
   memberBody: { flex: 1, minWidth: 0, marginLeft: 8 },
   memberTitle: {
     flexDirection: "row",

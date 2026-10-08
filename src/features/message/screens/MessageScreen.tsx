@@ -1,6 +1,7 @@
 import { FlatList, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useEffect, useMemo, useState } from "react";
+import { router } from "expo-router";
 import { useAuthStore } from "@esports/auth";
 
 import { MessageHeader } from "../components/MessageHeader";
@@ -37,7 +38,17 @@ export default function MessageScreen() {
   }, [accessToken]);
 
   const items = useMemo(() => imReady ? remoteItems : MESSAGE_ITEMS, [imReady, remoteItems]);
-  const handleMessagePress = (_item: MessageListItemModel) => undefined;
+  const handleMessagePress = (item: MessageListItemModel) => {
+    if (item.kind !== "conversation") return;
+    router.push({
+      pathname: "/chat/[id]",
+      params: {
+        id: item.id,
+        title: item.title,
+        avatar: typeof item.avatar === "string" ? item.avatar : "",
+      },
+    });
+  };
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>

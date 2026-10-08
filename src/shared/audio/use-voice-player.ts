@@ -22,7 +22,12 @@ export function useVoicePlayer() {
     playerRef.current = player;
     setPlayingUrl(voiceUrl);
     const subscription = player.addListener("playbackStatusUpdate", (status) => {
-      if (status.duration > 0 && status.currentTime >= status.duration && !status.playing) {
+      if (
+        status.didJustFinish ||
+        (status.duration > 0 &&
+          status.currentTime >= status.duration &&
+          !status.playing)
+      ) {
         subscription.remove();
         player.remove();
         if (playerRef.current === player) {

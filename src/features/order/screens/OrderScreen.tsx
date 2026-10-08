@@ -81,6 +81,7 @@ export default function OrderScreen() {
         key={payTarget?.id ?? "none"}
         item={payTarget}
         token={token}
+        onPaymentFailed={(message) => setPrompt({ title: "支付失败", message })}
         onClose={() => {
           const target = payTarget;
           setPayTarget(null);
@@ -91,9 +92,10 @@ export default function OrderScreen() {
             .catch((error) => setPrompt({ title: "取消订单失败", message: error instanceof Error ? error.message : "请稍后重试" }))
             .finally(() => { cancelingPaymentRef.current = false; });
         }}
-        onPaid={async () => {
+        onPaid={() => {
           setPayTarget(null);
-          await orders.refetch();
+          void orders.refetch();
+          setPrompt({ title: "支付成功", message: "订单已支付，可在订单页面查看进度" });
         }}
       />
       <AppPrompt
@@ -111,11 +113,13 @@ function StarPaymentPrompt({
   token,
   onClose,
   onPaid,
+  onPaymentFailed,
 }: {
   item: OrderItemModel | null;
   token: string | null;
   onClose: () => void | Promise<void>;
   onPaid: () => void;
+  onPaymentFailed: (message: string) => void;
 }) {
   const [balance, setBalance] = useState<number | null>(null);
   const [paying, setPaying] = useState(false);
@@ -139,11 +143,12 @@ function StarPaymentPrompt({
       settledRef.current = true;
       onPaid();
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "支付失败";
+      onPaymentFailed(errorMessage);
       if (!settledRef.current) {
         settledRef.current = true;
         await onClose();
       }
-      setMessage(error instanceof Error ? error.message : "支付失败");
     } finally {
       setPaying(false);
     }

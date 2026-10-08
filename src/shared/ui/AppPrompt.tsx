@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F5F5F5",
   },
   confirmButton: { flex: 1, marginTop: 0, alignSelf: "auto" },
-  singleButton: { marginTop: 20 },
+  singleButton: { flex: 1, marginTop: 0, alignSelf: "auto" },
   cancelText: {
     color: "#333",
     fontFamily: DOUYIN_SANS,

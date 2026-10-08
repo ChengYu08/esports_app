@@ -24,6 +24,7 @@ import { uploadClientObject } from "@/features/auth/oss-upload";
 import { clearAuthSession, saveAuthSession } from "@/features/auth/session-persistence";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { storage } from "@/core/storage/storage";
+import { disconnectRongCloud } from "@/features/message/rongcloud-im";
 
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const arrowIcon = require("../../../../assets/mine/figma/mine-arrow-right.svg");
@@ -190,7 +191,8 @@ export default function AccountSettingsScreen() {
     if (token) void clientAuthApi.logout(token).catch(() => undefined);
     try { await clearAuthSession(); } catch { /* Keep the UI signed out. */ }
     clearSession();
-    router.replace("/(tabs)/mine");
+    await disconnectRongCloud().catch(() => undefined);
+    router.replace("/");
   };
 
   return (

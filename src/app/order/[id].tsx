@@ -2,13 +2,17 @@ import { useLocalSearchParams, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
+import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Toast from "react-native-toast-message";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@esports/auth";
 
+import { queryClient } from "@/core/query/query-client";
+import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
-import { fetchOrderDetail, mapOrder } from "@/features/order/order.api";
+import { cancelOrder, fetchOrderDetail, mapOrder } from "@/features/order/order.api";
+import { getOrderDetailAction } from "@/features/order/order-detail-actions";
 
 const copyIcon = require("../../../assets/coms/copy.svg");
 
@@ -16,6 +20,8 @@ export default function OrderDetailRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const token = useAuthStore((state) => state.accessToken);
+  const [cancelPromptVisible, setCancelPromptVisible] = useState(false);
+  const [prompt, setPrompt] = useState<{ title: string; message: string } | null>(null);
   const detail = useQuery({
     queryKey: ["order-detail", id],
     queryFn: async () => mapOrder(await fetchOrderDetail(id, token as string)),
@@ -24,6 +30,7 @@ export default function OrderDetailRoute() {
   if (detail.isLoading) return <View style={styles.center}><Text style={styles.muted}>订单详情加载中...</Text></View>;
   if (detail.isError || !detail.data) return <View style={styles.center}><Text style={styles.muted}>订单详情加载失败</Text><Pressable onPress={() => void detail.refetch()}><Text style={styles.retry}>点击重试</Text></Pressable></View>;
   const order = detail.data;
+  const detailAction = getOrderDetailAction(order.actions);
   const isPending = order.status === "pendingPayment";
   const isCompleted = order.status === "completed";
   const orderNumber = order.orderNo ?? order.id;
@@ -46,7 +53,7 @@ export default function OrderDetailRoute() {
         <View style={styles.headerTitle} />
         <View style={styles.headerSlot} />
       </View>
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 148 + insets.bottom }]} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: (detailAction ? 148 : 24) + insets.bottom }]} showsVerticalScrollIndicator={false}>
         <View style={[styles.statusBlock, { height: 84, paddingTop: 12 }]}><Text style={styles.statusTitle}>{isPending ? "待支付" : order.statusLabel === "已支付" ? "进行中" : order.statusLabel}</Text><Text style={[styles.statusHint, { marginTop: 8, lineHeight: 22 }]}>{statusHint}</Text></View>
         <ProgressSteps activeStep={isPending ? 0 : isCompleted ? 4 : 1} />
         <View style={styles.infoBlock}>
@@ -61,16 +68,61 @@ export default function OrderDetailRoute() {
         </View>
         <View style={styles.infoBlock}>
           <InfoRow label="订单编号" value={orderNumber} copy onCopy={() => void copyOrderNumber()} />
-          <InfoRow label="创建时间" value={order.createTime ?? "-"} />
-          <InfoRow label="支付时间" value={order.paidTime ?? "-"} />
-          <InfoRow label="接单时间" value={order.acceptedTime ?? "-"} />
-          <InfoRow label="服务开始" value={order.serviceStartTime ?? "-"} />
-          <InfoRow label="完成时间" value={order.completedTime ?? "-"} />
+          <InfoRow label="创建时间" value={formatOrderTime(order.createTime)} />
+          <InfoRow label="支付时间" value={formatOrderTime(order.paidTime)} />
+          <InfoRow label="接单时间" value={formatOrderTime(order.acceptedTime)} />
+          <InfoRow
+            label="服务时间"
+            value={formatServiceTime(order.serviceStartTime, order.serviceEndTime)}
+          />
+          <InfoRow label="完成时间" value={formatOrderTime(order.completedTime)} />
         </View>
       </ScrollView>
-      <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-        <Pressable onPress={() => undefined} style={styles.outlineButton}><Text style={styles.outlineText}>{isPending ? "取消订单" : "申请售后"}</Text></Pressable>
-      </View>
+      {detailAction ? (
+        <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+          <Pressable
+            onPress={() => {
+              if (detailAction === "cancel") {
+                setCancelPromptVisible(true);
+              }
+            }}
+            style={styles.outlineButton}
+          >
+            <Text style={styles.outlineText}>
+              {detailAction === "cancel" ? "取消订单" : "申请售后"}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
+      <AppPrompt
+        visible={cancelPromptVisible}
+        title="提示"
+        message={`确定取消订单吗，订单号：${order.orderNo ?? order.id}`}
+        cancelText="取消"
+        confirmText="确认"
+        onCancel={() => setCancelPromptVisible(false)}
+        onConfirm={() => {
+          setCancelPromptVisible(false);
+          if (!token) return;
+          void cancelOrder(String(order.id), token)
+            .then(async () => {
+              await queryClient.invalidateQueries({ queryKey: ["orders"] });
+              await detail.refetch();
+            })
+            .catch((error) => {
+              setPrompt({
+                title: "取消订单失败",
+                message: error instanceof Error ? error.message : "请稍后重试",
+              });
+            });
+        }}
+      />
+      <AppPrompt
+        visible={Boolean(prompt)}
+        title={prompt?.title}
+        message={prompt?.message ?? ""}
+        onConfirm={() => setPrompt(null)}
+      />
     </View>
   );
 }
@@ -79,6 +131,18 @@ function ProgressSteps({ activeStep }: { activeStep: number }) { const labels = 
 
 function InfoRow({ label, value, copy, onCopy }: { label: string; value: string; copy?: boolean; onCopy?: () => void }) {
   return <View style={styles.infoRow}><Text style={styles.label}>{label}</Text><View style={styles.infoValue}><Text style={[styles.value, label === "实付款" && styles.amount]}>{value}</Text>{copy && <Pressable accessibilityRole="button" accessibilityLabel="复制订单编号" hitSlop={8} onPress={onCopy}><Image source={copyIcon} style={styles.copy} /></Pressable>}</View></View>;
+}
+
+function formatOrderTime(value?: string) {
+  return value ? value.replace("T", " ").slice(0, 19) : "-";
+}
+
+function formatServiceTime(startTime?: string, endTime?: string) {
+  const start = formatOrderTime(startTime);
+  const end = formatOrderTime(endTime);
+  if (start === "-") return end;
+  if (end === "-") return start;
+  return `${start} - ${end}`;
 }
 
 const styles = StyleSheet.create({

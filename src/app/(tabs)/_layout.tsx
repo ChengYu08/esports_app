@@ -3,10 +3,14 @@ import { AppTabBar } from "@/shared/ui/AppTabBar";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { useEffect, useState } from "react";
 import { BackHandler, Platform } from "react-native";
+import { useAuthStore } from "@esports/auth";
 
 export default function TabsLayout() {
   const [exitPromptVisible, setExitPromptVisible] = useState(false);
   const pathname = usePathname();
+  const isAuthenticated = useAuthStore(
+    (state) => Boolean(state.accessToken && state.user),
+  );
 
   useEffect(() => {
     if (
@@ -34,9 +38,11 @@ export default function TabsLayout() {
         screenOptions={{ headerShown: false }}
       >
         <Tabs.Screen name="index" />
-        <Tabs.Screen name="order" />
-        <Tabs.Screen name="message" />
-        <Tabs.Screen name="mine" />
+        <Tabs.Protected guard={isAuthenticated}>
+          <Tabs.Screen name="order" />
+          <Tabs.Screen name="message" />
+          <Tabs.Screen name="mine" />
+        </Tabs.Protected>
       </Tabs>
       <AppPrompt
         visible={exitPromptVisible}

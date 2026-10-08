@@ -3,9 +3,10 @@ import { useAuthStore } from "@esports/auth";
 import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Toast from "react-native-toast-message";
 
 const avatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const female = require("../../../../assets/mine/figma/mine-female.svg");
@@ -20,8 +21,6 @@ const settings = require("../../../../assets/mine/figma/mine-setting-entry.svg")
 export default function MineScreen() {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
-  const [copySuccessVisible, setCopySuccessVisible] = useState(false);
-  const copySuccessTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const displayName = useMemo(
     () =>
       user?.nickname ||
@@ -33,12 +32,7 @@ export default function MineScreen() {
   const copyUserId = async () => {
     if (!user?.id) return;
     await Clipboard.setStringAsync(String(user.id));
-    if (copySuccessTimer.current) clearTimeout(copySuccessTimer.current);
-    setCopySuccessVisible(true);
-    copySuccessTimer.current = setTimeout(() => {
-      setCopySuccessVisible(false);
-      copySuccessTimer.current = null;
-    }, 1800);
+    Toast.show({ type: "success", text1: "复制成功", text2: "ID 已复制到剪贴板" });
   };
 
   return (
@@ -144,20 +138,6 @@ export default function MineScreen() {
           />
         </View>
       </ScrollView>
-      {copySuccessVisible ? (
-        <View
-          accessibilityLiveRegion="polite"
-          accessibilityRole="alert"
-          pointerEvents="none"
-          style={[styles.copyToast, { top: insets.top + 16 }]}
-        >
-          <View style={styles.copyToastCheck}><Text style={styles.copyToastCheckText}>✓</Text></View>
-          <View>
-            <Text style={styles.copyToastTitle}>复制成功</Text>
-            <Text style={styles.copyToastHint}>ID 已复制到剪贴板</Text>
-          </View>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -187,34 +167,6 @@ function MenuRow({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F7F7" },
-  copyToast: {
-    position: "absolute",
-    alignSelf: "center",
-    minWidth: 172,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    borderRadius: 12,
-    backgroundColor: "rgba(24, 24, 27, 0.94)",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-    shadowColor: "#000",
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
-  },
-  copyToastCheck: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FF3158",
-  },
-  copyToastCheckText: { color: "#fff", fontSize: 14, fontWeight: "700", lineHeight: 17 },
-  copyToastTitle: { color: "#fff", fontFamily: DOUYIN_SANS, fontSize: 13, fontWeight: "600", lineHeight: 18 },
-  copyToastHint: { color: "#BFC0C5", fontFamily: DOUYIN_SANS, fontSize: 11, lineHeight: 16 },
   profile: {
     minHeight: 80,
     paddingHorizontal: 16,

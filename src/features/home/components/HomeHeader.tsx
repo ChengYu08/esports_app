@@ -42,11 +42,11 @@ export function HomeHeader({
             selected={tab === "home"}
             onPress={() => onTabChange("home")}
           />
-          <Tab
+          {/* <Tab
             label="小法庭"
             selected={tab === "court"}
             onPress={() => onTabChange("court")}
-          />
+          /> */}
         </View>
         <Pressable
           accessibilityLabel="搜索"
