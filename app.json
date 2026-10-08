@@ -7,7 +7,14 @@
     "scheme": "esportsapp",
     "userInterfaceStyle": "automatic",
     "android": {
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ],
+      "package": "com.chengyu08.app"
     },
     "web": {
       "output": "static"
@@ -27,6 +34,9 @@
         "projectId": "15231eb2-10b1-46ea-981b-67ec5fb980c5"
       }
     },
-    "owner": "chengyu08s-team"
+    "owner": "chengyu08s-team",
+    "ios": {
+      "bundleIdentifier": "com.chengyu08.app"
+    }
   }
 }

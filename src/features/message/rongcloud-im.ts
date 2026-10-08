@@ -34,7 +34,7 @@ async function hydrateConversation(conversation: RongConversation) {
 }
 
 export function isRongCloudAvailable() {
-  const turboModuleEnabled = Boolean((global as typeof globalThis & { __turboModuleProxy?: unknown }).__turboModuleProxy);
+  const turboModuleEnabled = Boolean((globalThis as typeof globalThis & { __turboModuleProxy?: unknown }).__turboModuleProxy);
   return Platform.OS !== 'web' && Boolean(env.rongCloudAppKey && (NativeModules.RCReactNativeIM || turboModuleEnabled));
 }
 
@@ -44,8 +44,8 @@ export async function connectRongCloud(accessToken: string) {
   if (!engine) {
     // The package is loaded lazily so Expo Go (which has no RongCloud native
     // module) keeps working. Development builds load the official native SDK.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { RCIMIWEngine: Engine } = require('@rongcloud/react-native-im-wrapper') as typeof import('@rongcloud/react-native-im-wrapper');
       engine = Engine.create(env.rongCloudAppKey);
     } catch {

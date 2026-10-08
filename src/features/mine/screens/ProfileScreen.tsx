@@ -79,6 +79,7 @@ export default function ProfileScreen() {
   } | null>(null);
   const [paymentSheetVisible, setPaymentSheetVisible] = useState(false);
   const [paymentCancelError, setPaymentCancelError] = useState<string | null>(null);
+  const paymentCancelingRef = useRef(false);
   const detailQuery = useProfileDetail(routeParams);
   const detail = detailQuery.data;
   const firstGameId = getFirstProfileGameId(detail?.games ?? []);
@@ -294,9 +295,11 @@ export default function ProfileScreen() {
   async function cancelPendingPaymentOrder() {
     const pendingOrder = paymentOrder;
     const token = useAuthStore.getState().accessToken;
+    if (paymentCancelingRef.current) return;
     setPaymentSheetVisible(false);
     setPaymentOrder(null);
     if (!pendingOrder || !token) return;
+    paymentCancelingRef.current = true;
     try {
       await cancelOrder(String(pendingOrder.orderId), token);
       void queryClient.invalidateQueries({ queryKey: ["orders"] });
@@ -308,6 +311,8 @@ export default function ProfileScreen() {
       setPaymentCancelError(
         error instanceof Error ? error.message : "订单取消失败",
       );
+    } finally {
+      paymentCancelingRef.current = false;
     }
   }
 }
@@ -864,14 +869,11 @@ function StarPaymentSheet({
       await payCompanionOrder(order.orderId, token);
       settledRef.current = true;
       onPaid();
-    } catch (error) {
+    } catch {
       if (!settledRef.current) {
         settledRef.current = true;
         await onClose();
       }
-      setPrompt({
-        message: error instanceof Error ? error.message : "支付失败",
-      });
     } finally {
       setPaying(false);
     }

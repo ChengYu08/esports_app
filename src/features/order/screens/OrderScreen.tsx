@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -26,6 +26,7 @@ export default function OrderScreen() {
   const [cancelTarget, setCancelTarget] = useState<OrderItemModel | null>(null);
   const [payTarget, setPayTarget] = useState<OrderItemModel | null>(null);
   const [prompt, setPrompt] = useState<{ title: string; message: string; confirmText?: string } | null>(null);
+  const cancelingPaymentRef = useRef(false);
   const items = orders.data?.items ?? [];
 
   const handleOrderAction = async (item: OrderItemModel, action: OrderActionKey) => {
@@ -80,7 +81,16 @@ export default function OrderScreen() {
         key={payTarget?.id ?? "none"}
         item={payTarget}
         token={token}
-        onClose={() => setPayTarget(null)}
+        onClose={() => {
+          const target = payTarget;
+          setPayTarget(null);
+          if (!target || !token || cancelingPaymentRef.current) return;
+          cancelingPaymentRef.current = true;
+          void cancelOrderRequest(target.id, token)
+            .then(() => orders.refetch())
+            .catch((error) => setPrompt({ title: "取消订单失败", message: error instanceof Error ? error.message : "请稍后重试" }))
+            .finally(() => { cancelingPaymentRef.current = false; });
+        }}
         onPaid={async () => {
           setPayTarget(null);
           await orders.refetch();
@@ -104,12 +114,13 @@ function StarPaymentPrompt({
 }: {
   item: OrderItemModel | null;
   token: string | null;
-  onClose: () => void;
+  onClose: () => void | Promise<void>;
   onPaid: () => void;
 }) {
   const [balance, setBalance] = useState<number | null>(null);
   const [paying, setPaying] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const settledRef = useRef(false);
 
   useEffect(() => {
     if (item && token) void fetchStarBalance(token).then(setBalance).catch((error: Error) => setMessage(error.message));
@@ -125,8 +136,13 @@ function StarPaymentPrompt({
     setPaying(true);
     try {
       await payCompanionOrder(Number(item.id), token);
+      settledRef.current = true;
       onPaid();
     } catch (error) {
+      if (!settledRef.current) {
+        settledRef.current = true;
+        await onClose();
+      }
       setMessage(error instanceof Error ? error.message : "支付失败");
     } finally {
       setPaying(false);
@@ -134,14 +150,14 @@ function StarPaymentPrompt({
   };
 
   return <>
-    <Modal animationType="slide" transparent visible={Boolean(item)} onRequestClose={onClose}>
+    <Modal animationType="slide" transparent visible={Boolean(item)} onRequestClose={() => void onClose()}>
       <View style={styles.paymentBackdrop}>
         <View style={styles.paymentSheet}>
           <Text style={styles.paymentTitle}>星钻支付</Text>
           <Text style={styles.paymentAmount}>支付 {item?.totalPrice ?? 0} 星钻</Text>
           <Text style={styles.paymentBalance}>当前余额：{balance === null ? "加载中..." : `${balance} 星钻`}</Text>
           <View style={styles.paymentActions}>
-            <Pressable style={styles.paymentCancel} onPress={onClose}><Text>取消</Text></Pressable>
+            <Pressable style={styles.paymentCancel} onPress={() => void onClose()}><Text>取消</Text></Pressable>
             <Pressable style={styles.paymentConfirm} disabled={paying || balance === null} onPress={() => void pay()}><Text style={styles.paymentConfirmText}>{paying ? "支付中..." : "确认支付"}</Text></Pressable>
           </View>
         </View>
