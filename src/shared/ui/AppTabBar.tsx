@@ -1,9 +1,9 @@
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useAuthStore } from "@esports/auth";
 
 import {
   getProtectedNavigationAction,
@@ -30,8 +30,8 @@ const icons = {
 
 export function AppTabBar({ state, navigation }: AppTabBarProps) {
   const insets = useSafeAreaInsets();
-  const isAuthenticated = useAuthStore(
-    (authState) => Boolean(authState.accessToken && authState.user),
+  const isAuthenticated = useAuthStore((authState) =>
+    Boolean(authState.accessToken && authState.user),
   );
   // Expo Router names the home tab route "index", while the visual tab key is "home".
   // Normalize it so the selected home asset is used when the index screen is active.
@@ -99,18 +99,20 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
           </Text>
         </Pressable>
       ))}
-      <Pressable
+      {/* <Pressable
         accessibilityLabel="快速匹配"
         style={styles.match}
         onPress={handleMatchPress}
       >
         <Image source={icons.publish} style={styles.publish} />
-      </Pressable>
+      </Pressable> */}
       {items.slice(2).map((item) => (
         <Pressable
           key={item.label}
           style={styles.bottomItem}
-          onPress={() => handleTabPress(item.label === "我的" ? "mine" : "message")}
+          onPress={() =>
+            handleTabPress(item.label === "我的" ? "mine" : "message")
+          }
         >
           <Image source={item.icon} style={styles.bottomIcon} />
           <Text

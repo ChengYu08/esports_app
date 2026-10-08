@@ -2,8 +2,10 @@ import { createAuthSsoAdapter, LoginScreen, useAuthStore } from "@esports/auth";
 import { createNativeQuickLoginProvider, SsoClient } from "@esports/sso-sdk";
 import { env } from "@/core/config/env";
 import { completeClientLogin } from "@/features/auth/client-auth-flow";
+import { getPasswordLoginErrorMessage } from "@/features/auth/password-login-error";
+import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { Stack, router, useLocalSearchParams } from "expo-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Alert, Platform } from "react-native";
 
 export default function LoginRoute() {
@@ -11,6 +13,7 @@ export default function LoginRoute() {
   const initialMode = params.mode === "password" ? "password" : "sms";
   const initialPhone = typeof params.phone === "string" ? params.phone : "";
   const setSession = useAuthStore((state) => state.setSession);
+  const [passwordLoginError, setPasswordLoginError] = useState<string | null>(null);
   const sso = useMemo(() => env.ssoClientSecret ? new SsoClient({
     baseUrl: env.ssoBaseUrl,
     clientAppId: env.ssoClientAppId,
@@ -46,7 +49,7 @@ export default function LoginRoute() {
         }}
         onPasswordLogin={async (payload) => {
           if (!adapter) {
-            Alert.alert("密码登录失败", "请先配置 SSO client secret。");
+            setPasswordLoginError("请先配置 SSO client secret。");
             return;
           }
           try {
@@ -54,10 +57,7 @@ export default function LoginRoute() {
             await completeClientLogin(token, "PASSWORD", setSession);
             router.replace("/");
           } catch (error) {
-            Alert.alert(
-              "密码登录失败",
-              error instanceof Error ? error.message : "请检查手机号和密码",
-            );
+            setPasswordLoginError(getPasswordLoginErrorMessage(error));
           }
         }}
         onForgotPassword={(phone) =>
@@ -92,6 +92,12 @@ export default function LoginRoute() {
             );
           }
         }}
+      />
+      <AppPrompt
+        visible={passwordLoginError !== null}
+        title="密码登录失败"
+        message={passwordLoginError ?? ""}
+        onConfirm={() => setPasswordLoginError(null)}
       />
     </>
   );

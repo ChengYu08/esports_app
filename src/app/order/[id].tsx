@@ -4,7 +4,7 @@ import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import Toast from "react-native-toast-message";
+import Toast from "react-native-root-toast";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@esports/auth";
 
@@ -38,9 +38,9 @@ export default function OrderDetailRoute() {
   const copyOrderNumber = async () => {
     try {
       await Clipboard.setStringAsync(orderNumber);
-      Toast.show({ type: "success", text1: "复制成功", text2: "订单编号已复制" });
+      Toast.show("订单编号已复制", { duration: Toast.durations.SHORT });
     } catch {
-      Toast.show({ type: "error", text1: "复制失败", text2: "请稍后重试" });
+      Toast.show("复制失败，请稍后重试", { duration: Toast.durations.SHORT });
     }
   };
 

@@ -15,11 +15,15 @@ class PzOneClickModule : Module() {
     }
 
     AsyncFunction("authorizeAsync") { _: Map<String, String> ->
-      throw Exception("请先集成阿里云号码认证 Android SDK")
+      throwUnsupportedAuthorization()
     }
 
     AsyncFunction("cancelAsync") {
       sendEvent("onStateChange", mapOf("state" to "cancelled"))
     }
+  }
+
+  private fun throwUnsupportedAuthorization(): Unit {
+    throw Exception("请先集成阿里云号码认证 Android SDK")
   }
 }

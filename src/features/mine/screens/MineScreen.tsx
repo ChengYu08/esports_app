@@ -6,7 +6,7 @@ import { router } from "expo-router";
 import { useMemo } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Toast from "react-native-toast-message";
+import Toast from "react-native-root-toast";
 
 const avatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const female = require("../../../../assets/mine/figma/mine-female.svg");
@@ -32,7 +32,7 @@ export default function MineScreen() {
   const copyUserId = async () => {
     if (!user?.id) return;
     await Clipboard.setStringAsync(String(user.id));
-    Toast.show({ type: "success", text1: "复制成功", text2: "ID 已复制到剪贴板" });
+    Toast.show("ID 已复制到剪贴板", { duration: Toast.durations.SHORT });
   };
 
   return (

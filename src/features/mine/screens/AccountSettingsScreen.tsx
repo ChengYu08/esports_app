@@ -191,7 +191,7 @@ export default function AccountSettingsScreen() {
     if (token) void clientAuthApi.logout(token).catch(() => undefined);
     try { await clearAuthSession(); } catch { /* Keep the UI signed out. */ }
     clearSession();
-    await disconnectRongCloud().catch(() => undefined);
+    void disconnectRongCloud().catch(() => undefined);
     router.replace("/");
   };
 

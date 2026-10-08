@@ -42,6 +42,7 @@ import {
   useProfileReviews,
 } from "@/features/mine/hooks/use-profile-data";
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
+import { createProfileAvatarPreviewParams } from "@/features/mine/profile-avatar-preview";
 import { cancelOrder } from "@/features/order/order.api";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
@@ -335,14 +336,34 @@ export default function ProfileScreen() {
 function ProfileIdentity({ profile }: { profile: ProfileDetail }) {
   const status = getStatus(profile.onlineStatus, profile.gameStatus);
   const age = profile.birth ? calculateAge(profile.birth) : "";
+  const avatarPreviewParams = createProfileAvatarPreviewParams(profile.headImage);
+  const avatarImage = (
+    <Image
+      source={profile.headImage ? { uri: profile.headImage } : fallbackAvatar}
+      style={styles.avatar}
+      contentFit="cover"
+    />
+  );
 
   return (
     <View style={styles.identity}>
-      <Image
-        source={profile.headImage ? { uri: profile.headImage } : fallbackAvatar}
-        style={styles.avatar}
-        contentFit="cover"
-      />
+      {avatarPreviewParams ? (
+        <Pressable
+          accessibilityLabel="预览头像"
+          accessibilityRole="button"
+          onPress={() =>
+            router.push({
+              pathname: "/image-preview",
+              params: avatarPreviewParams,
+            })
+          }
+          style={styles.avatarButton}
+        >
+          {avatarImage}
+        </Pressable>
+      ) : (
+        avatarImage
+      )}
       <View style={styles.identityCopy}>
         <View style={styles.nameRow}>
           <Text numberOfLines={1} style={styles.name}>
@@ -1129,6 +1150,12 @@ const styles = StyleSheet.create({
     borderRadius: 36,
     borderWidth: 1,
     borderColor: "#fff",
+  },
+  avatarButton: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    overflow: "hidden",
   },
   identityCopy: { flex: 1, minWidth: 0, gap: 6 },
   nameRow: { flexDirection: "row", alignItems: "center", gap: 5 },
