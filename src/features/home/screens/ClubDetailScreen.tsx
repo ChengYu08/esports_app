@@ -5,15 +5,18 @@ import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated,
   Alert,
+  Easing,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { CompanionFilters, GameKey } from "../api/home.types";
@@ -46,9 +49,11 @@ const filterDefinitions: { key: FilterKey; label: string }[] = [
 
 export default function ClubDetailScreen() {
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const [game, setGame] = useState<GameKey>("");
   const [openFilter, setOpenFilter] = useState<FilterKey | null>(null);
+  const [isFilterSheetVisible, setFilterSheetVisible] = useState(false);
   const [showPriceEmptyModal, setShowPriceEmptyModal] = useState(false);
   const [priceSort, setPriceSort] =
     useState<CompanionFilters["priceSort"]>("DEFAULT");
@@ -82,6 +87,71 @@ export default function ClubDetailScreen() {
   const members =
     companionsQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const voicePlayer = useVoicePlayer();
+  const [filterBackdropOpacity] = useState(() => new Animated.Value(0));
+  const [filterSheetTranslateY] = useState(
+    () => new Animated.Value(windowHeight),
+  );
+  const isFilterSheetClosing = useRef(false);
+
+  useEffect(() => {
+    if (!isFilterSheetVisible) return;
+
+    filterBackdropOpacity.setValue(0);
+    filterSheetTranslateY.setValue(windowHeight);
+    const animation = Animated.parallel([
+      Animated.timing(filterBackdropOpacity, {
+        toValue: 1,
+        duration: 180,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(filterSheetTranslateY, {
+        toValue: 0,
+        duration: 260,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]);
+
+    animation.start();
+    return () => animation.stop();
+  }, [
+    filterBackdropOpacity,
+    filterSheetTranslateY,
+    isFilterSheetVisible,
+    windowHeight,
+  ]);
+
+  function openFilterSheet(filter: FilterKey) {
+    if (isFilterSheetVisible) return;
+    isFilterSheetClosing.current = false;
+    setOpenFilter(filter);
+    setFilterSheetVisible(true);
+  }
+
+  function closeFilterSheet() {
+    if (!isFilterSheetVisible || isFilterSheetClosing.current) return;
+    isFilterSheetClosing.current = true;
+    Animated.parallel([
+      Animated.timing(filterBackdropOpacity, {
+        toValue: 0,
+        duration: 160,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(filterSheetTranslateY, {
+        toValue: windowHeight,
+        duration: 220,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (!finished) return;
+      setFilterSheetVisible(false);
+      setOpenFilter(null);
+      isFilterSheetClosing.current = false;
+    });
+  }
 
   if (clubQuery.isLoading) return <LoadingState />;
   if (clubQuery.isError || !club)
@@ -196,7 +266,7 @@ export default function ClubDetailScreen() {
                 styles.filterItem,
                 openFilter === key && styles.filterItemActive,
               ]}
-              onPress={() => setOpenFilter(key)}
+              onPress={() => openFilterSheet(key)}
             >
               <Text
                 numberOfLines={1}
@@ -214,15 +284,24 @@ export default function ClubDetailScreen() {
       </View>
       <Modal
         transparent
-        visible={openFilter !== null}
-        animationType="slide"
-        onRequestClose={() => setOpenFilter(null)}
+        visible={isFilterSheetVisible}
+        animationType="none"
+        onRequestClose={closeFilterSheet}
       >
-        <Pressable
-          style={styles.filterBackdrop}
-          onPress={() => setOpenFilter(null)}
+        <Animated.View
+          style={[styles.filterBackdrop, { opacity: filterBackdropOpacity }]}
         >
-          <Pressable style={styles.filterSheet} onPress={() => undefined}>
+          <Pressable
+            accessibilityLabel="关闭筛选弹窗"
+            onPress={closeFilterSheet}
+            style={StyleSheet.absoluteFill}
+          />
+          <Animated.View
+            style={[
+              styles.filterSheet,
+              { transform: [{ translateY: filterSheetTranslateY }] },
+            ]}
+          >
             <View style={styles.filterSheetHeader}>
               <Text style={styles.filterSheetTitle}>
                 {
@@ -230,7 +309,7 @@ export default function ClubDetailScreen() {
                     ?.label
                 }
               </Text>
-              <Pressable onPress={() => setOpenFilter(null)}>
+              <Pressable onPress={closeFilterSheet}>
                 <Text style={styles.filterClose}>×</Text>
               </Pressable>
             </View>
@@ -241,7 +320,7 @@ export default function ClubDetailScreen() {
                   selected={!selectedSex}
                   onPress={() => {
                     setSelectedSex(undefined);
-                    setOpenFilter(null);
+                    closeFilterSheet();
                   }}
                 />
                 <FilterOption
@@ -249,7 +328,7 @@ export default function ClubDetailScreen() {
                   selected={selectedSex === 1}
                   onPress={() => {
                     setSelectedSex(1);
-                    setOpenFilter(null);
+                    closeFilterSheet();
                   }}
                 />
                 <FilterOption
@@ -257,7 +336,7 @@ export default function ClubDetailScreen() {
                   selected={selectedSex === 2}
                   onPress={() => {
                     setSelectedSex(2);
-                    setOpenFilter(null);
+                    closeFilterSheet();
                   }}
                 />
               </>
@@ -269,7 +348,7 @@ export default function ClubDetailScreen() {
                   selected={!selectedMode}
                   onPress={() => {
                     setSelectedMode(undefined);
-                    setOpenFilter(null);
+                    closeFilterSheet();
                   }}
                 />
                 {modesQuery.data?.map((mode) => (
@@ -279,7 +358,7 @@ export default function ClubDetailScreen() {
                     selected={selectedMode === mode.id}
                     onPress={() => {
                       setSelectedMode(mode.id);
-                      setOpenFilter(null);
+                      closeFilterSheet();
                     }}
                   />
                 ))}
@@ -292,7 +371,7 @@ export default function ClubDetailScreen() {
                   selected={selectedStatus === undefined}
                   onPress={() => {
                     setSelectedStatus(undefined);
-                    setOpenFilter(null);
+                    closeFilterSheet();
                   }}
                 />
                 <FilterOption
@@ -300,7 +379,7 @@ export default function ClubDetailScreen() {
                   selected={selectedStatus === 0}
                   onPress={() => {
                     setSelectedStatus(0);
-                    setOpenFilter(null);
+                    closeFilterSheet();
                   }}
                 />
                 <FilterOption
@@ -308,7 +387,7 @@ export default function ClubDetailScreen() {
                   selected={selectedStatus === 1}
                   onPress={() => {
                     setSelectedStatus(1);
-                    setOpenFilter(null);
+                    closeFilterSheet();
                   }}
                 />
               </>
@@ -320,7 +399,7 @@ export default function ClubDetailScreen() {
                   selected={priceSort === "DEFAULT"}
                   onPress={() => {
                     setPriceSort("DEFAULT");
-                    setOpenFilter(null);
+                    closeFilterSheet();
                   }}
                 />
                 <FilterOption
@@ -328,7 +407,7 @@ export default function ClubDetailScreen() {
                   selected={priceSort === "DESC"}
                   onPress={() => {
                     setPriceSort("DESC");
-                    setOpenFilter(null);
+                    closeFilterSheet();
                   }}
                 />
                 <FilterOption
@@ -336,13 +415,13 @@ export default function ClubDetailScreen() {
                   selected={priceSort === "ASC"}
                   onPress={() => {
                     setPriceSort("ASC");
-                    setOpenFilter(null);
+                    closeFilterSheet();
                   }}
                 />
               </>
             )}
-          </Pressable>
-        </Pressable>
+          </Animated.View>
+        </Animated.View>
       </Modal>
       <Modal
         transparent

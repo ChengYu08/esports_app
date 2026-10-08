@@ -43,6 +43,8 @@ import {
 } from "@/features/mine/hooks/use-profile-data";
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import { createProfileAvatarPreviewParams } from "@/features/mine/profile-avatar-preview";
+import { RealNameVerificationSheet } from "@/features/mine/components/RealNameVerificationSheet";
+import { requiresRealNameVerification } from "@/features/mine/order-real-name";
 import { cancelOrder } from "@/features/order/order.api";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
@@ -85,6 +87,8 @@ export default function ProfileScreen() {
   const [paymentCancelError, setPaymentCancelError] = useState<string | null>(
     null,
   );
+  const [realNameVerificationVisible, setRealNameVerificationVisible] =
+    useState(false);
   const paymentCancelingRef = useRef(false);
   const detailQuery = useProfileDetail(routeParams);
   const detail = detailQuery.data;
@@ -256,6 +260,9 @@ export default function ProfileScreen() {
           }}
           token={useAuthStore.getState().accessToken}
           onClose={() => setOrderCard(null)}
+          onRealNameVerificationRequired={() =>
+            setRealNameVerificationVisible(true)
+          }
           onOrderCreated={(order) => {
             setOrderCard(null);
             setPaymentSuccess(false);
@@ -265,6 +272,10 @@ export default function ProfileScreen() {
           }}
         />
       ) : null}
+      <RealNameVerificationSheet
+        visible={realNameVerificationVisible}
+        onClose={() => setRealNameVerificationVisible(false)}
+      />
       {paymentOrder ? (
         <StarPaymentSheet
           order={paymentOrder}
@@ -612,12 +623,14 @@ function CompanionOrderSheet({
   context,
   token,
   onClose,
+  onRealNameVerificationRequired,
   onOrderCreated,
 }: {
   card: ProfileSkillCard;
   context: CompanionOrderContext;
   token: string | null;
   onClose: () => void;
+  onRealNameVerificationRequired: () => void;
   onOrderCreated: (order: { orderId: number; total: number }) => void;
 }) {
   const [services, setServices] = useState<CompanionServiceOption[]>([]);
@@ -714,6 +727,7 @@ function CompanionOrderSheet({
       });
     } catch (error) {
       setPrompt({
+        title: "订单创建失败",
         message: error instanceof Error ? error.message : "创建订单失败",
       });
     } finally {
@@ -840,7 +854,24 @@ function CompanionOrderSheet({
         visible={Boolean(prompt)}
         title={prompt?.title}
         message={prompt?.message ?? ""}
-        onConfirm={() => setPrompt(null)}
+        cancelText={
+          requiresRealNameVerification(prompt?.message ?? "")
+            ? "我知道了"
+            : undefined
+        }
+        confirmText={
+          requiresRealNameVerification(prompt?.message ?? "")
+            ? "去认证"
+            : undefined
+        }
+        onCancel={() => setPrompt(null)}
+        onConfirm={() => {
+          const shouldVerify = requiresRealNameVerification(
+            prompt?.message ?? "",
+          );
+          setPrompt(null);
+          if (shouldVerify) onRealNameVerificationRequired();
+        }}
       />
     </Modal>
   );

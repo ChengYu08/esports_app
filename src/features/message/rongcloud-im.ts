@@ -3,14 +3,15 @@ import type { RCIMIWConversation, RCIMIWEngine, RCIMIWMessage } from '@rongcloud
 
 import { clientAuthApi } from '@/features/auth/client-auth.api';
 import { env } from '@/core/config/env';
+import { mapRongMessage, type ChatMessage } from './chat-message';
 
 export type RongConversation = { id: string; title: string; preview: string; time: string; avatar?: string; unreadCount?: number };
-export type RongTextMessage = { id: string; text: string; time: string; isMine: boolean };
+export type RongTextMessage = ChatMessage;
 
 let engine: RCIMIWEngine | null = null;
 let connected = false;
 let messageHandler: ((conversation: RongConversation) => void) | null = null;
-let conversationMessageHandlers = new Map<string, (message: RongTextMessage) => void>();
+let conversationMessageHandlers = new Map<string, (message: ChatMessage) => void>();
 let businessToken = '';
 const PRIVATE = 1;
 const IMAGE = 4;
@@ -23,23 +24,6 @@ function mapMessage(message?: RCIMIWMessage): Pick<RongConversation, 'preview' |
 function mapConversation(conversation: RCIMIWConversation): RongConversation {
   const last = mapMessage(conversation.lastMessage);
   return { id: String(conversation.targetId || ''), title: String(conversation.targetId || '消息'), preview: last.preview, time: last.time, unreadCount: conversation.unreadCount };
-}
-
-function mapTextMessage(message: RCIMIWMessage): RongTextMessage | null {
-  const content = message as RCIMIWMessage & {
-    content?: string;
-    messageId?: number;
-    messageUId?: string;
-    text?: string;
-  };
-  const text = content.text || content.content;
-  if (!text) return null;
-  return {
-    id: content.messageUId || String(content.messageId || `${message.sentTime}-${message.senderUserId}`),
-    text,
-    time: message.sentTime ? new Date(message.sentTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '',
-    isMine: message.direction === 0,
-  };
 }
 
 async function hydrateConversation(conversation: RongConversation) {
@@ -74,7 +58,7 @@ export async function connectRongCloud(accessToken: string) {
       const peerId = message.senderUserId || message.targetId;
       if (message.conversationType === PRIVATE && peerId) {
         void hydrateConversation(mapConversation({ targetId: peerId, conversationType: message.conversationType, lastMessage: message })).then((conversation) => messageHandler?.(conversation));
-        const mappedMessage = mapTextMessage(message);
+        const mappedMessage = mapRongMessage(message);
         if (mappedMessage) conversationMessageHandlers.get(peerId)?.(mappedMessage);
       }
     });
@@ -119,7 +103,7 @@ export async function getRongMessages(targetId: string): Promise<RongTextMessage
       resolve(messages);
     };
     void engine?.getMessages(PRIVATE, targetId, '', 0, 0, 2, 20, {
-      onSuccess: (messages) => finish((messages || []).map(mapTextMessage).filter((message): message is RongTextMessage => Boolean(message)).reverse()),
+      onSuccess: (messages) => finish((messages || []).map(mapRongMessage).filter((message): message is RongTextMessage => Boolean(message)).reverse()),
       onError: () => finish([]),
     }).then((code) => {
       if (code !== 0) finish([]);
@@ -132,6 +116,13 @@ export async function sendRongText(targetId: string, text: string) {
   const message = await engine.createTextMessage(PRIVATE, targetId, '', text);
   const code = await engine.sendMessage(message);
   if (code !== 0) throw new Error(`发送消息失败（${code}）`);
+}
+
+export async function sendRongImage(targetId: string, path: string) {
+  if (!engine || !connected) throw new Error('融云尚未连接');
+  const message = await engine.createImageMessage(PRIVATE, targetId, '', path);
+  const code = await engine.sendMediaMessage(message);
+  if (code !== 0) throw new Error(`发送图片失败（${code}）`);
 }
 
 export async function disconnectRongCloud() {

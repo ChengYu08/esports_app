@@ -22,6 +22,7 @@ import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { toAuthUser } from "@/features/auth/client-auth-flow";
 import { uploadClientObject } from "@/features/auth/oss-upload";
 import { clearAuthSession, saveAuthSession } from "@/features/auth/session-persistence";
+import { RealNameVerificationSheet } from "@/features/mine/components/RealNameVerificationSheet";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { storage } from "@/core/storage/storage";
 import { disconnectRongCloud } from "@/features/message/rongcloud-im";
@@ -44,9 +45,6 @@ export default function AccountSettingsScreen() {
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [realNameVisible, setRealNameVisible] = useState(false);
-  const [realName, setRealName] = useState("");
-  const [idCard, setIdCard] = useState("");
-  const [realNameSaving, setRealNameSaving] = useState(false);
   const [logoutVisible, setLogoutVisible] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [feedback, setFeedback] = useState<{ title: string; message?: string } | null>(null);
@@ -98,29 +96,6 @@ export default function AccountSettingsScreen() {
       Alert.alert("保存失败", error instanceof Error ? error.message : "请稍后重试");
     } finally {
       setSaving(false);
-    }
-  };
-
-  const submitRealName = async () => {
-    if (!token || !realName.trim() || !isValidIdCard(idCard.trim())) {
-      Alert.alert("提示", "请输入姓名和正确的18位身份证号");
-      return;
-    }
-    setRealNameSaving(true);
-    try {
-      await clientAuthApi.realNameVerify(token, { name: realName.trim(), num: idCard.trim() });
-      const profile = await clientAuthApi.fetchCurrentUser(token);
-      const session = { accessToken: token, user: toAuthUser(profile, user?.phone) };
-      await saveAuthSession(session);
-      setSession(session);
-      setRealNameVisible(false);
-      setRealName("");
-      setIdCard("");
-      Alert.alert("认证成功");
-    } catch (error) {
-      Alert.alert("认证失败", error instanceof Error ? error.message : "请稍后重试");
-    } finally {
-      setRealNameSaving(false);
     }
   };
 
@@ -236,9 +211,7 @@ export default function AccountSettingsScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-      <Modal transparent visible={realNameVisible} animationType="slide" onRequestClose={() => setRealNameVisible(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalBackdrop}><View style={styles.modalCard}><Text style={styles.modalTitle}>实名认证</Text><Text style={styles.notice}>根据国家规定，本平台禁止未成年人交易</Text><TextInput value={realName} onChangeText={setRealName} placeholder="请输入真实姓名" style={styles.input} /><TextInput value={idCard} onChangeText={setIdCard} placeholder="请输入身份证号" maxLength={18} style={styles.input} autoCapitalize="characters" /><View style={styles.modalActions}><Pressable onPress={() => setRealNameVisible(false)} style={styles.cancelButton}><Text style={styles.cancelText}>取消</Text></Pressable><Pressable disabled={realNameSaving} onPress={() => void submitRealName()} style={styles.confirmButton}><Text style={styles.confirmText}>{realNameSaving ? "提交中" : "提交认证"}</Text></Pressable></View></View></KeyboardAvoidingView>
-      </Modal>
+      <RealNameVerificationSheet visible={realNameVisible} onClose={() => setRealNameVisible(false)} />
       <Modal transparent visible={logoutVisible} animationType="fade" onRequestClose={() => setLogoutVisible(false)}>
         <View style={styles.dialogBackdrop}>
           <View style={styles.logoutDialog}>
@@ -272,7 +245,6 @@ function genderText(value?: number) { return value === 1 ? "男" : value === 2 ?
 function maskPhone(phone?: string) { if (!phone) return "未绑定"; if (phone.includes("*")) return phone; return phone.length >= 7 ? `${phone.slice(0, 3)}*****${phone.slice(-4)}` : phone; }
 function isValidBirth(birth: string) { if (!/^\d{4}-\d{2}-\d{2}$/.test(birth)) return false; const [year, month, day] = birth.split("-").map(Number); const date = new Date(year, month - 1, day); return year >= 1900 && date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day && date <= new Date(); }
 function calculateAge(birth?: string) { if (!birth || !isValidBirth(birth)) return null; const date = new Date(birth); const now = new Date(); let value = now.getFullYear() - date.getFullYear(); if (now < new Date(now.getFullYear(), date.getMonth(), date.getDate())) value -= 1; return value; }
-function isValidIdCard(value: string) { if (!/^\d{17}[\dXx]$/.test(value)) return false; const birth = `${value.slice(6, 10)}-${value.slice(10, 12)}-${value.slice(12, 14)}`; return isValidBirth(birth); }
 function editTitle(field: EditField | null) { return field === "nickname" ? "编辑昵称" : field === "gender" ? "选择性别" : field === "birth" ? "编辑年龄" : "编辑个性签名"; }
 
 const styles = StyleSheet.create({ screen: { flex: 1, backgroundColor: "#F7F7F7" }, header: { height: 44, backgroundColor: "#FFF", flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16 }, backButton: { width: 28, height: 28, justifyContent: "center" }, backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" }, headerSpace: { width: 28 }, headerTitle: { color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 17, lineHeight: 24, fontWeight: "600" }, signedOut: { padding: 24, gap: 20, alignItems: "center" }, signedOutText: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 14 }, section: { marginTop: 20 }, sectionTitle: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 13, lineHeight: 20, marginHorizontal: 16, marginBottom: 8 }, card: { backgroundColor: "#FFF", paddingHorizontal: 16 }, row: { minHeight: 52, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#EBEBEB" }, label: { color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 15 }, rowValue: { maxWidth: "68%", flexDirection: "row", alignItems: "center", gap: 5 }, value: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 14, textAlign: "right" }, valueMuted: { color: "#999" }, arrow: { width: 16, height: 16 }, avatar: { width: 44, height: 44, borderRadius: 22 }, logoutButton: { height: 48, marginTop: 28, marginHorizontal: 16, borderRadius: 8, backgroundColor: "#FFF", alignItems: "center", justifyContent: "center" }, logoutText: { color: "#FF1F4C", fontFamily: DOUYIN_SANS, fontSize: 15 }, modalBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.35)" }, dialogBackdrop: { flex: 1, alignItems: "center", justifyContent: "center", padding: 28, backgroundColor: "rgba(0,0,0,0.45)" }, logoutDialog: { width: "100%", borderRadius: 12, backgroundColor: "#FFF", padding: 24, alignItems: "center" }, feedbackDialog: { width: "100%", borderRadius: 12, backgroundColor: "#FFF", padding: 24, alignItems: "center" }, logoutMark: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#FFF1F3", alignItems: "center", justifyContent: "center", marginBottom: 12 }, logoutMarkText: { color: "#FF1F4C", fontSize: 22, fontWeight: "700" }, feedbackMark: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#FFF1F3", alignItems: "center", justifyContent: "center", marginBottom: 12 }, feedbackMarkText: { color: "#FF1F4C", fontSize: 22, fontWeight: "700" }, logoutTitle: { color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 17, fontWeight: "600" }, logoutMessage: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 13, lineHeight: 20, marginTop: 8, textAlign: "center" }, feedbackButton: { width: "100%", height: 44, borderRadius: 8, backgroundColor: "#FF1F4C", alignItems: "center", justifyContent: "center", marginTop: 22 }, feedbackButtonText: { color: "#FFF", fontFamily: DOUYIN_SANS, fontSize: 15 }, logoutActions: { width: "100%", flexDirection: "row", gap: 10, marginTop: 22 }, logoutCancel: { flex: 1, height: 44, borderRadius: 8, backgroundColor: "#F7F7F7", alignItems: "center", justifyContent: "center" }, logoutCancelText: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 15 }, logoutConfirm: { flex: 1, height: 44, borderRadius: 8, backgroundColor: "#FF1F4C", alignItems: "center", justifyContent: "center" }, logoutConfirmText: { color: "#FFF", fontFamily: DOUYIN_SANS, fontSize: 15 }, modalCard: { backgroundColor: "#FFF", borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, paddingBottom: 28, gap: 14 }, modalTitle: { color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 18, fontWeight: "600" }, notice: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 13, lineHeight: 20 }, input: { height: 46, borderWidth: 1, borderColor: "#E7E7E7", borderRadius: 8, paddingHorizontal: 12, color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 15 }, genderOptions: { flexDirection: "row", gap: 10 }, genderOption: { flex: 1, height: 42, borderRadius: 8, backgroundColor: "#F7F7F7", alignItems: "center", justifyContent: "center" }, genderOptionActive: { backgroundColor: "#FFE8ED" }, genderOptionText: { color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 14 }, modalActions: { flexDirection: "row", gap: 12, marginTop: 4 }, cancelButton: { flex: 1, height: 44, borderRadius: 8, backgroundColor: "#F7F7F7", alignItems: "center", justifyContent: "center" }, cancelText: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 15 }, confirmButton: { flex: 1, height: 44, borderRadius: 8, backgroundColor: "#FF1F4C", alignItems: "center", justifyContent: "center" }, confirmText: { color: "#FFF", fontFamily: DOUYIN_SANS, fontSize: 15 } });

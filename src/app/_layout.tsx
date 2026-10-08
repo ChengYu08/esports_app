@@ -3,6 +3,7 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { RootSiblingParent } from "react-native-root-siblings";
 import { useEffect, useState } from "react";
 import { useAuthStore } from "@esports/auth";
 
@@ -77,15 +78,17 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
-        {privacyAccepted ? (
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="login" options={{ animation: "none" }} />
-            <Stack.Screen name="account-settings" />
-          </Stack>
-        ) : (
-          <PrivacyConsentGate onAccepted={() => setPrivacyAccepted(true)} />
-        )}
+        <RootSiblingParent>
+          {privacyAccepted ? (
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="login" options={{ animation: "none" }} />
+              <Stack.Screen name="account-settings" />
+            </Stack>
+          ) : (
+            <PrivacyConsentGate onAccepted={() => setPrivacyAccepted(true)} />
+          )}
+        </RootSiblingParent>
       </SafeAreaProvider>
     </QueryClientProvider>
   );

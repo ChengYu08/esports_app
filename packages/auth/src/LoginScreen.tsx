@@ -1,6 +1,7 @@
 import { Image } from "expo-image";
 import { useEffect, useState } from "react";
 import {
+  Keyboard,
   Modal,
   Pressable,
   StyleSheet,
@@ -124,7 +125,7 @@ export function LoginScreen({
   };
 
   return (
-    <View style={styles.screen}>
+    <View onTouchStart={Keyboard.dismiss} style={styles.screen}>
       <View style={styles.canvas}>
         <View style={styles.top}>
           <Image source={topArt} style={styles.topArt} contentFit="fill" />

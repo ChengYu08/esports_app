@@ -1,8 +1,11 @@
 import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -13,12 +16,15 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "@esports/auth";
+import EmojiPicker, { type EmojiType } from "rn-emoji-keyboard";
 
+import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { MESSAGE_ITEMS } from "../message.data";
 import {
   connectRongCloud,
   getRongMessages,
+  sendRongImage,
   sendRongText,
   subscribeRongConversationMessages,
   type RongTextMessage,
@@ -34,11 +40,11 @@ const chatPhoto = require("../../../../assets/message/chat-photo.svg");
 const chatSend = require("../../../../assets/message/chat-send.svg");
 
 const demoMessages: RongTextMessage[] = [
-  { id: "demo-1", text: "搞不懂，太难了", time: "11:30", isMine: false },
-  { id: "demo-2", text: "很简单", time: "11:30", isMine: true },
-  { id: "demo-3", text: "我一会儿分享个链接给你，你看有空了直接进房就可以", time: "11:30", isMine: true },
-  { id: "demo-4", text: "Okk", time: "11:30", isMine: false },
-  { id: "demo-5", text: "你进来了吗", time: "11:30", isMine: true },
+  { id: "demo-1", kind: "text", text: "搞不懂，太难了", time: "11:30", isMine: false },
+  { id: "demo-2", kind: "text", text: "很简单", time: "11:30", isMine: true },
+  { id: "demo-3", kind: "text", text: "我一会儿分享个链接给你，你看有空了直接进房就可以", time: "11:30", isMine: true },
+  { id: "demo-4", kind: "text", text: "Okk", time: "11:30", isMine: false },
+  { id: "demo-5", kind: "text", text: "你进来了吗", time: "11:30", isMine: true },
 ];
 
 export default function ChatScreen() {
@@ -48,6 +54,8 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<RongTextMessage[]>(demoMessages);
   const [draft, setDraft] = useState("");
   const [imReady, setImReady] = useState(false);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [imageSending, setImageSending] = useState(false);
   const listRef = useRef<FlatList<RongTextMessage>>(null);
   const conversationId = String(id || "");
   const localConversation = useMemo(() => MESSAGE_ITEMS.find((item) => item.id === conversationId), [conversationId]);
@@ -95,6 +103,46 @@ export default function ChatScreen() {
     }
   };
 
+  const selectEmoji = (emoji: EmojiType) => {
+    setDraft((current) => `${current}${emoji.emoji}`);
+  };
+
+  const pickImage = async () => {
+    if (imageSending) return;
+    setEmojiPickerOpen(false);
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("需要访问相册", "请在系统设置中允许访问照片，用于发送聊天图片。");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.85,
+    });
+    if (result.canceled || !result.assets[0]) return;
+
+    const image = result.assets[0];
+    const optimistic: RongTextMessage = {
+      id: `local-image-${Date.now()}`,
+      kind: "image",
+      imageUrl: image.uri,
+      time: new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
+      isMine: true,
+    };
+    setMessages((current) => [...current, optimistic]);
+    requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+    if (!imReady) return;
+
+    setImageSending(true);
+    try {
+      await sendRongImage(conversationId, image.uri);
+    } catch (error) {
+      Alert.alert("图片发送失败", error instanceof Error ? error.message : "请稍后重试");
+    } finally {
+      setImageSending(false);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -133,6 +181,7 @@ export default function ChatScreen() {
           accessibilityLabel="输入消息"
           multiline
           onChangeText={setDraft}
+          onFocus={() => setEmojiPickerOpen(false)}
           placeholder="输入消息"
           placeholderTextColor="#CCCCCC"
           style={styles.input}
@@ -140,10 +189,10 @@ export default function ChatScreen() {
         />
         <View style={styles.composerActions}>
           <View style={styles.toolButtons}>
-            <Pressable accessibilityLabel="表情" accessibilityRole="button" hitSlop={8} onPress={() => setDraft((current) => `${current}😀`)} style={styles.toolButton}>
+            <Pressable accessibilityLabel="表情" accessibilityRole="button" hitSlop={8} onPress={() => { Keyboard.dismiss(); setEmojiPickerOpen(true); }} style={styles.toolButton}>
               <Image source={chatEmoji} style={styles.toolIcon} />
             </Pressable>
-            <Pressable accessibilityLabel="图片" accessibilityRole="button" hitSlop={8} onPress={() => undefined} style={styles.toolButton}>
+            <Pressable accessibilityLabel="图片" accessibilityRole="button" disabled={imageSending} hitSlop={8} onPress={() => void pickImage()} style={[styles.toolButton, imageSending && styles.toolButtonDisabled]}>
               <Image source={chatPhoto} style={styles.toolIcon} />
             </Pressable>
           </View>
@@ -153,6 +202,20 @@ export default function ChatScreen() {
           </Pressable>
         </View>
       </View>
+      <EmojiPicker
+        defaultHeight={340}
+        enableRecentlyUsed
+        onClose={() => setEmojiPickerOpen(false)}
+        onEmojiSelected={selectEmoji}
+        open={emojiPickerOpen}
+        theme={{
+          backdrop: "rgba(0, 0, 0, 0.18)",
+          knob: "#CCCCCC",
+          container: "#FFFFFF",
+          header: "#333333",
+          category: { icon: "#999999", iconActive: "#FE1F4C" },
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -161,8 +224,15 @@ function ChatBubble({ item, avatar }: { item: RongTextMessage; avatar: string | 
   return (
     <View style={[styles.bubbleRow, item.isMine && styles.mineRow]}>
       {!item.isMine && <Image contentFit="cover" source={avatar} style={styles.messageAvatar} />}
-      <View style={[styles.bubble, item.isMine ? styles.mineBubble : styles.theirBubble]}>
-        <Text style={styles.bubbleText}>{item.text}</Text>
+      <View style={[styles.bubble, item.isMine ? styles.mineBubble : styles.theirBubble, item.kind === "image" && styles.imageBubble]}>
+        {item.kind === "image" ? (
+          <Pressable
+            accessibilityLabel="预览聊天图片"
+            onPress={() => router.push({ pathname: "/image-preview", params: createImagePreviewParams([item.imageUrl], 0) })}
+          >
+            <Image contentFit="cover" source={{ uri: item.imageUrl }} style={styles.messageImage} />
+          </Pressable>
+        ) : <Text style={styles.bubbleText}>{item.text}</Text>}
       </View>
       {item.isMine && <Image contentFit="cover" source={avatar} style={styles.messageAvatar} />}
     </View>
@@ -189,13 +259,16 @@ const styles = StyleSheet.create({
   theirBubble: { backgroundColor: "#FFFFFF" },
   mineBubble: { backgroundColor: "#FFF2F5" },
   bubbleText: { color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 14, lineHeight: 22 },
+  imageBubble: { padding: 0, overflow: "hidden" },
+  messageImage: { width: 168, height: 168 },
   composer: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 12, borderTopRightRadius: 12, paddingHorizontal: 12, paddingTop: 12, gap: 8 },
   input: { minHeight: 60, maxHeight: 120, backgroundColor: "#F7F7F7", borderRadius: 8, paddingHorizontal: 12, paddingTop: 8, paddingBottom: 12, color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 14, lineHeight: 22, textAlignVertical: "top" },
   composerActions: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   toolButtons: { flexDirection: "row", gap: 16 },
   toolButton: { width: 24, height: 24 },
+  toolButtonDisabled: { opacity: 0.45 },
   toolIcon: { width: 24, height: 24 },
-  sendButton: { minWidth: 48, height: 24, borderRadius: 999, paddingHorizontal: 12, backgroundColor: "#FF708D", flexDirection: "row", gap: 4, alignItems: "center", justifyContent: "center" },
+  sendButton: { minWidth: 48, height: 24, borderRadius: 999, paddingHorizontal: 12, backgroundColor: "#FE1F4C", flexDirection: "row", gap: 4, alignItems: "center", justifyContent: "center" },
   sendButtonDisabled: { opacity: 0.55 },
   sendText: { color: "#FFFFFF", fontFamily: DOUYIN_SANS, fontSize: 12, lineHeight: 18 },
   sendIcon: { width: 14, height: 14 },
