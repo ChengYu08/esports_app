@@ -43,8 +43,10 @@ import {
 } from "@/features/mine/hooks/use-profile-data";
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import { createProfileAvatarPreviewParams } from "@/features/mine/profile-avatar-preview";
-import { RealNameVerificationSheet } from "@/features/mine/components/RealNameVerificationSheet";
-import { requiresRealNameVerification } from "@/features/mine/order-real-name";
+import {
+  handleOrderFailurePromptConfirm,
+  requiresRealNameVerification,
+} from "@/features/mine/order-real-name";
 import { cancelOrder } from "@/features/order/order.api";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
@@ -87,8 +89,6 @@ export default function ProfileScreen() {
   const [paymentCancelError, setPaymentCancelError] = useState<string | null>(
     null,
   );
-  const [realNameVerificationVisible, setRealNameVerificationVisible] =
-    useState(false);
   const paymentCancelingRef = useRef(false);
   const detailQuery = useProfileDetail(routeParams);
   const detail = detailQuery.data;
@@ -260,9 +260,7 @@ export default function ProfileScreen() {
           }}
           token={useAuthStore.getState().accessToken}
           onClose={() => setOrderCard(null)}
-          onRealNameVerificationRequired={() =>
-            setRealNameVerificationVisible(true)
-          }
+          onRealNameVerificationRequired={() => router.push("/account-settings")}
           onOrderCreated={(order) => {
             setOrderCard(null);
             setPaymentSuccess(false);
@@ -272,10 +270,6 @@ export default function ProfileScreen() {
           }}
         />
       ) : null}
-      <RealNameVerificationSheet
-        visible={realNameVerificationVisible}
-        onClose={() => setRealNameVerificationVisible(false)}
-      />
       {paymentOrder ? (
         <StarPaymentSheet
           order={paymentOrder}
@@ -866,11 +860,14 @@ function CompanionOrderSheet({
         }
         onCancel={() => setPrompt(null)}
         onConfirm={() => {
-          const shouldVerify = requiresRealNameVerification(
+          handleOrderFailurePromptConfirm(
             prompt?.message ?? "",
+            {
+              dismissPrompt: () => setPrompt(null),
+              dismissSheet: closeSheet,
+              openVerification: onRealNameVerificationRequired,
+            },
           );
-          setPrompt(null);
-          if (shouldVerify) onRealNameVerificationRequired();
         }}
       />
     </Modal>

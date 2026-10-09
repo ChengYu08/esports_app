@@ -16,7 +16,7 @@ export type ChatImageMessage = {
 
 export type ChatMessage = ChatTextMessage | ChatImageMessage;
 
-type RongMessage = {
+export type RongSdkMessage = {
   messageType?: number;
   messageUId?: string;
   messageId?: number;
@@ -32,7 +32,7 @@ type RongMessage = {
 
 const IMAGE_MESSAGE_TYPE = 4;
 
-export function mapRongMessage(message: RongMessage): ChatMessage | null {
+export function mapRongMessage(message: RongSdkMessage): ChatMessage | null {
   const id = message.messageUId || String(message.messageId || `${message.sentTime}-${message.senderUserId}`);
   const time = message.sentTime
     ? new Date(message.sentTime).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })

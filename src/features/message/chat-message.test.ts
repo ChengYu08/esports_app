@@ -18,4 +18,20 @@ describe("mapRongMessage", () => {
       isMine: true,
     });
   });
+
+  it("maps a received RongCloud text message", () => {
+    expect(mapRongMessage({
+      messageType: 1,
+      messageUId: "text-1",
+      text: "hello",
+      sentTime: new Date("2026-10-08T10:30:00").getTime(),
+      direction: 1,
+    })).toEqual({
+      id: "text-1",
+      kind: "text",
+      text: "hello",
+      time: "10:30",
+      isMine: false,
+    });
+  });
 });

@@ -24,6 +24,7 @@
       "expo-router",
       "expo-splash-screen",
       "expo-audio",
+      "./plugins/withNodeCommandUtf8",
       [
         "expo-image-picker",
         {

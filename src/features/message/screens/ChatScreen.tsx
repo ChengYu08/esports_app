@@ -88,6 +88,7 @@ export default function ChatScreen() {
     if (!text) return;
     const optimistic: RongTextMessage = {
       id: `local-${Date.now()}`,
+      kind: "text",
       text,
       time: new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
       isMine: true,
