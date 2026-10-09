@@ -24,14 +24,13 @@ export default function MessageScreen() {
 
   useEffect(() => { if (accessToken) void initialize(accessToken); }, [accessToken, initialize]);
 
-  const items = useMemo<MessageListItemModel[]>(() => conversations.map((item) => ({
-    ...item,
-    kind: "conversation",
-    avatar: resolveConversationAvatar(item.title, item.avatar, defaultConversationAvatar),
-  })), [conversations]);
+  const items = useMemo<MessageListItemModel[]>(() => conversations.map((item) => {
+    const avatar = resolveConversationAvatar(item.title, item.avatar, defaultConversationAvatar);
+    return { ...item, kind: "conversation", avatar: typeof avatar === "string" ? { uri: avatar } : avatar };
+  }), [conversations]);
   const handleMessagePress = (item: MessageListItemModel) => {
     if (item.kind !== "conversation") return;
-    router.push({ pathname: "/chat/[id]", params: { id: item.id, title: item.title, avatar: typeof item.avatar === "string" ? item.avatar : "" } });
+    router.push({ pathname: "/chat/[id]", params: { id: item.id, title: item.title } });
   };
 
   const stateMessage = !accessToken ? "登录后查看消息" : connectionState === "unavailable" ? "当前版本暂不支持即时消息" : connectionState === "connecting" ? "消息连接中..." : connectionState === "error" ? lastError || "消息连接失败" : null;
