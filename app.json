@@ -15,7 +15,7 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
-      "package": "com.chengyu08.app"
+      "package": "com.esportsapp.app"
     },
     "web": {
       "output": "static"
@@ -44,7 +44,7 @@
     },
     "owner": "chengyu08s-team",
     "ios": {
-      "bundleIdentifier": "com.chengyu08.app"
+      "bundleIdentifier": "com.esportsapp.app"
     }
   }
 }

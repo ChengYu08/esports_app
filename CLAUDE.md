@@ -7,6 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 盼之电竞 (Esports App) — Expo/React Native mobile application with integrated IM (RongCloud), authentication via workspace SSO SDK, and feature-based architecture.
 
 This is the mobile client in a multi-repo workspace:
+
 - PC: `/Users/yucheng/Desktop/盼之电竞/pzdj-pc`
 - Admin: `/Users/yucheng/Desktop/盼之电竞/pzdj-admin`
 - Mobile: `/Users/yucheng/Desktop/盼之电竞/esports_app` (this repo)
@@ -91,11 +92,13 @@ packages/                  # Workspace packages
 **Routing**: Expo Router (file-based). Routes live in `src/app/`, non-route code lives outside `src/app/`. Use `Link`, `router`, `useLocalSearchParams` from `expo-router`.
 
 **State Management**:
+
 - **Global auth**: Zustand store in `packages/auth/src/auth-store.ts` (`useAuthStore`)
 - **Server state**: React Query (`@tanstack/react-query`) via `src/core/query/query-client.ts`
 - **Local state**: React hooks (`useState`, `useReducer`)
 
 **API Calls**: Use `apiClient` from `src/core/network/api-client.ts`. Automatically adds:
+
 - Base URL from `env.apiBaseUrl`
 - `token` header for authentication (pass as `{ token: accessToken }`)
 - 15s timeout (configurable via `timeoutMs`)
@@ -103,6 +106,7 @@ packages/                  # Workspace packages
 - Error handling with `ApiError`
 
 **IM Integration**: RongCloud via `@rongcloud/react-native-im-wrapper`. Wrapper in `src/features/message/rongcloud-im.ts`:
+
 - `connectRongCloud(accessToken)` — Connects to IM, fetches IM token from backend
 - `getRongConversations()` — Fetches conversation list
 - `subscribeRongMessages(onMessage)` — Real-time message listener
@@ -112,6 +116,7 @@ packages/                  # Workspace packages
 - Native module availability check: `isRongCloudAvailable()` (false on Expo Go, true on dev builds)
 
 **Path Aliases** (tsconfig.json):
+
 - `@/*` → `src/*`
 - `@/assets/*` → `assets/*`
 - `@esports/auth` → `packages/auth/src/index.ts`
@@ -122,6 +127,7 @@ packages/                  # Workspace packages
 Current: **Expo SDK 57** (see `package.json`).
 
 **CRITICAL**: Expo APIs change every SDK release. Before writing any Expo/React Native code:
+
 1. Fetch versioned docs: `https://docs.expo.dev/versions/v57.0.0/`
 2. For general guidance: `https://docs.expo.dev/llms.txt`
 3. Never trust training data — always verify against current docs.
@@ -134,6 +140,7 @@ Current: **Expo SDK 57** (see `package.json`).
   - Any library with native code not in Expo Go
 
 To create a dev build:
+
 ```bash
 npx expo run:ios        # Local (requires Xcode)
 npx expo run:android    # Local (requires Android Studio)
@@ -143,7 +150,8 @@ npx eas-cli build --profile development  # Cloud build via EAS
 ## Configuration
 
 **app.json**:
-- Package ID: `com.chengyu08.app`
+
+- Package ID: `com.esportsapp.app`
 - Scheme: `esportsapp`
 - Custom plugin: `./plugins/withNodeCommandUtf8` (fixes Gradle encoding on Windows)
 - Permissions: Audio recording (for voice messages)
@@ -154,16 +162,19 @@ npx eas-cli build --profile development  # Cloud build via EAS
 ## 开发规范
 
 **作为专业的 React Native 移动端工程师，遵循以下原则**:
+
 - 组件化: 按功能拆分，提高可维护性
 - 性能优化: 使用 `React.memo`、`useMemo`、`useCallback` 避免不必要的重渲染
 - 跨平台兼容: 优先使用 Expo 模块，避免平台特定代码
 
 **还原 Figma 设计**:
+
 - 自动切图: 分析页面功能，识别可变区域，切图尽量大
 - 去除状态栏: Figma 顶部手机状态栏在真实代码中不需要（真机自带）
 - 优先检查 `package.json` 已有的库，避免重复引入
 
 **代码质量**:
+
 - 默认不写注释 — 只有非显而易见的逻辑才需要注释
 - 不过度设计 — 三行相似代码优于过早抽象
 - 不添加无法发生的错误处理 — 只在系统边界（用户输入、外部API）校验
@@ -171,6 +182,7 @@ npx eas-cli build --profile development  # Cloud build via EAS
 ## Testing
 
 No test framework configured yet. If adding tests:
+
 - Install a test runner (Jest, Vitest, or React Native Testing Library)
 - Add test scripts to `package.json`
 - Follow Expo testing best practices: https://docs.expo.dev/develop/unit-testing/
@@ -178,12 +190,14 @@ No test framework configured yet. If adding tests:
 ## Environment Variables
 
 Managed in `src/core/config/env.ts`:
+
 - `apiBaseUrl` — Backend API base URL
 - `rongCloudAppKey` — RongCloud app key (for IM)
 
 ## Dependencies
 
 Key libraries already installed:
+
 - **UI**: `expo-image`, `expo-linear-gradient`, `expo-symbols`, `@expo/ui`, `rn-emoji-keyboard`
 - **Navigation**: `expo-router`, `react-native-screens`, `react-native-safe-area-context`
 - **State**: `zustand`, `@tanstack/react-query`

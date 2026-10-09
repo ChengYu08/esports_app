@@ -52,9 +52,7 @@ export function LoginScreen({
   onQuickLogin,
   onForgotPassword,
 }: LoginScreenProps) {
-  const [mode, setMode] = useState<"sms" | "password">(
-    initialMode ?? "sms",
-  );
+  const [mode, setMode] = useState<"sms" | "password">(initialMode ?? "sms");
   const [phone, setPhone] = useState(() => sanitizePhone(initialPhone ?? ""));
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
@@ -160,7 +158,11 @@ export function LoginScreen({
             <View style={styles.field}>
               <TextInput
                 value={isPasswordMode ? password : code}
-                onChangeText={isPasswordMode ? setPassword : (value) => setCode(sanitizeCode(value))}
+                onChangeText={
+                  isPasswordMode
+                    ? setPassword
+                    : (value) => setCode(sanitizeCode(value))
+                }
                 keyboardType={isPasswordMode ? "default" : "number-pad"}
                 maxLength={isPasswordMode ? 16 : 6}
                 placeholder={isPasswordMode ? "请输入密码" : "请输入验证码"}
@@ -172,7 +174,9 @@ export function LoginScreen({
               {isPasswordMode ? (
                 <View style={styles.passwordActions}>
                   <Pressable
-                    accessibilityLabel={passwordVisible ? "隐藏密码" : "显示密码"}
+                    accessibilityLabel={
+                      passwordVisible ? "隐藏密码" : "显示密码"
+                    }
                     accessibilityRole="button"
                     hitSlop={8}
                     onPress={() => setPasswordVisible((visible) => !visible)}
@@ -203,7 +207,9 @@ export function LoginScreen({
                     disabled={!canSendCode}
                     onPress={() => void handleSendCode()}
                   >
-                    <Text style={[styles.send, !canSendCode && styles.sendDisabled]}>
+                    <Text
+                      style={[styles.send, !canSendCode && styles.sendDisabled]}
+                    >
                       {getSmsCodeActionLabel(isSendingCode, codeCountdown)}
                     </Text>
                   </Pressable>
@@ -228,16 +234,16 @@ export function LoginScreen({
           </View>
         </View>
         <View style={styles.other}>
-          <LoginMethod
+          {/* <LoginMethod
             icon={phoneIcon}
             label="一键登录"
             onPress={onQuickLogin}
-          />
+          /> */}
           <LoginMethod
             icon={lockIcon}
             label={isPasswordMode ? "验证码登录" : "密码登录"}
             onPress={() =>
-              setMode((current) => current === "sms" ? "password" : "sms")
+              setMode((current) => (current === "sms" ? "password" : "sms"))
             }
           />
           {/* <LoginMethod icon={wechatIcon} label="微信" /> */}
@@ -250,7 +256,12 @@ export function LoginScreen({
           onPress={() => setAgreementAccepted((accepted) => !accepted)}
           style={styles.agreement}
         >
-          <View style={[styles.checkbox, agreementAccepted && styles.checkboxChecked]}>
+          <View
+            style={[
+              styles.checkbox,
+              agreementAccepted && styles.checkboxChecked,
+            ]}
+          >
             {agreementAccepted ? <Text style={styles.checkmark}>✓</Text> : null}
           </View>
           <Text style={styles.agreementText}>
