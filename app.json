@@ -15,10 +15,15 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
-      "package": "com.esportsapp.app"
+      "package": "com.esportsapp.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      }
     },
     "web": {
-      "output": "static"
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       "expo-router",
@@ -45,6 +50,7 @@
     "owner": "chengyu08s-team",
     "ios": {
       "bundleIdentifier": "com.esportsapp.app"
-    }
+    },
+    "icon": "./assets/images/icon.png"
   }
 }
