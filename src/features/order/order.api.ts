@@ -62,6 +62,7 @@ export function mapOrder(item: ApiOrder, index = 0): OrderItemModel {
     status,
     statusLabel,
     receiverUserId: stringValue(item, "receiverUserId"),
+    clubId: numberValue(item, "companionClubId", "clubId", "receiverClubId"),
     sellerName: stringValue(item, "sellerName", "receiverNickname", "companionName", "clubName") ?? "盼之电竞俱乐部",
     sellerAvatar: stringValue(item, "sellerAvatar", "receiverHeadImage", "clubLogo", "logoUrl", "headImage") ?? sellerAvatar,
     serviceName: stringValue(item, "serviceName", "productName") ?? ([stringValue(item, "gameModeName"), stringValue(item, "gameLevelName")].filter(Boolean).join("-") || "陪玩服务"),
@@ -88,6 +89,14 @@ export async function completeOrder(orderId: string | number, token: string): Pr
     method: "POST", token, body: { action: { orderId: Number(orderId) } },
   });
   if (response.code !== "SUCCESS") throw new Error(response.info || "完成订单失败");
+}
+
+export type AfterSaleMember = { userId: number; nickname?: string; headImage?: string; onlineStatus?: number | null };
+
+export async function fetchAfterSaleMembers(clubId: number, token: string): Promise<AfterSaleMember[]> {
+  const response = await apiClient<ApiEnvelope<AfterSaleMember[]>>(`/client/v1/afterSale/memberList?clubId=${encodeURIComponent(clubId)}`, { method: "GET", token });
+  if (response.code !== "SUCCESS") throw new Error(response.info || "售后客服加载失败");
+  return Array.isArray(response.data) ? response.data : [];
 }
 
 export async function fetchOrderDetail(orderId: string, token: string): Promise<ApiOrder> {

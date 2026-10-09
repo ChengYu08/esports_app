@@ -32,6 +32,7 @@ export type OrderItemModel = {
   statusLabel: string;
   sellerName: string;
   receiverUserId?: string;
+  clubId?: number;
   sellerAvatar: ImageSource | number;
   serviceName: string;
   gameName: string;

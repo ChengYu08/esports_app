@@ -14,7 +14,16 @@ export type ChatImageMessage = {
   isMine: boolean;
 };
 
-export type ChatMessage = ChatTextMessage | ChatImageMessage;
+export type AfterSaleCardMessage = {
+  id: string;
+  kind: "afterSale";
+  title: string;
+  orderNo?: string;
+  time: string;
+  isMine: boolean;
+};
+
+export type ChatMessage = ChatTextMessage | ChatImageMessage | AfterSaleCardMessage;
 
 export type RongSdkMessage = {
   messageType?: number;
@@ -28,6 +37,8 @@ export type RongSdkMessage = {
   local?: string;
   remote?: string;
   mediaUrl?: string;
+  identifier?: string;
+  fields?: Record<string, string>;
 };
 
 export function mapRongMessage(message: RongSdkMessage, enums: { image: number; send: number }): ChatMessage | null {
@@ -40,6 +51,13 @@ export function mapRongMessage(message: RongSdkMessage, enums: { image: number; 
   if (message.messageType === enums.image) {
     const imageUrl = message.local || message.remote || message.mediaUrl;
     return imageUrl ? { id, kind: "image", imageUrl, time, isMine } : null;
+  }
+
+  if (message.identifier === "PZAfterSaleApply") {
+    let fields = message.fields || {};
+    let payload: Record<string, string> = fields;
+    try { payload = JSON.parse(fields.data || "{}"); } catch { /* use fields */ }
+    return { id, kind: "afterSale", title: "订单服务不满意，申请售后～", orderNo: payload.orderNo, time, isMine };
   }
 
   const text = message.text || message.content;

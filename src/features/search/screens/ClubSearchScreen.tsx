@@ -20,7 +20,7 @@ import type { SearchUser } from "../api/search.api";
 type SearchType = "club" | "user" | "message";
 type SearchResult = Club | SearchUser | MessageListItemModel;
 
-const defaultConversationAvatar = require("../../../../assets/message/avatar-wangzhe.svg");
+const defaultConversationAvatar = require("../../../../assets/coms/avatar_default_2.png");
 
 const MAX_HISTORY = 10;
 

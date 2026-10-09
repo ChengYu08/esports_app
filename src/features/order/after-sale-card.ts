@@ -1,0 +1,1 @@
+export type AfterSaleCardPayload = { orderId: number; orderNo?: string; companionUserId?: number; companionNickname?: string; gameName?: string; serviceDesc?: string; unitPrice?: number; quantity?: number; totalPrice?: number; createTime?: string; remark?: string; clubId?: number; csUserId: number };

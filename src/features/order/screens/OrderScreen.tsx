@@ -7,10 +7,11 @@ import { AppPrompt } from "@/shared/ui/AppPrompt";
 
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
 import { OrderCard } from "../components/OrderCard";
+import { OrderAfterSaleSheet } from "../components/OrderAfterSaleSheet";
 import { OrderHeader } from "../components/OrderHeader";
 import { OrderTabs } from "../components/OrderTabs";
 import { useOrderPage } from "../hooks/use-order-page";
-import { cancelOrder as cancelOrderRequest, completeOrder as completeOrderRequest } from "../order.api";
+import { cancelOrder as cancelOrderRequest, completeOrder as completeOrderRequest, fetchAfterSaleMembers, type AfterSaleMember } from "../order.api";
 import { fetchStarBalance, payCompanionOrder } from "@/features/mine/api/companion-order.api";
 import type {
   OrderActionKey,
@@ -25,6 +26,9 @@ export default function OrderScreen() {
   const token = useAuthStore((state) => state.accessToken);
   const [cancelTarget, setCancelTarget] = useState<OrderItemModel | null>(null);
   const [completeTarget, setCompleteTarget] = useState<OrderItemModel | null>(null);
+  const [afterSaleTarget, setAfterSaleTarget] = useState<OrderItemModel | null>(null);
+  const [afterSaleMembers, setAfterSaleMembers] = useState<AfterSaleMember[]>([]);
+  const [afterSaleLoading, setAfterSaleLoading] = useState(false);
   const [payTarget, setPayTarget] = useState<OrderItemModel | null>(null);
   const [prompt, setPrompt] = useState<{ title: string; message: string; confirmText?: string } | null>(null);
   const cancelingPaymentRef = useRef(false);
@@ -37,6 +41,13 @@ export default function OrderScreen() {
     }
     if (action === "cancel") setCancelTarget(item);
     if (action === "complete") setCompleteTarget(item);
+    if (action === "afterSales") {
+      setAfterSaleTarget(item);
+      if (token && item.clubId) {
+        setAfterSaleLoading(true);
+        void fetchAfterSaleMembers(item.clubId, token).then(setAfterSaleMembers).catch(() => setAfterSaleMembers([])).finally(() => setAfterSaleLoading(false));
+      } else setAfterSaleMembers([]);
+    }
   };
 
   const confirmCancel = async () => {
@@ -90,6 +101,12 @@ export default function OrderScreen() {
         onCancel={() => setCancelTarget(null)}
         onConfirm={() => void confirmCancel()}
       />
+      <OrderAfterSaleSheet visible={Boolean(afterSaleTarget)} loading={afterSaleLoading} members={afterSaleMembers} onClose={() => setAfterSaleTarget(null)} onContact={(member) => {
+        const order = afterSaleTarget;
+        setAfterSaleTarget(null);
+        const payload = { orderId: Number(order?.id), orderNo: order?.orderNo, companionUserId: Number(order?.receiverUserId) || undefined, companionNickname: order?.sellerName, gameName: order?.gameName, serviceDesc: order?.serviceName, unitPrice: Number(order?.unitPrice), quantity: order?.quantity, totalPrice: Number(order?.totalPrice), createTime: order?.createTime, clubId: order?.clubId, csUserId: member.userId };
+        router.push({ pathname: "/chat/[id]", params: { id: String(member.userId), title: member.nickname || "售后客服", avatar: member.headImage || "", afterSale: JSON.stringify(payload) } });
+      }} />
       <AppPrompt
         visible={Boolean(completeTarget)}
         title="提示"

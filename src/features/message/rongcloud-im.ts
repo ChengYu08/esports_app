@@ -7,6 +7,7 @@ import type {
 
 import { mapRongMessage, type RongSdkMessage } from './chat-message';
 import type { ManagedMessage, MessageConversation, MessageHistoryPage } from './message-state';
+import type { AfterSaleCardPayload } from '@/features/order/after-sale-card';
 
 export type RongConversation = MessageConversation;
 export type RongTextMessage = ManagedMessage;
@@ -277,6 +278,21 @@ export async function sendRongImage(targetId: string, path: string): Promise<Man
       else reject(new Error('发送图片失败'));
     };
     void currentEngine.sendMediaMessage(message, { onMediaMessageSent: (code, sent) => code === 0 ? finish(undefined, sent) : finish(new Error(`发送图片失败（${code}）`)) }).then((code) => { if (code !== 0) finish(new Error(`发送图片失败（${code}）`)); }).catch((error) => finish(error instanceof Error ? error : new Error('发送图片失败')));
+  });
+}
+
+export async function sendRongAfterSaleCard(targetId: string, payload: AfterSaleCardPayload): Promise<ManagedMessage> {
+  const sdk = loadSdk();
+  if (!sdk) throw new Error('当前版本暂不支持即时消息');
+  const currentEngine = requireConnected();
+  const fields = new Map<string, string>([['data', JSON.stringify(payload)], ['content', '【售后申请】订单 ' + (payload.orderNo || '')]]);
+  const message = await currentEngine.createCustomMessage(sdk.RCIMIWConversationType.PRIVATE, targetId, '', sdk.RCIMIWCustomMessagePolicy.NORMAL, 'PZAfterSaleApply', fields);
+  return new Promise((resolve, reject) => {
+    void currentEngine.sendMessage(message, { onMessageSent: (code, sent) => {
+      if (code !== 0) return reject(new Error(`售后卡片发送失败（${code}）`));
+      const managed = sent ? toManagedMessage(sent) : null;
+      managed ? resolve({ ...managed, isMine: true }) : reject(new Error('发送消息失败'));
+    } });
   });
 }
 

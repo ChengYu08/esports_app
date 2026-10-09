@@ -24,8 +24,9 @@ import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useMessageStore } from "../message-store";
 import type { ManagedMessage } from "../message-state";
+import type { AfterSaleCardPayload } from "@/features/order/after-sale-card";
 
-const defaultAvatar = require("../../../../assets/message/avatar-wangzhe.svg");
+const defaultAvatar = require("../../../../assets/coms/avatar_default_2.png");
 const defaultMyAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const chatBack = require("../../../../assets/message/chat-back.svg");
 const chatMore = require("../../../../assets/message/chat-more.svg");
@@ -38,14 +39,17 @@ const EMPTY_MESSAGES: ManagedMessage[] = [];
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
-  const { id, title, avatar } = useLocalSearchParams<{ id?: string; title?: string; avatar?: string }>();
+  const { id, title, avatar, afterSale } = useLocalSearchParams<{ id?: string; title?: string; avatar?: string; afterSale?: string }>();
   const accessToken = useAuthStore((state) => state.accessToken);
   const myAvatarUrl = useAuthStore((state) => state.user?.headImage);
   const [draft, setDraft] = useState("");
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [imageSending, setImageSending] = useState(false);
   const listRef = useRef<FlatList<ManagedMessage>>(null);
-  const initialScrollDone = useRef(false);
+  const initialHistoryLoaded = useRef(false);
+  const shouldScrollToEnd = useRef(false);
+  const isNearBottom = useRef(true);
+  const previousMessageCount = useRef(0);
   const conversationId = String(id || "");
   const conversation = useMessageStore((state) => state.conversations.find((item) => item.id === conversationId));
   const messages = useMessageStore((state) => state.messagesByPeerId[conversationId] || EMPTY_MESSAGES);
@@ -55,19 +59,47 @@ export default function ChatScreen() {
   const closeConversation = useMessageStore((state) => state.closeConversation);
   const sendText = useMessageStore((state) => state.sendText);
   const sendImage = useMessageStore((state) => state.sendImage);
+  const sendAfterSaleCard = useMessageStore((state) => state.sendAfterSaleCard);
+  const [afterSalePayload, setAfterSalePayload] = useState<AfterSaleCardPayload | null>(() => {
+    if (!afterSale || typeof afterSale !== "string") return null;
+    try { return JSON.parse(afterSale) as AfterSaleCardPayload; } catch { return null; }
+  });
   const retryMessage = useMessageStore((state) => state.retryMessage);
   const loadOlder = useMessageStore((state) => state.loadOlder);
-  const historyLoading = useMessageStore((state) => state.historyByPeerId[conversationId]?.loading || false);
+  const historyState = useMessageStore((state) => state.historyByPeerId[conversationId]);
+  const historyLoading = historyState?.loading || false;
   const conversationTitle = title || conversation?.title || "用户聊天";
   const conversationAvatar = avatar || conversation?.avatar || defaultAvatar;
   const myAvatar = myAvatarUrl ? { uri: myAvatarUrl } : defaultMyAvatar;
   const imReady = connectionState === "ready";
+  const scrollToLatest = () => requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: false }));
 
   useEffect(() => {
-    initialScrollDone.current = false;
+    initialHistoryLoaded.current = false;
+    shouldScrollToEnd.current = false;
+    isNearBottom.current = true;
+    previousMessageCount.current = 0;
     if (accessToken && conversationId) void openConversation({ id: conversationId, title: conversationTitle, avatar: typeof conversationAvatar === "string" ? conversationAvatar : undefined });
     return () => closeConversation();
   }, [accessToken, closeConversation, connectionState, conversationAvatar, conversationId, conversationTitle, openConversation]);
+
+  useEffect(() => {
+    if (!historyState || historyState.loading) return;
+
+    if (!initialHistoryLoaded.current) {
+      initialHistoryLoaded.current = true;
+      previousMessageCount.current = messages.length;
+      shouldScrollToEnd.current = true;
+      scrollToLatest();
+      return;
+    }
+
+    if (messages.length > previousMessageCount.current && isNearBottom.current) {
+      shouldScrollToEnd.current = true;
+      scrollToLatest();
+    }
+    previousMessageCount.current = messages.length;
+  }, [historyState, messages.length]);
 
   const sendMessage = async () => {
     const text = draft.trim();
@@ -102,7 +134,16 @@ export default function ChatScreen() {
   };
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (event.nativeEvent.contentOffset.y < 24 && !historyLoading) void loadOlder(conversationId);
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    const distanceFromBottom = contentSize.height - layoutMeasurement.height - contentOffset.y;
+    isNearBottom.current = distanceFromBottom <= 48;
+    if (contentOffset.y < 24 && !historyLoading) void loadOlder(conversationId);
+  };
+
+  const handleContentSizeChange = () => {
+    if (!shouldScrollToEnd.current) return;
+    shouldScrollToEnd.current = false;
+    scrollToLatest();
   };
 
   return (
@@ -135,11 +176,12 @@ export default function ChatScreen() {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => <ChatBubble item={item} peerAvatar={conversationAvatar} myAvatar={myAvatar} onRetry={() => void retryMessage(conversationId, item.clientId || "")} />}
         showsVerticalScrollIndicator={false}
-        onContentSizeChange={() => { if (!historyLoading && !initialScrollDone.current) { initialScrollDone.current = true; listRef.current?.scrollToEnd({ animated: false }); } }}
+        onContentSizeChange={handleContentSizeChange}
         maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
         onScroll={handleScroll}
         scrollEventThrottle={150}
       />
+      {afterSalePayload ? <Pressable style={styles.afterSaleGuide} onPress={() => { void sendAfterSaleCard(conversationId, afterSalePayload).then(() => setAfterSalePayload(null)); }}><View style={styles.afterSaleGuideCopy}><Text style={styles.afterSaleGuideTitle}>发送订单信息给售后客服</Text><Text style={styles.afterSaleGuideSub}>订单服务不满意，申请售后～ · 订单 {afterSalePayload.orderNo || afterSalePayload.orderId}</Text></View><Text style={styles.afterSaleGuideButton}>点击发送</Text></Pressable> : null}
       {lastError && connectionState !== "ready" ? <Text style={styles.errorBanner}>{lastError}</Text> : null}
 
       <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
@@ -198,7 +240,7 @@ function ChatBubble({ item, peerAvatar, myAvatar, onRetry }: { item: ManagedMess
           >
             <Image contentFit="cover" source={{ uri: item.imageUrl }} style={styles.messageImage} />
           </Pressable>
-        ) : <Text style={styles.bubbleText}>{item.text}</Text>}
+        ) : item.kind === "afterSale" ? <View style={styles.afterSaleCard}><Text style={styles.afterSaleCardTitle}>{item.title}</Text><Text style={styles.afterSaleCardSub}>订单 {item.orderNo || "-"}</Text></View> : <Text style={styles.bubbleText}>{item.text}</Text>}
       </View>
       {item.isMine && <Image contentFit="cover" source={myAvatar} style={styles.messageAvatar} />}
       {item.status === "failed" ? <Pressable accessibilityRole="button" onPress={onRetry}><Text style={styles.retryLabel}>重试</Text></Pressable> : null}
@@ -241,4 +283,7 @@ const styles = StyleSheet.create({
   sendButtonDisabled: { opacity: 0.55 },
   sendText: { color: "#FFFFFF", fontFamily: DOUYIN_SANS, fontSize: 12, lineHeight: 18 },
   sendIcon: { width: 14, height: 14 },
+  afterSaleGuide: { marginHorizontal: 12, marginBottom: 8, padding: 12, backgroundColor: "#FFF2F5", borderRadius: 10, flexDirection: "row", alignItems: "center" },
+  afterSaleGuideCopy: { flex: 1 }, afterSaleGuideTitle: { color: "#111", fontSize: 14, fontWeight: "600" }, afterSaleGuideSub: { color: "#888", fontSize: 11, marginTop: 4 }, afterSaleGuideButton: { color: "#FE1F4C", fontSize: 13, fontWeight: "600" },
+  afterSaleCard: { minWidth: 190, padding: 4 }, afterSaleCardTitle: { color: "#111", fontSize: 14, fontWeight: "600" }, afterSaleCardSub: { color: "#777", fontSize: 12, marginTop: 8 },
 });

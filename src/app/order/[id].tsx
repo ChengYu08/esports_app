@@ -14,6 +14,8 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { cancelOrder, completeOrder, fetchOrderDetail, mapOrder } from "@/features/order/order.api";
 import { getOrderDetailAction } from "@/features/order/order-detail-actions";
 import type { OrderItemModel } from "@/features/order/order.types";
+import { OrderAfterSaleSheet } from "@/features/order/components/OrderAfterSaleSheet";
+import { fetchAfterSaleMembers, type AfterSaleMember } from "@/features/order/order.api";
 
 const copyIcon = require("../../../assets/coms/copy.svg");
 
@@ -23,6 +25,9 @@ export default function OrderDetailRoute() {
   const token = useAuthStore((state) => state.accessToken);
   const [cancelPromptVisible, setCancelPromptVisible] = useState(false);
   const [completePromptVisible, setCompletePromptVisible] = useState(false);
+  const [afterSaleVisible, setAfterSaleVisible] = useState(false);
+  const [afterSaleMembers, setAfterSaleMembers] = useState<AfterSaleMember[]>([]);
+  const [afterSaleLoading, setAfterSaleLoading] = useState(false);
   const [prompt, setPrompt] = useState<{ title: string; message: string } | null>(null);
   const detail = useQuery({
     queryKey: ["order-detail", id],
@@ -103,6 +108,17 @@ export default function OrderDetailRoute() {
                 setCancelPromptVisible(true);
               } else if (detailAction === "complete") {
                 setCompletePromptVisible(true);
+              } else if (detailAction === "afterSales") {
+                setAfterSaleVisible(true);
+                if (token && order.clubId) {
+                  setAfterSaleLoading(true);
+                  void fetchAfterSaleMembers(order.clubId, token)
+                    .then(setAfterSaleMembers)
+                    .catch(() => setAfterSaleMembers([]))
+                    .finally(() => setAfterSaleLoading(false));
+                } else {
+                  setAfterSaleMembers([]);
+                }
               }
             }}
             style={styles.outlineButton}
@@ -134,6 +150,20 @@ export default function OrderDetailRoute() {
                 message: error instanceof Error ? error.message : "请稍后重试",
               });
             });
+        }}
+      />
+      <OrderAfterSaleSheet
+        visible={afterSaleVisible}
+        loading={afterSaleLoading}
+        members={afterSaleMembers}
+        onClose={() => setAfterSaleVisible(false)}
+        onContact={(member) => {
+          setAfterSaleVisible(false);
+          const payload = { orderId: Number(order.id), orderNo: order.orderNo, companionUserId: Number(order.receiverUserId) || undefined, companionNickname: order.sellerName, gameName: order.gameName, serviceDesc: order.serviceName, unitPrice: Number(order.unitPrice), quantity: order.quantity, totalPrice: Number(order.totalPrice), createTime: order.createTime, clubId: order.clubId, csUserId: member.userId };
+          router.push({
+            pathname: "/chat/[id]",
+            params: { id: String(member.userId), title: member.nickname || "售后客服", avatar: member.headImage || "", afterSale: JSON.stringify(payload) },
+          });
         }}
       />
       <AppPrompt

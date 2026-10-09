@@ -10,6 +10,7 @@ import {
   markRongConversationRead,
   sendRongImage,
   sendRongText,
+  sendRongAfterSaleCard,
   subscribeRongMessageEvents,
   subscribeRongMessages,
 } from './rongcloud-im';
@@ -23,6 +24,7 @@ import {
   type MessageConversation,
   type MessageHistoryPage,
 } from './message-state';
+import type { AfterSaleCardPayload } from '@/features/order/after-sale-card';
 
 export type MessageConnectionState = 'idle' | 'connecting' | 'ready' | 'unavailable' | 'error';
 
@@ -33,6 +35,7 @@ export type MessageAdapter = {
   getMessages: (peerId: string, beforeSentTime?: number) => Promise<MessageHistoryPage>;
   sendText: (peerId: string, text: string) => Promise<ManagedMessage>;
   sendImage: (peerId: string, path: string) => Promise<ManagedMessage>;
+  sendAfterSaleCard?: (peerId: string, payload: AfterSaleCardPayload) => Promise<ManagedMessage>;
   markRead: (peerId: string) => Promise<boolean>;
   subscribeConversations: (listener: (conversation: MessageConversation) => void) => () => void;
   subscribeMessages: (listener: (peerId: string, message: ManagedMessage, conversation: MessageConversation) => void) => () => void;
@@ -57,6 +60,7 @@ export type MessageStoreState = {
   closeConversation: () => void;
   loadOlder: (peerId: string) => Promise<void>;
   sendText: (peerId: string, text: string) => Promise<void>;
+  sendAfterSaleCard: (peerId: string, payload: import('@/features/order/after-sale-card').AfterSaleCardPayload) => Promise<void>;
   sendImage: (peerId: string, path: string) => Promise<void>;
   retryMessage: (peerId: string, clientId: string) => Promise<void>;
   markRead: (peerId: string) => Promise<void>;
@@ -104,6 +108,7 @@ function createAdapter(): MessageAdapter {
     getMessages: getRongMessages,
     sendText: sendRongText,
     sendImage: sendRongImage,
+    sendAfterSaleCard: sendRongAfterSaleCard,
     markRead: markRongConversationRead,
     subscribeConversations: subscribeRongMessages,
     subscribeMessages: subscribeRongMessageEvents,
@@ -143,7 +148,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
     };
 
     const updateLocalPreview = (peerId: string, message: ManagedMessage) => {
-      const preview = message.kind === 'image' ? '[图片]' : message.text;
+        const preview = message.kind === 'image' ? '[图片]' : message.kind === 'afterSale' ? message.title : message.text;
       set((state) => {
         const existing = state.conversations.find((item) => item.id === peerId) || toConversationShell({ id: peerId, title: peerId });
         return { conversations: mergeConversations(state.conversations, { ...existing, preview, time: message.time, updatedAt: message.sentAt }) };
@@ -249,6 +254,15 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         } catch (error) {
           set((state) => ({ messagesByPeerId: { ...state.messagesByPeerId, [peerId]: markMessageFailed(state.messagesByPeerId[peerId] || [], pending.clientId || pending.id) }, lastError: error instanceof Error ? error.message : '发送图片失败' }));
         }
+      },
+
+      sendAfterSaleCard: async (peerId, payload) => {
+        if (get().connectionState !== 'ready') { set({ lastError: unavailableMessage }); return; }
+        try {
+          const sent = await adapter.sendAfterSaleCard(peerId, payload);
+          set((state) => ({ messagesByPeerId: { ...state.messagesByPeerId, [peerId]: mergeMessages(state.messagesByPeerId[peerId] || [], sent) } }));
+          updateLocalPreview(peerId, sent);
+        } catch (error) { set({ lastError: error instanceof Error ? error.message : '发送售后卡片失败' }); }
       },
 
       retryMessage: async (peerId, clientId) => {

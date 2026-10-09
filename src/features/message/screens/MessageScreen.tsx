@@ -3,13 +3,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useEffect, useMemo } from "react";
 import { router } from "expo-router";
 import { useAuthStore } from "@esports/auth";
+import { EmptyState } from "@/shared/ui/AsyncStates";
 
 import { MessageHeader } from "../components/MessageHeader";
 import { MessageListItem } from "../components/MessageListItem";
 import { useMessageStore } from "../message-store";
 import type { MessageListItemModel } from "../message.types";
 
-const defaultConversationAvatar = require("../../../../assets/message/avatar-wangzhe.svg");
+const defaultConversationAvatar = require("../../../../assets/coms/avatar_default_2.png");
 
 export default function MessageScreen() {
   const insets = useSafeAreaInsets();
@@ -35,7 +36,7 @@ export default function MessageScreen() {
         onClear={() => void clearAllUnread()}
         onSearch={() => router.push({ pathname: "/search", params: { type: "message" } })}
       />
-      {stateMessage ? <View style={styles.state}><Text style={styles.stateText}>{stateMessage}</Text>{connectionState === "error" ? <Pressable accessibilityRole="button" onPress={() => accessToken && void initialize(accessToken)} style={styles.retry}><Text style={styles.retryText}>重试</Text></Pressable> : null}</View> : items.length === 0 ? <View style={styles.state}><Text style={styles.stateText}>暂无消息</Text></View> : <FlatList contentContainerStyle={{ paddingBottom: 80 + insets.bottom }} data={items} keyExtractor={(item) => item.id} renderItem={({ item, index }) => <MessageListItem item={item} isLast={index === items.length - 1} onPress={handleMessagePress} />} showsVerticalScrollIndicator={false} />}
+      {stateMessage ? <View style={styles.state}><Text style={styles.stateText}>{stateMessage}</Text>{connectionState === "error" ? <Pressable accessibilityRole="button" onPress={() => accessToken && void initialize(accessToken)} style={styles.retry}><Text style={styles.retryText}>重试</Text></Pressable> : null}</View> : items.length === 0 ? <View style={styles.state}><EmptyState message="暂无消息" /></View> : <FlatList contentContainerStyle={{ paddingBottom: 80 + insets.bottom }} data={items} keyExtractor={(item) => item.id} renderItem={({ item, index }) => <MessageListItem item={item} isLast={index === items.length - 1} onPress={handleMessagePress} />} showsVerticalScrollIndicator={false} />}
     </View>
   );
 }
