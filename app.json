@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "esports_app",
-    "slug": "app",
+    "name": "盼之电竞",
+    "slug": "esportsapp",
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "esportsapp",

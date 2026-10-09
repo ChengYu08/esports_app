@@ -1,9 +1,9 @@
 {
-  "name": "esports_app",
+  "name": "esportsappapp",
   "main": "expo-router/entry",
   "version": "1.0.0",
   "dependencies": {
-    "@esports/sso-sdk": "*",
+    "@esportsapp/sso-sdk": "*",
     "@expo/ui": "~57.0.19",
     "@likashefqet/react-native-image-zoom": "^4.3.0",
     "@react-native-async-storage/async-storage": "2.2.0",
