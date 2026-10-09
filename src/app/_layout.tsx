@@ -17,6 +17,23 @@ import { PrivacyConsentGate } from "@/features/privacy/components/PrivacyConsent
 import { readPrivacyConsent } from "@/features/privacy/privacy-consent";
 import { messageStore, useMessageStore } from "@/features/message/message-store";
 
+const STARTUP_TIMEOUT_MS = 8000;
+
+function withStartupTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), STARTUP_TIMEOUT_MS);
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch(() => {
+        clearTimeout(timer);
+        resolve(fallback);
+      });
+  });
+}
+
 const fonts = {
   [DOUYIN_SANS]: require("../../assets/fonts/Douyin Sans.otf"),
 };
@@ -40,7 +57,7 @@ export default function RootLayout() {
   useEffect(() => {
     let active = true;
     void (async () => {
-      const hasPrivacyConsent = await readPrivacyConsent();
+      const hasPrivacyConsent = await withStartupTimeout(readPrivacyConsent(), false);
       if (active) {
         setPrivacyAccepted(hasPrivacyConsent);
         setPrivacyReady(true);
@@ -49,7 +66,7 @@ export default function RootLayout() {
         if (active) setSessionReady(true);
         return;
       }
-      const session = await readAuthSession();
+      const session = await withStartupTimeout(readAuthSession(), null);
       if (!session) {
         if (active) setSessionReady(true);
         return;
@@ -57,7 +74,11 @@ export default function RootLayout() {
 
       setSession(session);
       try {
-        const profile = await clientAuthApi.fetchCurrentUser(session.accessToken);
+        const profile = await withStartupTimeout(clientAuthApi.fetchCurrentUser(session.accessToken), null);
+        if (!profile) {
+          if (active) setSessionReady(true);
+          return;
+        }
         const refreshedSession = { accessToken: session.accessToken, user: toAuthUser(profile, typeof session.user.phone === "string" ? session.user.phone : undefined) };
         await saveAuthSession(refreshedSession);
         if (active) setSession(refreshedSession);

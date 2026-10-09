@@ -8,7 +8,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
-  Alert,
   Easing,
   Modal,
   Pressable,
@@ -16,7 +15,7 @@ import {
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
+  useWindowDimensions
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { CompanionFilters, GameKey } from "../api/home.types";
@@ -531,7 +530,7 @@ export default function ClubDetailScreen() {
         >
           <Text style={styles.priceText}>价目表</Text>
         </Pressable>
-        <Pressable
+        {/* <Pressable
           style={styles.matchButton}
           onPress={() => Alert.alert("一键匹配", "正在为你匹配合适的陪玩")}
         >
@@ -543,7 +542,7 @@ export default function ClubDetailScreen() {
           >
             <Text style={styles.matchText}>一键匹配</Text>
           </LinearGradient>
-        </Pressable>
+        </Pressable> */}
       </View>
     </View>
   );
@@ -1086,7 +1085,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   priceButton: {
-    width: 104,
+    // width: 104,
+    flex: 1,
+
     height: 42,
     borderWidth: 1,
     borderColor: "#e5e5e5",

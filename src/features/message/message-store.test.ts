@@ -65,6 +65,22 @@ describe('message store', () => {
     expect(store.getState().conversations[0].unreadCount).toBe(0);
   });
 
+  it('clears unread counts for every conversation and marks unread peers as read', async () => {
+    const markRead = vi.fn(async () => true);
+    const store = createMessageStore(makeAdapter({
+      markRead,
+      getConversations: vi.fn(async () => [
+        { ...conversation, unreadCount: 2 },
+        { ...conversation, id: '7', unreadCount: 0 },
+      ]),
+    }));
+    await store.getState().initialize('token');
+    await store.getState().clearAllUnread();
+    expect(store.getState().conversations.every((item) => item.unreadCount === 0)).toBe(true);
+    expect(markRead).toHaveBeenCalledTimes(1);
+    expect(markRead).toHaveBeenCalledWith('42');
+  });
+
   it('loads older history only once per cursor and prepends it', async () => {
     const older: ManagedMessage = { ...sentMessage, id: 'old', sentAt: 1, time: '09:00' };
     const adapter = makeAdapter({

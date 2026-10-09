@@ -11,8 +11,9 @@ import { useAuthStore } from "@esports/auth";
 import { queryClient } from "@/core/query/query-client";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
-import { cancelOrder, fetchOrderDetail, mapOrder } from "@/features/order/order.api";
+import { cancelOrder, completeOrder, fetchOrderDetail, mapOrder } from "@/features/order/order.api";
 import { getOrderDetailAction } from "@/features/order/order-detail-actions";
+import type { OrderItemModel } from "@/features/order/order.types";
 
 const copyIcon = require("../../../assets/coms/copy.svg");
 
@@ -21,6 +22,7 @@ export default function OrderDetailRoute() {
   const insets = useSafeAreaInsets();
   const token = useAuthStore((state) => state.accessToken);
   const [cancelPromptVisible, setCancelPromptVisible] = useState(false);
+  const [completePromptVisible, setCompletePromptVisible] = useState(false);
   const [prompt, setPrompt] = useState<{ title: string; message: string } | null>(null);
   const detail = useQuery({
     queryKey: ["order-detail", id],
@@ -33,8 +35,23 @@ export default function OrderDetailRoute() {
   const detailAction = getOrderDetailAction(order.actions);
   const isPending = order.status === "pendingPayment";
   const isCompleted = order.status === "completed";
+  const isCancelled = order.status === "cancelled" || order.status === "refunded";
   const orderNumber = order.orderNo ?? order.id;
-  const statusHint = isPending ? "请在剩余时间内完成支付" : isCompleted ? "感谢你的支持" : "陪玩 2分41秒 内确认订单并开始服务";
+  const handleChat = () => {
+    if (!order.receiverUserId || order.receiverUserId === "0") {
+      setPrompt({ title: "暂时无法聊天", message: "订单暂无接单者信息，请稍后重试" });
+      return;
+    }
+    router.push({
+      pathname: "/chat/[id]",
+      params: {
+        id: order.receiverUserId,
+        title: order.sellerName,
+        avatar: typeof order.sellerAvatar === "string" ? order.sellerAvatar : "",
+      },
+    });
+  };
+  const statusHint = isPending ? "请在剩余时间内完成支付" : isCompleted ? "感谢你的支持" : order.status === "inService" ? "服务进行中" : "陪玩确认后开始服务";
   const copyOrderNumber = async () => {
     try {
       await Clipboard.setStringAsync(orderNumber);
@@ -55,9 +72,9 @@ export default function OrderDetailRoute() {
       </View>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: (detailAction ? 148 : 24) + insets.bottom }]} showsVerticalScrollIndicator={false}>
         <View style={[styles.statusBlock, { height: 84, paddingTop: 12 }]}><Text style={styles.statusTitle}>{isPending ? "待支付" : order.statusLabel === "已支付" ? "进行中" : order.statusLabel}</Text><Text style={[styles.statusHint, { marginTop: 8, lineHeight: 22 }]}>{statusHint}</Text></View>
-        <ProgressSteps activeStep={isPending ? 0 : isCompleted ? 4 : 1} />
+        {!isCancelled && <ProgressSteps status={order.status} />}
         <View style={styles.infoBlock}>
-          <View style={styles.sellerRow}><Image contentFit="cover" source={order.sellerAvatar} style={styles.avatar} /><View style={styles.sellerCopy}><Text style={styles.sellerName}>{order.sellerName}</Text><Text style={styles.muted}>盼之电竞自营俱乐部</Text></View><Pressable style={styles.chatButton}><Text style={styles.chatText}>聊一聊</Text></Pressable></View>
+          <View style={styles.sellerRow}><Image contentFit="cover" source={order.sellerAvatar} style={styles.avatar} /><View style={styles.sellerCopy}><Text style={styles.sellerName}>{order.sellerName}</Text><Text style={styles.muted}>盼之电竞自营俱乐部</Text></View><Pressable accessibilityRole="button" onPress={handleChat} style={styles.chatButton}><Text style={styles.chatText}>聊一聊</Text></Pressable></View>
           <View style={styles.divider} />
           <InfoRow label="游戏" value={order.gameName} />
           <InfoRow label="服务" value={order.serviceName.replace("服务", "")} />
@@ -84,12 +101,14 @@ export default function OrderDetailRoute() {
             onPress={() => {
               if (detailAction === "cancel") {
                 setCancelPromptVisible(true);
+              } else if (detailAction === "complete") {
+                setCompletePromptVisible(true);
               }
             }}
             style={styles.outlineButton}
           >
             <Text style={styles.outlineText}>
-              {detailAction === "cancel" ? "取消订单" : "申请售后"}
+              {detailAction === "cancel" ? "取消订单" : detailAction === "complete" ? "完成订单" : "申请售后"}
             </Text>
           </Pressable>
         </View>
@@ -118,6 +137,24 @@ export default function OrderDetailRoute() {
         }}
       />
       <AppPrompt
+        visible={completePromptVisible}
+        title="提示"
+        message={`确定完成订单吗，订单号：${order.orderNo ?? order.id}`}
+        cancelText="取消"
+        confirmText="确认"
+        onCancel={() => setCompletePromptVisible(false)}
+        onConfirm={() => {
+          setCompletePromptVisible(false);
+          if (!token) return;
+          void completeOrder(order.id, token)
+            .then(async () => {
+              await queryClient.invalidateQueries({ queryKey: ["orders"] });
+              await detail.refetch();
+            })
+            .catch((error) => setPrompt({ title: "完成订单失败", message: error instanceof Error ? error.message : "请稍后重试" }));
+        }}
+      />
+      <AppPrompt
         visible={Boolean(prompt)}
         title={prompt?.title}
         message={prompt?.message ?? ""}
@@ -127,7 +164,7 @@ export default function OrderDetailRoute() {
   );
 }
 
-function ProgressSteps({ activeStep }: { activeStep: number }) { const labels = ["支付订单", "陪玩确认", "陪玩服务", "服务完成"]; return <View style={styles.flow}><View style={styles.flowLine} />{labels.map((label, index) => { const done = index < activeStep; const active = index === activeStep; return <View style={styles.flowStep} key={label}><View style={[styles.flowMarker, done && styles.flowMarkerDone, active && styles.flowMarkerActive]}>{done ? <Text style={styles.flowCheck}>✓</Text> : active ? <View style={styles.flowActiveDot} /> : <Text style={styles.flowNumber}>{index + 1}</Text>}</View><Text style={[styles.flowLabel, index > activeStep && styles.flowLabelMuted]}>{label}</Text></View>; })}</View>; }
+function ProgressSteps({ status }: { status: OrderItemModel["status"] }) { const labels = ["支付订单", "陪玩确认", "陪玩服务", "服务完成"]; const activeStep = status === "pendingPayment" ? 0 : status === "paid" ? 1 : status === "waitingService" || status === "inService" ? 2 : 4; return <View style={styles.flow}><View style={styles.flowLine} />{labels.map((label, index) => { const done = index < activeStep; const active = index === activeStep; return <View style={styles.flowStep} key={label}><View style={[styles.flowMarker, done && styles.flowMarkerDone, active && styles.flowMarkerActive]}>{done ? <Text style={styles.flowCheck}>✓</Text> : active ? <View style={styles.flowActiveDot} /> : <Text style={styles.flowNumber}>{index + 1}</Text>}</View><Text style={[styles.flowLabel, index > activeStep && styles.flowLabelMuted]}>{label}</Text></View>; })}</View>; }
 
 function InfoRow({ label, value, copy, onCopy }: { label: string; value: string; copy?: boolean; onCopy?: () => void }) {
   return <View style={styles.infoRow}><Text style={styles.label}>{label}</Text><View style={styles.infoValue}><Text style={[styles.value, label === "实付款" && styles.amount]}>{value}</Text>{copy && <Pressable accessibilityRole="button" accessibilityLabel="复制订单编号" hitSlop={8} onPress={onCopy}><Image source={copyIcon} style={styles.copy} /></Pressable>}</View></View>;

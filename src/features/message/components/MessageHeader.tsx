@@ -20,7 +20,7 @@ export function MessageHeader({ onClear, onSearch }: MessageHeaderProps) {
         消息
       </Text>
       <View style={styles.spacer} />
-      <IconButton accessibilityLabel="清空消息" icon={icons.clear} onPress={onClear} />
+      <IconButton accessibilityLabel="清除所有未读消息" icon={icons.clear} onPress={onClear} />
       <IconButton accessibilityLabel="搜索消息中的用户" icon={icons.search} onPress={onSearch} />
     </View>
   );

@@ -60,6 +60,7 @@ export type MessageStoreState = {
   sendImage: (peerId: string, path: string) => Promise<void>;
   retryMessage: (peerId: string, clientId: string) => Promise<void>;
   markRead: (peerId: string) => Promise<void>;
+  clearAllUnread: () => Promise<void>;
   reset: () => Promise<void>;
 };
 
@@ -267,6 +268,21 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         set((state) => ({ conversations: state.conversations.map((item) => item.id === peerId ? { ...item, unreadCount: 0 } : item) }));
         if (get().connectionState !== 'ready') return;
         try { await adapter.markRead(peerId); } catch (error) { set({ lastError: error instanceof Error ? error.message : '清除未读失败' }); }
+      },
+
+      clearAllUnread: async () => {
+        const peerIds = get().conversations
+          .filter((conversation) => conversation.unreadCount > 0)
+          .map((conversation) => conversation.id);
+        set((state) => ({
+          conversations: state.conversations.map((conversation) => ({ ...conversation, unreadCount: 0 })),
+        }));
+        if (get().connectionState !== 'ready' || peerIds.length === 0) return;
+        const results = await Promise.allSettled(peerIds.map((peerId) => adapter.markRead(peerId)));
+        const failure = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+        if (failure) {
+          set({ lastError: failure.reason instanceof Error ? failure.reason.message : '清除未读失败' });
+        }
       },
 
       reset: async () => {

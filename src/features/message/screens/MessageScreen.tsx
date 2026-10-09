@@ -18,6 +18,7 @@ export default function MessageScreen() {
   const connectionState = useMessageStore((state) => state.connectionState);
   const lastError = useMessageStore((state) => state.lastError);
   const conversations = useMessageStore((state) => state.conversations);
+  const clearAllUnread = useMessageStore((state) => state.clearAllUnread);
 
   useEffect(() => { if (accessToken) void initialize(accessToken); }, [accessToken, initialize]);
 
@@ -31,7 +32,7 @@ export default function MessageScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}> 
       <MessageHeader
-        onClear={() => undefined}
+        onClear={() => void clearAllUnread()}
         onSearch={() => router.push({ pathname: "/search", params: { type: "message" } })}
       />
       {stateMessage ? <View style={styles.state}><Text style={styles.stateText}>{stateMessage}</Text>{connectionState === "error" ? <Pressable accessibilityRole="button" onPress={() => accessToken && void initialize(accessToken)} style={styles.retry}><Text style={styles.retryText}>重试</Text></Pressable> : null}</View> : items.length === 0 ? <View style={styles.state}><Text style={styles.stateText}>暂无消息</Text></View> : <FlatList contentContainerStyle={{ paddingBottom: 80 + insets.bottom }} data={items} keyExtractor={(item) => item.id} renderItem={({ item, index }) => <MessageListItem item={item} isLast={index === items.length - 1} onPress={handleMessagePress} />} showsVerticalScrollIndicator={false} />}

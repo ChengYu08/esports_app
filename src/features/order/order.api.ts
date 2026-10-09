@@ -61,6 +61,7 @@ export function mapOrder(item: ApiOrder, index = 0): OrderItemModel {
     orderNo: stringValue(item, "orderNo", "orderNumber") ?? id,
     status,
     statusLabel,
+    receiverUserId: stringValue(item, "receiverUserId"),
     sellerName: stringValue(item, "sellerName", "receiverNickname", "companionName", "clubName") ?? "盼之电竞俱乐部",
     sellerAvatar: stringValue(item, "sellerAvatar", "receiverHeadImage", "clubLogo", "logoUrl", "headImage") ?? sellerAvatar,
     serviceName: stringValue(item, "serviceName", "productName") ?? ([stringValue(item, "gameModeName"), stringValue(item, "gameLevelName")].filter(Boolean).join("-") || "陪玩服务"),
@@ -80,6 +81,13 @@ export async function cancelOrder(orderId: string, token: string): Promise<void>
     body: { action: { orderId: Number(orderId), reason: "用户取消订单" } },
   });
   if (response.code !== "SUCCESS") throw new Error(response.info || "取消订单失败");
+}
+
+export async function completeOrder(orderId: string | number, token: string): Promise<void> {
+  const response = await apiClient<ApiEnvelope<unknown>>("/client/v1/order/completeService", {
+    method: "POST", token, body: { action: { orderId: Number(orderId) } },
+  });
+  if (response.code !== "SUCCESS") throw new Error(response.info || "完成订单失败");
 }
 
 export async function fetchOrderDetail(orderId: string, token: string): Promise<ApiOrder> {

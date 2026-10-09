@@ -10,7 +10,7 @@ import { OrderCard } from "../components/OrderCard";
 import { OrderHeader } from "../components/OrderHeader";
 import { OrderTabs } from "../components/OrderTabs";
 import { useOrderPage } from "../hooks/use-order-page";
-import { cancelOrder as cancelOrderRequest } from "../order.api";
+import { cancelOrder as cancelOrderRequest, completeOrder as completeOrderRequest } from "../order.api";
 import { fetchStarBalance, payCompanionOrder } from "@/features/mine/api/companion-order.api";
 import type {
   OrderActionKey,
@@ -24,6 +24,7 @@ export default function OrderScreen() {
   const orders = useOrderPage(filter);
   const token = useAuthStore((state) => state.accessToken);
   const [cancelTarget, setCancelTarget] = useState<OrderItemModel | null>(null);
+  const [completeTarget, setCompleteTarget] = useState<OrderItemModel | null>(null);
   const [payTarget, setPayTarget] = useState<OrderItemModel | null>(null);
   const [prompt, setPrompt] = useState<{ title: string; message: string; confirmText?: string } | null>(null);
   const cancelingPaymentRef = useRef(false);
@@ -34,8 +35,8 @@ export default function OrderScreen() {
       setPayTarget(item);
       return;
     }
-    if (action !== "cancel") return;
-    setCancelTarget(item);
+    if (action === "cancel") setCancelTarget(item);
+    if (action === "complete") setCompleteTarget(item);
   };
 
   const confirmCancel = async () => {
@@ -47,6 +48,18 @@ export default function OrderScreen() {
       await orders.refetch();
     } catch (error) {
       setPrompt({ title: "取消订单失败", message: error instanceof Error ? error.message : "请稍后重试" });
+    }
+  };
+
+  const confirmComplete = async () => {
+    if (!completeTarget || !token) return;
+    const target = completeTarget;
+    setCompleteTarget(null);
+    try {
+      await completeOrderRequest(target.id, token);
+      await orders.refetch();
+    } catch (error) {
+      setPrompt({ title: "完成订单失败", message: error instanceof Error ? error.message : "请稍后重试" });
     }
   };
 
@@ -76,6 +89,15 @@ export default function OrderScreen() {
         confirmText="确认"
         onCancel={() => setCancelTarget(null)}
         onConfirm={() => void confirmCancel()}
+      />
+      <AppPrompt
+        visible={Boolean(completeTarget)}
+        title="提示"
+        message={`确定完成订单吗，订单号：${completeTarget?.orderNo ?? completeTarget?.id ?? ""}`}
+        cancelText="取消"
+        confirmText="确认"
+        onCancel={() => setCompleteTarget(null)}
+        onConfirm={() => void confirmComplete()}
       />
       <StarPaymentPrompt
         key={payTarget?.id ?? "none"}

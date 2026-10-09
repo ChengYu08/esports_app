@@ -42,18 +42,18 @@ import {
   useProfileReviews,
 } from "@/features/mine/hooks/use-profile-data";
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
-import { createProfileAvatarPreviewParams } from "@/features/mine/profile-avatar-preview";
 import {
   handleOrderFailurePromptConfirm,
   requiresRealNameVerification,
 } from "@/features/mine/order-real-name";
+import { createProfileAvatarPreviewParams } from "@/features/mine/profile-avatar-preview";
+import { createProfileChatParams } from "@/features/mine/profile-chat";
 import { cancelOrder } from "@/features/order/order.api";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { EmptyState } from "@/shared/ui/AsyncStates";
-import { createProfileChatParams } from "@/features/mine/profile-chat";
 
 const fallbackAvatar = require("../../../../assets/mine/figma/profile-avatar.png");
 const background = require("../../../../assets/mine/figma/profile-bg.png");
@@ -239,10 +239,22 @@ export default function ProfileScreen() {
             { paddingBottom: Math.max(insets.bottom, 12) },
           ]}
         >
-          <Pressable style={styles.followButton} onPress={() => undefined}>
+          {/* <Pressable style={styles.followButton} onPress={() => undefined}>
             <Text style={styles.followText}>关注</Text>
-          </Pressable>
-          <Pressable style={styles.chatButton} onPress={() => router.push({ pathname: "/chat/[id]", params: createProfileChatParams({ userId: profile.userId, nickname: profile.nickname, headImage: profile.headImage }) })}>
+          </Pressable> */}
+          <Pressable
+            style={styles.chatButton}
+            onPress={() =>
+              router.push({
+                pathname: "/chat/[id]",
+                params: createProfileChatParams({
+                  userId: profile.userId,
+                  nickname: profile.nickname,
+                  headImage: profile.headImage,
+                }),
+              })
+            }
+          >
             <Text style={styles.chatText}>聊一聊</Text>
           </Pressable>
         </View>
@@ -261,7 +273,9 @@ export default function ProfileScreen() {
           }}
           token={useAuthStore.getState().accessToken}
           onClose={() => setOrderCard(null)}
-          onRealNameVerificationRequired={() => router.push("/account-settings")}
+          onRealNameVerificationRequired={() =>
+            router.push("/account-settings")
+          }
           onOrderCreated={(order) => {
             setOrderCard(null);
             setPaymentSuccess(false);
@@ -342,7 +356,9 @@ export default function ProfileScreen() {
 function ProfileIdentity({ profile }: { profile: ProfileDetail }) {
   const status = getStatus(profile.onlineStatus, profile.gameStatus);
   const age = profile.birth ? calculateAge(profile.birth) : "";
-  const avatarPreviewParams = createProfileAvatarPreviewParams(profile.headImage);
+  const avatarPreviewParams = createProfileAvatarPreviewParams(
+    profile.headImage,
+  );
   const avatarImage = (
     <Image
       source={profile.headImage ? { uri: profile.headImage } : fallbackAvatar}
@@ -831,11 +847,15 @@ function CompanionOrderSheet({
               <Pressable
                 style={[
                   styles.orderSubmit,
-                  (!agreed || submitting || (Boolean(token) && !selectedService)) &&
+                  (!agreed ||
+                    submitting ||
+                    (Boolean(token) && !selectedService)) &&
                     styles.orderSubmitDisabled,
                 ]}
                 onPress={() => void submitOrder()}
-                disabled={!agreed || submitting || (Boolean(token) && !selectedService)}
+                disabled={
+                  !agreed || submitting || (Boolean(token) && !selectedService)
+                }
               >
                 <Text style={styles.orderSubmitText}>
                   {submitting ? "提交中..." : "确认下单"}
@@ -861,14 +881,11 @@ function CompanionOrderSheet({
         }
         onCancel={() => setPrompt(null)}
         onConfirm={() => {
-          handleOrderFailurePromptConfirm(
-            prompt?.message ?? "",
-            {
-              dismissPrompt: () => setPrompt(null),
-              dismissSheet: closeSheet,
-              openVerification: onRealNameVerificationRequired,
-            },
-          );
+          handleOrderFailurePromptConfirm(prompt?.message ?? "", {
+            dismissPrompt: () => setPrompt(null),
+            dismissSheet: closeSheet,
+            openVerification: onRealNameVerificationRequired,
+          });
         }}
       />
     </Modal>
@@ -937,7 +954,12 @@ function StarPaymentSheet({
       onRequestClose={() => void onClose()}
     >
       <View style={styles.orderModalBackdrop}>
-        <View style={[styles.paymentModal, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+        <View
+          style={[
+            styles.paymentModal,
+            { paddingBottom: Math.max(insets.bottom, 16) },
+          ]}
+        >
           <View style={styles.paymentModalHeader}>
             <View style={styles.paymentModalHeading}>
               <Text style={styles.paymentModalTitle}>星钻支付</Text>
@@ -951,7 +973,10 @@ function StarPaymentSheet({
               onPress={() => void onClose()}
               style={styles.paymentClose}
             >
-              <Image source={paymentCloseIcon} style={styles.paymentCloseIcon} />
+              <Image
+                source={paymentCloseIcon}
+                style={styles.paymentCloseIcon}
+              />
             </Pressable>
           </View>
           <View style={styles.orderPaymentContent}>

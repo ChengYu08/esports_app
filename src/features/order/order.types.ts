@@ -31,6 +31,7 @@ export type OrderItemModel = {
   status: OrderStatus;
   statusLabel: string;
   sellerName: string;
+  receiverUserId?: string;
   sellerAvatar: ImageSource | number;
   serviceName: string;
   gameName: string;

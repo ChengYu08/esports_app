@@ -26,6 +26,7 @@ import { useMessageStore } from "../message-store";
 import type { ManagedMessage } from "../message-state";
 
 const defaultAvatar = require("../../../../assets/message/avatar-wangzhe.svg");
+const defaultMyAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const chatBack = require("../../../../assets/message/chat-back.svg");
 const chatMore = require("../../../../assets/message/chat-more.svg");
 const chatOnline = require("../../../../assets/message/chat-online.svg");
@@ -39,6 +40,7 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const { id, title, avatar } = useLocalSearchParams<{ id?: string; title?: string; avatar?: string }>();
   const accessToken = useAuthStore((state) => state.accessToken);
+  const myAvatarUrl = useAuthStore((state) => state.user?.headImage);
   const [draft, setDraft] = useState("");
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [imageSending, setImageSending] = useState(false);
@@ -58,6 +60,7 @@ export default function ChatScreen() {
   const historyLoading = useMessageStore((state) => state.historyByPeerId[conversationId]?.loading || false);
   const conversationTitle = title || conversation?.title || "用户聊天";
   const conversationAvatar = avatar || conversation?.avatar || defaultAvatar;
+  const myAvatar = myAvatarUrl ? { uri: myAvatarUrl } : defaultMyAvatar;
   const imReady = connectionState === "ready";
 
   useEffect(() => {
@@ -130,7 +133,7 @@ export default function ChatScreen() {
         contentContainerStyle={styles.messageList}
         data={messages}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <ChatBubble item={item} avatar={conversationAvatar} onRetry={() => void retryMessage(conversationId, item.clientId || "")} />}
+        renderItem={({ item }) => <ChatBubble item={item} peerAvatar={conversationAvatar} myAvatar={myAvatar} onRetry={() => void retryMessage(conversationId, item.clientId || "")} />}
         showsVerticalScrollIndicator={false}
         onContentSizeChange={() => { if (!historyLoading && !initialScrollDone.current) { initialScrollDone.current = true; listRef.current?.scrollToEnd({ animated: false }); } }}
         maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
@@ -183,10 +186,10 @@ export default function ChatScreen() {
   );
 }
 
-function ChatBubble({ item, avatar, onRetry }: { item: ManagedMessage; avatar: string | number; onRetry: () => void }) {
+function ChatBubble({ item, peerAvatar, myAvatar, onRetry }: { item: ManagedMessage; peerAvatar: string | number; myAvatar: { uri: string } | number; onRetry: () => void }) {
   return (
     <View style={[styles.bubbleRow, item.isMine && styles.mineRow]}>
-      {!item.isMine && <Image contentFit="cover" source={avatar} style={styles.messageAvatar} />}
+      {!item.isMine && <Image contentFit="cover" source={peerAvatar} style={styles.messageAvatar} />}
       <View style={[styles.bubble, item.isMine ? styles.mineBubble : styles.theirBubble, item.kind === "image" && styles.imageBubble]}>
         {item.kind === "image" ? (
           <Pressable
@@ -197,7 +200,7 @@ function ChatBubble({ item, avatar, onRetry }: { item: ManagedMessage; avatar: s
           </Pressable>
         ) : <Text style={styles.bubbleText}>{item.text}</Text>}
       </View>
-      {item.isMine && <Image contentFit="cover" source={avatar} style={styles.messageAvatar} />}
+      {item.isMine && <Image contentFit="cover" source={myAvatar} style={styles.messageAvatar} />}
       {item.status === "failed" ? <Pressable accessibilityRole="button" onPress={onRetry}><Text style={styles.retryLabel}>重试</Text></Pressable> : null}
     </View>
   );
