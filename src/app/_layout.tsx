@@ -15,7 +15,7 @@ import { toAuthUser } from "@/features/auth/client-auth-flow";
 import { clearAuthSession, readAuthSession, saveAuthSession } from "@/features/auth/session-persistence";
 import { PrivacyConsentGate } from "@/features/privacy/components/PrivacyConsentGate";
 import { readPrivacyConsent } from "@/features/privacy/privacy-consent";
-import { disconnectRongCloud } from "@/features/message/rongcloud-im";
+import { messageStore, useMessageStore } from "@/features/message/message-store";
 
 const fonts = {
   [DOUYIN_SANS]: require("../../assets/fonts/Douyin Sans.otf"),
@@ -28,6 +28,14 @@ export default function RootLayout() {
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const setSession = useAuthStore((state) => state.setSession);
   const clearSession = useAuthStore((state) => state.clearSession);
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const initializeMessages = useMessageStore((state) => state.initialize);
+  const resetMessages = useMessageStore((state) => state.reset);
+
+  useEffect(() => {
+    if (accessToken && privacyAccepted) void initializeMessages(accessToken);
+    else if (privacyReady) void resetMessages();
+  }, [accessToken, initializeMessages, privacyAccepted, privacyReady, resetMessages]);
 
   useEffect(() => {
     let active = true;
@@ -65,7 +73,7 @@ export default function RootLayout() {
     return () => { active = false; };
   }, [clearSession, setSession]);
 
-  useEffect(() => () => { void disconnectRongCloud(); }, []);
+  useEffect(() => () => { void messageStore.getState().reset(); }, []);
 
   if ((!loaded && !error) || !sessionReady || !privacyReady) {
     return (

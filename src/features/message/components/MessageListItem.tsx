@@ -4,6 +4,9 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import type { MessageListItemModel } from "../message.types";
+import { formatUnreadCount } from "../message-unread";
+
+export { formatUnreadCount } from "../message-unread";
 
 type MessageListItemProps = {
   item: MessageListItemModel;
@@ -36,6 +39,7 @@ export const MessageListItem = memo(function MessageListItem({
         </Text>
       </View>
       {!isLast && <View style={styles.divider} />}
+      {formatUnreadCount(item.unreadCount || 0) ? <View style={styles.badge}><Text style={styles.badgeText}>{formatUnreadCount(item.unreadCount || 0)}</Text></View> : null}
     </Pressable>
   );
 });
@@ -82,4 +86,6 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     backgroundColor: "#EBEBEB",
   },
+  badge: { position: "absolute", right: 16, bottom: 14, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 5, alignItems: "center", justifyContent: "center", backgroundColor: "#FE1F4C" },
+  badgeText: { color: "#FFFFFF", fontFamily: DOUYIN_SANS, fontSize: 10, lineHeight: 14, fontWeight: "600" },
 });

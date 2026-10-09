@@ -13,6 +13,7 @@ export default function LoginRoute() {
   const initialMode = params.mode === "password" ? "password" : "sms";
   const initialPhone = typeof params.phone === "string" ? params.phone : "";
   const setSession = useAuthStore((state) => state.setSession);
+  const setCompanionStatus = useAuthStore((state) => state.setCompanionStatus);
   const [passwordLoginError, setPasswordLoginError] = useState<string | null>(null);
   const sso = useMemo(() => env.ssoClientSecret ? new SsoClient({
     baseUrl: env.ssoBaseUrl,
@@ -54,7 +55,7 @@ export default function LoginRoute() {
           }
           try {
             const token = await adapter.passwordLogin(payload);
-            await completeClientLogin(token, "PASSWORD", setSession);
+            await completeClientLogin(token, "PASSWORD", setSession, setCompanionStatus);
             router.replace("/");
           } catch (error) {
             setPasswordLoginError(getPasswordLoginErrorMessage(error));
@@ -70,7 +71,7 @@ export default function LoginRoute() {
           }
           try {
             const token = await adapter.quickLogin(quickLoginProvider);
-            await completeClientLogin(token, "ONE_CLICK_LOGIN", setSession);
+            await completeClientLogin(token, "ONE_CLICK_LOGIN", setSession, setCompanionStatus);
             router.replace("/");
           } catch (error) {
             Alert.alert("一键登录不可用", error instanceof Error ? error.message : "请使用验证码登录");
@@ -83,7 +84,7 @@ export default function LoginRoute() {
           }
           try {
             const token = await adapter.login(payload);
-            await completeClientLogin(token, "SMS_CODE", setSession);
+            await completeClientLogin(token, "SMS_CODE", setSession, setCompanionStatus);
             router.replace("/");
           } catch (error) {
             Alert.alert(

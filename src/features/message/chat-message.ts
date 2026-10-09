@@ -30,16 +30,14 @@ export type RongSdkMessage = {
   mediaUrl?: string;
 };
 
-const IMAGE_MESSAGE_TYPE = 4;
-
-export function mapRongMessage(message: RongSdkMessage): ChatMessage | null {
+export function mapRongMessage(message: RongSdkMessage, enums: { image: number; send: number }): ChatMessage | null {
   const id = message.messageUId || String(message.messageId || `${message.sentTime}-${message.senderUserId}`);
   const time = message.sentTime
     ? new Date(message.sentTime).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })
     : "";
-  const isMine = message.direction === 0;
+  const isMine = message.direction === enums.send;
 
-  if (message.messageType === IMAGE_MESSAGE_TYPE) {
+  if (message.messageType === enums.image) {
     const imageUrl = message.local || message.remote || message.mediaUrl;
     return imageUrl ? { id, kind: "image", imageUrl, time, isMine } : null;
   }

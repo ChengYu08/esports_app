@@ -53,6 +53,7 @@ import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { EmptyState } from "@/shared/ui/AsyncStates";
+import { createProfileChatParams } from "@/features/mine/profile-chat";
 
 const fallbackAvatar = require("../../../../assets/mine/figma/profile-avatar.png");
 const background = require("../../../../assets/mine/figma/profile-bg.png");
@@ -241,7 +242,7 @@ export default function ProfileScreen() {
           <Pressable style={styles.followButton} onPress={() => undefined}>
             <Text style={styles.followText}>关注</Text>
           </Pressable>
-          <Pressable style={styles.chatButton} onPress={() => undefined}>
+          <Pressable style={styles.chatButton} onPress={() => router.push({ pathname: "/chat/[id]", params: createProfileChatParams({ userId: profile.userId, nickname: profile.nickname, headImage: profile.headImage }) })}>
             <Text style={styles.chatText}>聊一聊</Text>
           </Pressable>
         </View>

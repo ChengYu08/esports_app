@@ -1,7 +1,7 @@
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -9,6 +9,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
   StyleSheet,
   Text,
   TextInput,
@@ -20,15 +22,8 @@ import EmojiPicker, { type EmojiType } from "rn-emoji-keyboard";
 
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
-import { MESSAGE_ITEMS } from "../message.data";
-import {
-  connectRongCloud,
-  getRongMessages,
-  sendRongImage,
-  sendRongText,
-  subscribeRongConversationMessages,
-  type RongTextMessage,
-} from "../rongcloud-im";
+import { useMessageStore } from "../message-store";
+import type { ManagedMessage } from "../message-state";
 
 const defaultAvatar = require("../../../../assets/message/avatar-wangzhe.svg");
 const chatBack = require("../../../../assets/message/chat-back.svg");
@@ -39,69 +34,43 @@ const chatEmoji = require("../../../../assets/message/chat-emoji.svg");
 const chatPhoto = require("../../../../assets/message/chat-photo.svg");
 const chatSend = require("../../../../assets/message/chat-send.svg");
 
-const demoMessages: RongTextMessage[] = [
-  { id: "demo-1", kind: "text", text: "搞不懂，太难了", time: "11:30", isMine: false },
-  { id: "demo-2", kind: "text", text: "很简单", time: "11:30", isMine: true },
-  { id: "demo-3", kind: "text", text: "我一会儿分享个链接给你，你看有空了直接进房就可以", time: "11:30", isMine: true },
-  { id: "demo-4", kind: "text", text: "Okk", time: "11:30", isMine: false },
-  { id: "demo-5", kind: "text", text: "你进来了吗", time: "11:30", isMine: true },
-];
-
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const { id, title, avatar } = useLocalSearchParams<{ id?: string; title?: string; avatar?: string }>();
   const accessToken = useAuthStore((state) => state.accessToken);
-  const [messages, setMessages] = useState<RongTextMessage[]>(demoMessages);
   const [draft, setDraft] = useState("");
-  const [imReady, setImReady] = useState(false);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [imageSending, setImageSending] = useState(false);
-  const listRef = useRef<FlatList<RongTextMessage>>(null);
+  const listRef = useRef<FlatList<ManagedMessage>>(null);
+  const initialScrollDone = useRef(false);
   const conversationId = String(id || "");
-  const localConversation = useMemo(() => MESSAGE_ITEMS.find((item) => item.id === conversationId), [conversationId]);
-  const conversationTitle = title || localConversation?.title || "用户聊天";
-  const conversationAvatar = avatar || localConversation?.avatar || defaultAvatar;
+  const conversation = useMessageStore((state) => state.conversations.find((item) => item.id === conversationId));
+  const messages = useMessageStore((state) => state.messagesByPeerId[conversationId] || []);
+  const connectionState = useMessageStore((state) => state.connectionState);
+  const lastError = useMessageStore((state) => state.lastError);
+  const openConversation = useMessageStore((state) => state.openConversation);
+  const closeConversation = useMessageStore((state) => state.closeConversation);
+  const sendText = useMessageStore((state) => state.sendText);
+  const sendImage = useMessageStore((state) => state.sendImage);
+  const retryMessage = useMessageStore((state) => state.retryMessage);
+  const loadOlder = useMessageStore((state) => state.loadOlder);
+  const historyLoading = useMessageStore((state) => state.historyByPeerId[conversationId]?.loading || false);
+  const conversationTitle = title || conversation?.title || "用户聊天";
+  const conversationAvatar = avatar || conversation?.avatar || defaultAvatar;
+  const imReady = connectionState === "ready";
 
   useEffect(() => {
-    if (!conversationId) return;
-    return subscribeRongConversationMessages(conversationId, (message) => {
-      setMessages((current) => current.some((item) => item.id === message.id) ? current : [...current, message]);
-    });
-  }, [conversationId]);
-
-  useEffect(() => {
-    let active = true;
-    if (!accessToken || !conversationId) return () => { active = false; };
-    void connectRongCloud(accessToken).then(async (connected) => {
-      if (!connected || !active) return;
-      const history = await getRongMessages(conversationId);
-      if (active) {
-        setImReady(true);
-        if (history.length > 0) setMessages(history);
-      }
-    });
-    return () => { active = false; };
-  }, [accessToken, conversationId]);
+    initialScrollDone.current = false;
+    if (accessToken && conversationId) void openConversation({ id: conversationId, title: conversationTitle, avatar: typeof conversationAvatar === "string" ? conversationAvatar : undefined });
+    return () => closeConversation();
+  }, [accessToken, closeConversation, connectionState, conversationAvatar, conversationId, conversationTitle, openConversation]);
 
   const sendMessage = async () => {
     const text = draft.trim();
     if (!text) return;
-    const optimistic: RongTextMessage = {
-      id: `local-${Date.now()}`,
-      kind: "text",
-      text,
-      time: new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
-      isMine: true,
-    };
-    setMessages((current) => [...current, optimistic]);
     setDraft("");
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
-    if (!imReady) return;
-    try {
-      await sendRongText(conversationId, text);
-    } catch {
-      // The optimistic message remains visible; the conversation list will reconcile on the next sync.
-    }
+    await sendText(conversationId, text);
   };
 
   const selectEmoji = (emoji: EmojiType) => {
@@ -123,25 +92,13 @@ export default function ChatScreen() {
     if (result.canceled || !result.assets[0]) return;
 
     const image = result.assets[0];
-    const optimistic: RongTextMessage = {
-      id: `local-image-${Date.now()}`,
-      kind: "image",
-      imageUrl: image.uri,
-      time: new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" }),
-      isMine: true,
-    };
-    setMessages((current) => [...current, optimistic]);
-    requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
-    if (!imReady) return;
-
     setImageSending(true);
-    try {
-      await sendRongImage(conversationId, image.uri);
-    } catch (error) {
-      Alert.alert("图片发送失败", error instanceof Error ? error.message : "请稍后重试");
-    } finally {
-      setImageSending(false);
-    }
+    await sendImage(conversationId, image.uri);
+    setImageSending(false);
+  };
+
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (event.nativeEvent.contentOffset.y < 24 && !historyLoading) void loadOlder(conversationId);
   };
 
   return (
@@ -172,10 +129,14 @@ export default function ChatScreen() {
         contentContainerStyle={styles.messageList}
         data={messages}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <ChatBubble item={item} avatar={conversationAvatar} />}
+        renderItem={({ item }) => <ChatBubble item={item} avatar={conversationAvatar} onRetry={() => void retryMessage(conversationId, item.clientId || "")} />}
         showsVerticalScrollIndicator={false}
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+        onContentSizeChange={() => { if (!historyLoading && !initialScrollDone.current) { initialScrollDone.current = true; listRef.current?.scrollToEnd({ animated: false }); } }}
+        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+        onScroll={handleScroll}
+        scrollEventThrottle={150}
       />
+      {lastError && connectionState !== "ready" ? <Text style={styles.errorBanner}>{lastError}</Text> : null}
 
       <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
         <TextInput
@@ -221,7 +182,7 @@ export default function ChatScreen() {
   );
 }
 
-function ChatBubble({ item, avatar }: { item: RongTextMessage; avatar: string | number }) {
+function ChatBubble({ item, avatar, onRetry }: { item: ManagedMessage; avatar: string | number; onRetry: () => void }) {
   return (
     <View style={[styles.bubbleRow, item.isMine && styles.mineRow]}>
       {!item.isMine && <Image contentFit="cover" source={avatar} style={styles.messageAvatar} />}
@@ -236,6 +197,7 @@ function ChatBubble({ item, avatar }: { item: RongTextMessage; avatar: string | 
         ) : <Text style={styles.bubbleText}>{item.text}</Text>}
       </View>
       {item.isMine && <Image contentFit="cover" source={avatar} style={styles.messageAvatar} />}
+      {item.status === "failed" ? <Pressable accessibilityRole="button" onPress={onRetry}><Text style={styles.retryLabel}>重试</Text></Pressable> : null}
     </View>
   );
 }
@@ -259,6 +221,8 @@ const styles = StyleSheet.create({
   bubble: { maxWidth: "74%", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
   theirBubble: { backgroundColor: "#FFFFFF" },
   mineBubble: { backgroundColor: "#FFF2F5" },
+  retryLabel: { color: "#FE1F4C", fontFamily: DOUYIN_SANS, fontSize: 12, marginLeft: 4, marginTop: 8 },
+  errorBanner: { color: "#FE1F4C", backgroundColor: "#FFF1F3", fontFamily: DOUYIN_SANS, fontSize: 12, lineHeight: 18, paddingHorizontal: 16, paddingVertical: 8, textAlign: "center" },
   bubbleText: { color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 14, lineHeight: 22 },
   imageBubble: { padding: 0, overflow: "hidden" },
   messageImage: { width: 168, height: 168 },
