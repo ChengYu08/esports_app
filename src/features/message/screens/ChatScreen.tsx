@@ -33,6 +33,7 @@ const chatOffline = require("../../../../assets/message/chat-offline.svg");
 const chatEmoji = require("../../../../assets/message/chat-emoji.svg");
 const chatPhoto = require("../../../../assets/message/chat-photo.svg");
 const chatSend = require("../../../../assets/message/chat-send.svg");
+const EMPTY_MESSAGES: ManagedMessage[] = [];
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
@@ -45,7 +46,7 @@ export default function ChatScreen() {
   const initialScrollDone = useRef(false);
   const conversationId = String(id || "");
   const conversation = useMessageStore((state) => state.conversations.find((item) => item.id === conversationId));
-  const messages = useMessageStore((state) => state.messagesByPeerId[conversationId] || []);
+  const messages = useMessageStore((state) => state.messagesByPeerId[conversationId] || EMPTY_MESSAGES);
   const connectionState = useMessageStore((state) => state.connectionState);
   const lastError = useMessageStore((state) => state.lastError);
   const openConversation = useMessageStore((state) => state.openConversation);

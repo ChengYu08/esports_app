@@ -1,30 +1,38 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
 import { Image } from "expo-image";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ClubCard } from "@/features/home/components/ClubCard";
 import type { Club } from "@/features/home/api/home.types";
+import { MessageListItem } from "@/features/message/components/MessageListItem";
+import { filterMessageConversations } from "@/features/message/message-search";
+import { useMessageStore } from "@/features/message/message-store";
+import type { MessageListItemModel } from "@/features/message/message.types";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useClubSearch } from "../hooks/use-club-search";
 import { useUserSearch } from "../hooks/use-user-search";
 import type { SearchUser } from "../api/search.api";
 
-type SearchResult = Club | SearchUser;
+type SearchType = "club" | "user" | "message";
+type SearchResult = Club | SearchUser | MessageListItemModel;
+
+const defaultConversationAvatar = require("../../../../assets/message/avatar-wangzhe.svg");
 
 const MAX_HISTORY = 10;
 
 export default function ClubSearchScreen() {
   const insets = useSafeAreaInsets();
-  const { type, clubId } = useLocalSearchParams<{ type?: "club" | "user"; clubId?: string }>();
-  const searchType = type === "user" ? "user" : "club";
+  const { type, clubId } = useLocalSearchParams<{ type?: SearchType; clubId?: string }>();
+  const searchType: SearchType = type === "user" || type === "message" ? type : "club";
   const historyKey = `search.${searchType}.history`;
   const [input, setInput] = useState("");
   const [keyword, setKeyword] = useState("");
   const [history, setHistory] = useState<string[]>([]);
+  const conversations = useMessageStore((state) => state.conversations);
   const clubSearch = useClubSearch(searchType === "club" ? keyword : "");
   const userSearch = useUserSearch(searchType === "user" ? keyword : "");
 
@@ -50,9 +58,27 @@ export default function ClubSearchScreen() {
     void AsyncStorage.removeItem(historyKey);
   };
 
-  const searching = keyword.length > 0;
+  const searching = searchType === "message" || keyword.length > 0;
+  const messageItems = useMemo<MessageListItemModel[]>(() =>
+    filterMessageConversations(conversations, keyword).map((conversation) => ({
+      ...conversation,
+      kind: "conversation",
+      avatar: conversation.avatar || defaultConversationAvatar,
+    })), [conversations, keyword]);
   const search = searchType === "club" ? clubSearch : userSearch;
-  const items = search.data?.items ?? [];
+  const items = searchType === "message" ? messageItems : search.data?.items ?? [];
+  const placeholder = searchType === "club" ? "搜索俱乐部" : searchType === "user" ? "搜索大神昵称或ID" : "搜索聊天用户";
+
+  const handleMessagePress = (item: MessageListItemModel) => {
+    router.push({
+      pathname: "/chat/[id]",
+      params: {
+        id: item.id,
+        title: item.title,
+        avatar: typeof item.avatar === "string" ? item.avatar : "",
+      },
+    });
+  };
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -65,7 +91,7 @@ export default function ClubSearchScreen() {
           clearButtonMode="while-editing"
           onChangeText={setInput}
           onSubmitEditing={() => submit()}
-          placeholder={searchType === "club" ? "搜索俱乐部" : "搜索大神昵称或ID"}
+          placeholder={placeholder}
           placeholderTextColor="#CCCCCC"
           returnKeyType="search"
           style={styles.input}
@@ -79,9 +105,9 @@ export default function ClubSearchScreen() {
         <FlatList<SearchResult>
           contentContainerStyle={styles.results}
           data={items as SearchResult[]}
-          keyExtractor={(item) => searchType === "club" ? (item as Club).id : String((item as SearchUser).profileId)}
-          ListEmptyComponent={search.isLoading ? <LoadingState /> : search.isError ? <ErrorState onRetry={() => void search.refetch()} /> : <EmptyState message={searchType === "club" ? "暂无相关俱乐部" : "暂无相关用户"} />}
-          renderItem={({ item }) => searchType === "club" ? <ClubCard club={item as Club} /> : <UserSearchCard user={item as SearchUser} clubId={clubId} />}
+          keyExtractor={(item) => searchType === "club" ? (item as Club).id : searchType === "user" ? String((item as SearchUser).profileId) : (item as MessageListItemModel).id}
+          ListEmptyComponent={searchType === "message" ? <EmptyState message="暂无相关聊天用户" /> : search.isLoading ? <LoadingState /> : search.isError ? <ErrorState onRetry={() => void search.refetch()} /> : <EmptyState message={searchType === "club" ? "暂无相关俱乐部" : "暂无相关用户"} />}
+          renderItem={({ item, index }) => searchType === "club" ? <ClubCard club={item as Club} /> : searchType === "user" ? <UserSearchCard user={item as SearchUser} clubId={clubId} /> : <MessageListItem item={item as MessageListItemModel} isLast={index === items.length - 1} onPress={handleMessagePress} />}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           showsVerticalScrollIndicator={false}
         />
