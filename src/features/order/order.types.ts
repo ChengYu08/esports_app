@@ -33,6 +33,8 @@ export type OrderItemModel = {
   sellerName: string;
   receiverUserId?: string;
   clubId?: number;
+  reviewId?: number;
+  reviewExists?: boolean;
   sellerAvatar: ImageSource | number;
   serviceName: string;
   gameName: string;

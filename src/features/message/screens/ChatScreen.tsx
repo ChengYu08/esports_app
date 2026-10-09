@@ -22,6 +22,7 @@ import EmojiPicker, { type EmojiType } from "rn-emoji-keyboard";
 
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { resolveConversationAvatar } from "../message-avatar";
 import { useMessageStore } from "../message-store";
 import type { ManagedMessage } from "../message-state";
 import type { AfterSaleCardPayload } from "@/features/order/after-sale-card";
@@ -69,7 +70,7 @@ export default function ChatScreen() {
   const historyState = useMessageStore((state) => state.historyByPeerId[conversationId]);
   const historyLoading = historyState?.loading || false;
   const conversationTitle = title || conversation?.title || "用户聊天";
-  const conversationAvatar = avatar || conversation?.avatar || defaultAvatar;
+  const conversationAvatar = resolveConversationAvatar(conversationTitle, avatar || conversation?.avatar, defaultAvatar);
   const myAvatar = myAvatarUrl ? { uri: myAvatarUrl } : defaultMyAvatar;
   const imReady = connectionState === "ready";
   const scrollToLatest = () => requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: false }));

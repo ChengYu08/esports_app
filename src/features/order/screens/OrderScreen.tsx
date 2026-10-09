@@ -8,10 +8,11 @@ import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
 import { OrderCard } from "../components/OrderCard";
 import { OrderAfterSaleSheet } from "../components/OrderAfterSaleSheet";
+import { OrderReviewSheet } from "../components/OrderReviewSheet";
 import { OrderHeader } from "../components/OrderHeader";
 import { OrderTabs } from "../components/OrderTabs";
 import { useOrderPage } from "../hooks/use-order-page";
-import { cancelOrder as cancelOrderRequest, completeOrder as completeOrderRequest, fetchAfterSaleMembers, type AfterSaleMember } from "../order.api";
+import { cancelOrder as cancelOrderRequest, completeOrder as completeOrderRequest, fetchAfterSaleMembers, fetchOrderReview, submitOrderReview, type AfterSaleMember, type OrderReview } from "../order.api";
 import { fetchStarBalance, payCompanionOrder } from "@/features/mine/api/companion-order.api";
 import type {
   OrderActionKey,
@@ -29,6 +30,8 @@ export default function OrderScreen() {
   const [afterSaleTarget, setAfterSaleTarget] = useState<OrderItemModel | null>(null);
   const [afterSaleMembers, setAfterSaleMembers] = useState<AfterSaleMember[]>([]);
   const [afterSaleLoading, setAfterSaleLoading] = useState(false);
+  const [reviewTarget, setReviewTarget] = useState<OrderItemModel | null>(null);
+  const [reviewDetail, setReviewDetail] = useState<OrderReview | null>(null);
   const [payTarget, setPayTarget] = useState<OrderItemModel | null>(null);
   const [prompt, setPrompt] = useState<{ title: string; message: string; confirmText?: string } | null>(null);
   const cancelingPaymentRef = useRef(false);
@@ -48,6 +51,12 @@ export default function OrderScreen() {
         void fetchAfterSaleMembers(item.clubId, token).then(setAfterSaleMembers).catch(() => setAfterSaleMembers([])).finally(() => setAfterSaleLoading(false));
       } else setAfterSaleMembers([]);
     }
+    if (action === "review") {
+      setReviewTarget(item);
+      setReviewDetail(null);
+      if (item.reviewId && token) void fetchOrderReview(item.reviewId, token).then(setReviewDetail).catch(() => undefined);
+    }
+    if (action === "reorder") router.push({ pathname: "/profile", params: { clubId: String(item.clubId || ""), userId: String(item.receiverUserId || "") } });
   };
 
   const confirmCancel = async () => {
@@ -107,6 +116,7 @@ export default function OrderScreen() {
         const payload = { orderId: Number(order?.id), orderNo: order?.orderNo, companionUserId: Number(order?.receiverUserId) || undefined, companionNickname: order?.sellerName, gameName: order?.gameName, serviceDesc: order?.serviceName, unitPrice: Number(order?.unitPrice), quantity: order?.quantity, totalPrice: Number(order?.totalPrice), createTime: order?.createTime, clubId: order?.clubId, csUserId: member.userId };
         router.push({ pathname: "/chat/[id]", params: { id: String(member.userId), title: member.nickname || "售后客服", avatar: member.headImage || "", afterSale: JSON.stringify(payload) } });
       }} />
+      <OrderReviewSheet visible={Boolean(reviewTarget)} readonly={Boolean(reviewTarget?.reviewExists)} detail={reviewDetail} onClose={() => setReviewTarget(null)} onSubmit={async (rating, content) => { if (!reviewTarget || !token) return; await submitOrderReview(reviewTarget.orderNo || reviewTarget.id, rating, content, token); setReviewTarget((current) => current ? { ...current, reviewExists: true } : current); setReviewDetail({ rating, content }); await orders.refetch(); }} />
       <AppPrompt
         visible={Boolean(completeTarget)}
         title="提示"

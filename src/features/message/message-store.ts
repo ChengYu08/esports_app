@@ -259,7 +259,9 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       sendAfterSaleCard: async (peerId, payload) => {
         if (get().connectionState !== 'ready') { set({ lastError: unavailableMessage }); return; }
         try {
-          const sent = await adapter.sendAfterSaleCard(peerId, payload);
+          const sendCard = adapter.sendAfterSaleCard;
+          if (!sendCard) { set({ lastError: '当前版本暂不支持售后卡片' }); return; }
+          const sent = await sendCard(peerId, payload);
           set((state) => ({ messagesByPeerId: { ...state.messagesByPeerId, [peerId]: mergeMessages(state.messagesByPeerId[peerId] || [], sent) } }));
           updateLocalPreview(peerId, sent);
         } catch (error) { set({ lastError: error instanceof Error ? error.message : '发送售后卡片失败' }); }

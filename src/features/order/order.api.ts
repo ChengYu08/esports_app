@@ -47,6 +47,8 @@ export function mapOrder(item: ApiOrder, index = 0): OrderItemModel {
     pendingPayment: "待支付", paid: "已支付", waitingService: "待服务",
     inService: "服务中", completed: "已完成", cancelled: "已取消", refunded: "已退款",
   }[status];
+  const reviewId = numberValue(item, "reviewId", "orderReviewId");
+  const reviewExists = item.reviewExists === true || reviewId !== undefined;
   const actions: OrderItemModel["actions"] = status === "pendingPayment"
     ? [{ key: "cancel", label: "取消订单", variant: "secondary" }, { key: "pay", label: "去支付", variant: "primary" }]
     : status === "paid" || status === "waitingService"
@@ -54,7 +56,7 @@ export function mapOrder(item: ApiOrder, index = 0): OrderItemModel {
     : status === "inService"
     ? [{ key: "complete", label: "完成订单", variant: "primary" }]
     : status === "completed"
-    ? [{ key: "afterSales", label: "售后", variant: "secondary" }, { key: "review", label: "评价", variant: "secondary" }, { key: "reorder", label: "再来一单", variant: "secondary" }]
+    ? [{ key: "afterSales", label: "售后", variant: "secondary" }, { key: "review", label: reviewExists ? "已评价" : "评价", variant: "secondary" }, { key: "reorder", label: "再来一单", variant: "secondary" }]
     : [];
   return {
     id,
@@ -63,6 +65,8 @@ export function mapOrder(item: ApiOrder, index = 0): OrderItemModel {
     statusLabel,
     receiverUserId: stringValue(item, "receiverUserId"),
     clubId: numberValue(item, "companionClubId", "clubId", "receiverClubId"),
+    reviewId,
+    reviewExists,
     sellerName: stringValue(item, "sellerName", "receiverNickname", "companionName", "clubName") ?? "盼之电竞俱乐部",
     sellerAvatar: stringValue(item, "sellerAvatar", "receiverHeadImage", "clubLogo", "logoUrl", "headImage") ?? sellerAvatar,
     serviceName: stringValue(item, "serviceName", "productName") ?? ([stringValue(item, "gameModeName"), stringValue(item, "gameLevelName")].filter(Boolean).join("-") || "陪玩服务"),
@@ -97,6 +101,17 @@ export async function fetchAfterSaleMembers(clubId: number, token: string): Prom
   const response = await apiClient<ApiEnvelope<AfterSaleMember[]>>(`/client/v1/afterSale/memberList?clubId=${encodeURIComponent(clubId)}`, { method: "GET", token });
   if (response.code !== "SUCCESS") throw new Error(response.info || "售后客服加载失败");
   return Array.isArray(response.data) ? response.data : [];
+}
+
+export type OrderReview = { id?: number; rating: number; content?: string; imageUrls?: string[] };
+export async function submitOrderReview(orderNo: string, rating: number, content: string, token: string): Promise<void> {
+  const response = await apiClient<ApiEnvelope<unknown>>("/client/v1/afterSale/evaluate", { method: "POST", token, body: { action: { orderNo, rating, content } } });
+  if (response.code !== "SUCCESS") throw new Error(response.info || "评价提交失败");
+}
+export async function fetchOrderReview(reviewId: number, token: string): Promise<OrderReview> {
+  const response = await apiClient<ApiEnvelope<OrderReview>>(`/client/v1/afterSale/review/detail?reviewId=${reviewId}`, { method: "GET", token });
+  if (response.code !== "SUCCESS" || !response.data) throw new Error(response.info || "评价加载失败");
+  return response.data;
 }
 
 export async function fetchOrderDetail(orderId: string, token: string): Promise<ApiOrder> {

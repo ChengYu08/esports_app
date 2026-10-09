@@ -1,4 +1,5 @@
 import { useAuthStore } from "@esports/auth";
+import Toast from "react-native-root-toast";
 import { useState } from "react";
 import {
   Alert,
@@ -16,6 +17,7 @@ import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { toAuthUser } from "@/features/auth/client-auth-flow";
 import { saveAuthSession } from "@/features/auth/session-persistence";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { AppPrompt } from "@/shared/ui/AppPrompt";
 
 export function RealNameVerificationSheet({
   visible,
@@ -32,11 +34,13 @@ export function RealNameVerificationSheet({
   const [name, setName] = useState("");
   const [idCard, setIdCard] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [validationPromptVisible, setValidationPromptVisible] = useState(false);
 
   const close = () => {
     if (submitting) return;
     setName("");
     setIdCard("");
+    setValidationPromptVisible(false);
     onClose();
   };
 
@@ -44,7 +48,7 @@ export function RealNameVerificationSheet({
     const normalizedName = name.trim();
     const normalizedIdCard = idCard.trim().toUpperCase();
     if (!token || !normalizedName || !isValidIdCard(normalizedIdCard)) {
-      Alert.alert("提示", "请输入姓名和正确的18位身份证号");
+      setValidationPromptVisible(true);
       return;
     }
 
@@ -65,7 +69,7 @@ export function RealNameVerificationSheet({
       setIdCard("");
       onClose();
       onVerified?.();
-      Alert.alert("认证成功");
+      Toast.show("认证成功", { duration: Toast.durations.SHORT });
     } catch (error) {
       Alert.alert(
         "认证失败",
@@ -77,14 +81,15 @@ export function RealNameVerificationSheet({
   };
 
   return (
-    <Modal
+    <>
+      <Modal
       transparent
       visible={visible}
       animationType="slide"
       onRequestClose={close}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.backdrop}
       >
         <View style={styles.card}>
@@ -122,7 +127,15 @@ export function RealNameVerificationSheet({
           </View>
         </View>
       </KeyboardAvoidingView>
-    </Modal>
+      </Modal>
+      <AppPrompt
+        visible={validationPromptVisible}
+        title="信息有误"
+        message="请输入姓名和正确的18位身份证号"
+        confirmText="我知道了"
+        onConfirm={() => setValidationPromptVisible(false)}
+      />
+    </>
   );
 }
 

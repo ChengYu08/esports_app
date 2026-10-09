@@ -1,12 +1,31 @@
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useAuthStore } from "@esports/auth";
+import {
+  DocumentText24Regular,
+  Password24Regular,
+  PersonDelete24Regular,
+  PersonProhibited24Regular,
+  Settings24Regular,
+  ShieldKeyhole24Regular,
+} from "@fluentui/react-native-icons";
 import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useMemo } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useMemo, useState } from "react";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import Toast from "react-native-root-toast";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { clientAuthApi } from "@/features/auth/client-auth.api";
+import { clearAuthSession } from "@/features/auth/session-persistence";
+import { messageStore } from "@/features/message/message-store";
 
 const avatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const female = require("../../../../assets/mine/figma/mine-female.svg");
@@ -16,11 +35,21 @@ const arrow = require("../../../../assets/mine/figma/mine-arrow-right.svg");
 const room = require("../../../../assets/mine/figma/mine-room-figma.svg");
 const playCenter = require("../../../../assets/mine/figma/mine-play-center.svg");
 const building = require("../../../../assets/mine/figma/mine-club-entry.svg");
-const settings = require("../../../../assets/mine/figma/mine-setting-entry.svg");
+
+type MenuIcon = typeof Settings24Regular;
+
+type MenuItem = {
+  icon: MenuIcon;
+  onPress: () => void;
+  title: string;
+};
 
 export default function MineScreen() {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const clearSession = useAuthStore((state) => state.clearSession);
+  const [logoutVisible, setLogoutVisible] = useState(false);
   const displayName = useMemo(
     () =>
       user?.nickname ||
@@ -34,6 +63,65 @@ export default function MineScreen() {
     await Clipboard.setStringAsync(String(user.id));
     Toast.show("ID 已复制到剪贴板", { duration: Toast.durations.SHORT });
   };
+
+  const confirmLogout = async () => {
+    setLogoutVisible(false);
+    if (accessToken)
+      void clientAuthApi.logout(accessToken).catch(() => undefined);
+    try {
+      await clearAuthSession();
+    } catch {
+      /* Keep the UI signed out. */
+    }
+    clearSession();
+    void messageStore
+      .getState()
+      .reset()
+      .catch(() => undefined);
+    router.replace("/");
+  };
+
+  const logout = () => {
+    setLogoutVisible(true);
+  };
+  const menuItems = [
+    {
+      title: "基础设置",
+      icon: Settings24Regular,
+      onPress: () => router.push("/account-settings"),
+    },
+    {
+      title: "修改密码",
+      icon: Password24Regular,
+      onPress: () =>
+        router.push({
+          pathname: "/forgot-password",
+          params: { phone: user?.phone || "" },
+        }),
+    },
+    {
+      title: "黑名单",
+      icon: PersonProhibited24Regular,
+      onPress: () => router.push("/blacklist"),
+    },
+    {
+      title: "用户协议",
+      icon: DocumentText24Regular,
+      onPress: () =>
+        router.push({ pathname: "/protocol", params: { kind: "user" } }),
+    },
+    {
+      title: "隐私协议",
+      icon: ShieldKeyhole24Regular,
+      onPress: () =>
+        router.push({ pathname: "/protocol", params: { kind: "privacy" } }),
+    },
+    {
+      title: "注销账号",
+      icon: PersonDelete24Regular,
+      onPress: () => router.push("/account-cancellation"),
+    },
+  ] satisfies readonly MenuItem[];
 
   return (
     <View style={styles.screen}>
@@ -120,7 +208,7 @@ export default function MineScreen() {
           </View>
         </View>
         <View style={styles.sectionCard}>
-          <MenuRow icon={room} title="我的房间" onPress={() => undefined} />
+          {/* <MenuRow icon={room} title="我的房间" onPress={() => undefined} />
           <MenuRow
             icon={playCenter}
             title="陪玩中心"
@@ -130,14 +218,53 @@ export default function MineScreen() {
             icon={building}
             title="俱乐部入驻"
             onPress={() => undefined}
-          />
-          <MenuRow
-            icon={settings}
-            title="基础设置"
-            onPress={() => router.push("/account-settings")}
-          />
+          /> */}
+          {menuItems.map((item) => (
+            <MenuRow key={item.title} {...item} />
+          ))}
         </View>
+        {user ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={logout}
+            style={styles.logoutButton}
+          >
+            <Text style={styles.logoutText}>退出登录</Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
+      <Modal
+        transparent
+        visible={logoutVisible}
+        animationType="fade"
+        onRequestClose={() => setLogoutVisible(false)}
+      >
+        <View style={styles.dialogBackdrop}>
+          <View style={styles.logoutDialog}>
+            <View style={styles.logoutMark}>
+              <Text style={styles.logoutMarkText}>!</Text>
+            </View>
+            <Text style={styles.logoutTitle}>退出登录</Text>
+            <Text style={styles.logoutMessage}>
+              确认退出当前账号吗？您的数据将被清除！
+            </Text>
+            <View style={styles.logoutActions}>
+              <Pressable
+                onPress={() => setLogoutVisible(false)}
+                style={styles.logoutCancel}
+              >
+                <Text style={styles.logoutCancelText}>取消</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => void confirmLogout()}
+                style={styles.logoutConfirm}
+              >
+                <Text style={styles.logoutConfirmText}>退出登录</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -148,14 +275,18 @@ function MenuRow({
   subtitle,
   onPress,
 }: {
-  icon: number;
+  icon: MenuIcon;
   title: string;
   subtitle?: string;
   onPress: () => void;
 }) {
+  const Icon = icon;
+
   return (
     <Pressable style={styles.menuRow} onPress={onPress}>
-      <Image source={icon} style={styles.menuIcon} />
+      <View style={styles.menuIcon}>
+        <Icon color="#4A4A4A" height={22} width={22} />
+      </View>
       <View style={styles.menuCopy}>
         <Text style={styles.menuTitle}>{title}</Text>
         {subtitle && <Text style={styles.menuSubtitle}>{subtitle}</Text>}
@@ -232,7 +363,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 2,
   },
-  menuIcon: { width: 32, height: 32, marginRight: 2 },
+  menuIcon: {
+    width: 32,
+    height: 32,
+    marginRight: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   menuCopy: { flex: 1 },
   menuTitle: {
     fontFamily: DOUYIN_SANS,
@@ -247,4 +384,26 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   chevron: { color: "#b6b6b6", fontSize: 28, fontWeight: "300" },
+  logoutButton: {
+    height: 48,
+    marginHorizontal: 12,
+    marginTop: 28,
+    marginBottom: 28,
+    borderRadius: 8,
+    backgroundColor: "#FFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logoutText: { color: "#FF1F4C", fontFamily: DOUYIN_SANS, fontSize: 15 },
+  dialogBackdrop: { flex: 1, alignItems: "center", justifyContent: "center", padding: 28, backgroundColor: "rgba(0,0,0,0.45)" },
+  logoutDialog: { width: "100%", borderRadius: 12, backgroundColor: "#FFF", padding: 24, alignItems: "center" },
+  logoutMark: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#FFF1F3", alignItems: "center", justifyContent: "center", marginBottom: 12 },
+  logoutMarkText: { color: "#FF1F4C", fontSize: 22, fontWeight: "700" },
+  logoutTitle: { color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 17, fontWeight: "600" },
+  logoutMessage: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 13, lineHeight: 20, marginTop: 8, textAlign: "center" },
+  logoutActions: { width: "100%", flexDirection: "row", gap: 10, marginTop: 22 },
+  logoutCancel: { flex: 1, height: 44, borderRadius: 8, backgroundColor: "#F7F7F7", alignItems: "center", justifyContent: "center" },
+  logoutCancelText: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 15 },
+  logoutConfirm: { flex: 1, height: 44, borderRadius: 8, backgroundColor: "#FF1F4C", alignItems: "center", justifyContent: "center" },
+  logoutConfirmText: { color: "#FFF", fontFamily: DOUYIN_SANS, fontSize: 15 },
 });

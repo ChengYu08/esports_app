@@ -7,6 +7,7 @@ import { EmptyState } from "@/shared/ui/AsyncStates";
 
 import { MessageHeader } from "../components/MessageHeader";
 import { MessageListItem } from "../components/MessageListItem";
+import { resolveConversationAvatar } from "../message-avatar";
 import { useMessageStore } from "../message-store";
 import type { MessageListItemModel } from "../message.types";
 
@@ -23,7 +24,11 @@ export default function MessageScreen() {
 
   useEffect(() => { if (accessToken) void initialize(accessToken); }, [accessToken, initialize]);
 
-  const items = useMemo<MessageListItemModel[]>(() => conversations.map((item) => ({ ...item, kind: "conversation", avatar: item.avatar || defaultConversationAvatar })), [conversations]);
+  const items = useMemo<MessageListItemModel[]>(() => conversations.map((item) => ({
+    ...item,
+    kind: "conversation",
+    avatar: resolveConversationAvatar(item.title, item.avatar, defaultConversationAvatar),
+  })), [conversations]);
   const handleMessagePress = (item: MessageListItemModel) => {
     if (item.kind !== "conversation") return;
     router.push({ pathname: "/chat/[id]", params: { id: item.id, title: item.title, avatar: typeof item.avatar === "string" ? item.avatar : "" } });
