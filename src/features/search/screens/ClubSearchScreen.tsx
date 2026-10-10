@@ -127,7 +127,7 @@ export default function ClubSearchScreen() {
 function UserSearchCard({ user, clubId }: { user: SearchUser; clubId?: string }) {
   return (
     <Pressable style={styles.userCard} onPress={() => router.push({ pathname: "/profile", params: { clubId: clubId || String(user.clubId), userId: String(user.userId) } })}>
-      <View style={styles.userAvatar}>{user.headImage ? <Image source={{ uri: user.headImage }} style={styles.userAvatarImage} /> : <Text style={styles.userAvatarText}>{user.nickname.slice(0, 1)}</Text>}</View>
+      <View style={styles.userAvatar}>{user.headImage ? <Image contentFit="cover" source={{ uri: user.headImage }} style={styles.userAvatarImage} /> : <Text style={styles.userAvatarText}>{user.nickname.slice(0, 1)}</Text>}</View>
       <View style={styles.userCopy}><Text numberOfLines={1} style={styles.userName}>{user.nickname}</Text><Text numberOfLines={1} style={styles.userClub}>{user.clubName || "陪玩用户"}</Text><Text numberOfLines={1} style={styles.userSignature}>{user.signature || "暂无个人简介"}</Text></View>
     </Pressable>
   );

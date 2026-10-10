@@ -30,9 +30,13 @@ export type MessageHistoryPage = {
 
 export function mergeConversations(items: MessageConversation[], updated: MessageConversation) {
   const current = items.find((item) => item.id === updated.id);
+  const hasNewerMessage = !current || updated.updatedAt >= current.updatedAt;
   const merged = {
     ...current,
     ...updated,
+    preview: hasNewerMessage ? updated.preview : current.preview,
+    time: hasNewerMessage ? updated.time : current.time,
+    updatedAt: Math.max(current?.updatedAt || 0, updated.updatedAt),
     clubId: updated.clubId ?? current?.clubId,
     note: updated.note ?? current?.note,
     isPinned: updated.isPinned ?? current?.isPinned,

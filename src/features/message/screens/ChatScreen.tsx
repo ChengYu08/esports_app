@@ -16,6 +16,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "@esports/auth";
@@ -302,6 +303,15 @@ export default function ChatScreen() {
 }
 
 function ChatBubble({ item, peerAvatar, myAvatar, onRetry }: { item: ManagedMessage; peerAvatar: string | number; myAvatar: { uri: string } | number; onRetry: () => void }) {
+  const { width: windowWidth } = useWindowDimensions();
+  const [imageRatio, setImageRatio] = useState(1);
+  const maxImageWidth = Math.min(168, Math.max(120, windowWidth * 0.58));
+  const maxImageHeight = 240;
+  const naturalImageHeight = maxImageWidth / imageRatio;
+  const imageScale = Math.min(1, maxImageHeight / naturalImageHeight);
+  const imageWidth = maxImageWidth * imageScale;
+  const imageHeight = naturalImageHeight * imageScale;
+
   return (
     <View style={[styles.bubbleRow, item.isMine && styles.mineRow]}>
       {!item.isMine && <Image contentFit="cover" source={peerAvatar} style={styles.messageAvatar} />}
@@ -311,7 +321,16 @@ function ChatBubble({ item, peerAvatar, myAvatar, onRetry }: { item: ManagedMess
             accessibilityLabel="预览聊天图片"
             onPress={() => router.push({ pathname: "/image-preview", params: createImagePreviewParams([item.imageUrl], 0) })}
           >
-            <Image contentFit="cover" source={{ uri: item.imageUrl }} style={styles.messageImage} />
+            <Image
+              contentFit="contain"
+              source={{ uri: item.imageUrl }}
+              style={[styles.messageImage, { width: imageWidth, height: imageHeight }]}
+              onLoad={({ source }) => {
+                if (source.width > 0 && source.height > 0) {
+                  setImageRatio(source.width / source.height);
+                }
+              }}
+            />
           </Pressable>
         ) : item.kind === "afterSale" ? <View style={styles.afterSaleCard}><Text style={styles.afterSaleCardTitle}>{item.title}</Text><Text style={styles.afterSaleCardSub}>订单 {item.orderNo || "-"}</Text></View> : item.kind === "orderNotify" ? (
           <View style={styles.orderNotifyCard}>
@@ -354,7 +373,7 @@ const styles = StyleSheet.create({
   errorBanner: { color: "#FE1F4C", backgroundColor: "#FFF1F3", fontFamily: DOUYIN_SANS, fontSize: 12, lineHeight: 18, paddingHorizontal: 16, paddingVertical: 8, textAlign: "center" },
   bubbleText: { color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 14, lineHeight: 22 },
   imageBubble: { padding: 0, overflow: "hidden" },
-  messageImage: { width: 168, height: 168 },
+  messageImage: { backgroundColor: "#F2F2F2" },
   composer: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 12, borderTopRightRadius: 12, paddingHorizontal: 12, paddingTop: 12, gap: 8 },
   input: { minHeight: 60, maxHeight: 120, backgroundColor: "#F7F7F7", borderRadius: 8, paddingHorizontal: 12, paddingTop: 8, paddingBottom: 12, color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 14, lineHeight: 22, textAlignVertical: "top" },
   composerActions: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },

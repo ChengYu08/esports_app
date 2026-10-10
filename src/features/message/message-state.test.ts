@@ -33,6 +33,19 @@ describe("message state helpers", () => {
     ]);
   });
 
+  it("does not move a conversation when an older conversation update arrives", () => {
+    const current = { id: "1", title: "Peer", preview: "latest", time: "10:00", unreadCount: 0, updatedAt: 10 };
+    const olderUpdate = { ...current, preview: "", time: "", updatedAt: 0 };
+
+    expect(mergeConversations([
+      current,
+      { id: "2", title: "Other", preview: "older", time: "09:00", unreadCount: 0, updatedAt: 5 },
+    ], olderUpdate)).toEqual([
+      current,
+      { id: "2", title: "Other", preview: "older", time: "09:00", unreadCount: 0, updatedAt: 5 },
+    ]);
+  });
+
   it("replaces a pending message and prepends unique chronological history", () => {
     const sent = { ...pending, id: "server-1", status: "sent" as const };
     expect(replacePendingMessage([pending], "local-1", sent)).toEqual([sent]);

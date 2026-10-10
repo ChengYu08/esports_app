@@ -1,16 +1,17 @@
 import { ImageZoom } from "@likashefqet/react-native-image-zoom";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";
-import { Dimensions, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { parseImagePreviewParams } from "@/features/mine/image-preview.params";
 import { IMAGE_PREVIEW_ZOOM } from "@/features/mine/image-preview.zoom";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-
 export default function ImagePreviewScreen() {
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ images?: string | string[]; index?: string | string[] }>();
   const { images, index } = parseImagePreviewParams(params);
 
@@ -32,24 +33,24 @@ export default function ImagePreviewScreen() {
         initialScrollIndex={index}
         keyExtractor={(uri, itemIndex) => `${uri}-${itemIndex}`}
         getItemLayout={(_, itemIndex) => ({
-          length: SCREEN_WIDTH,
-          offset: SCREEN_WIDTH * itemIndex,
+          length: width,
+          offset: width * itemIndex,
           index: itemIndex,
         })}
         renderItem={({ item }) => (
-          <View style={styles.page}>
+          <View style={[styles.page, { width, height }]}>
             <ImageZoom
               uri={item}
               maxScale={IMAGE_PREVIEW_ZOOM.maxScale}
               doubleTapScale={IMAGE_PREVIEW_ZOOM.doubleTapScale}
               isDoubleTapEnabled
               isPinchEnabled
-              style={styles.zoomImage}
+              style={{ width, height }}
             />
           </View>
         )}
       />
-      <Pressable accessibilityLabel="关闭图片预览" hitSlop={12} onPress={() => router.back()} style={styles.closeButton}>
+      <Pressable accessibilityLabel="关闭图片预览" hitSlop={12} onPress={() => router.back()} style={[styles.closeButton, { top: insets.top + 8 }]}>
         <Text style={styles.closeText}>×</Text>
       </Pressable>
     </GestureHandlerRootView>
@@ -59,16 +60,13 @@ export default function ImagePreviewScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#000" },
   page: {
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#000",
   },
-  zoomImage: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT },
   closeButton: {
     position: "absolute",
-    top: 56,
+    top: 8,
     left: 16,
     width: 40,
     height: 40,
