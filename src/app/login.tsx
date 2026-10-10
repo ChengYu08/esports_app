@@ -1,9 +1,11 @@
 import { createAuthSsoAdapter, LoginScreen, useAuthStore } from "@esports/auth";
 import { createNativeQuickLoginProvider, SsoClient } from "@esports/sso-sdk";
 import { env } from "@/core/config/env";
+import { APP_LINKS } from "@/core/config/links";
 import { completeClientLogin } from "@/features/auth/client-auth-flow";
 import { getPasswordLoginErrorMessage } from "@/features/auth/password-login-error";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
+import { openExternalLink } from "@/shared/navigation/open-external-link";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
 import { Alert, Platform } from "react-native";
@@ -64,6 +66,8 @@ export default function LoginRoute() {
         onForgotPassword={(phone) =>
           router.push({ pathname: "/forgot-password", params: { phone } })
         }
+        onUserAgreementPress={() => void openExternalLink(APP_LINKS.userAgreement)}
+        onPrivacyPolicyPress={() => void openExternalLink(APP_LINKS.privacyPolicy)}
         onQuickLogin={async () => {
           if (!adapter) {
             Alert.alert("暂无法一键登录", "请先配置 SSO client secret。");

@@ -43,6 +43,7 @@ import type {
   ProfileReview,
   ProfileSkillCard,
 } from "@/features/mine/api/profile.types";
+import { addToBlacklist } from "@/features/mine/blacklist";
 import {
   useProfileDetail,
   useProfileGameDetail,
@@ -55,7 +56,6 @@ import {
 } from "@/features/mine/order-real-name";
 import { createProfileAvatarPreviewParams } from "@/features/mine/profile-avatar-preview";
 import { createProfileChatParams } from "@/features/mine/profile-chat";
-import { addToBlacklist } from "@/features/mine/blacklist";
 import { cancelOrder } from "@/features/order/order.api";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
@@ -183,6 +183,7 @@ export default function ProfileScreen() {
         stickyHeaderIndices={[1]}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
+          flexGrow: 1,
           paddingBottom: isMine ? 24 + insets.bottom : 88 + insets.bottom,
         }}
       >
@@ -249,7 +250,7 @@ export default function ProfileScreen() {
             onPress={() => router.push("/edit-profile")}
             style={styles.editProfileButton}
           >
-            <Edit24Regular color="#FF1F4C" height={20} width={20} />
+            <Edit24Regular color="#0A0A0A" height={20} width={20} />
             <Text style={styles.editProfileText}>编辑个人资料</Text>
           </Pressable>
         ) : null}
@@ -288,6 +289,15 @@ export default function ProfileScreen() {
           visible={profileActionsVisible}
           bottomInset={insets.bottom}
           onClose={() => setProfileActionsVisible(false)}
+          onReportRequest={() =>
+            router.push({
+              pathname: "/report",
+              params: {
+                userId: String(profile.userId),
+                nickname: profile.nickname,
+              },
+            })
+          }
           onBlockRequest={() => setBlacklistPromptVisible(true)}
         />
       ) : null}
@@ -411,18 +421,18 @@ function ProfileActionsSheet({
   visible,
   bottomInset,
   onClose,
+  onReportRequest,
   onBlockRequest,
 }: {
   visible: boolean;
   bottomInset: number;
   onClose: () => void;
+  onReportRequest: () => void;
   onBlockRequest: () => void;
 }) {
   const { height: windowHeight } = useWindowDimensions();
   const [backdropOpacity] = useState(() => new Animated.Value(0));
-  const [sheetTranslateY] = useState(
-    () => new Animated.Value(windowHeight),
-  );
+  const [sheetTranslateY] = useState(() => new Animated.Value(windowHeight));
   const isClosing = useRef(false);
 
   useEffect(() => {
@@ -502,7 +512,7 @@ function ProfileActionsSheet({
           <Pressable
             accessibilityLabel="举报"
             accessibilityRole="button"
-            onPress={() => closeSheet()}
+            onPress={() => closeSheet(onReportRequest)}
             style={({ pressed }) => [
               styles.profileActionRow,
               pressed && styles.profileActionRowPressed,
@@ -1493,17 +1503,19 @@ const styles = StyleSheet.create({
   editProfileButton: {
     height: 48,
     marginHorizontal: 12,
-    marginTop: 28,
+    marginTop: "auto",
     marginBottom: 28,
     borderRadius: 8,
     backgroundColor: "#FFF",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    borderColor: "#EBEBEB",
+    borderWidth: 1,
     gap: 8,
   },
   editProfileText: {
-    color: "#FF1F4C",
+    color: "#0A0A0A",
     fontFamily: DOUYIN_SANS,
     fontSize: 15,
   },

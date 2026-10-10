@@ -1,9 +1,13 @@
 import { useAuthStore } from "@esports/auth";
+import { Delete24Regular } from "@fluentui/react-native-icons";
+import { Paths } from "expo-file-system";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -22,45 +26,58 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const arrowIcon = require("../../../../assets/mine/figma/mine-arrow-right.svg");
 
+function readCacheSize() {
+  if (Platform.OS === "web") return 0;
+  try {
+    return Math.max(0, Paths.cache.size ?? 0);
+  } catch {
+    return null;
+  }
+}
+
+function formatBytes(bytes: number | null) {
+  if (bytes === null) return "暂不可用";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
 export default function BasicSettingsScreen() {
   const insets = useSafeAreaInsets();
   const token = useAuthStore((state) => state.accessToken);
   const clearSession = useAuthStore((state) => state.clearSession);
   const [clearing, setClearing] = useState(false);
+  const [cacheModalVisible, setCacheModalVisible] = useState(false);
+  const [cacheSize, setCacheSize] = useState<number | null>(() => readCacheSize());
   const [loggingOut, setLoggingOut] = useState(false);
 
-  const clearCache = () => {
-    Alert.alert(
-      "清除缓存",
-      "将清理可重新下载的图片和列表缓存，不会删除账号、订单或登录信息。",
-      [
-        { text: "取消", style: "cancel" },
-        {
-          text: "清除",
-          onPress: () => {
-            void (async () => {
-              setClearing(true);
-              try {
-                if (Platform.OS !== "web") {
-                  const cleared = await Image.clearDiskCache();
-                  await Image.clearMemoryCache();
-                  if (!cleared) throw new Error("图片缓存暂时无法清理");
-                }
-                queryClient.clear();
-                Alert.alert("清理完成", "缓存已清除");
-              } catch (error) {
-                Alert.alert(
-                  "清理失败",
-                  error instanceof Error ? error.message : "请稍后重试",
-                );
-              } finally {
-                setClearing(false);
-              }
-            })();
-          },
-        },
-      ],
-    );
+  const clearCache = () => setCacheModalVisible(true);
+
+  const confirmClearCache = () => {
+    if (clearing) return;
+    setCacheModalVisible(false);
+    void (async () => {
+      setClearing(true);
+      try {
+        if (Platform.OS !== "web") {
+          const cleared = await Image.clearDiskCache();
+          await Image.clearMemoryCache();
+          if (!cleared) throw new Error("图片缓存暂时无法清理");
+        }
+        queryClient.clear();
+        setCacheSize(readCacheSize());
+        Alert.alert("清理完成", "可重新下载的缓存已清除");
+      } catch (error) {
+        Alert.alert(
+          "清理失败",
+          error instanceof Error ? error.message : "请稍后重试",
+        );
+        setCacheSize(readCacheSize());
+      } finally {
+        setClearing(false);
+      }
+    })();
   };
 
   const logout = () => {
@@ -133,7 +150,7 @@ export default function BasicSettingsScreen() {
           /> */}
           <SettingsRow
             label={clearing ? "正在清理缓存" : "清除缓存"}
-            value="可清理"
+            value={formatBytes(cacheSize)}
             disabled={clearing}
             onPress={clearCache}
           />
@@ -154,6 +171,50 @@ export default function BasicSettingsScreen() {
           </Text>
         </Pressable>
       </ScrollView>
+      <Modal
+        animationType="fade"
+        transparent
+        visible={cacheModalVisible}
+        onRequestClose={() => setCacheModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <Pressable
+            accessibilityLabel="关闭清除缓存弹窗"
+            onPress={() => setCacheModalVisible(false)}
+            style={StyleSheet.absoluteFill}
+          />
+          <View accessibilityViewIsModal style={styles.cacheModalCard}>
+            <View style={styles.cacheModalIcon}>
+              <Delete24Regular color="#FF1F4C" height={24} width={24} />
+            </View>
+            <Text style={styles.cacheModalTitle}>清除缓存</Text>
+            <Text style={styles.cacheModalMessage}>
+              将清理可重新下载的图片和列表缓存，不会影响账号、订单或登录信息。
+            </Text>
+            <View style={styles.cacheSizePanel}>
+              <Text style={styles.cacheSizeLabel}>可清理文件</Text>
+              <Text style={styles.cacheSizeValue}>{formatBytes(cacheSize)}</Text>
+            </View>
+            <View style={styles.cacheModalActions}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setCacheModalVisible(false)}
+                style={({ pressed }) => [styles.cacheCancelButton, pressed && styles.buttonPressed]}
+              >
+                <Text style={styles.cacheCancelText}>取消</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                disabled={clearing}
+                onPress={confirmClearCache}
+                style={({ pressed }) => [styles.cacheConfirmButton, pressed && styles.buttonPressed, clearing && styles.buttonDisabled]}
+              >
+                {clearing ? <ActivityIndicator color="#FFF" /> : <Text style={styles.cacheConfirmText}>立即清理</Text>}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -251,4 +312,100 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   pressed: { backgroundColor: "#F5F5F5" },
+  modalBackdrop: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+    backgroundColor: "rgba(0,0,0,0.48)",
+  },
+  cacheModalCard: {
+    width: "100%",
+    maxWidth: 348,
+    borderRadius: 16,
+    padding: 22,
+    backgroundColor: "#FFF",
+  },
+  cacheModalIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFF0F2",
+    alignSelf: "center",
+  },
+  cacheModalTitle: {
+    marginTop: 14,
+    color: "#111216",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 18,
+    lineHeight: 25,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  cacheModalMessage: {
+    marginTop: 8,
+    color: "#666",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 13,
+    lineHeight: 21,
+    textAlign: "center",
+  },
+  cacheSizePanel: {
+    marginTop: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: 8,
+    backgroundColor: "#F8F8F8",
+  },
+  cacheSizeLabel: {
+    color: "#666",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  cacheSizeValue: {
+    color: "#FF1F4C",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: "600",
+  },
+  cacheModalActions: { marginTop: 22, flexDirection: "row", gap: 10 },
+  cacheCancelButton: {
+    flex: 1,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+    backgroundColor: "#F5F5F5",
+  },
+  cacheConfirmButton: {
+    flex: 1,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+    backgroundColor: "#FF1F4C",
+  },
+  cacheCancelText: {
+    color: "#555",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "600",
+  },
+  cacheConfirmText: {
+    color: "#FFF",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "600",
+  },
+  buttonPressed: { opacity: 0.82 },
+  buttonDisabled: { opacity: 0.58 },
 });

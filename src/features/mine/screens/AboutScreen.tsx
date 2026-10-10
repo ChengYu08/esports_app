@@ -10,6 +10,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { APP_LINKS } from "@/core/config/links";
+import { openExternalLink } from "@/shared/navigation/open-external-link";
 
 const appIcon = require("../../../../assets/images/icon.png");
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
@@ -64,18 +66,11 @@ export default function AboutScreen() {
           {/* <AboutRow label="检测更新" onPress={() => Alert.alert("检查更新", "请前往应用商店查看是否有新版本")} /> */}
           <AboutRow
             label="用户协议"
-            onPress={() =>
-              router.push({ pathname: "/protocol", params: { kind: "user" } })
-            }
+            onPress={() => void openExternalLink(APP_LINKS.userAgreement)}
           />
           <AboutRow
             label="隐私政策"
-            onPress={() =>
-              router.push({
-                pathname: "/protocol",
-                params: { kind: "privacy" },
-              })
-            }
+            onPress={() => void openExternalLink(APP_LINKS.privacyPolicy)}
           />
         </View>
       </ScrollView>

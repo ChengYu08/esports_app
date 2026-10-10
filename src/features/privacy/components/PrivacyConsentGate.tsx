@@ -3,7 +3,9 @@ import { BackHandler, Modal, Pressable, StyleSheet, Text, View } from "react-nat
 
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { colors } from "@/shared/theme/tokens";
+import { APP_LINKS } from "@/core/config/links";
 import { savePrivacyConsent } from "@/features/privacy/privacy-consent";
+import { openExternalLink } from "@/shared/navigation/open-external-link";
 
 type PrivacyConsentGateProps = {
   onAccepted: () => void;
@@ -43,7 +45,15 @@ export function PrivacyConsentGate({ onAccepted }: PrivacyConsentGateProps) {
         <View accessibilityViewIsModal style={styles.card}>
           <Text style={styles.title}>隐私保护提示</Text>
           <Text style={styles.body}>
-            为了向你提供更好的服务，我们会按照《隐私政策》收集、使用和保护你的相关信息。
+            为了向你提供更好的服务，我们会按照
+            <Text
+              accessibilityRole="link"
+              onPress={() => void openExternalLink(APP_LINKS.privacyPolicy)}
+              style={styles.link}
+            >
+              《隐私政策》
+            </Text>
+            收集、使用和保护你的相关信息。
             请你阅读并同意相关协议后继续使用盼之电竞。你可以随时在设置中查看或管理你的隐私设置。
           </Text>
           <View style={styles.actions}>
@@ -105,6 +115,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 23,
   },
+  link: { color: colors.brand },
   actions: {
     flexDirection: "row",
     gap: 10,

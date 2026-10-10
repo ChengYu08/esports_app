@@ -40,6 +40,8 @@ export type LoginScreenProps = {
   onSendCode?: (phone: string) => void | Promise<void>;
   onQuickLogin?: () => void | Promise<void>;
   onForgotPassword?: (phone: string) => void;
+  onUserAgreementPress?: () => void;
+  onPrivacyPolicyPress?: () => void;
 };
 
 export function LoginScreen({
@@ -52,6 +54,8 @@ export function LoginScreen({
   onSendCode,
   onQuickLogin,
   onForgotPassword,
+  onUserAgreementPress,
+  onPrivacyPolicyPress,
 }: LoginScreenProps) {
   const [mode, setMode] = useState<"sms" | "password">(initialMode ?? "sms");
   const [phone, setPhone] = useState(() => sanitizePhone(initialPhone ?? ""));
@@ -295,8 +299,9 @@ export function LoginScreen({
             {agreementAccepted ? <Text style={styles.checkmark}>✓</Text> : null}
           </View>
           <Text style={styles.agreementText}>
-            已阅读并同意 <Text style={styles.link}>《用户协议》</Text>{" "}
-            <Text style={styles.link}>《隐私政策》</Text>，未注册用户
+            已阅读并同意{" "}
+            <Text accessibilityRole="link" onPress={onUserAgreementPress} style={styles.link}>《用户协议》</Text>{" "}
+            <Text accessibilityRole="link" onPress={onPrivacyPolicyPress} style={styles.link}>《隐私政策》</Text>，未注册用户
             在登录成功后自动创建账号
           </Text>
         </Pressable>
@@ -312,8 +317,9 @@ export function LoginScreen({
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>阅读并同意以下协议</Text>
             <Text style={styles.modalText}>
-              已阅读并同意 <Text style={styles.link}>《用户协议》</Text>{" "}
-              <Text style={styles.link}>《隐私政策》</Text>
+              已阅读并同意{" "}
+              <Text accessibilityRole="link" onPress={onUserAgreementPress} style={styles.link}>《用户协议》</Text>{" "}
+              <Text accessibilityRole="link" onPress={onPrivacyPolicyPress} style={styles.link}>《隐私政策》</Text>
               ，未注册用户在登录成功后自动创建账号
             </Text>
             <View style={styles.modalActions}>
