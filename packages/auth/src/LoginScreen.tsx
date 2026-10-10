@@ -1,6 +1,7 @@
 import { Image } from "expo-image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Keyboard,
   Modal,
   Pressable,
@@ -60,6 +61,8 @@ export function LoginScreen({
   const [agreementAccepted, setAgreementAccepted] = useState(false);
   const [agreementModalVisible, setAgreementModalVisible] = useState(false);
   const [isSendingCode, setIsSendingCode] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [codeCountdown, setCodeCountdown] = useState(0);
   const [codeSentPhone, setCodeSentPhone] = useState("");
   const isPasswordMode = mode === "password";
@@ -85,27 +88,38 @@ export function LoginScreen({
     }
   };
 
-  const performLogin = () => {
-    if (isPasswordMode) {
-      void onPasswordLogin?.({ username: phone, password });
-      return;
+  const performLogin = async () => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+    try {
+      if (isPasswordMode) {
+        await onPasswordLogin?.({ username: phone, password });
+        return;
+      }
+      await onLogin?.({ phone, code });
+    } catch {
+      // The route owns login error presentation.
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
     }
-    void onLogin?.({ phone, code });
   };
 
   const handleSubmit = () => {
-    if (!isSubmitReady) return;
+    if (!isSubmitReady || isSubmittingRef.current) return;
     if (!agreementAccepted) {
       setAgreementModalVisible(true);
       return;
     }
-    performLogin();
+    void performLogin();
   };
 
   const handleAgreeAndContinue = () => {
+    if (isSubmittingRef.current) return;
     setAgreementAccepted(true);
     setAgreementModalVisible(false);
-    performLogin();
+    void performLogin();
   };
 
   const handleSendCode = async () => {
@@ -129,6 +143,7 @@ export function LoginScreen({
           <Image source={topArt} style={styles.topArt} contentFit="fill" />
           <Pressable
             accessibilityLabel="返回"
+            disabled={isSubmitting}
             onPress={onBack}
             style={styles.back}
           >
@@ -146,6 +161,7 @@ export function LoginScreen({
               <TextInput
                 value={phone}
                 onChangeText={handlePhoneChange}
+                editable={!isSubmitting}
                 autoCapitalize="none"
                 keyboardType="phone-pad"
                 maxLength={11}
@@ -158,6 +174,7 @@ export function LoginScreen({
             <View style={styles.field}>
               <TextInput
                 value={isPasswordMode ? password : code}
+                editable={!isSubmitting}
                 onChangeText={
                   isPasswordMode
                     ? setPassword
@@ -178,6 +195,7 @@ export function LoginScreen({
                       passwordVisible ? "隐藏密码" : "显示密码"
                     }
                     accessibilityRole="button"
+                    disabled={isSubmitting}
                     hitSlop={8}
                     onPress={() => setPasswordVisible((visible) => !visible)}
                     style={styles.eyeButton}
@@ -193,6 +211,7 @@ export function LoginScreen({
                   <Pressable
                     accessibilityLabel="忘记密码"
                     accessibilityRole="button"
+                    disabled={isSubmitting}
                     onPress={() => onForgotPassword?.(phone)}
                   >
                     <Text style={styles.forgotPassword}>忘记密码</Text>
@@ -204,7 +223,7 @@ export function LoginScreen({
                   <Pressable
                     accessibilityLabel="获取验证码"
                     accessibilityRole="button"
-                    disabled={!canSendCode}
+                    disabled={!canSendCode || isSubmitting}
                     onPress={() => void handleSendCode()}
                   >
                     <Text
@@ -220,15 +239,24 @@ export function LoginScreen({
           <View style={styles.actions}>
             <Pressable
               accessibilityRole="button"
-              disabled={!isSubmitReady}
-              style={[styles.submit, isSubmitReady && styles.submitActive]}
+              accessibilityLabel={isSubmitting ? "登录中" : undefined}
+              accessibilityState={{ disabled: !isSubmitReady || isSubmitting, busy: isSubmitting }}
+              disabled={!isSubmitReady || isSubmitting}
+              style={[styles.submit, isSubmitReady && styles.submitActive, isSubmitting && styles.submitLoading]}
               onPress={handleSubmit}
             >
-              <Text style={styles.submitText}>
-                {isPasswordMode ? "登录" : "登录/注册"}
-              </Text>
+              {isSubmitting ? (
+                <View style={styles.submitContent}>
+                  <ActivityIndicator color="#fff" size="small" />
+                  <Text style={styles.submitText}>登录中…</Text>
+                </View>
+              ) : (
+                <Text style={styles.submitText}>
+                  {isPasswordMode ? "登录" : "登录/注册"}
+                </Text>
+              )}
             </Pressable>
-            <Pressable onPress={onSkip}>
+            <Pressable disabled={isSubmitting} onPress={onSkip}>
               <Text style={styles.browse}>暂不登录，先去逛逛</Text>
             </Pressable>
           </View>
@@ -242,6 +270,7 @@ export function LoginScreen({
           <LoginMethod
             icon={lockIcon}
             label={isPasswordMode ? "验证码登录" : "密码登录"}
+            disabled={isSubmitting}
             onPress={() =>
               setMode((current) => (current === "sms" ? "password" : "sms"))
             }
@@ -252,6 +281,7 @@ export function LoginScreen({
           accessibilityLabel="已阅读并同意用户协议和隐私政策"
           accessibilityRole="checkbox"
           accessibilityState={{ checked: agreementAccepted }}
+          disabled={isSubmitting}
           hitSlop={8}
           onPress={() => setAgreementAccepted((accepted) => !accepted)}
           style={styles.agreement}
@@ -289,6 +319,7 @@ export function LoginScreen({
             <View style={styles.modalActions}>
               <Pressable
                 accessibilityRole="button"
+                disabled={isSubmitting}
                 onPress={() => setAgreementModalVisible(false)}
                 style={styles.disagreeButton}
               >
@@ -296,6 +327,7 @@ export function LoginScreen({
               </Pressable>
               <Pressable
                 accessibilityRole="button"
+                disabled={isSubmitting}
                 onPress={handleAgreeAndContinue}
                 style={styles.agreeButton}
               >
@@ -313,14 +345,17 @@ function LoginMethod({
   icon,
   label,
   onPress,
+  disabled = false,
 }: {
   icon: number;
   label: string;
   onPress?: () => void | Promise<void>;
+  disabled?: boolean;
 }) {
   return (
     <Pressable
       accessibilityLabel={label}
+      disabled={disabled}
       style={styles.method}
       onPress={() => void onPress?.()}
     >
@@ -405,6 +440,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   submitActive: { backgroundColor: "#e01b28" },
+  submitLoading: { opacity: 0.88 },
+  submitContent: { flexDirection: "row", alignItems: "center", gap: 8 },
   submitText: {
     color: "#fff",
     fontFamily: DOUYIN_SANS,

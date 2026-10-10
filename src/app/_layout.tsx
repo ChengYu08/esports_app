@@ -112,7 +112,9 @@ export default function RootLayout() {
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="login" options={{ animation: "none" }} />
+              <Stack.Screen name="basic-settings" />
               <Stack.Screen name="account-settings" />
+              <Stack.Screen name="about" />
             </Stack>
           ) : (
             <PrivacyConsentGate onAccepted={() => setPrivacyAccepted(true)} />

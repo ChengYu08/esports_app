@@ -73,3 +73,55 @@ test("verifies real name and logs out with the business token", async () => {
     { path: "/client/v1/user/logout", options: { method: "POST", token: "business-token" } },
   ]);
 });
+
+test("checks account cancellation status and returns blocking reasons", async () => {
+  const requests = [];
+  const api = createClientAuthContract(async (path, options) => {
+    requests.push({ path, options });
+    return {
+      success: true,
+      code: "SUCCESS",
+      data: ["存在未完成订单", "还有待处理的售后"],
+    };
+  });
+
+  const reasons = await api.checkAccountCancellation("business-token");
+
+  assert.deepEqual(reasons, ["存在未完成订单", "还有待处理的售后"]);
+  assert.deepEqual(requests, [{
+    path: "/h5-client/v2/user/write/off/check",
+    options: { method: "POST", token: "business-token", body: { action: {} }, signed: true },
+  }]);
+});
+
+test("sends cancellation sms and submits the verified cancellation request", async () => {
+  const requests = [];
+  const api = createClientAuthContract(async (path, options) => {
+    requests.push({ path, options });
+    return { success: true, code: "SUCCESS", data: true };
+  });
+
+  await api.sendAccountCancellationSms("business-token");
+  await api.cancelAccount("business-token", "123456");
+
+  assert.deepEqual(requests, [
+    {
+      path: "/h5-client/v2/common/sms",
+      options: {
+        method: "POST",
+        token: "business-token",
+        body: { action: { smsTemplate: "WRITE_OFF" } },
+        signed: true,
+      },
+    },
+    {
+      path: "/h5-client/v2/user/write/off",
+      options: {
+        method: "POST",
+        token: "business-token",
+        body: { action: { smsCode: "123456" } },
+        signed: true,
+      },
+    },
+  ]);
+});

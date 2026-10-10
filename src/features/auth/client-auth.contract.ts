@@ -49,6 +49,8 @@ export type AuthRequestOptions = {
   method: 'POST';
   body?: unknown;
   token?: string;
+  /** H5 client endpoints require the legacy PZ signature headers. */
+  signed?: boolean;
 };
 
 export type AuthRequester = <T>(path: string, options?: AuthRequestOptions) => Promise<ClientApiResponse<T>>;
@@ -88,6 +90,28 @@ export function createClientAuthContract(requester: AuthRequester) {
     async logout(token: string) {
       return unwrap(await requester<unknown>('/client/v1/user/logout', {
         method: 'POST', token,
+      }));
+    },
+    async checkAccountCancellation(token: string) {
+      const reasons = unwrap(await requester<unknown>('/h5-client/v2/user/write/off/check', {
+        method: 'POST', token, body: { action: {} }, signed: true,
+      }));
+      return Array.isArray(reasons)
+        ? reasons.map((reason) => String(reason).trim()).filter(Boolean)
+        : [];
+    },
+    async sendAccountCancellationSms(token: string) {
+      return unwrap(await requester<boolean>('/h5-client/v2/common/sms', {
+        method: 'POST', token,
+        body: { action: { smsTemplate: 'WRITE_OFF' } },
+        signed: true,
+      }));
+    },
+    async cancelAccount(token: string, smsCode: string) {
+      return unwrap(await requester<boolean>('/h5-client/v2/user/write/off', {
+        method: 'POST', token,
+        body: { action: { smsCode } },
+        signed: true,
       }));
     },
     async getImToken(token: string) {

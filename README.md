@@ -28,3 +28,9 @@ npx expo prebuild # 生成 android/ 原生目录
 cd android
 ./gradlew assembleRelease # 出 APK
 ./gradlew bundleRelease # 出 AAB
+
+用户协议
+https://www.luanfengxuan.cn/vpi/pages/pzdj_privacy
+
+服务协议
+https://www.luanfengxuan.cn/vpi/pages/pzdj_user

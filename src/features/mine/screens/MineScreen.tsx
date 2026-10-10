@@ -1,12 +1,13 @@
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useAuthStore } from "@esports/auth";
 import {
-  DocumentText24Regular,
+  BuildingPeople24Regular,
+  Dismiss24Regular,
   Password24Regular,
   PersonDelete24Regular,
   PersonProhibited24Regular,
+  PersonStar24Regular,
   Settings24Regular,
-  ShieldKeyhole24Regular,
 } from "@fluentui/react-native-icons";
 import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
@@ -32,9 +33,10 @@ const female = require("../../../../assets/mine/figma/mine-female.svg");
 const clubFlag = require("../../../../assets/mine/figma/mine-club-flag.svg");
 const copyIcon = require("../../../../assets/mine/figma/mine-copy.svg");
 const arrow = require("../../../../assets/mine/figma/mine-arrow-right.svg");
-const room = require("../../../../assets/mine/figma/mine-room-figma.svg");
-const playCenter = require("../../../../assets/mine/figma/mine-play-center.svg");
-const building = require("../../../../assets/mine/figma/mine-club-entry.svg");
+const clubEntryQrCode = require("../../../../assets/coms/qrcode-jlb.png");
+const companionEntryQrCode = require("../../../../assets/coms/qrcode-pws.png");
+
+type QrCodeModalType = "club" | "companion";
 
 type MenuIcon = typeof Settings24Regular;
 
@@ -50,6 +52,7 @@ export default function MineScreen() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const clearSession = useAuthStore((state) => state.clearSession);
   const [logoutVisible, setLogoutVisible] = useState(false);
+  const [qrCodeModal, setQrCodeModal] = useState<QrCodeModalType | null>(null);
   const displayName = useMemo(
     () =>
       user?.nickname ||
@@ -88,8 +91,19 @@ export default function MineScreen() {
     {
       title: "基础设置",
       icon: Settings24Regular,
-      onPress: () => router.push("/account-settings"),
+      onPress: () => router.push("/basic-settings"),
     },
+    {
+      title: "俱乐部入驻",
+      icon: BuildingPeople24Regular,
+      onPress: () => setQrCodeModal("club"),
+    },
+    {
+      title: "成为陪玩师",
+      icon: PersonStar24Regular,
+      onPress: () => setQrCodeModal("companion"),
+    },
+
     {
       title: "修改密码",
       icon: Password24Regular,
@@ -103,18 +117,6 @@ export default function MineScreen() {
       title: "黑名单",
       icon: PersonProhibited24Regular,
       onPress: () => router.push("/blacklist"),
-    },
-    {
-      title: "用户协议",
-      icon: DocumentText24Regular,
-      onPress: () =>
-        router.push({ pathname: "/protocol", params: { kind: "user" } }),
-    },
-    {
-      title: "隐私协议",
-      icon: ShieldKeyhole24Regular,
-      onPress: () =>
-        router.push({ pathname: "/protocol", params: { kind: "privacy" } }),
     },
     {
       title: "注销账号",
@@ -133,14 +135,17 @@ export default function MineScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.profile}>
-          <Pressable
-            style={styles.profileMain}
-            onPress={() => !user && router.push("/login")}
-          >
-            <Image
-              source={user?.headImage ? { uri: user.headImage } : avatar}
-              style={styles.avatar}
-            />
+          <View style={styles.profileMain}>
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel={user ? "账号设置" : "登录 / 注册"}
+              onPress={() => router.push(user ? "/account-settings" : "/login")}
+            >
+              <Image
+                source={user?.headImage ? { uri: user.headImage } : avatar}
+                style={styles.avatar}
+              />
+            </Pressable>
             <View style={styles.profileCopy}>
               <Text style={styles.name}>{displayName}</Text>
               <View style={styles.detailLine}>
@@ -169,7 +174,7 @@ export default function MineScreen() {
                 ) : null}
               </Pressable>
             </View>
-          </Pressable>
+          </View>
           <Pressable
             accessibilityRole="link"
             accessibilityLabel="个人主页"
@@ -208,17 +213,6 @@ export default function MineScreen() {
           </View>
         </View>
         <View style={styles.sectionCard}>
-          {/* <MenuRow icon={room} title="我的房间" onPress={() => undefined} />
-          <MenuRow
-            icon={playCenter}
-            title="陪玩中心"
-            onPress={() => undefined}
-          />
-          <MenuRow
-            icon={building}
-            title="俱乐部入驻"
-            onPress={() => undefined}
-          /> */}
           {menuItems.map((item) => (
             <MenuRow key={item.title} {...item} />
           ))}
@@ -265,7 +259,66 @@ export default function MineScreen() {
           </View>
         </View>
       </Modal>
+      <JoinQrCodeModal
+        type={qrCodeModal}
+        onClose={() => setQrCodeModal(null)}
+      />
     </View>
+  );
+}
+
+function JoinQrCodeModal({
+  type,
+  onClose,
+}: {
+  type: QrCodeModalType | null;
+  onClose: () => void;
+}) {
+  const isClub = type === "club";
+
+  return (
+    <Modal
+      animationType="fade"
+      transparent
+      visible={type !== null}
+      onRequestClose={onClose}
+    >
+      <View style={styles.qrModalBackdrop}>
+        <Pressable
+          accessibilityLabel="关闭二维码弹窗"
+          onPress={onClose}
+          style={StyleSheet.absoluteFill}
+        />
+        <View accessibilityViewIsModal style={styles.qrModalCard}>
+          <View style={styles.qrModalHeader}>
+            <Text style={styles.qrModalTitle}>
+              {isClub ? "俱乐部入驻" : "成为陪玩师"}
+            </Text>
+            <Pressable
+              accessibilityLabel="关闭"
+              hitSlop={10}
+              onPress={onClose}
+              style={styles.qrModalClose}
+            >
+              <Dismiss24Regular color="#999999" height={20} width={20} />
+            </Pressable>
+          </View>
+          <Image
+            accessibilityLabel={
+              isClub ? "俱乐部入驻二维码" : "成为陪玩师二维码"
+            }
+            contentFit="contain"
+            source={isClub ? clubEntryQrCode : companionEntryQrCode}
+            style={styles.qrCode}
+          />
+          <Text style={styles.qrModalHint}>
+            {isClub
+              ? "扫码联系工作人员，申请俱乐部入驻"
+              : "扫码联系工作人员，申请成为陪玩师"}
+          </Text>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -395,15 +448,118 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   logoutText: { color: "#FF1F4C", fontFamily: DOUYIN_SANS, fontSize: 15 },
-  dialogBackdrop: { flex: 1, alignItems: "center", justifyContent: "center", padding: 28, backgroundColor: "rgba(0,0,0,0.45)" },
-  logoutDialog: { width: "100%", borderRadius: 12, backgroundColor: "#FFF", padding: 24, alignItems: "center" },
-  logoutMark: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#FFF1F3", alignItems: "center", justifyContent: "center", marginBottom: 12 },
+  dialogBackdrop: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 28,
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  logoutDialog: {
+    width: "100%",
+    borderRadius: 12,
+    backgroundColor: "#FFF",
+    padding: 24,
+    alignItems: "center",
+  },
+  logoutMark: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#FFF1F3",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
   logoutMarkText: { color: "#FF1F4C", fontSize: 22, fontWeight: "700" },
-  logoutTitle: { color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 17, fontWeight: "600" },
-  logoutMessage: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 13, lineHeight: 20, marginTop: 8, textAlign: "center" },
-  logoutActions: { width: "100%", flexDirection: "row", gap: 10, marginTop: 22 },
-  logoutCancel: { flex: 1, height: 44, borderRadius: 8, backgroundColor: "#F7F7F7", alignItems: "center", justifyContent: "center" },
+  logoutTitle: {
+    color: "#0A0A0A",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 17,
+    fontWeight: "600",
+  },
+  logoutMessage: {
+    color: "#666",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: 8,
+    textAlign: "center",
+  },
+  logoutActions: {
+    width: "100%",
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 22,
+  },
+  logoutCancel: {
+    flex: 1,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: "#F7F7F7",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   logoutCancelText: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 15 },
-  logoutConfirm: { flex: 1, height: 44, borderRadius: 8, backgroundColor: "#FF1F4C", alignItems: "center", justifyContent: "center" },
+  logoutConfirm: {
+    flex: 1,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: "#FF1F4C",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   logoutConfirmText: { color: "#FFF", fontFamily: DOUYIN_SANS, fontSize: 15 },
+  qrModalBackdrop: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  qrModalCard: {
+    width: "100%",
+    maxWidth: 327,
+    alignItems: "center",
+    borderRadius: 12,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 24,
+    backgroundColor: "#FFF",
+  },
+  qrModalHeader: {
+    width: "100%",
+    minHeight: 28,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  qrModalTitle: {
+    color: "#0A0A0A",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: "600",
+  },
+  qrModalClose: {
+    position: "absolute",
+    right: 0,
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  qrCode: {
+    width: 160,
+    height: 160,
+    marginTop: 20,
+  },
+  qrModalHint: {
+    marginTop: 16,
+    color: "#666",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: "center",
+  },
 });

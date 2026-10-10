@@ -1,5 +1,10 @@
 import { useAuthStore } from "@esports/auth";
-import { Edit24Regular } from "@fluentui/react-native-icons";
+import {
+  Edit24Regular,
+  Flag24Regular,
+  MoreHorizontal24Regular,
+  PersonProhibited24Regular,
+} from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -13,6 +18,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -49,12 +55,14 @@ import {
 } from "@/features/mine/order-real-name";
 import { createProfileAvatarPreviewParams } from "@/features/mine/profile-avatar-preview";
 import { createProfileChatParams } from "@/features/mine/profile-chat";
+import { addToBlacklist } from "@/features/mine/blacklist";
 import { cancelOrder } from "@/features/order/order.api";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { EmptyState } from "@/shared/ui/AsyncStates";
+import Toast from "react-native-root-toast";
 
 const fallbackAvatar = require("../../../../assets/mine/figma/profile-avatar.png");
 const background = require("../../../../assets/mine/figma/profile-bg.png");
@@ -87,6 +95,8 @@ export default function ProfileScreen() {
     total: number;
   } | null>(null);
   const [paymentSheetVisible, setPaymentSheetVisible] = useState(false);
+  const [profileActionsVisible, setProfileActionsVisible] = useState(false);
+  const [blacklistPromptVisible, setBlacklistPromptVisible] = useState(false);
   const [paymentCancelError, setPaymentCancelError] = useState<string | null>(
     null,
   );
@@ -151,7 +161,19 @@ export default function ProfileScreen() {
           >
             <Image source={backIcon} style={styles.backIcon} />
           </Pressable>
-          <View style={styles.navButton} />
+          {!isMine ? (
+            <Pressable
+              accessibilityLabel="更多操作"
+              accessibilityRole="button"
+              hitSlop={12}
+              onPress={() => setProfileActionsVisible(true)}
+              style={styles.navButton}
+            >
+              <MoreHorizontal24Regular color="#fff" height={24} width={24} />
+            </Pressable>
+          ) : (
+            <View style={styles.navButton} />
+          )}
         </View>
         <ProfileIdentity profile={profile} />
       </View>
@@ -224,7 +246,7 @@ export default function ProfileScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="编辑个人资料"
-            onPress={() => router.push("/account-settings")}
+            onPress={() => router.push("/edit-profile")}
             style={styles.editProfileButton}
           >
             <Edit24Regular color="#FF1F4C" height={20} width={20} />
@@ -261,6 +283,36 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
       ) : null}
+      {!isMine ? (
+        <ProfileActionsSheet
+          visible={profileActionsVisible}
+          bottomInset={insets.bottom}
+          onClose={() => setProfileActionsVisible(false)}
+          onBlockRequest={() => setBlacklistPromptVisible(true)}
+        />
+      ) : null}
+      <AppPrompt
+        visible={blacklistPromptVisible}
+        title="拉黑提示"
+        message="拉黑后，您将无法收到对方的私信，且相互无法进行下单操作"
+        cancelText="取消"
+        confirmText="确认"
+        onCancel={() => setBlacklistPromptVisible(false)}
+        onConfirm={() => {
+          setBlacklistPromptVisible(false);
+          void addToBlacklist({
+            userId: String(profile.userId),
+            nickname: profile.nickname,
+            headImage: profile.headImage,
+            clubName: profile.clubName,
+            clubId: String(profile.clubId),
+          }).then(() => {
+            Toast.show("加入黑名单成功", {
+              duration: Toast.durations.SHORT,
+            });
+          });
+        }}
+      />
       {orderCard && gameDetail ? (
         <CompanionOrderSheet
           card={orderCard}
@@ -276,7 +328,7 @@ export default function ProfileScreen() {
           token={useAuthStore.getState().accessToken}
           onClose={() => setOrderCard(null)}
           onRealNameVerificationRequired={() =>
-            router.push("/account-settings")
+            router.push("/account-security")
           }
           onOrderCreated={(order) => {
             setOrderCard(null);
@@ -353,6 +405,129 @@ export default function ProfileScreen() {
       paymentCancelingRef.current = false;
     }
   }
+}
+
+function ProfileActionsSheet({
+  visible,
+  bottomInset,
+  onClose,
+  onBlockRequest,
+}: {
+  visible: boolean;
+  bottomInset: number;
+  onClose: () => void;
+  onBlockRequest: () => void;
+}) {
+  const { height: windowHeight } = useWindowDimensions();
+  const [backdropOpacity] = useState(() => new Animated.Value(0));
+  const [sheetTranslateY] = useState(
+    () => new Animated.Value(windowHeight),
+  );
+  const isClosing = useRef(false);
+
+  useEffect(() => {
+    if (!visible) return;
+
+    isClosing.current = false;
+    backdropOpacity.setValue(0);
+    sheetTranslateY.setValue(windowHeight);
+    const animation = Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        toValue: 1,
+        duration: 180,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(sheetTranslateY, {
+        toValue: 0,
+        duration: 260,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]);
+
+    animation.start();
+    return () => animation.stop();
+  }, [backdropOpacity, sheetTranslateY, visible, windowHeight]);
+
+  function closeSheet(afterClose?: () => void) {
+    if (!visible || isClosing.current) return;
+    isClosing.current = true;
+    Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: 160,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(sheetTranslateY, {
+        toValue: windowHeight,
+        duration: 220,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (!finished) return;
+      isClosing.current = false;
+      onClose();
+      afterClose?.();
+    });
+  }
+
+  return (
+    <Modal
+      transparent
+      visible={visible}
+      animationType="none"
+      onRequestClose={() => closeSheet()}
+    >
+      <Animated.View
+        style={[styles.profileActionsBackdrop, { opacity: backdropOpacity }]}
+      >
+        <Pressable
+          accessibilityLabel="关闭更多操作"
+          onPress={() => closeSheet()}
+          style={StyleSheet.absoluteFill}
+        />
+        <Animated.View
+          style={[
+            styles.profileActionsSheet,
+            {
+              paddingBottom: Math.max(bottomInset, 16),
+              transform: [{ translateY: sheetTranslateY }],
+            },
+          ]}
+        >
+          <View style={styles.profileActionsHandle} />
+          <Pressable
+            accessibilityLabel="举报"
+            accessibilityRole="button"
+            onPress={() => closeSheet()}
+            style={({ pressed }) => [
+              styles.profileActionRow,
+              pressed && styles.profileActionRowPressed,
+            ]}
+          >
+            <Flag24Regular color="#333" height={24} width={24} />
+            <Text style={styles.profileActionLabel}>举报</Text>
+          </Pressable>
+          <View style={styles.profileActionsDivider} />
+          <Pressable
+            accessibilityLabel="拉黑"
+            accessibilityRole="button"
+            onPress={() => closeSheet(onBlockRequest)}
+            style={({ pressed }) => [
+              styles.profileActionRow,
+              pressed && styles.profileActionRowPressed,
+            ]}
+          >
+            <PersonProhibited24Regular color="#333" height={24} width={24} />
+            <Text style={styles.profileActionLabel}>拉黑</Text>
+          </Pressable>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
 }
 
 function ProfileIdentity({ profile }: { profile: ProfileDetail }) {
@@ -1188,8 +1363,51 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
-  navButton: { width: 24, height: 24 },
+  navButton: {
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   backIcon: { width: 24, height: 24, tintColor: "#fff" },
+  profileActionsBackdrop: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  profileActionsSheet: {
+    paddingTop: 10,
+    paddingHorizontal: 16,
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
+  profileActionsHandle: {
+    alignSelf: "center",
+    width: 36,
+    height: 4,
+    marginBottom: 8,
+    borderRadius: 2,
+    backgroundColor: "#D9D9D9",
+  },
+  profileActionRow: {
+    height: 56,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 4,
+  },
+  profileActionRowPressed: { opacity: 0.6 },
+  profileActionLabel: {
+    marginLeft: 12,
+    color: "#222",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 16,
+  },
+  profileActionsDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 40,
+    backgroundColor: "#EEEEEE",
+  },
   identity: {
     position: "absolute",
     left: 16,
