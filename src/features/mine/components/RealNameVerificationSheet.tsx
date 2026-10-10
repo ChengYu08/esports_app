@@ -3,7 +3,6 @@ import Toast from "react-native-root-toast";
 import { useState } from "react";
 import {
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -11,6 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { BottomSheet } from "@/shared/ui/BottomSheet";
 
 import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { toAuthUser } from "@/features/auth/client-auth-flow";
@@ -81,17 +81,10 @@ export function RealNameVerificationSheet({
 
   return (
     <>
-      <Modal
-      transparent
-      visible={visible}
-      animationType="slide"
-      onRequestClose={close}
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.backdrop}
-      >
-        <View style={styles.card}>
+      <BottomSheet visible={visible} onClose={close} contentStyle={styles.card}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
           <Text style={styles.title}>实名认证</Text>
           <Text style={styles.notice}>
             根据国家规定，本平台禁止未成年人交易
@@ -124,9 +117,8 @@ export function RealNameVerificationSheet({
               </Text>
             </Pressable>
           </View>
-        </View>
-      </KeyboardAvoidingView>
-      </Modal>
+        </KeyboardAvoidingView>
+      </BottomSheet>
       <AppPrompt
         visible={validationPromptVisible}
         title="信息有误"
@@ -151,11 +143,6 @@ function isValidIdCard(value: string) {
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.35)",
-  },
   card: {
     gap: 14,
     padding: 20,

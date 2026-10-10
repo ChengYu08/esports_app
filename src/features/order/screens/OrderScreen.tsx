@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "@esports/auth";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
+import { BottomSheet } from "@/shared/ui/BottomSheet";
 
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
 import { OrderCard } from "../components/OrderCard";
@@ -204,9 +205,7 @@ function StarPaymentPrompt({
   };
 
   return <>
-    <Modal animationType="slide" transparent visible={Boolean(item)} onRequestClose={() => void onClose()}>
-      <View style={styles.paymentBackdrop}>
-        <View style={styles.paymentSheet}>
+    <BottomSheet visible={Boolean(item)} onClose={() => void onClose()} contentStyle={styles.paymentSheet}>
           <Text style={styles.paymentTitle}>星钻支付</Text>
           <Text style={styles.paymentAmount}>支付 {item?.totalPrice ?? 0} 星钻</Text>
           <Text style={styles.paymentBalance}>当前余额：{balance === null ? "加载中..." : `${balance} 星钻`}</Text>
@@ -214,9 +213,7 @@ function StarPaymentPrompt({
             <Pressable style={styles.paymentCancel} onPress={() => void onClose()}><Text>取消</Text></Pressable>
             <Pressable style={styles.paymentConfirm} disabled={paying || balance === null} onPress={() => void pay()}><Text style={styles.paymentConfirmText}>{paying ? "支付中..." : "确认支付"}</Text></Pressable>
           </View>
-        </View>
-      </View>
-    </Modal>
+    </BottomSheet>
     <AppPrompt visible={Boolean(message)} title="支付提示" message={message ?? ""} onConfirm={() => setMessage(null)} />
   </>;
 }
@@ -230,7 +227,6 @@ const styles = StyleSheet.create({
   content: { flexGrow: 1, paddingTop: 8 },
   separator: { height: 8 },
   empty: { flex: 1, minHeight: 320, alignItems: "center", justifyContent: "center" },
-  paymentBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.48)" },
   paymentSheet: { padding: 24, borderTopLeftRadius: 20, borderTopRightRadius: 20, backgroundColor: "#fff" },
   paymentTitle: { color: "#111", fontSize: 18, fontWeight: "600", textAlign: "center" },
   paymentAmount: { marginTop: 24, color: "#111", fontSize: 22, fontWeight: "700", textAlign: "center" },

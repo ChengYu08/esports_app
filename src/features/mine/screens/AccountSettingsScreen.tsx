@@ -29,6 +29,7 @@ import {
 import { messageStore } from "@/features/message/message-store";
 import { RealNameVerificationSheet } from "@/features/mine/components/RealNameVerificationSheet";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { BottomSheet } from "@/shared/ui/BottomSheet";
 
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const arrowIcon = require("../../../../assets/mine/figma/mine-arrow-right.svg");
@@ -331,17 +332,11 @@ export default function AccountSettingsScreen() {
         </ScrollView>
       )}
 
-      <Modal
-        transparent
-        visible={editing !== null}
-        animationType="slide"
-        onRequestClose={() => setEditing(null)}
-      >
+      <BottomSheet visible={editing !== null} onClose={() => setEditing(null)} contentStyle={styles.modalCard}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={styles.modalBackdrop}
         >
-          <View style={styles.modalCard}>
+          <View>
             <Text style={styles.modalTitle}>{editTitle(editing)}</Text>
             {editing === "gender" ? (
               <View style={styles.genderOptions}>
@@ -401,7 +396,7 @@ export default function AccountSettingsScreen() {
             </View>
           </View>
         </KeyboardAvoidingView>
-      </Modal>
+      </BottomSheet>
       <RealNameVerificationSheet
         visible={realNameVisible}
         onClose={() => setRealNameVisible(false)}

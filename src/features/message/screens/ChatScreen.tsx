@@ -23,6 +23,7 @@ import EmojiPicker, { type EmojiType } from "rn-emoji-keyboard";
 
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { resolveConversationAvatar } from "../message-avatar";
 import { useMessageStore } from "../message-store";
 import type { ManagedMessage } from "../message-state";
@@ -255,9 +256,8 @@ export default function ChatScreen() {
           category: { icon: "#999999", iconActive: "#FE1F4C" },
         }}
       />
-      <Modal animationType="slide" transparent visible={settingsVisible} onRequestClose={() => setSettingsVisible(false)}>
-        <Pressable style={styles.sheetBackdrop} onPress={() => setSettingsVisible(false)}>
-          <View onStartShouldSetResponder={() => true} style={[styles.settingsSheet, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+      <BottomSheet visible={settingsVisible} onClose={() => setSettingsVisible(false)} contentStyle={[styles.settingsSheet, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+          <View onStartShouldSetResponder={() => true}>
             <View style={styles.sheetTitleRow}>
               <Text style={styles.sheetTitle}>消息设置</Text>
               <Pressable accessibilityLabel="关闭消息设置" accessibilityRole="button" hitSlop={8} onPress={() => setSettingsVisible(false)} style={styles.sheetClose}>
@@ -284,8 +284,7 @@ export default function ChatScreen() {
               </Pressable>
             </View>
           </View>
-        </Pressable>
-      </Modal>
+      </BottomSheet>
       <Modal animationType="fade" transparent visible={noteVisible} onRequestClose={() => setNoteVisible(false)}>
         <Pressable style={styles.noteBackdrop} onPress={() => setNoteVisible(false)}>
           <View onStartShouldSetResponder={() => true} style={styles.noteDialog}>

@@ -11,6 +11,7 @@ import { resolveConversationAvatar } from "../message-avatar";
 import { useMessageStore } from "../message-store";
 import type { MessageListItemModel } from "../message.types";
 import { getSystemConversationTitle, normalizeSystemConversationId } from "../system-conversations";
+import Toast from "react-native-root-toast";
 
 const defaultConversationAvatar = require("../../../../assets/coms/avatar_default_2.png");
 
@@ -22,6 +23,11 @@ export default function MessageScreen() {
   const lastError = useMessageStore((state) => state.lastError);
   const conversations = useMessageStore((state) => state.conversations);
   const clearAllUnread = useMessageStore((state) => state.clearAllUnread);
+
+  const handleClear = async () => {
+    await clearAllUnread();
+    Toast.show("清理完成", { duration: Toast.durations.SHORT });
+  };
 
   useEffect(() => { if (accessToken) void initialize(accessToken); }, [accessToken, initialize]);
 
@@ -40,7 +46,7 @@ export default function MessageScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}> 
       <MessageHeader
-        onClear={() => void clearAllUnread()}
+        onClear={() => void handleClear()}
         onSearch={() => router.push({ pathname: "/search", params: { type: "message" } })}
       />
       {stateMessage ? <View style={styles.state}><Text style={styles.stateText}>{stateMessage}</Text>{connectionState === "error" ? <Pressable accessibilityRole="button" onPress={() => accessToken && void initialize(accessToken)} style={styles.retry}><Text style={styles.retryText}>重试</Text></Pressable> : null}</View> : items.length === 0 ? <View style={styles.state}><EmptyState message="暂无消息" /></View> : <FlatList contentContainerStyle={{ paddingBottom: 80 + insets.bottom }} data={items} keyExtractor={(item) => item.id} renderItem={({ item, index }) => <MessageListItem item={item} isLast={index === items.length - 1} onPress={handleMessagePress} />} showsVerticalScrollIndicator={false} />}

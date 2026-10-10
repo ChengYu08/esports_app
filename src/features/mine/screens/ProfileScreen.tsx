@@ -60,6 +60,7 @@ import { cancelOrder } from "@/features/order/order.api";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import Toast from "react-native-root-toast";
@@ -1134,19 +1135,8 @@ function StarPaymentSheet({
   }
 
   return (
-    <Modal
-      animationType="slide"
-      transparent
-      visible={visible}
-      onRequestClose={() => void onClose()}
-    >
-      <View style={styles.orderModalBackdrop}>
-        <View
-          style={[
-            styles.paymentModal,
-            { paddingBottom: Math.max(insets.bottom, 16) },
-          ]}
-        >
+    <>
+    <BottomSheet visible={visible} onClose={() => void onClose()} contentStyle={[styles.paymentModal, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <View style={styles.paymentModalHeader}>
             <View style={styles.paymentModalHeading}>
               <Text style={styles.paymentModalTitle}>星钻支付</Text>
@@ -1181,15 +1171,14 @@ function StarPaymentSheet({
               </Text>
             </Pressable>
           </View>
-        </View>
-      </View>
+    </BottomSheet>
       <AppPrompt
         visible={Boolean(prompt)}
         title={prompt?.title}
         message={prompt?.message ?? ""}
         onConfirm={() => setPrompt(null)}
       />
-    </Modal>
+    </>
   );
 }
 
