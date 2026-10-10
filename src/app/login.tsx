@@ -7,8 +7,9 @@ import { getPasswordLoginErrorMessage } from "@/features/auth/password-login-err
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { openExternalLink } from "@/shared/navigation/open-external-link";
 import { Stack, router, useLocalSearchParams } from "expo-router";
+import Toast from "react-native-root-toast";
 import { useMemo, useState } from "react";
-import { Alert, Platform } from "react-native";
+import { Platform } from "react-native";
 
 export default function LoginRoute() {
   const params = useLocalSearchParams<{ mode?: string; phone?: string }>();
@@ -37,15 +38,15 @@ export default function LoginRoute() {
         onSkip={() => router.replace("/")}
         onSendCode={async (phone) => {
           if (!adapter) {
-            Alert.alert("验证码发送失败", "请先配置 SSO client secret。");
+            Toast.show("验证码发送失败，请先配置 SSO client secret。", { duration: Toast.durations.SHORT });
             throw new Error("SSO client secret is not configured");
           }
           try {
             await adapter.sendCode(phone);
           } catch (error) {
-            Alert.alert(
-              "验证码发送失败",
-              error instanceof Error ? error.message : "请稍后重试",
+            Toast.show(
+              `验证码发送失败，${error instanceof Error ? error.message : "请稍后重试"}`,
+              { duration: Toast.durations.SHORT },
             );
             throw error;
           }
@@ -57,7 +58,7 @@ export default function LoginRoute() {
           }
           try {
             const token = await adapter.passwordLogin(payload);
-            await completeClientLogin(token, "PASSWORD", setSession, setCompanionStatus);
+            await completeClientLogin(token, "PASSWORD", setSession, setCompanionStatus, payload.username);
             router.replace("/");
           } catch (error) {
             setPasswordLoginError(getPasswordLoginErrorMessage(error));
@@ -70,30 +71,33 @@ export default function LoginRoute() {
         onPrivacyPolicyPress={() => void openExternalLink(APP_LINKS.privacyPolicy)}
         onQuickLogin={async () => {
           if (!adapter) {
-            Alert.alert("暂无法一键登录", "请先配置 SSO client secret。");
+            Toast.show("暂无法一键登录，请先配置 SSO client secret。", { duration: Toast.durations.SHORT });
             return;
           }
           try {
             const token = await adapter.quickLogin(quickLoginProvider);
-            await completeClientLogin(token, "ONE_CLICK_LOGIN", setSession, setCompanionStatus);
+            await completeClientLogin(token, "ONE_CLICK_LOGIN", setSession, setCompanionStatus, token.phone);
             router.replace("/");
           } catch (error) {
-            Alert.alert("一键登录不可用", error instanceof Error ? error.message : "请使用验证码登录");
+            Toast.show(
+              `一键登录不可用，${error instanceof Error ? error.message : "请使用验证码登录"}`,
+              { duration: Toast.durations.SHORT },
+            );
           }
         }}
         onLogin={async (payload) => {
           if (!adapter) {
-            Alert.alert("登录失败", "请先配置 SSO client secret。");
+            Toast.show("登录失败，请先配置 SSO client secret。", { duration: Toast.durations.SHORT });
             return;
           }
           try {
             const token = await adapter.login(payload);
-            await completeClientLogin(token, "SMS_CODE", setSession, setCompanionStatus);
+            await completeClientLogin(token, "SMS_CODE", setSession, setCompanionStatus, payload.phone);
             router.replace("/");
           } catch (error) {
-            Alert.alert(
-              "登录失败",
-              error instanceof Error ? error.message : "请检查手机号和验证码",
+            Toast.show(
+              `登录失败，${error instanceof Error ? error.message : "请检查手机号和验证码"}`,
+              { duration: Toast.durations.SHORT },
             );
           }
         }}

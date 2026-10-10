@@ -3,6 +3,7 @@ import { Delete24Regular } from "@fluentui/react-native-icons";
 import { Paths } from "expo-file-system";
 import { Image } from "expo-image";
 import { router } from "expo-router";
+import Toast from "react-native-root-toast";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -67,11 +68,11 @@ export default function BasicSettingsScreen() {
         }
         queryClient.clear();
         setCacheSize(readCacheSize());
-        Alert.alert("清理完成", "可重新下载的缓存已清除");
+        Toast.show("清理完成，可重新下载的缓存已清除", { duration: Toast.durations.SHORT });
       } catch (error) {
-        Alert.alert(
-          "清理失败",
-          error instanceof Error ? error.message : "请稍后重试",
+        Toast.show(
+          `清理失败，${error instanceof Error ? error.message : "请稍后重试"}`,
+          { duration: Toast.durations.SHORT },
         );
         setCacheSize(readCacheSize());
       } finally {

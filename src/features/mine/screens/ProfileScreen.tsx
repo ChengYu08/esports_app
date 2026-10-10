@@ -338,7 +338,7 @@ export default function ProfileScreen() {
           token={useAuthStore.getState().accessToken}
           onClose={() => setOrderCard(null)}
           onRealNameVerificationRequired={() =>
-            router.push("/account-security")
+            router.push("/account-settings")
           }
           onOrderCreated={(order) => {
             setOrderCard(null);
@@ -1504,7 +1504,7 @@ const styles = StyleSheet.create({
     height: 48,
     marginHorizontal: 12,
     marginTop: "auto",
-    marginBottom: 28,
+    marginBottom: 8,
     borderRadius: 8,
     backgroundColor: "#FFF",
     flexDirection: "row",

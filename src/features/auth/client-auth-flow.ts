@@ -5,6 +5,7 @@ import { saveAuthSession } from './session-persistence';
 import { fetchUserDetail } from './api/companion.api';
 import { logger } from '@/core/logging/logger';
 import type { CompanionProfile } from '@/types/companion';
+import { resolveAuthPhone } from './auth-phone';
 
 type SetSession = (session: { accessToken: string; user: AuthUser }) => void;
 type SetCompanionStatus = (isCompanion: boolean, profile: CompanionProfile | null) => void;
@@ -14,7 +15,7 @@ export function toAuthUser(profile: ClientUserInfo, fallbackPhone?: string): Aut
     id: String(profile.id),
     nickname: profile.nickname,
     headImage: profile.headImage,
-    phone: profile.phone ?? fallbackPhone,
+    phone: resolveAuthPhone(profile.phone, fallbackPhone),
     gender: profile.gender,
     birth: profile.birth,
     signature: profile.signature,
@@ -32,12 +33,13 @@ export async function completeClientLogin(
   registerWay: string,
   setSession: SetSession,
   setCompanionStatus?: SetCompanionStatus,
+  fallbackPhone?: string,
 ) {
   if (!ssoToken.id_token) throw new Error('统一登录未返回 idToken');
   const login = await clientAuthApi.exchangeIdToken(ssoToken.id_token, registerWay);
   if (!login.token) throw new Error('业务 token 为空');
   const profile = await clientAuthApi.fetchCurrentUser(login.token);
-  const session = { accessToken: login.token, user: toAuthUser(profile, ssoToken.phone) };
+  const session = { accessToken: login.token, user: toAuthUser(profile, fallbackPhone ?? ssoToken.phone) };
   await saveAuthSession(session);
   setSession(session);
 

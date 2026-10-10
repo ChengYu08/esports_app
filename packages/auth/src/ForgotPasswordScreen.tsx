@@ -37,7 +37,10 @@ export function ForgotPasswordScreen({
   onSendCode,
   onSubmit,
 }: ForgotPasswordScreenProps) {
-  const [phone, setPhone] = useState(() => sanitizePhone(initialPhone ?? ""));
+  const [phone, setPhone] = useState(() => {
+    const normalizedPhone = sanitizePhone(initialPhone ?? "");
+    return validatePhone(normalizedPhone) ? "" : normalizedPhone;
+  });
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");

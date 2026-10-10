@@ -2,7 +2,6 @@ import { useAuthStore } from "@esports/auth";
 import Toast from "react-native-root-toast";
 import { useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -71,9 +70,9 @@ export function RealNameVerificationSheet({
       onVerified?.();
       Toast.show("认证成功", { duration: Toast.durations.SHORT });
     } catch (error) {
-      Alert.alert(
-        "认证失败",
-        error instanceof Error ? error.message : "请稍后重试",
+      Toast.show(
+        `认证失败，${error instanceof Error ? error.message : "请稍后重试"}`,
+        { duration: Toast.durations.SHORT },
       );
     } finally {
       setSubmitting(false);

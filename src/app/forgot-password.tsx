@@ -2,8 +2,9 @@ import { createAuthSsoAdapter, ForgotPasswordScreen } from "@esports/auth";
 import { SsoClient } from "@esports/sso-sdk";
 import { env } from "@/core/config/env";
 import { Stack, router, useLocalSearchParams } from "expo-router";
+import Toast from "react-native-root-toast";
 import { useMemo } from "react";
-import { Alert, Platform } from "react-native";
+import { Platform } from "react-native";
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
@@ -30,15 +31,15 @@ export default function ForgotPasswordRoute() {
         onSendCode={async (phone) => {
           if (!adapter) {
             const error = new Error("请先配置 SSO client secret。");
-            Alert.alert("验证码发送失败", error.message);
+            Toast.show(`验证码发送失败，${error.message}`, { duration: Toast.durations.SHORT });
             throw error;
           }
           try {
             await adapter.sendResetCode(phone);
           } catch (error) {
-            Alert.alert(
-              "验证码发送失败",
-              getErrorMessage(error, "发送验证码失败"),
+            Toast.show(
+              `验证码发送失败，${getErrorMessage(error, "发送验证码失败")}`,
+              { duration: Toast.durations.SHORT },
             );
             throw error;
           }
@@ -46,24 +47,20 @@ export default function ForgotPasswordRoute() {
         onSubmit={async (payload) => {
           if (!adapter) {
             const error = new Error("请先配置 SSO client secret。");
-            Alert.alert("密码重置失败", error.message);
+            Toast.show(`密码重置失败，${error.message}`, { duration: Toast.durations.SHORT });
             throw error;
           }
           try {
             await adapter.forgetPassword(payload);
-            Alert.alert("密码重置成功", "请使用新密码登录。", [
-              {
-                text: "去登录",
-                onPress: () => router.replace({
-                  pathname: "/login",
-                  params: { mode: "password", phone: payload.phone },
-                }),
-              },
-            ]);
+            Toast.show("密码重置成功，请使用新密码登录。", { duration: Toast.durations.SHORT });
+            router.replace({
+              pathname: "/login",
+              params: { mode: "password", phone: payload.phone },
+            });
           } catch (error) {
-            Alert.alert(
-              "密码重置失败",
-              getErrorMessage(error, "密码重置失败"),
+            Toast.show(
+              `密码重置失败，${getErrorMessage(error, "密码重置失败")}`,
+              { duration: Toast.durations.SHORT },
             );
             throw error;
           }

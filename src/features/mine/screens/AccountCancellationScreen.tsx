@@ -1,6 +1,7 @@
 import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { router } from "expo-router";
+import Toast from "react-native-root-toast";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -92,7 +93,10 @@ export default function AccountCancellationScreen() {
       setCountdown(60);
       Alert.alert("验证码已发送", "验证码已发送至绑定手机号，请注意查收。", [{ text: "知道了" }]);
     } catch (error) {
-      Alert.alert("验证码发送失败", error instanceof Error ? error.message : "请稍后重试");
+      Toast.show(
+        `验证码发送失败，${error instanceof Error ? error.message : "请稍后重试"}`,
+        { duration: Toast.durations.SHORT },
+      );
     } finally {
       setSendingCode(false);
     }
@@ -107,11 +111,13 @@ export default function AccountCancellationScreen() {
       await clearAuthSession().catch(() => undefined);
       clearSession();
       await messageStore.getState().reset().catch(() => undefined);
-      Alert.alert("注销申请已提交", "账号将在办理期内完成注销，请勿再次登录。", [
-        { text: "返回首页", onPress: () => router.replace("/") },
-      ]);
+      Toast.show("注销申请已提交，账号将在办理期内完成注销，请勿再次登录。", { duration: Toast.durations.SHORT });
+      router.replace("/");
     } catch (error) {
-      Alert.alert("注销申请失败", error instanceof Error ? error.message : "请检查验证码后重试");
+      Toast.show(
+        `注销申请失败，${error instanceof Error ? error.message : "请检查验证码后重试"}`,
+        { duration: Toast.durations.SHORT },
+      );
     } finally {
       setSubmitting(false);
     }
