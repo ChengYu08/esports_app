@@ -23,7 +23,21 @@ export type AfterSaleCardMessage = {
   isMine: boolean;
 };
 
-export type ChatMessage = ChatTextMessage | ChatImageMessage | AfterSaleCardMessage;
+export type OrderNotifyCardMessage = {
+  id: string;
+  kind: "orderNotify";
+  title: string;
+  orderNo?: string;
+  gameName?: string;
+  serviceDesc?: string;
+  numDesc?: string;
+  totalPriceDesc?: string;
+  createTime?: string;
+  time: string;
+  isMine: boolean;
+};
+
+export type ChatMessage = ChatTextMessage | ChatImageMessage | AfterSaleCardMessage | OrderNotifyCardMessage;
 
 export type RongSdkMessage = {
   messageType?: number;
@@ -58,6 +72,25 @@ export function mapRongMessage(message: RongSdkMessage, enums: { image: number; 
     let payload: Record<string, string> = fields;
     try { payload = JSON.parse(fields.data || "{}"); } catch { /* use fields */ }
     return { id, kind: "afterSale", title: "订单服务不满意，申请售后～", orderNo: payload.orderNo, time, isMine };
+  }
+
+  if (message.identifier === "ORDER_NOTIFY") {
+    let fields = message.fields || {};
+    let payload: Record<string, string> = fields;
+    try { payload = JSON.parse(fields.data || "{}"); } catch { /* use fields */ }
+    return {
+      id,
+      kind: "orderNotify",
+      title: payload.title || "订单状态通知",
+      orderNo: payload.orderNo,
+      gameName: payload.gameName,
+      serviceDesc: payload.serviceDesc,
+      numDesc: payload.numDesc,
+      totalPriceDesc: payload.totalPriceDesc,
+      createTime: payload.createTime,
+      time,
+      isMine,
+    };
   }
 
   const text = message.text || message.content;

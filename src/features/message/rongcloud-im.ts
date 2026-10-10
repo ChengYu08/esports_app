@@ -8,6 +8,7 @@ import type {
 import { mapRongMessage, type RongSdkMessage } from './chat-message';
 import type { ManagedMessage, MessageConversation, MessageHistoryPage } from './message-state';
 import type { AfterSaleCardPayload } from '@/features/order/after-sale-card';
+import { getRongConversationTargetId, getSystemConversationTitle, isSystemConversationId, normalizeSystemConversationId } from './system-conversations';
 
 export type RongConversation = MessageConversation;
 export type RongTextMessage = ManagedMessage;
@@ -66,10 +67,11 @@ function mapPreview(message?: RCIMIWMessage) {
 }
 
 function mapConversation(conversation: RCIMIWConversation): RongConversation {
+  const id = normalizeSystemConversationId(String(conversation.targetId || ''));
   const last = mapPreview(conversation.lastMessage);
   return {
-    id: String(conversation.targetId || ''),
-    title: String(conversation.targetId || '消息'),
+    id,
+    title: getSystemConversationTitle(id, String(conversation.targetId || '消息')),
     preview: last.preview,
     time: last.time,
     unreadCount: conversation.unreadCount || 0,
@@ -79,6 +81,9 @@ function mapConversation(conversation: RCIMIWConversation): RongConversation {
 
 async function hydrateConversation(conversation: RongConversation) {
   if (!businessToken || !conversation.id) return conversation;
+  if (isSystemConversationId(conversation.id)) {
+    return { ...conversation, title: getSystemConversationTitle(conversation.id), avatar: undefined };
+  }
   try {
     const profile = await getClientAuthApi().getUserProfile(businessToken, conversation.id);
     return { ...conversation, title: profile.nickname || conversation.title, avatar: profile.headImage || undefined };
@@ -116,12 +121,12 @@ function emitConversation(conversation: RongConversation) {
 
 async function emitReceived(message: RCIMIWMessage) {
   const enums = getSdkEnums();
-  const peerId = message.senderUserId || message.targetId;
+  const peerId = normalizeSystemConversationId(message.senderUserId || message.targetId || '');
   if (!enums || message.conversationType !== enums.conversationType || !peerId) return;
   const mapped = toManagedMessage(message);
   if (!mapped) return;
   const conversation = await hydrateConversation(mapConversation({
-    targetId: peerId,
+    targetId: getRongConversationTargetId(peerId),
     conversationType: message.conversationType,
     lastMessage: message,
     unreadCount: 1,
@@ -152,6 +157,10 @@ export async function connectRongCloud(accessToken: string) {
     try {
       const { env } = getRuntimeConfig();
       engine = sdk.RCIMIWEngine.create(env.rongCloudAppKey);
+      await engine.registerNativeCustomMessage(
+        'ORDER_NOTIFY',
+        sdk.RCIMIWNativeCustomMessagePersistentFlag.Counted,
+      );
       installListeners();
     } catch {
       return false;
@@ -200,7 +209,8 @@ export function subscribeRongMessages(onMessage: ConversationListener) {
 }
 
 export function subscribeRongConversationMessages(targetId: string, onMessage: (message: ManagedMessage) => void) {
-  const listener: MessageListener = (peerId, message) => { if (peerId === targetId) onMessage(message); };
+  const normalizedTargetId = normalizeSystemConversationId(targetId);
+  const listener: MessageListener = (peerId, message) => { if (normalizeSystemConversationId(peerId) === normalizedTargetId) onMessage(message); };
   messageListeners.add(listener);
   return () => messageListeners.delete(listener);
 }
@@ -219,7 +229,7 @@ export async function getRongMessages(targetId: string, beforeSentTime?: number)
     const finish = (page: MessageHistoryPage) => { if (!settled) { settled = true; resolve(page); } };
     void engine?.getMessages(
       sdk.RCIMIWConversationType.PRIVATE,
-      targetId,
+      getRongConversationTargetId(targetId),
       '',
       beforeSentTime || 0,
       sdk.RCIMIWTimeOrder.BEFORE,
@@ -247,7 +257,7 @@ export async function sendRongText(targetId: string, text: string): Promise<Mana
   const sdk = loadSdk();
   if (!sdk) throw new Error('当前版本暂不支持即时消息');
   const currentEngine = requireConnected();
-  const message = await currentEngine.createTextMessage(sdk.RCIMIWConversationType.PRIVATE, targetId, '', text);
+  const message = await currentEngine.createTextMessage(sdk.RCIMIWConversationType.PRIVATE, getRongConversationTargetId(targetId), '', text);
   return new Promise((resolve, reject) => {
     let settled = false;
     const finish = (error?: Error, sent?: RCIMIWMessage) => {
@@ -266,7 +276,7 @@ export async function sendRongImage(targetId: string, path: string): Promise<Man
   const sdk = loadSdk();
   if (!sdk) throw new Error('当前版本暂不支持即时消息');
   const currentEngine = requireConnected();
-  const message = await currentEngine.createImageMessage(sdk.RCIMIWConversationType.PRIVATE, targetId, '', path);
+  const message = await currentEngine.createImageMessage(sdk.RCIMIWConversationType.PRIVATE, getRongConversationTargetId(targetId), '', path);
   return new Promise((resolve, reject) => {
     let settled = false;
     const finish = (error?: Error, sent?: RCIMIWMediaMessage) => {
@@ -286,7 +296,7 @@ export async function sendRongAfterSaleCard(targetId: string, payload: AfterSale
   if (!sdk) throw new Error('当前版本暂不支持即时消息');
   const currentEngine = requireConnected();
   const fields = new Map<string, string>([['data', JSON.stringify(payload)], ['content', '【售后申请】订单 ' + (payload.orderNo || '')]]);
-  const message = await currentEngine.createCustomMessage(sdk.RCIMIWConversationType.PRIVATE, targetId, '', sdk.RCIMIWCustomMessagePolicy.NORMAL, 'PZAfterSaleApply', fields);
+  const message = await currentEngine.createCustomMessage(sdk.RCIMIWConversationType.PRIVATE, getRongConversationTargetId(targetId), '', sdk.RCIMIWCustomMessagePolicy.NORMAL, 'PZAfterSaleApply', fields);
   return new Promise((resolve, reject) => {
     void currentEngine.sendMessage(message, { onMessageSent: (code, sent) => {
       if (code !== 0) return reject(new Error(`售后卡片发送失败（${code}）`));
@@ -299,7 +309,7 @@ export async function sendRongAfterSaleCard(targetId: string, payload: AfterSale
 export async function markRongConversationRead(targetId: string) {
   const sdk = loadSdk();
   if (!engine || !connected || !sdk || !targetId) return false;
-  const code = await engine.clearUnreadCount(sdk.RCIMIWConversationType.PRIVATE, targetId, '', Date.now());
+  const code = await engine.clearUnreadCount(sdk.RCIMIWConversationType.PRIVATE, getRongConversationTargetId(targetId), '', Date.now());
   if (code !== 0) throw new Error(`清除未读失败（${code}）`);
   return true;
 }

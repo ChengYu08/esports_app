@@ -1,4 +1,5 @@
 import { useAuthStore } from "@esports/auth";
+import { Edit24Regular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -60,7 +61,6 @@ const background = require("../../../../assets/mine/figma/profile-bg.png");
 const maleIcon = require("../../../../assets/home/club-detail/male.svg");
 const femaleIcon = require("../../../../assets/mine/figma/mine-female.svg");
 const clubIcon = require("../../../../assets/mine/figma/mine-club-flag.svg");
-const settingsIcon = require("../../../../assets/mine/figma/mine-settings.svg");
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const diamondIcon = require("../../../../assets/home/club-detail/icon-diamond.svg");
 const idleStatusIcon = require("../../../../assets/home/club-detail/status-idle.svg");
@@ -151,18 +151,7 @@ export default function ProfileScreen() {
           >
             <Image source={backIcon} style={styles.backIcon} />
           </Pressable>
-          {isMine ? (
-            <Pressable
-              accessibilityLabel="设置"
-              hitSlop={12}
-              onPress={() => router.push("/account-settings")}
-              style={styles.navButton}
-            >
-              <Image source={settingsIcon} style={styles.settingsIcon} />
-            </Pressable>
-          ) : (
-            <View style={styles.navButton} />
-          )}
+          <View style={styles.navButton} />
         </View>
         <ProfileIdentity profile={profile} />
       </View>
@@ -230,6 +219,18 @@ export default function ProfileScreen() {
             )
           ) : null}
         </View>
+
+        {isMine ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="编辑个人资料"
+            onPress={() => router.push("/account-settings")}
+            style={styles.editProfileButton}
+          >
+            <Edit24Regular color="#FF1F4C" height={20} width={20} />
+            <Text style={styles.editProfileText}>编辑个人资料</Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
 
       {!isMine ? (
@@ -251,6 +252,7 @@ export default function ProfileScreen() {
                   userId: profile.userId,
                   nickname: profile.nickname,
                   headImage: profile.headImage,
+                  clubId: profile.clubId,
                 }),
               })
             }
@@ -1188,7 +1190,6 @@ const styles = StyleSheet.create({
   },
   navButton: { width: 24, height: 24 },
   backIcon: { width: 24, height: 24, tintColor: "#fff" },
-  settingsIcon: { width: 24, height: 24, tintColor: "#fff" },
   identity: {
     position: "absolute",
     left: 16,
@@ -1270,6 +1271,23 @@ const styles = StyleSheet.create({
   scrollBody: {
     paddingHorizontal: 16,
     backgroundColor: "#fff",
+  },
+  editProfileButton: {
+    height: 48,
+    marginHorizontal: 12,
+    marginTop: 28,
+    marginBottom: 28,
+    borderRadius: 8,
+    backgroundColor: "#FFF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  editProfileText: {
+    color: "#FF1F4C",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 15,
   },
   stats: { flexDirection: "row", gap: 16 },
   stat: { flexDirection: "row", alignItems: "baseline", gap: 5 },

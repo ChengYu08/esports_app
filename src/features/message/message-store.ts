@@ -25,6 +25,7 @@ import {
   type MessageHistoryPage,
 } from './message-state';
 import type { AfterSaleCardPayload } from '@/features/order/after-sale-card';
+import { getSystemConversationTitle, normalizeSystemConversationId } from './system-conversations';
 
 export type MessageConnectionState = 'idle' | 'connecting' | 'ready' | 'unavailable' | 'error';
 
@@ -56,7 +57,7 @@ export type MessageStoreState = {
   activePeerId: string | null;
   lastError: string | null;
   initialize: (token: string) => Promise<void>;
-  openConversation: (conversation: Pick<MessageConversation, 'id' | 'title' | 'avatar'>) => Promise<void>;
+  openConversation: (conversation: Pick<MessageConversation, 'id' | 'title' | 'avatar' | 'clubId'>) => Promise<void>;
   closeConversation: () => void;
   loadOlder: (peerId: string) => Promise<void>;
   sendText: (peerId: string, text: string) => Promise<void>;
@@ -64,6 +65,8 @@ export type MessageStoreState = {
   sendImage: (peerId: string, path: string) => Promise<void>;
   retryMessage: (peerId: string, clientId: string) => Promise<void>;
   markRead: (peerId: string) => Promise<void>;
+  setConversationNote: (peerId: string, note: string) => void;
+  setConversationPinned: (peerId: string, isPinned: boolean) => void;
   clearAllUnread: () => Promise<void>;
   reset: () => Promise<void>;
 };
@@ -97,7 +100,8 @@ function createPendingImage(path: string): ManagedMessage {
 }
 
 function toConversationShell(conversation: Pick<MessageConversation, 'id' | 'title' | 'avatar'>): MessageConversation {
-  return { ...conversation, preview: '', time: '', unreadCount: 0, updatedAt: 0 };
+  const id = normalizeSystemConversationId(conversation.id);
+  return { ...conversation, id, title: getSystemConversationTitle(id, conversation.title), preview: '', time: '', unreadCount: 0, updatedAt: 0 };
 }
 
 function createAdapter(): MessageAdapter {
@@ -122,33 +126,44 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
 
   const store = createStore<MessageStoreState>((set, get) => {
     const receiveConversation = (conversation: MessageConversation) => {
+      const normalizedConversation = {
+        ...conversation,
+        id: normalizeSystemConversationId(conversation.id),
+        title: getSystemConversationTitle(conversation.id, conversation.title),
+      };
       set((state) => {
-        const existing = state.conversations.find((item) => item.id === conversation.id);
-        return { conversations: mergeConversations(state.conversations, { ...conversation, unreadCount: existing?.unreadCount || 0 }) };
+        const existing = state.conversations.find((item) => item.id === normalizedConversation.id || normalizeSystemConversationId(item.id) === normalizedConversation.id);
+        return { conversations: mergeConversations(state.conversations, { ...normalizedConversation, unreadCount: existing?.unreadCount || 0 }) };
       });
     };
 
     const receiveMessage = (peerId: string, message: ManagedMessage, conversation: MessageConversation) => {
-      const isActive = get().activePeerId === peerId;
+      const normalizedPeerId = normalizeSystemConversationId(peerId);
+      const normalizedConversation = { ...conversation, id: normalizedPeerId, title: getSystemConversationTitle(normalizedPeerId, conversation.title) };
+      const isActive = get().activePeerId === normalizedPeerId;
       set((state) => {
-        const existing = state.conversations.find((item) => item.id === peerId);
+        const existing = state.conversations.find((item) => item.id === normalizedPeerId);
         const nextConversation: MessageConversation = {
-          ...conversation,
-          title: existing?.title || conversation.title,
-          avatar: existing?.avatar || conversation.avatar,
+          ...normalizedConversation,
+          title: getSystemConversationTitle(normalizedPeerId, existing?.title || normalizedConversation.title),
+          avatar: existing?.avatar || normalizedConversation.avatar,
           unreadCount: isActive ? 0 : (existing?.unreadCount || 0) + 1,
           updatedAt: message.sentAt,
         };
         return {
-          messagesByPeerId: { ...state.messagesByPeerId, [peerId]: mergeMessages(state.messagesByPeerId[peerId] || [], message) },
+          messagesByPeerId: { ...state.messagesByPeerId, [normalizedPeerId]: mergeMessages(state.messagesByPeerId[normalizedPeerId] || [], message) },
           conversations: mergeConversations(state.conversations, nextConversation),
         };
       });
-      if (isActive) void adapter.markRead(peerId).catch((error) => set({ lastError: error instanceof Error ? error.message : '清除未读失败' }));
+      if (isActive) void adapter.markRead(normalizedPeerId).catch((error) => set({ lastError: error instanceof Error ? error.message : '清除未读失败' }));
     };
 
     const updateLocalPreview = (peerId: string, message: ManagedMessage) => {
-        const preview = message.kind === 'image' ? '[图片]' : message.kind === 'afterSale' ? message.title : message.text;
+        const preview = message.kind === 'image'
+          ? '[图片]'
+          : message.kind === 'afterSale' || message.kind === 'orderNotify'
+            ? message.title
+            : message.text;
       set((state) => {
         const existing = state.conversations.find((item) => item.id === peerId) || toConversationShell({ id: peerId, title: peerId });
         return { conversations: mergeConversations(state.conversations, { ...existing, preview, time: message.time, updatedAt: message.sentAt }) };
@@ -187,7 +202,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           }
           set({ connectionState: 'ready', lastError: null });
           const conversations = await adapter.getConversations();
-          set({ conversations: conversations.sort((left, right) => right.updatedAt - left.updatedAt) });
+          set((state) => ({ conversations: conversations.reduce(mergeConversations, state.conversations) }));
           stopConversationSubscription?.();
           stopMessageSubscription?.();
           stopConversationSubscription = adapter.subscribeConversations(receiveConversation);
@@ -285,6 +300,16 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         if (get().connectionState !== 'ready') return;
         try { await adapter.markRead(peerId); } catch (error) { set({ lastError: error instanceof Error ? error.message : '清除未读失败' }); }
       },
+
+      setConversationNote: (peerId, note) => set((state) => ({
+        conversations: state.conversations.map((conversation) => conversation.id === peerId ? { ...conversation, note } : conversation),
+      })),
+
+      setConversationPinned: (peerId, isPinned) => set((state) => ({
+        conversations: state.conversations
+          .map((conversation) => conversation.id === peerId ? { ...conversation, isPinned } : conversation)
+          .sort((left, right) => Number(Boolean(right.isPinned)) - Number(Boolean(left.isPinned)) || right.updatedAt - left.updatedAt),
+      })),
 
       clearAllUnread: async () => {
         const peerIds = get().conversations

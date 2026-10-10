@@ -22,6 +22,17 @@ describe("message state helpers", () => {
     ], updated).map((item) => item.id)).toEqual(["1", "2"]);
   });
 
+  it("keeps pinned peers ahead of newer unpinned peers and preserves local settings", () => {
+    const pinned = { id: "1", title: "Peer", preview: "latest", time: "10:00", unreadCount: 0, updatedAt: 1, isPinned: true, note: "熟客" };
+    expect(mergeConversations([
+      { id: "1", title: "Peer", preview: "old", time: "09:00", unreadCount: 0, updatedAt: 1, isPinned: true, note: "熟客" },
+      { id: "2", title: "Newer", preview: "new", time: "10:01", unreadCount: 0, updatedAt: 10 },
+    ], { id: "1", title: "Peer", preview: "latest", time: "10:00", unreadCount: 0, updatedAt: 1 })).toEqual([
+      pinned,
+      { id: "2", title: "Newer", preview: "new", time: "10:01", unreadCount: 0, updatedAt: 10 },
+    ]);
+  });
+
   it("replaces a pending message and prepends unique chronological history", () => {
     const sent = { ...pending, id: "server-1", status: "sent" as const };
     expect(replacePendingMessage([pending], "local-1", sent)).toEqual([sent]);

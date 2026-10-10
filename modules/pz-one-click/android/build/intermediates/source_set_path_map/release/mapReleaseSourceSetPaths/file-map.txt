@@ -1,0 +1,7 @@
+expo.modules.pz.oneclick.pz-one-click-pngs-0 /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/build/generated/res/pngs/release
+expo.modules.pz.oneclick.pz-one-click-resValues-1 /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/build/generated/res/resValues/release
+expo.modules.pz.oneclick.pz-one-click-mergeReleaseResources-2 /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/build/intermediates/incremental/release/mergeReleaseResources/merged.dir
+expo.modules.pz.oneclick.pz-one-click-mergeReleaseResources-3 /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/build/intermediates/incremental/release/mergeReleaseResources/stripped.dir
+expo.modules.pz.oneclick.pz-one-click-release-4 /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/build/intermediates/merged_res/release/mergeReleaseResources
+expo.modules.pz.oneclick.pz-one-click-main-5 /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/res
+expo.modules.pz.oneclick.pz-one-click-release-6 /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/release/res

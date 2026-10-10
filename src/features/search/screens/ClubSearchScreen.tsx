@@ -16,6 +16,7 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useClubSearch } from "../hooks/use-club-search";
 import { useUserSearch } from "../hooks/use-user-search";
 import type { SearchUser } from "../api/search.api";
+import { getSystemConversationTitle, normalizeSystemConversationId } from "@/features/message/system-conversations";
 
 type SearchType = "club" | "user" | "message";
 type SearchResult = Club | SearchUser | MessageListItemModel;
@@ -62,6 +63,8 @@ export default function ClubSearchScreen() {
   const messageItems = useMemo<MessageListItemModel[]>(() =>
     filterMessageConversations(conversations, keyword).map((conversation) => ({
       ...conversation,
+      id: normalizeSystemConversationId(conversation.id),
+      title: getSystemConversationTitle(conversation.id, conversation.title),
       kind: "conversation",
       avatar: conversation.avatar || defaultConversationAvatar,
     })), [conversations, keyword]);
@@ -73,8 +76,8 @@ export default function ClubSearchScreen() {
     router.push({
       pathname: "/chat/[id]",
       params: {
-        id: item.id,
-        title: item.title,
+        id: normalizeSystemConversationId(item.id),
+        title: getSystemConversationTitle(item.id, item.title),
         avatar: typeof item.avatar === "string" ? item.avatar : "",
       },
     });

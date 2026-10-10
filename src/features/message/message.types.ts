@@ -8,4 +8,5 @@ export type MessageListItemModel = {
   time: string;
   avatar: ImageSource | number;
   unreadCount?: number;
+  clubId?: string;
 };

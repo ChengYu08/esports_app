@@ -96,6 +96,7 @@ export default function OrderDetailRoute() {
         title: order.sellerName,
         avatar:
           typeof order.sellerAvatar === "string" ? order.sellerAvatar : "",
+        clubId: order.clubId ? String(order.clubId) : "",
       },
     });
   };
@@ -302,6 +303,7 @@ export default function OrderDetailRoute() {
               id: String(member.userId),
               title: member.nickname || "售后客服",
               avatar: member.headImage || "",
+              clubId: order.clubId ? String(order.clubId) : "",
               afterSale: JSON.stringify(payload),
             },
           });

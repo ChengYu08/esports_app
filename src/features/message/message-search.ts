@@ -1,4 +1,5 @@
 import type { MessageConversation } from "./message-state";
+import { getSystemConversationTitle, normalizeSystemConversationId } from "./system-conversations";
 
 export function filterMessageConversations(
   conversations: MessageConversation[],
@@ -8,7 +9,7 @@ export function filterMessageConversations(
   if (!normalizedKeyword) return conversations;
 
   return conversations.filter((conversation) =>
-    [conversation.title, conversation.id].some((value) =>
+    [conversation.title, getSystemConversationTitle(conversation.id, ""), conversation.id, normalizeSystemConversationId(conversation.id)].some((value) =>
       value.toLocaleLowerCase().includes(normalizedKeyword),
     ),
   );

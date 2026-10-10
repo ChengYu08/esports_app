@@ -17,6 +17,9 @@ export type MessageConversation = {
   avatar?: string;
   unreadCount: number;
   updatedAt: number;
+  clubId?: string;
+  note?: string;
+  isPinned?: boolean;
 };
 
 export type MessageHistoryPage = {
@@ -26,8 +29,16 @@ export type MessageHistoryPage = {
 };
 
 export function mergeConversations(items: MessageConversation[], updated: MessageConversation) {
-  return [...items.filter((item) => item.id !== updated.id), updated]
-    .sort((left, right) => right.updatedAt - left.updatedAt);
+  const current = items.find((item) => item.id === updated.id);
+  const merged = {
+    ...current,
+    ...updated,
+    clubId: updated.clubId ?? current?.clubId,
+    note: updated.note ?? current?.note,
+    isPinned: updated.isPinned ?? current?.isPinned,
+  };
+  return [...items.filter((item) => item.id !== updated.id), merged]
+    .sort((left, right) => Number(Boolean(right.isPinned)) - Number(Boolean(left.isPinned)) || right.updatedAt - left.updatedAt);
 }
 
 function mergeById(items: ManagedMessage[]) {

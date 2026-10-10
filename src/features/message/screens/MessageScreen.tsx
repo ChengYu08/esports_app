@@ -10,6 +10,7 @@ import { MessageListItem } from "../components/MessageListItem";
 import { resolveConversationAvatar } from "../message-avatar";
 import { useMessageStore } from "../message-store";
 import type { MessageListItemModel } from "../message.types";
+import { getSystemConversationTitle, normalizeSystemConversationId } from "../system-conversations";
 
 const defaultConversationAvatar = require("../../../../assets/coms/avatar_default_2.png");
 
@@ -25,12 +26,14 @@ export default function MessageScreen() {
   useEffect(() => { if (accessToken) void initialize(accessToken); }, [accessToken, initialize]);
 
   const items = useMemo<MessageListItemModel[]>(() => conversations.map((item) => {
-    const avatar = resolveConversationAvatar(item.title, item.avatar, defaultConversationAvatar);
-    return { ...item, kind: "conversation", avatar: typeof avatar === "string" ? { uri: avatar } : avatar };
+    const id = normalizeSystemConversationId(item.id);
+    const title = getSystemConversationTitle(id, item.title);
+    const avatar = resolveConversationAvatar(title, item.avatar, defaultConversationAvatar, id);
+    return { ...item, id, title, kind: "conversation", avatar: typeof avatar === "string" ? { uri: avatar } : avatar };
   }), [conversations]);
   const handleMessagePress = (item: MessageListItemModel) => {
     if (item.kind !== "conversation") return;
-    router.push({ pathname: "/chat/[id]", params: { id: item.id, title: item.title } });
+    router.push({ pathname: "/chat/[id]", params: { id: normalizeSystemConversationId(item.id), title: getSystemConversationTitle(item.id, item.title), clubId: item.clubId || "" } });
   };
 
   const stateMessage = !accessToken ? "登录后查看消息" : connectionState === "unavailable" ? "当前版本暂不支持即时消息" : connectionState === "connecting" ? "消息连接中..." : connectionState === "error" ? lastError || "消息连接失败" : null;

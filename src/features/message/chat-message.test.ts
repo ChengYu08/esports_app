@@ -36,6 +36,38 @@ describe("mapRongMessage", () => {
     });
   });
 
+  it("maps an ORDER_NOTIFY custom message to a renderable order notification card", () => {
+    expect(mapRongMessage({
+      messageUId: "order-notify-1",
+      identifier: "ORDER_NOTIFY",
+      fields: {
+        data: JSON.stringify({
+          title: "您的订单已被接单",
+          orderNo: "PZ20261008001",
+          gameName: "王者荣耀",
+          serviceDesc: "排位上分",
+          numDesc: "2局",
+          totalPriceDesc: "¥68.00",
+          createTime: "2026-10-08T10:30:00",
+        }),
+      },
+      sentTime: new Date("2026-10-08T10:30:00").getTime(),
+      direction: 1,
+    }, { image: 4, send: 0 })).toEqual({
+      id: "order-notify-1",
+      kind: "orderNotify",
+      title: "您的订单已被接单",
+      orderNo: "PZ20261008001",
+      gameName: "王者荣耀",
+      serviceDesc: "排位上分",
+      numDesc: "2局",
+      totalPriceDesc: "¥68.00",
+      createTime: "2026-10-08T10:30:00",
+      time: "10:30",
+      isMine: false,
+    });
+  });
+
   it("keeps the SDK ID and timestamp in a confirmed outgoing message", () => {
     expect(toManagedMessage({
       messageUId: "m-1",

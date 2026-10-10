@@ -81,6 +81,14 @@ describe('message store', () => {
     expect(markRead).toHaveBeenCalledWith('42');
   });
 
+  it('updates a conversation note and pin state without changing its message data', async () => {
+    const store = createMessageStore(makeAdapter({ getConversations: vi.fn(async () => [conversation]) }));
+    await store.getState().initialize('token');
+    store.getState().setConversationNote('42', '常用陪玩');
+    store.getState().setConversationPinned('42', true);
+    expect(store.getState().conversations[0]).toMatchObject({ id: '42', note: '常用陪玩', isPinned: true });
+  });
+
   it('loads older history only once per cursor and prepends it', async () => {
     const older: ManagedMessage = { ...sentMessage, id: 'old', sentAt: 1, time: '09:00' };
     const adapter = makeAdapter({
