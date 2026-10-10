@@ -1,7 +1,8 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useFonts } from "expo-font";
+import { Image } from "expo-image";
 import { Stack } from "expo-router";
-import { ActivityIndicator, View } from "react-native";
+import { View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { RootSiblingParent } from "react-native-root-siblings";
 import { useEffect, useState } from "react";
@@ -37,6 +38,7 @@ function withStartupTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
 const fonts = {
   [DOUYIN_SANS]: require("../../assets/fonts/Douyin Sans.otf"),
 };
+const splashImage = require("../../assets/images/splash-screen.png");
 
 export default function RootLayout() {
   const [loaded, error] = useFonts(fonts);
@@ -98,8 +100,13 @@ export default function RootLayout() {
 
   if ((!loaded && !error) || !sessionReady || !privacyReady) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator />
+      <View style={{ flex: 1, backgroundColor: "#2A1013" }}>
+        <Image
+          accessibilityIgnoresInvertColors
+          contentFit="cover"
+          source={splashImage}
+          style={{ flex: 1, width: "100%" }}
+        />
       </View>
     );
   }
@@ -109,7 +116,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <RootSiblingParent>
           {privacyAccepted ? (
-            <Stack screenOptions={{ headerShown: false }}>
+            <Stack screenOptions={{ headerShown: false, gestureEnabled: true }}>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="login" options={{ animation: "none" }} />
               <Stack.Screen name="basic-settings" />

@@ -8,7 +8,7 @@
     "userInterfaceStyle": "automatic",
     "android": {
       "softwareKeyboardLayoutMode": "resize",
-      "predictiveBackGestureEnabled": false,
+      "predictiveBackGestureEnabled": true,
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
@@ -35,7 +35,8 @@
           "backgroundColor": "#2A1013",
           "enableFullScreenImage_legacy": true,
           "android": {
-            "resizeMode": "contain",
+            "image": "./assets/images/splash-icon.png",
+            "resizeMode": "cover",
             "imageWidth": 288
           }
         }
