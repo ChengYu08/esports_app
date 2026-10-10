@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Image } from "expo-image";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
+import { CachedImage } from "@/shared/ui/CachedImage";
 import type { AfterSaleMember } from "../order.api";
 
 export function OrderAfterSaleSheet({ visible, loading, members, onClose, onContact }: {
@@ -9,7 +9,7 @@ export function OrderAfterSaleSheet({ visible, loading, members, onClose, onCont
   return <BottomSheet visible={visible} onClose={onClose} contentStyle={styles.sheet}>
       <View style={styles.header}><Text style={styles.title}>申请售后</Text><Pressable onPress={onClose}><Text style={styles.close}>×</Text></Pressable></View>
       {loading ? <Text style={styles.tip}>加载中...</Text> : members.length === 0 ? <Text style={styles.tip}>暂无售后客服</Text> : members.map((member) => <View style={styles.row} key={member.userId}>
-        <Image contentFit="cover" source={member.headImage} style={styles.avatar} /><View style={styles.copy}><Text style={styles.name}>{member.nickname || "售后客服"}</Text><Text style={styles.status}>{Number(member.onlineStatus) === 1 ? "在线中" : "离线"}</Text></View><Pressable style={styles.contact} onPress={() => onContact(member)}><Text style={styles.contactText}>联系</Text></Pressable>
+        <CachedImage contentFit="cover" source={member.headImage} style={styles.avatar} /><View style={styles.copy}><Text style={styles.name}>{member.nickname || "售后客服"}</Text><Text style={styles.status}>{Number(member.onlineStatus) === 1 ? "在线中" : "离线"}</Text></View><Pressable style={styles.contact} onPress={() => onContact(member)}><Text style={styles.contactText}>联系</Text></Pressable>
       </View>)}
       <Text style={styles.footer}>如无法解决，可前往小法庭申请平台介入</Text>
   </BottomSheet>;

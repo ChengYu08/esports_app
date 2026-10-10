@@ -26,6 +26,7 @@ import {
 import type { OrderItemModel } from "@/features/order/order.types";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
+import { CachedImage } from "@/shared/ui/CachedImage";
 
 const copyIcon = require("../../../assets/coms/copy.svg");
 
@@ -152,7 +153,7 @@ export default function OrderDetailRoute() {
         {!isCancelled && <ProgressSteps status={order.status} />}
         <View style={styles.infoBlock}>
           <View style={styles.sellerRow}>
-            <Image
+            <CachedImage
               contentFit="cover"
               source={order.sellerAvatar}
               style={styles.avatar}

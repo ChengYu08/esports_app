@@ -1,5 +1,6 @@
 import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
+import { CachedImage } from "@/shared/ui/CachedImage";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
@@ -270,7 +271,7 @@ export default function AccountSettingsScreen() {
               label={avatarUploading ? "头像上传中" : "头像"}
               onPress={() => void changeAvatar()}
             >
-              <Image
+              <CachedImage
                 source={user?.headImage ? { uri: user.headImage } : avatar}
                 style={styles.avatar}
               />

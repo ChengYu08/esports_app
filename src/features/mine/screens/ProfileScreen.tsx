@@ -6,6 +6,7 @@ import {
   PersonProhibited24Regular,
 } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
+import { CachedImage } from "@/shared/ui/CachedImage";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -548,7 +549,7 @@ function ProfileIdentity({ profile }: { profile: ProfileDetail }) {
     profile.headImage,
   );
   const avatarImage = (
-    <Image
+    <CachedImage
       source={profile.headImage ? { uri: profile.headImage } : fallbackAvatar}
       style={styles.avatar}
       contentFit="cover"
@@ -652,7 +653,7 @@ function GameSelector({
             style={[styles.gameTag, active && styles.gameTagActive]}
           >
             {game.iconUrl ? (
-              <Image source={{ uri: game.iconUrl }} style={styles.gameLogo} />
+              <CachedImage source={{ uri: game.iconUrl }} style={styles.gameLogo} />
             ) : null}
             <Text style={[styles.gameText, active && styles.gameTextActive]}>
               {game.gameName}
@@ -771,7 +772,7 @@ function ImageGallery({ images }: { images: string[] }) {
           }
           style={styles.galleryItem}
         >
-          <Image
+          <CachedImage
             source={{ uri: image }}
             contentFit="cover"
             style={StyleSheet.absoluteFill}
@@ -1227,7 +1228,7 @@ function ReviewCard({ review }: { review: ProfileReview }) {
                 }
                 style={styles.reviewImage}
               >
-                <Image
+                <CachedImage
                   source={{ uri: image }}
                   contentFit="cover"
                   style={StyleSheet.absoluteFill}

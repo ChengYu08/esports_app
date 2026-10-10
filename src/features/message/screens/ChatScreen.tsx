@@ -25,6 +25,7 @@ import EmojiPicker, { type EmojiType } from "rn-emoji-keyboard";
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
+import { CachedImage } from "@/shared/ui/CachedImage";
 import { resolveConversationAvatar } from "../message-avatar";
 import { useMessageStore } from "../message-store";
 import type { ManagedMessage } from "../message-state";
@@ -191,7 +192,7 @@ export default function ChatScreen() {
             <Image source={chatBack} style={styles.headerIcon} />
           </Pressable>
           <View style={styles.identity}>
-            <Image contentFit="cover" source={conversationAvatar} style={styles.headerAvatar} />
+            <CachedImage contentFit="cover" source={conversationAvatar} style={styles.headerAvatar} />
             <Text numberOfLines={1} style={styles.name}>{conversationTitle}</Text>
             <Image source={imReady ? chatOnline : chatOffline} style={styles.onlineIcon} />
             <Text style={[styles.onlineText, !imReady && styles.offlineText]}>{imReady ? "在线中" : "3天前在线"}</Text>
@@ -314,14 +315,14 @@ function ChatBubble({ item, peerAvatar, myAvatar, onRetry }: { item: ManagedMess
 
   return (
     <View style={[styles.bubbleRow, item.isMine && styles.mineRow]}>
-      {!item.isMine && <Image contentFit="cover" source={peerAvatar} style={styles.messageAvatar} />}
+      {!item.isMine && <CachedImage contentFit="cover" source={peerAvatar} style={styles.messageAvatar} />}
       <View style={[styles.bubble, item.isMine ? styles.mineBubble : styles.theirBubble, item.kind === "image" && styles.imageBubble, item.kind === "orderNotify" && styles.orderNotifyBubble]}>
         {item.kind === "image" ? (
           <Pressable
             accessibilityLabel="预览聊天图片"
             onPress={() => router.push({ pathname: "/image-preview", params: createImagePreviewParams([item.imageUrl], 0) })}
           >
-            <Image
+            <CachedImage
               contentFit="contain"
               source={{ uri: item.imageUrl }}
               style={[styles.messageImage, { width: imageWidth, height: imageHeight }]}
@@ -344,7 +345,7 @@ function ChatBubble({ item, peerAvatar, myAvatar, onRetry }: { item: ManagedMess
           </View>
         ) : <Text style={styles.bubbleText}>{item.text}</Text>}
       </View>
-      {item.isMine && <Image contentFit="cover" source={myAvatar} style={styles.messageAvatar} />}
+      {item.isMine && <CachedImage contentFit="cover" source={myAvatar} style={styles.messageAvatar} />}
       {item.status === "failed" ? <Pressable accessibilityRole="button" onPress={onRetry}><Text style={styles.retryLabel}>重试</Text></Pressable> : null}
     </View>
   );

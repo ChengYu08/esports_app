@@ -3,6 +3,7 @@ import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
 import { Image } from "expo-image";
+import { CachedImage } from "@/shared/ui/CachedImage";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -188,7 +189,7 @@ export default function ClubDetailScreen() {
           </View>
         </View>
         <View style={styles.clubInfo}>
-          <Image
+          <CachedImage
             source={club.logoUrl ? { uri: club.logoUrl } : undefined}
             style={styles.clubLogo}
             contentFit="cover"
@@ -573,7 +574,7 @@ function GameTab({
     >
       <View style={styles.gameLogo}>
         {iconUrl ? (
-          <Image source={{ uri: iconUrl }} style={styles.gameIcon} />
+          <CachedImage source={{ uri: iconUrl }} style={styles.gameIcon} />
         ) : (
           <Text style={styles.gameTriangle}>△</Text>
         )}
@@ -673,7 +674,7 @@ function MemberCard({
       }
     >
       <View style={styles.avatarWrap}>
-        <Image
+        <CachedImage
           source={image ? { uri: image } : undefined}
           contentFit="cover"
           style={styles.avatar}

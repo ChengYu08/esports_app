@@ -17,6 +17,7 @@ import {
 } from "@/features/mine/blacklist";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { EmptyState } from "@/shared/ui/AsyncStates";
+import { CachedImage } from "@/shared/ui/CachedImage";
 
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 
@@ -90,7 +91,7 @@ function BlacklistRow({
         rightThreshold={REMOVE_ACTION_WIDTH / 2}
       >
         <View style={styles.row}>
-          <Image
+          <CachedImage
             source={entry.headImage ? { uri: entry.headImage } : fallbackAvatar}
             style={styles.avatar}
             contentFit="cover"

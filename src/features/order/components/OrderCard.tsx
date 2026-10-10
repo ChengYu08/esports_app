@@ -1,9 +1,9 @@
-import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { CachedImage } from "@/shared/ui/CachedImage";
 import type {
   OrderAction,
   OrderActionKey,
@@ -43,7 +43,7 @@ export const OrderCard = memo(function OrderCard({
       >
       <View style={styles.sellerRow}>
         <View style={styles.seller}>
-          <Image
+          <CachedImage
             contentFit="cover"
             source={item.sellerAvatar}
             style={styles.avatar}

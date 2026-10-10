@@ -1,6 +1,7 @@
 import { ImageZoom } from "@likashefqet/react-native-image-zoom";
+import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -13,11 +14,17 @@ export default function ImagePreviewScreen() {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ images?: string | string[]; index?: string | string[] }>();
-  const { images, index } = parseImagePreviewParams(params);
+  const rawImages = params.images;
+  const rawIndex = params.index;
+  const { images, index } = useMemo(
+    () => parseImagePreviewParams({ images: rawImages, index: rawIndex }),
+    [rawImages, rawIndex],
+  );
 
   useEffect(() => {
     if (images.length === 0) router.back();
-  }, [images.length]);
+    else void Image.prefetch(images, "memory-disk");
+  }, [images]);
 
   if (images.length === 0) {
     return <View style={styles.empty}><EmptyState message="暂无图片" /></View>;

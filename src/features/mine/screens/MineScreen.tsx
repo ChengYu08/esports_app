@@ -11,6 +11,7 @@ import {
 } from "@fluentui/react-native-icons";
 import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
+import { CachedImage } from "@/shared/ui/CachedImage";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import {
@@ -141,7 +142,7 @@ export default function MineScreen() {
               accessibilityLabel={user ? "账号设置" : "登录 / 注册"}
               onPress={() => router.push(user ? "/account-settings" : "/login")}
             >
-              <Image
+              <CachedImage
                 source={user?.headImage ? { uri: user.headImage } : avatar}
                 style={styles.avatar}
               />

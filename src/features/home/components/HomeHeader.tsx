@@ -5,6 +5,7 @@ import type {
   HomeTab,
 } from "@/features/home/api/home.types";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { CachedImage } from "@/shared/ui/CachedImage";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -59,7 +60,7 @@ export function HomeHeader({
         </Pressable>
       </View>
       <View style={styles.banner}>
-        <Image
+        <CachedImage
           source={
             banners[bannerIndex]?.imageUrl
               ? { uri: banners[bannerIndex].imageUrl }
@@ -96,7 +97,7 @@ export function HomeHeader({
                   ]}
                 >
                   {item.iconUrl ? (
-                    <Image
+                    <CachedImage
                       source={{ uri: item.iconUrl }}
                       style={styles.gameIcon}
                     />

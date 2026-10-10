@@ -1,6 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
-import { Image } from "expo-image";
 import { useEffect, useMemo, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -12,6 +11,7 @@ import { filterMessageConversations } from "@/features/message/message-search";
 import { useMessageStore } from "@/features/message/message-store";
 import type { MessageListItemModel } from "@/features/message/message.types";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
+import { CachedImage } from "@/shared/ui/CachedImage";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useClubSearch } from "../hooks/use-club-search";
 import { useUserSearch } from "../hooks/use-user-search";
@@ -127,7 +127,7 @@ export default function ClubSearchScreen() {
 function UserSearchCard({ user, clubId }: { user: SearchUser; clubId?: string }) {
   return (
     <Pressable style={styles.userCard} onPress={() => router.push({ pathname: "/profile", params: { clubId: clubId || String(user.clubId), userId: String(user.userId) } })}>
-      <View style={styles.userAvatar}>{user.headImage ? <Image contentFit="cover" source={{ uri: user.headImage }} style={styles.userAvatarImage} /> : <Text style={styles.userAvatarText}>{user.nickname.slice(0, 1)}</Text>}</View>
+      <View style={styles.userAvatar}>{user.headImage ? <CachedImage contentFit="cover" source={{ uri: user.headImage }} style={styles.userAvatarImage} /> : <Text style={styles.userAvatarText}>{user.nickname.slice(0, 1)}</Text>}</View>
       <View style={styles.userCopy}><Text numberOfLines={1} style={styles.userName}>{user.nickname}</Text><Text numberOfLines={1} style={styles.userClub}>{user.clubName || "陪玩用户"}</Text><Text numberOfLines={1} style={styles.userSignature}>{user.signature || "暂无个人简介"}</Text></View>
     </Pressable>
   );

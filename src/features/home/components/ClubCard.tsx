@@ -1,6 +1,7 @@
 import type { Club } from "@/features/home/api/home.types";
 import { colors, radius, spacing } from "@/shared/theme/tokens";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { CachedImage } from "@/shared/ui/CachedImage";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -24,7 +25,7 @@ export function ClubCard({ club }: { club: Club }) {
     >
       <View style={[styles.cover, { backgroundColor: hue }]}>
         {club.coverUrl ? (
-          <Image
+          <CachedImage
             source={{ uri: club.coverUrl }}
             style={styles.coverImage}
             contentFit="cover"

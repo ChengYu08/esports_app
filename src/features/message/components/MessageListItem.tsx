@@ -1,8 +1,8 @@
-import { Image } from "expo-image";
 import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { CachedImage } from "@/shared/ui/CachedImage";
 import type { MessageListItemModel } from "../message.types";
 import { formatUnreadCount } from "../message-unread";
 
@@ -26,7 +26,7 @@ export const MessageListItem = memo(function MessageListItem({
       onPress={() => onPress(item)}
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
     >
-      <Image source={item.avatar} style={styles.avatar} contentFit="cover" />
+      <CachedImage source={item.avatar} style={styles.avatar} contentFit="cover" />
       <View style={styles.content}>
         <View style={styles.heading}>
           <Text numberOfLines={1} style={styles.title}>

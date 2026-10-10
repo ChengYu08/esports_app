@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { usePriceList } from "../hooks/use-home-data";
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
+import { CachedImage } from "@/shared/ui/CachedImage";
 
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 
@@ -67,7 +68,7 @@ function PriceImage({ uri, onPress }: { uri: string; onPress: () => void }) {
   const [ratio, setRatio] = useState(1);
   return (
     <Pressable accessibilityLabel="预览价目表图片" onPress={onPress}>
-      <Image
+      <CachedImage
         source={{ uri }}
         contentFit="contain"
         style={[styles.priceImage, { aspectRatio: ratio }]}

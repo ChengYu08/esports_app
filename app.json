@@ -27,7 +27,19 @@
     },
     "plugins": [
       "expo-router",
-      "expo-splash-screen",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-screen.png",
+          "resizeMode": "cover",
+          "backgroundColor": "#2A1013",
+          "enableFullScreenImage_legacy": true,
+          "android": {
+            "resizeMode": "contain",
+            "imageWidth": 288
+          }
+        }
+      ],
       "expo-audio",
       "./plugins/withNodeCommandUtf8",
       [
