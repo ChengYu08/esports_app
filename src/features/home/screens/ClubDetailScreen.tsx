@@ -32,7 +32,7 @@ const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const searchIcon = require("../../../../assets/home/club-detail/icon-search.svg");
 const maleIcon = require("../../../../assets/home/club-detail/male.svg");
 const femaleIcon = require("../../../../assets/home/club-detail/female.svg");
-const memberIcon = require("../../../../assets/home/h_user.svg");
+const memberIcon = require("../../../../assets/coms/user.svg");
 const filterArrowIcon = require("../../../../assets/home/club-detail/arrow-fill-down.svg");
 const idleIcon = require("../../../../assets/home/club-detail/status-idle.svg");
 const playingIcon = require("../../../../assets/home/club-detail/status-playing.svg");
@@ -681,6 +681,7 @@ function MemberCard({
         />
         {voiceUrl ? (
           <VoicePlayButton
+            compact
             duration={voiceDuration}
             onToggleVoice={onToggleVoice}
             playingUrl={voicePlaying ? voiceUrl : null}

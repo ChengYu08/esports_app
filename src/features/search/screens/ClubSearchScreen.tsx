@@ -16,7 +16,7 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useClubSearch } from "../hooks/use-club-search";
 import { useUserSearch } from "../hooks/use-user-search";
 import type { SearchUser } from "../api/search.api";
-import { getSystemConversationTitle, normalizeSystemConversationId } from "@/features/message/system-conversations";
+import { normalizeSystemConversationId } from "@/features/message/system-conversations";
 import { getConversationDisplayTitle } from "@/features/message/message-title";
 
 type SearchType = "club" | "user" | "message";
@@ -78,7 +78,7 @@ export default function ClubSearchScreen() {
       pathname: "/chat/[id]",
       params: {
         id: normalizeSystemConversationId(item.id),
-        title: getSystemConversationTitle(item.id, item.title),
+        title: item.title,
         avatar: typeof item.avatar === "string" ? item.avatar : "",
         clubId: item.clubId || "",
       },

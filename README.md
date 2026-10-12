@@ -16,18 +16,8 @@ npx expo run:ios
 npx expo run:android
 ```
 
-或者使用 EAS：
-
-```
-npx eas-cli build --profile development
-```
-
 准备发布apk
-
-npx expo prebuild # 生成 android/ 原生目录
-cd android
-./gradlew assembleRelease # 出 APK
-./gradlew bundleRelease # 出 AAB
+scripts/build_apk.sh
 
 用户协议
 https://www.luanfengxuan.cn/vpi/pages/pzdj_privacy

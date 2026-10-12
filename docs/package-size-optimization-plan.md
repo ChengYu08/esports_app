@@ -58,4 +58,10 @@
 
 ## 本轮结论
 
-本文件是优化方案，不包含代码、依赖或资源修改。当前工作区已有的排行榜组件未提交修改不属于本计划范围。
+已通过全仓文件名和资源路径扫描确认 `profile-work-1.png`、`profile-work-2.png`、`member-1.jpg` 至 `member-5.jpg` 没有静态引用、动态加载路径或配置引用。这 7 个文件合计约 26.6 MB，现已从仓库移除；删除前已通过 iOS/Android 导出资源清单确认它们不在应用资源中。
+
+本地分别执行 `expo export --platform ios` 和 `expo export --platform android` 成功：两端 Hermes JS bundle 各约 29 MB，资源清单分别为 95 和 99 项；删除前 7 张候选遗留图均不在清单中，而启动图、字体和钻石 SVG 均在清单中。此前 `--platform all` 在 Web SSR 阶段因 `Cannot destructure property '__extends' of 'n.default'` 失败，因此本地导出不能作为完整或正式包体基线。当前环境也没有 IPA/AAB 生产产物。后续仍需在相同生产配置下执行 EAS 构建，才能量化上传归档和用户下载/安装体积。
+
+删除后再次分别导出 iOS 和 Android 成功，Hermes bundle 仍各约 29 MB，资源清单为 96 和 100 项；差异来自工作区原有的 `assets/coms/user.svg`，本次删除未引入构建错误。安装包收益仍需通过正式 EAS 构建测量。
+
+当前工作区原有的排行榜组件修改不属于本计划范围。

@@ -19,6 +19,7 @@ type VoicePlayButtonProps = {
   playingUrl: string | null;
   onToggleVoice: (url: string) => void;
   inline?: boolean;
+  compact?: boolean;
 };
 
 const BAR_HEIGHTS = [8, 14, 10, 12];
@@ -29,6 +30,7 @@ export function VoicePlayButton({
   playingUrl,
   onToggleVoice,
   inline = false,
+  compact = false,
 }: VoicePlayButtonProps) {
   const playing = playingUrl === url;
 
@@ -36,33 +38,34 @@ export function VoicePlayButton({
     <Pressable
       accessibilityLabel={playing ? "暂停语音" : "播放语音"}
       accessibilityRole="button"
+      hitSlop={compact ? 6 : 0}
       onPress={(event) => {
         event.stopPropagation();
         onToggleVoice(url);
       }}
-      style={[styles.button, inline ? styles.inlineButton : styles.overlayButton]}
+      style={[styles.button, inline ? styles.inlineButton : styles.overlayButton, compact && styles.compactButton]}
     >
-      <View style={styles.iconCircle}>
+      <View style={[styles.iconCircle, compact && styles.compactIconCircle]}>
         {playing ? (
-          <View style={styles.pauseIcon}>
-            <View style={styles.pauseBar} />
-            <View style={styles.pauseBar} />
+          <View style={[styles.pauseIcon, compact && styles.compactPauseIcon]}>
+            <View style={[styles.pauseBar, compact && styles.compactPauseBar]} />
+            <View style={[styles.pauseBar, compact && styles.compactPauseBar]} />
           </View>
         ) : (
-          <Text style={styles.playIcon}>▶</Text>
+          <Text style={[styles.playIcon, compact && styles.compactPlayIcon]}>▶</Text>
         )}
       </View>
-      <View style={styles.wave} accessibilityElementsHidden>
+      <View style={[styles.wave, compact && styles.compactWave]} accessibilityElementsHidden>
         {BAR_HEIGHTS.map((height, index) => (
           <WaveBar
             key={height}
             delay={index * 120}
-            height={height}
+            height={compact ? Math.round(height * 0.75) : height}
             playing={playing}
           />
         ))}
       </View>
-      <Text style={styles.duration}>{duration ?? 0}&quot;&quot;</Text>
+      <Text style={[styles.duration, compact && styles.compactDuration]}>{duration ?? 0}&quot;&quot;</Text>
     </Pressable>
   );
 }
@@ -126,6 +129,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 4,
   },
+  compactButton: { height: 24, paddingVertical: 2, paddingRight: 6, paddingLeft: 3, gap: 3 },
   inlineButton: { backgroundColor: "#FF3158" },
   overlayButton: {
     position: "absolute",
@@ -143,19 +147,23 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexShrink: 0,
   },
+  compactIconCircle: { width: 18, height: 18, borderRadius: 9 },
   playIcon: {
     color: "#FF3158",
     fontSize: 10,
     lineHeight: 11,
     marginLeft: 1,
   },
+  compactPlayIcon: { fontSize: 8, lineHeight: 9 },
   pauseIcon: { flexDirection: "row", gap: 3 },
+  compactPauseIcon: { gap: 2 },
   pauseBar: {
     width: 3,
     height: 10,
     borderRadius: 1.5,
     backgroundColor: "#FF3158",
   },
+  compactPauseBar: { width: 2, height: 8, borderRadius: 1 },
   wave: {
     width: 20,
     height: 20,
@@ -165,6 +173,7 @@ const styles = StyleSheet.create({
     gap: 2.5,
     flexShrink: 0,
   },
+  compactWave: { width: 16, height: 16, gap: 2 },
   bar: {
     width: 2,
     borderRadius: 1,
@@ -172,4 +181,5 @@ const styles = StyleSheet.create({
     transformOrigin: "center",
   },
   duration: { color: "#fff", fontSize: 12, lineHeight: 22, fontWeight: "700" },
+  compactDuration: { fontSize: 10, lineHeight: 18 },
 });
