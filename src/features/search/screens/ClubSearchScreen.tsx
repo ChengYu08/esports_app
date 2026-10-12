@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAuthStore } from "@esports/auth";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
@@ -16,7 +17,7 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useClubSearch } from "../hooks/use-club-search";
 import { useUserSearch } from "../hooks/use-user-search";
 import type { SearchUser } from "../api/search.api";
-import { normalizeSystemConversationId } from "@/features/message/system-conversations";
+import { isSelfConversationId, normalizeSystemConversationId } from "@/features/message/system-conversations";
 import { getConversationDisplayTitle } from "@/features/message/message-title";
 
 type SearchType = "club" | "user" | "message";
@@ -34,6 +35,7 @@ export default function ClubSearchScreen() {
   const [input, setInput] = useState("");
   const [keyword, setKeyword] = useState("");
   const [history, setHistory] = useState<string[]>([]);
+  const userId = useAuthStore((state) => state.user?.id);
   const conversations = useMessageStore((state) => state.conversations);
   const clubSearch = useClubSearch(searchType === "club" ? keyword : "");
   const userSearch = useUserSearch(searchType === "user" ? keyword : "");
@@ -62,18 +64,19 @@ export default function ClubSearchScreen() {
 
   const searching = searchType === "message" || keyword.length > 0;
   const messageItems = useMemo<MessageListItemModel[]>(() =>
-    filterMessageConversations(conversations, keyword).map((conversation) => ({
+    filterMessageConversations(conversations, keyword, userId).map((conversation) => ({
       ...conversation,
       id: normalizeSystemConversationId(conversation.id),
       title: getConversationDisplayTitle(conversation.id, conversation.title, conversation.note),
       kind: "conversation",
       avatar: conversation.avatar || defaultConversationAvatar,
-    })), [conversations, keyword]);
+    })), [conversations, keyword, userId]);
   const search = searchType === "club" ? clubSearch : userSearch;
   const items = searchType === "message" ? messageItems : search.data?.items ?? [];
   const placeholder = searchType === "club" ? "搜索俱乐部" : searchType === "user" ? "搜索大神昵称或ID" : "搜索聊天用户";
 
   const handleMessagePress = (item: MessageListItemModel) => {
+    if (isSelfConversationId(item.id, userId)) return;
     router.push({
       pathname: "/chat/[id]",
       params: {

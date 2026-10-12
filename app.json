@@ -63,7 +63,6 @@
     },
     "owner": "chengyu08s-team",
     "ios": {
-      // "bundleIdentifier": "com.esportsapp.app"
       "bundleIdentifier": "com.spacewhisp.apps"
     },
     "icon": "./assets/images/icon.png"

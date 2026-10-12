@@ -10,7 +10,7 @@ import { MessageListItem } from "../components/MessageListItem";
 import { resolveConversationAvatar } from "../message-avatar";
 import { useMessageStore } from "../message-store";
 import type { MessageListItemModel } from "../message.types";
-import { normalizeSystemConversationId } from "../system-conversations";
+import { isSelfConversationId, normalizeSystemConversationId } from "../system-conversations";
 import { getConversationDisplayTitle } from "../message-title";
 import Toast from "react-native-root-toast";
 
@@ -19,6 +19,7 @@ const defaultConversationAvatar = require("../../../../assets/coms/avatar_defaul
 export default function MessageScreen() {
   const insets = useSafeAreaInsets();
   const accessToken = useAuthStore((state) => state.accessToken);
+  const userId = useAuthStore((state) => state.user?.id);
   const initialize = useMessageStore((state) => state.initialize);
   const connectionState = useMessageStore((state) => state.connectionState);
   const lastError = useMessageStore((state) => state.lastError);
@@ -32,14 +33,14 @@ export default function MessageScreen() {
 
   useEffect(() => { if (accessToken) void initialize(accessToken); }, [accessToken, initialize]);
 
-  const items = useMemo<MessageListItemModel[]>(() => conversations.map((item) => {
+  const items = useMemo<MessageListItemModel[]>(() => conversations.filter((item) => !isSelfConversationId(item.id, userId)).map((item) => {
     const id = normalizeSystemConversationId(item.id);
     const title = getConversationDisplayTitle(id, item.title, item.note);
     const avatar = resolveConversationAvatar(title, item.avatar, defaultConversationAvatar, id);
     return { ...item, id, title, kind: "conversation", avatar: typeof avatar === "string" ? { uri: avatar } : avatar };
-  }), [conversations]);
+  }), [conversations, userId]);
   const handleMessagePress = (item: MessageListItemModel) => {
-    if (item.kind !== "conversation") return;
+    if (item.kind !== "conversation" || isSelfConversationId(item.id, userId)) return;
     router.push({ pathname: "/chat/[id]", params: { id: normalizeSystemConversationId(item.id), title: item.title, clubId: item.clubId || "" } });
   };
 

@@ -32,7 +32,7 @@ import { useMessageStore } from "../message-store";
 import type { ManagedMessage } from "../message-state";
 import type { AfterSaleCardPayload } from "@/features/order/after-sale-card";
 import { afterSaleCardRows } from "@/features/order/after-sale-card";
-import { getSystemConversationTitle, isSystemConversationId, normalizeSystemConversationId } from "../system-conversations";
+import { getSystemConversationTitle, isSelfConversationId, isSystemConversationId, normalizeSystemConversationId } from "../system-conversations";
 import { getConversationDisplayTitle } from "../message-title";
 
 const defaultAvatar = require("../../../../assets/coms/avatar_default_2.png");
@@ -51,6 +51,7 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const { id, title, avatar, clubId, afterSale } = useLocalSearchParams<{ id?: string; title?: string; avatar?: string; clubId?: string; afterSale?: string }>();
   const accessToken = useAuthStore((state) => state.accessToken);
+  const userId = useAuthStore((state) => state.user?.id);
   const myAvatarUrl = useAuthStore((state) => state.user?.headImage);
   const [draft, setDraft] = useState("");
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
@@ -65,6 +66,7 @@ export default function ChatScreen() {
   const isNearBottom = useRef(true);
   const previousMessageCount = useRef(0);
   const conversationId = normalizeSystemConversationId(String(id || ""));
+  const isSelfConversation = isSelfConversationId(conversationId, userId);
   const canViewProfile = !isSystemConversationId(conversationId);
   const conversation = useMessageStore((state) => state.conversations.find((item) => item.id === conversationId));
   const messages = useMessageStore((state) => state.messagesByPeerId[conversationId] || EMPTY_MESSAGES);
@@ -98,9 +100,13 @@ export default function ChatScreen() {
     shouldScrollToEnd.current = false;
     isNearBottom.current = true;
     previousMessageCount.current = 0;
+    if (isSelfConversation) {
+      router.back();
+      return () => closeConversation();
+    }
     if (accessToken && conversationId) void openConversation({ id: conversationId, title: conversationBaseTitle, avatar: typeof conversationAvatar === "string" ? conversationAvatar : undefined, clubId: clubId || conversation?.clubId });
     return () => closeConversation();
-  }, [accessToken, closeConversation, clubId, connectionState, conversation?.clubId, conversationAvatar, conversationBaseTitle, conversationId, openConversation]);
+  }, [accessToken, closeConversation, clubId, connectionState, conversation?.clubId, conversationAvatar, conversationBaseTitle, conversationId, isSelfConversation, openConversation]);
 
   useEffect(() => {
     if (!historyState || historyState.loading) return;
@@ -121,6 +127,7 @@ export default function ChatScreen() {
   }, [historyState, messages.length]);
 
   const sendMessage = async () => {
+    if (isSelfConversation) return;
     const text = draft.trim();
     if (!text) return;
     setDraft("");
@@ -133,7 +140,7 @@ export default function ChatScreen() {
   };
 
   const pickImage = async () => {
-    if (imageSending) return;
+    if (imageSending || isSelfConversation) return;
     setEmojiPickerOpen(false);
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
@@ -185,6 +192,8 @@ export default function ChatScreen() {
     const targetClubId = clubId || conversation?.clubId || (afterSalePayload?.clubId ? String(afterSalePayload.clubId) : undefined);
     router.push({ pathname: "/profile", params: { ...(targetClubId ? { clubId: String(targetClubId) } : {}), userId: conversationId } });
   };
+
+  if (isSelfConversation) return null;
 
   return (
     <KeyboardAvoidingView

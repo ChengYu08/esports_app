@@ -244,9 +244,16 @@ export function LoginScreen({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={isSubmitting ? "登录中" : undefined}
-              accessibilityState={{ disabled: !isSubmitReady || isSubmitting, busy: isSubmitting }}
+              accessibilityState={{
+                disabled: !isSubmitReady || isSubmitting,
+                busy: isSubmitting,
+              }}
               disabled={!isSubmitReady || isSubmitting}
-              style={[styles.submit, isSubmitReady && styles.submitActive, isSubmitting && styles.submitLoading]}
+              style={[
+                styles.submit,
+                isSubmitReady && styles.submitActive,
+                isSubmitting && styles.submitLoading,
+              ]}
               onPress={handleSubmit}
             >
               {isSubmitting ? (
@@ -266,11 +273,11 @@ export function LoginScreen({
           </View>
         </View>
         <View style={styles.other}>
-          {/* <LoginMethod
+          <LoginMethod
             icon={phoneIcon}
             label="一键登录"
             onPress={onQuickLogin}
-          /> */}
+          />
           <LoginMethod
             icon={lockIcon}
             label={isPasswordMode ? "验证码登录" : "密码登录"}
@@ -300,9 +307,21 @@ export function LoginScreen({
           </View>
           <Text style={styles.agreementText}>
             已阅读并同意{" "}
-            <Text accessibilityRole="link" onPress={onUserAgreementPress} style={styles.link}>《用户协议》</Text>{" "}
-            <Text accessibilityRole="link" onPress={onPrivacyPolicyPress} style={styles.link}>《隐私政策》</Text>，未注册用户
-            在登录成功后自动创建账号
+            <Text
+              accessibilityRole="link"
+              onPress={onUserAgreementPress}
+              style={styles.link}
+            >
+              《用户协议》
+            </Text>{" "}
+            <Text
+              accessibilityRole="link"
+              onPress={onPrivacyPolicyPress}
+              style={styles.link}
+            >
+              《隐私政策》
+            </Text>
+            ，未注册用户 在登录成功后自动创建账号
           </Text>
         </Pressable>
         <View style={styles.homeIndicator} />
@@ -318,8 +337,20 @@ export function LoginScreen({
             <Text style={styles.modalTitle}>阅读并同意以下协议</Text>
             <Text style={styles.modalText}>
               已阅读并同意{" "}
-              <Text accessibilityRole="link" onPress={onUserAgreementPress} style={styles.link}>《用户协议》</Text>{" "}
-              <Text accessibilityRole="link" onPress={onPrivacyPolicyPress} style={styles.link}>《隐私政策》</Text>
+              <Text
+                accessibilityRole="link"
+                onPress={onUserAgreementPress}
+                style={styles.link}
+              >
+                《用户协议》
+              </Text>{" "}
+              <Text
+                accessibilityRole="link"
+                onPress={onPrivacyPolicyPress}
+                style={styles.link}
+              >
+                《隐私政策》
+              </Text>
               ，未注册用户在登录成功后自动创建账号
             </Text>
             <View style={styles.modalActions}>

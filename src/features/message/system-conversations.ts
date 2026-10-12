@@ -23,6 +23,15 @@ export function normalizeSystemConversationId(value: string): string {
   return SYSTEM_TITLES[raw] ? `rc_p_${raw}` : value;
 }
 
+export function isSelfConversationId(
+  conversationId: string | undefined | null,
+  userId: string | undefined | null,
+): boolean {
+  const normalizedUserId = userId?.trim();
+  if (!conversationId || !normalizedUserId || isSystemConversationId(conversationId)) return false;
+  return conversationId.trim() === normalizedUserId;
+}
+
 export function getRongConversationTargetId(value: string): string {
   const raw = rawSystemId(value);
   return SYSTEM_TITLES[raw] ? raw : value;

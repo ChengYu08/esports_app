@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { BackHandler, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { BackHandler, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { colors } from "@/shared/theme/tokens";
@@ -43,19 +43,64 @@ export function PrivacyConsentGate({ onAccepted }: PrivacyConsentGateProps) {
     >
       <View style={styles.overlay}>
         <View accessibilityViewIsModal style={styles.card}>
-          <Text style={styles.title}>隐私保护提示</Text>
-          <Text style={styles.body}>
-            为了向你提供更好的服务，我们会按照
-            <Text
-              accessibilityRole="link"
-              onPress={() => void openExternalLink(APP_LINKS.privacyPolicy)}
-              style={styles.link}
-            >
-              《隐私政策》
+          <Text style={styles.title}>个人信息提示</Text>
+          <ScrollView
+            contentContainerStyle={styles.bodyContent}
+            showsVerticalScrollIndicator
+            style={styles.bodyScroll}
+          >
+            <Text style={styles.body}>友情提示</Text>
+            <Text style={styles.body}>欢迎登录盼之电竞APP！</Text>
+            <Text style={styles.body}>
+              盼之电竞重视保障您的个人隐私，我们依据最新的监管要求更新了盼之电竞APP的
+              <Text
+                accessibilityRole="link"
+                onPress={() => void openExternalLink(APP_LINKS.userAgreement)}
+                style={styles.link}
+              >
+                《用户协议》
+              </Text>
+              和
+              <Text
+                accessibilityRole="link"
+                onPress={() => void openExternalLink(APP_LINKS.privacyPolicy)}
+                style={styles.link}
+              >
+                《隐私政策》
+              </Text>
+              ，以下将向你说明：
             </Text>
-            收集、使用和保护你的相关信息。
-            请你阅读并同意相关协议后继续使用盼之电竞。你可以随时在设置中查看或管理你的隐私设置。
-          </Text>
+            <Text style={styles.body}>
+              1.为保障应用安全、稳定运行，我们可能会收集您的设备信息、IP 地址和 MAC 地址。；
+            </Text>
+            <Text style={styles.body}>
+              2.使用客服功能时，为确保您在应用关闭或处于后台时仍能及时接收消息，本应用可能需要使用自启动或关联启动能力，并通过系统广播唤醒或启动应用。该能力仅用于实现消息推送等必要功能。；
+            </Text>
+            <Text style={styles.body}>
+              3.我们尊重并保障您的选择权。您可以访问、更正、删除个人信息，管理个人信息授权；同时，我们为您提供账号注销和投诉反馈渠道
+            </Text>
+            <Text style={styles.body}>
+              4.未经你的同意，我们不会从第三方获取、共享或向其提供你的信息；
+            </Text>
+            <Text style={styles.body}>
+              5.你可以随时访问、修改和删除你的个人信息，同时我们也提供注销、隐身和投诉等方式。详情请查看
+              <Text
+                accessibilityRole="link"
+                onPress={() => void openExternalLink(APP_LINKS.userAgreement)}
+                style={styles.link}
+              >
+                《用户协议》
+              </Text>
+              <Text
+                accessibilityRole="link"
+                onPress={() => void openExternalLink(APP_LINKS.privacyPolicy)}
+                style={styles.link}
+              >
+                《隐私政策》
+              </Text>
+              ）
+            </Text>
+          </ScrollView>
           <View style={styles.actions}>
             <Pressable
               accessibilityRole="button"
@@ -109,11 +154,17 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   body: {
-    marginTop: 14,
     color: colors.textSecondary,
     fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 23,
+  },
+  bodyScroll: {
+    maxHeight: 420,
+    marginTop: 14,
+  },
+  bodyContent: {
+    gap: 10,
   },
   link: { color: colors.brand },
   actions: {
