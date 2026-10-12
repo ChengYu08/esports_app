@@ -142,13 +142,20 @@ export class SsoClient {
   }
 
   async getQuickLoginAuthToken(): Promise<QuickLoginAuthToken> {
+    console.info("[DEBUG-QUICK-LOGIN] requesting SSO auth token");
     const body = await this.request<{ data?: QuickLoginAuthToken }>(
       "/api/auth/public/ali/h5/one-key/auth-token",
       { method: "GET", skipCodeCheck: true },
     );
     const token = body.data ?? (body as unknown as QuickLoginAuthToken);
-    if (!token.jwtToken || !token.accessToken)
+    if (!token.jwtToken || !token.accessToken) {
+      console.warn("[DEBUG-QUICK-LOGIN] SSO auth token response is incomplete", {
+        hasJwtToken: Boolean(token.jwtToken),
+        hasAccessToken: Boolean(token.accessToken),
+      });
       throw new SsoError("一键登录鉴权 token 不完整");
+    }
+    console.info("[DEBUG-QUICK-LOGIN] SSO auth token received");
     return token;
   }
 
@@ -156,10 +163,20 @@ export class SsoClient {
     provider: QuickLoginProvider,
   ): Promise<SsoToken & { phone?: string }> {
     const authToken = await this.getQuickLoginAuthToken();
-    if (!(await provider.checkLoginAvailable(authToken)))
-      throw new SsoError("当前环境不支持一键登录");
+    console.info("[DEBUG-QUICK-LOGIN] checking native provider availability");
+    const available = await provider.checkLoginAvailable(authToken);
+    console.info("[DEBUG-QUICK-LOGIN] native provider availability", {
+      available,
+    });
+    if (!available)
+      throw new SsoError("当前原生模块尚未集成阿里云号码认证 SDK");
+    console.info("[DEBUG-QUICK-LOGIN] requesting carrier authorization");
     const result = await provider.getLoginToken(authToken);
+    console.info("[DEBUG-QUICK-LOGIN] carrier authorization completed", {
+      hasSpToken: Boolean(result.spToken),
+    });
     if (!result.spToken) throw new SsoError("一键登录未返回授权 token");
+    console.info("[DEBUG-QUICK-LOGIN] exchanging carrier token with SSO");
     return this.request<SsoToken & { phone?: string }>(
       "/api/auth/oauth2/token",
       {

@@ -114,7 +114,14 @@ export default function LoginRoute() {
           void openExternalLink(APP_LINKS.privacyPolicy)
         }
         onQuickLogin={async () => {
+          console.info("[DEBUG-QUICK-LOGIN] button pressed", {
+            platform: Platform.OS,
+            ssoConfigured: Boolean(env.ssoClientSecret),
+          });
           if (!adapter) {
+            console.warn(
+              "[DEBUG-QUICK-LOGIN] stopped: SSO client secret is not configured",
+            );
             Toast.show("暂无法一键登录，请先配置 SSO client secret。", {
               duration: Toast.durations.SHORT,
             });
@@ -131,6 +138,10 @@ export default function LoginRoute() {
             );
             router.replace("/");
           } catch (error) {
+            console.error("[DEBUG-QUICK-LOGIN] failed", {
+              name: error instanceof Error ? error.name : "UnknownError",
+              message: error instanceof Error ? error.message : String(error),
+            });
             Toast.show(
               `一键登录不可用，${error instanceof Error ? error.message : "请使用验证码登录"}`,
               { duration: Toast.durations.SHORT },

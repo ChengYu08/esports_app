@@ -2,6 +2,7 @@ package expo.modules.pz.oneclick
 
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import android.util.Log
 
 class PzOneClickModule : Module() {
   override fun definition() = ModuleDefinition {
@@ -10,11 +11,13 @@ class PzOneClickModule : Module() {
     Events("onStateChange")
 
     AsyncFunction("checkLoginAvailableAsync") { _: Map<String, String> ->
+      Log.w("PzOneClick", "[DEBUG-QUICK-LOGIN] availability check is a stub; carrier SDK is not integrated")
       sendEvent("onStateChange", mapOf("state" to "unavailable"))
       false
     }
 
     AsyncFunction("authorizeAsync") { _: Map<String, String> ->
+      Log.e("PzOneClick", "[DEBUG-QUICK-LOGIN] authorization requested before carrier SDK integration")
       throwUnsupportedAuthorization()
     }
 

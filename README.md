@@ -25,14 +25,16 @@ https://www.luanfengxuan.cn/vpi/pages/pzdj_privacy
 服务协议
 https://www.luanfengxuan.cn/vpi/pages/pzdj_user
 
-1、注销登录
+1、注销登录 ✅
 
-2、排行傍
+2、排行傍 ✅
 
-3、网络体验问题
+3、网络体验问题 ✅ 切换到正式换成即可 测试环境限制了局域网访问
 
 4、打包构建
 
 5、切换到正式环境
 
-6、登录使用标识
+6、登录使用标识 ✅
+
+7、上架截图 上架描述、隐私协议、用户协议、域名映射

@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import {
   Animated,
   Easing,
+  KeyboardAvoidingView,
   Modal,
   Pressable,
+  Platform,
   StyleSheet,
   useWindowDimensions,
   type StyleProp,
@@ -18,6 +20,7 @@ type BottomSheetProps = {
   contentStyle?: StyleProp<ViewStyle>;
   backdropStyle?: StyleProp<ViewStyle>;
   dismissOnBackdropPress?: boolean;
+  keyboardAvoiding?: boolean;
 };
 
 /** Bottom sheets use the same timing as the club detail filter sheet. */
@@ -28,6 +31,7 @@ export function BottomSheet({
   contentStyle,
   backdropStyle,
   dismissOnBackdropPress = true,
+  keyboardAvoiding = false,
 }: BottomSheetProps) {
   const { height: windowHeight } = useWindowDimensions();
   const [mounted, setMounted] = useState(visible);
@@ -83,6 +87,24 @@ export function BottomSheet({
 
   if (!mounted) return null;
 
+  const backdrop = (
+    <Animated.View
+      style={[styles.backdrop, backdropStyle, { opacity: backdropOpacity }]}
+    >
+      <Pressable
+        accessibilityLabel="关闭弹窗"
+        disabled={!dismissOnBackdropPress}
+        onPress={onClose}
+        style={StyleSheet.absoluteFill}
+      />
+      <Animated.View
+        style={[contentStyle, { transform: [{ translateY: sheetTranslateY }] }]}
+      >
+        {children}
+      </Animated.View>
+    </Animated.View>
+  );
+
   return (
     <Modal
       transparent
@@ -91,21 +113,14 @@ export function BottomSheet({
       visible
       onRequestClose={onClose}
     >
-      <Animated.View
-        style={[styles.backdrop, backdropStyle, { opacity: backdropOpacity }]}
-      >
-        <Pressable
-          accessibilityLabel="关闭弹窗"
-          disabled={!dismissOnBackdropPress}
-          onPress={onClose}
-          style={StyleSheet.absoluteFill}
-        />
-        <Animated.View
-          style={[contentStyle, { transform: [{ translateY: sheetTranslateY }] }]}
+      {keyboardAvoiding ? (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.keyboardAvoiding}
         >
-          {children}
-        </Animated.View>
-      </Animated.View>
+          {backdrop}
+        </KeyboardAvoidingView>
+      ) : backdrop}
     </Modal>
   );
 }
@@ -116,4 +131,5 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     backgroundColor: "rgba(0,0,0,.35)",
   },
+  keyboardAvoiding: { flex: 1 },
 });
