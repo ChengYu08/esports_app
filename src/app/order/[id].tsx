@@ -24,6 +24,7 @@ import {
   type OrderReview,
 } from "@/features/order/order.api";
 import type { OrderItemModel } from "@/features/order/order.types";
+import { requireLogin } from "@/shared/navigation/require-login";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { CachedImage } from "@/shared/ui/CachedImage";
@@ -83,6 +84,7 @@ export default function OrderDetailRoute() {
     order.status === "cancelled" || order.status === "refunded";
   const orderNumber = order.orderNo ?? order.id;
   const handleChat = () => {
+    if (!requireLogin()) return;
     if (!order.receiverUserId || order.receiverUserId === "0") {
       setPrompt({
         title: "暂时无法聊天",

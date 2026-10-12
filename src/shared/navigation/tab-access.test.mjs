@@ -9,13 +9,15 @@ import {
 
 test("only order, message, and mine require authentication", () => {
   assert.equal(isProtectedTab("index"), false);
+  assert.equal(isProtectedTab("ranking"), false);
   assert.equal(isProtectedTab("order"), true);
   assert.equal(isProtectedTab("message"), true);
   assert.equal(isProtectedTab("mine"), true);
 });
 
-test("unauthenticated users can open home but not protected tabs", () => {
+test("unauthenticated users can open home and ranking but not protected tabs", () => {
   assert.equal(canOpenTab("index", false), true);
+  assert.equal(canOpenTab("ranking", false), true);
   assert.equal(canOpenTab("order", false), false);
   assert.equal(canOpenTab("message", false), false);
   assert.equal(canOpenTab("mine", false), false);
@@ -23,6 +25,7 @@ test("unauthenticated users can open home but not protected tabs", () => {
 
 test("authenticated users can open every tab", () => {
   assert.equal(canOpenTab("index", true), true);
+  assert.equal(canOpenTab("ranking", true), true);
   assert.equal(canOpenTab("order", true), true);
   assert.equal(canOpenTab("message", true), true);
   assert.equal(canOpenTab("mine", true), true);
@@ -63,4 +66,17 @@ test("quick match requires authentication before navigation", () => {
     type: "navigate",
     destination: "match",
   });
+});
+
+test("ranking navigation is available with or without authentication", () => {
+  for (const isAuthenticated of [false, true]) {
+    assert.deepEqual(getTabPressAction("ranking", isAuthenticated), {
+      type: "navigate",
+      tab: "ranking",
+    });
+    assert.deepEqual(getProtectedNavigationAction("ranking", isAuthenticated), {
+      type: "navigate",
+      destination: "ranking",
+    });
+  }
 });

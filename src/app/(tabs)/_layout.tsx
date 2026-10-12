@@ -34,6 +34,7 @@ export default function TabsLayout() {
         screenOptions={{ headerShown: false }}
       >
         <Tabs.Screen name="index" />
+        <Tabs.Screen name="ranking" options={{ title: "排行榜" }} />
         <Tabs.Protected guard={isAuthenticated}>
           <Tabs.Screen name="order" />
           <Tabs.Screen name="message" />

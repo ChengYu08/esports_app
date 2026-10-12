@@ -6,7 +6,6 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
-  getProtectedNavigationAction,
   getTabPressAction,
   type AppTab,
 } from "@/shared/navigation/tab-access";
@@ -16,49 +15,45 @@ type AppTabBarProps = {
   navigation: { navigate: (name: string) => void };
 };
 
-const icons = {
-  home: require("../../../assets/coms/tab-home.svg"),
-  homeSelected: require("../../../assets/coms/tab-home-selected.svg"),
-  order: require("../../../assets/coms/tab-order.svg"),
-  orderSelected: require("../../../assets/coms/tab-order-selected.svg"),
-  message: require("../../../assets/coms/tab-message.svg"),
-  messageSelected: require("../../../assets/coms/tab-message-selected.svg"),
-  mine: require("../../../assets/coms/tab-mine.svg"),
-  mineSelected: require("../../../assets/coms/tab-mine-selected.svg"),
-  publish: require("../../../assets/home/h_publish.svg"),
-};
+const items = [
+  {
+    route: "index",
+    label: "首页",
+    icon: require("../../../assets/coms/tab-home.svg"),
+    selectedIcon: require("../../../assets/coms/tab-home-selected.svg"),
+  },
+  {
+    route: "ranking",
+    label: "排行榜",
+    icon: require("../../../assets/coms/tab-ranking.svg"),
+    selectedIcon: require("../../../assets/coms/tab-ranking-selected.svg"),
+  },
+  {
+    route: "order",
+    label: "订单",
+    icon: require("../../../assets/coms/tab-order.svg"),
+    selectedIcon: require("../../../assets/coms/tab-order-selected.svg"),
+  },
+  {
+    route: "message",
+    label: "消息",
+    icon: require("../../../assets/coms/tab-message.svg"),
+    selectedIcon: require("../../../assets/coms/tab-message-selected.svg"),
+  },
+  {
+    route: "mine",
+    label: "我的",
+    icon: require("../../../assets/coms/tab-mine.svg"),
+    selectedIcon: require("../../../assets/coms/tab-mine-selected.svg"),
+  },
+] as const;
 
 export function AppTabBar({ state, navigation }: AppTabBarProps) {
   const insets = useSafeAreaInsets();
   const isAuthenticated = useAuthStore((authState) =>
     Boolean(authState.accessToken && authState.user),
   );
-  // Expo Router names the home tab route "index", while the visual tab key is "home".
-  // Normalize it so the selected home asset is used when the index screen is active.
   const activeRoute = state.routes[state.index]?.name;
-  const active = activeRoute === "index" ? "home" : activeRoute;
-  const items = [
-    {
-      label: "首页",
-      icon: active === "home" ? icons.homeSelected : icons.home,
-      active: active === "home",
-    },
-    {
-      label: "订单",
-      icon: active === "order" ? icons.orderSelected : icons.order,
-      active: active === "order",
-    },
-    {
-      label: "消息",
-      icon: active === "message" ? icons.messageSelected : icons.message,
-      active: active === "message",
-    },
-    {
-      label: "我的",
-      icon: active === "mine" ? icons.mineSelected : icons.mine,
-      active: active === "mine",
-    },
-  ];
 
   const handleTabPress = (tab: AppTab) => {
     const action = getTabPressAction(tab, isAuthenticated);
@@ -69,15 +64,6 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
     navigation.navigate(action.tab);
   };
 
-  const handleMatchPress = () => {
-    const action = getProtectedNavigationAction("match", isAuthenticated);
-    if (action.type === "login") {
-      router.replace("/login");
-      return;
-    }
-    router.push("/match");
-  };
-
   return (
     <View
       style={[
@@ -85,43 +71,28 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
         { height: 60 + insets.bottom, paddingBottom: insets.bottom },
       ]}
     >
-      {items.slice(0, 2).map((item, index) => (
-        <Pressable
-          key={item.label}
-          style={styles.bottomItem}
-          onPress={() => handleTabPress(index ? "order" : "index")}
-        >
-          <Image source={item.icon} style={styles.bottomIcon} />
-          <Text
-            style={[styles.bottomLabel, item.active && styles.bottomActive]}
+      {items.map((item) => {
+        const selected = activeRoute === item.route;
+
+        return (
+          <Pressable
+            key={item.route}
+            accessibilityRole="tab"
+            accessibilityLabel={item.label}
+            accessibilityState={{ selected }}
+            style={styles.bottomItem}
+            onPress={() => handleTabPress(item.route)}
           >
-            {item.label}
-          </Text>
-        </Pressable>
-      ))}
-      {/* <Pressable
-        accessibilityLabel="快速匹配"
-        style={styles.match}
-        onPress={handleMatchPress}
-      >
-        <Image source={icons.publish} style={styles.publish} />
-      </Pressable> */}
-      {items.slice(2).map((item) => (
-        <Pressable
-          key={item.label}
-          style={styles.bottomItem}
-          onPress={() =>
-            handleTabPress(item.label === "我的" ? "mine" : "message")
-          }
-        >
-          <Image source={item.icon} style={styles.bottomIcon} />
-          <Text
-            style={[styles.bottomLabel, item.active && styles.bottomActive]}
-          >
-            {item.label}
-          </Text>
-        </Pressable>
-      ))}
+            <Image
+              source={selected ? item.selectedIcon : item.icon}
+              style={styles.bottomIcon}
+            />
+            <Text style={[styles.bottomLabel, selected && styles.bottomActive]}>
+              {item.label}
+            </Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
@@ -153,12 +124,4 @@ const styles = StyleSheet.create({
   bottomIcon: { width: 30, height: 30 },
   bottomLabel: { fontFamily: DOUYIN_SANS, color: "#c8c8cc", fontSize: 11 },
   bottomActive: { fontFamily: DOUYIN_SANS, color: "#333" },
-  match: {
-    width: 71,
-    height: 60,
-    alignItems: "center",
-    justifyContent: "center",
-    transform: [{ translateY: -10 }],
-  },
-  publish: { width: 71, height: 60 },
 });

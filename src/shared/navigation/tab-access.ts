@@ -1,4 +1,4 @@
-export type AppTab = "index" | "order" | "message" | "mine";
+export type AppTab = "index" | "ranking" | "order" | "message" | "mine";
 export type ProtectedDestination = AppTab | "match";
 
 const protectedTabs = new Set<AppTab>(["order", "message", "mine"]);
@@ -32,7 +32,7 @@ export function getProtectedNavigationAction(
   destination: ProtectedDestination,
   isAuthenticated: boolean,
 ): ProtectedNavigationAction {
-  if (destination === "index" || isAuthenticated) {
+  if (destination === "index" || destination === "ranking" || isAuthenticated) {
     return { type: "navigate", destination };
   }
   return { type: "login", replaceCurrentRoute: true };

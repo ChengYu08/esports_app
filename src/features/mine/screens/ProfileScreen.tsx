@@ -60,6 +60,7 @@ import { createProfileChatParams } from "@/features/mine/profile-chat";
 import { cancelOrder } from "@/features/order/order.api";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
+import { requireLogin } from "@/shared/navigation/require-login";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
@@ -234,7 +235,10 @@ export default function ProfileScreen() {
               <SkillsContent
                 query={gameDetailQuery}
                 detail={gameDetail}
-                onOrder={setOrderCard}
+                onOrder={(card) => {
+                  if (!requireLogin()) return;
+                  setOrderCard(card);
+                }}
               />
             ) : (
               <ReviewsContent
@@ -270,7 +274,8 @@ export default function ProfileScreen() {
           </Pressable> */}
           <Pressable
             style={styles.chatButton}
-            onPress={() =>
+            onPress={() => {
+              if (!requireLogin()) return;
               router.push({
                 pathname: "/chat/[id]",
                 params: createProfileChatParams({
@@ -279,8 +284,8 @@ export default function ProfileScreen() {
                   headImage: profile.headImage,
                   clubId: profile.clubId,
                 }),
-              })
-            }
+              });
+            }}
           >
             <Text style={styles.chatText}>聊一聊</Text>
           </Pressable>
