@@ -1,4 +1,5 @@
 import { Image } from "expo-image";
+import { HeadphonesRegular } from "@fluentui/react-native-icons";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -30,6 +31,7 @@ import { resolveConversationAvatar } from "../message-avatar";
 import { useMessageStore } from "../message-store";
 import type { ManagedMessage } from "../message-state";
 import type { AfterSaleCardPayload } from "@/features/order/after-sale-card";
+import { afterSaleCardRows } from "@/features/order/after-sale-card";
 import { getSystemConversationTitle, normalizeSystemConversationId } from "../system-conversations";
 
 const defaultAvatar = require("../../../../assets/coms/avatar_default_2.png");
@@ -52,6 +54,7 @@ export default function ChatScreen() {
   const [draft, setDraft] = useState("");
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [imageSending, setImageSending] = useState(false);
+  const [afterSaleSending, setAfterSaleSending] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [noteVisible, setNoteVisible] = useState(false);
   const [noteDraft, setNoteDraft] = useState("");
@@ -215,7 +218,7 @@ export default function ChatScreen() {
         onScroll={handleScroll}
         scrollEventThrottle={150}
       />
-      {afterSalePayload ? <Pressable style={styles.afterSaleGuide} onPress={() => { void sendAfterSaleCard(conversationId, afterSalePayload).then(() => setAfterSalePayload(null)); }}><View style={styles.afterSaleGuideCopy}><Text style={styles.afterSaleGuideTitle}>发送订单信息给售后客服</Text><Text style={styles.afterSaleGuideSub}>订单服务不满意，申请售后～ · 订单 {afterSalePayload.orderNo || afterSalePayload.orderId}</Text></View><Text style={styles.afterSaleGuideButton}>点击发送</Text></Pressable> : null}
+      {afterSalePayload ? <View style={styles.afterSaleGuide}><View style={styles.afterSaleGuideCopy}><Text style={styles.afterSaleGuideTitle}>发送订单信息给售后客服</Text><Text numberOfLines={1} style={styles.afterSaleGuideSub}>{`订单服务不满意，申请售后～ · 订单 ${afterSalePayload.orderNo || afterSalePayload.orderId}`}</Text></View><Pressable accessibilityRole="button" disabled={afterSaleSending} onPress={async () => { setAfterSaleSending(true); const sent = await sendAfterSaleCard(conversationId, afterSalePayload); setAfterSaleSending(false); if (sent) setAfterSalePayload(null); }}><Text style={[styles.afterSaleGuideButton, afterSaleSending && styles.afterSaleGuideButtonDisabled]}>{afterSaleSending ? "发送中..." : "点击发送"}</Text></Pressable><Pressable accessibilityLabel="关闭售后引导" accessibilityRole="button" hitSlop={8} onPress={() => setAfterSalePayload(null)} style={styles.afterSaleGuideClose}><Text style={styles.afterSaleGuideCloseText}>×</Text></Pressable></View> : null}
       {lastError && connectionState !== "ready" ? <Text style={styles.errorBanner}>{lastError}</Text> : null}
 
       <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
@@ -333,7 +336,10 @@ function ChatBubble({ item, peerAvatar, myAvatar, onRetry }: { item: ManagedMess
               }}
             />
           </Pressable>
-        ) : item.kind === "afterSale" ? <View style={styles.afterSaleCard}><Text style={styles.afterSaleCardTitle}>{item.title}</Text><Text style={styles.afterSaleCardSub}>订单 {item.orderNo || "-"}</Text></View> : item.kind === "orderNotify" ? (
+        ) : item.kind === "afterSale" ? <View style={styles.afterSaleCard}>
+          <View style={styles.afterSaleCardHeader}><View style={styles.afterSaleCardIcon}><HeadphonesRegular color="#FE1F4C" width={18} height={18} /></View><Text style={styles.afterSaleCardTitle}>{item.title}</Text></View>
+          <View style={styles.afterSaleCardRows}>{afterSaleCardRows(item.payload).map((row) => <View key={row.label} style={styles.afterSaleCardRow}><Text style={styles.afterSaleCardLabel}>{row.label}：</Text><Text numberOfLines={row.label === "备注" ? 2 : undefined} style={styles.afterSaleCardValue}>{row.value}</Text></View>)}</View>
+        </View> : item.kind === "orderNotify" ? (
           <View style={styles.orderNotifyCard}>
             <Text style={styles.orderNotifyTitle}>{item.title}</Text>
             {item.orderNo ? <Text style={styles.orderNotifyRow}>订单号：{item.orderNo}</Text> : null}
@@ -386,9 +392,11 @@ const styles = StyleSheet.create({
   sendButtonDisabled: { opacity: 0.55 },
   sendText: { color: "#FFFFFF", fontFamily: DOUYIN_SANS, fontSize: 12, lineHeight: 18 },
   sendIcon: { width: 14, height: 14 },
-  afterSaleGuide: { marginHorizontal: 12, marginBottom: 8, padding: 12, backgroundColor: "#FFF2F5", borderRadius: 10, flexDirection: "row", alignItems: "center" },
-  afterSaleGuideCopy: { flex: 1 }, afterSaleGuideTitle: { color: "#111", fontSize: 14, fontWeight: "600" }, afterSaleGuideSub: { color: "#888", fontSize: 11, marginTop: 4 }, afterSaleGuideButton: { color: "#FE1F4C", fontSize: 13, fontWeight: "600" },
-  afterSaleCard: { minWidth: 190, padding: 4 }, afterSaleCardTitle: { color: "#111", fontSize: 14, fontWeight: "600" }, afterSaleCardSub: { color: "#777", fontSize: 12, marginTop: 8 },
+  afterSaleGuide: { marginHorizontal: 12, marginBottom: 8, padding: 12, backgroundColor: "#FFF2F5", borderRadius: 10, flexDirection: "row", alignItems: "center", gap: 10 },
+  afterSaleGuideCopy: { flex: 1, minWidth: 0 }, afterSaleGuideTitle: { color: "#111", fontSize: 14, fontWeight: "600" }, afterSaleGuideSub: { color: "#888", fontSize: 11, marginTop: 4 }, afterSaleGuideButton: { color: "#FE1F4C", fontSize: 13, fontWeight: "600" }, afterSaleGuideButtonDisabled: { opacity: 0.55 }, afterSaleGuideClose: { width: 24, height: 28, alignItems: "center", justifyContent: "center" }, afterSaleGuideCloseText: { color: "#999", fontSize: 22, lineHeight: 24 },
+  afterSaleCard: { width: 260, maxWidth: "100%", padding: 12, borderRadius: 12, backgroundColor: "#F5F5F5", borderWidth: StyleSheet.hairlineWidth, borderColor: "#E7E7E7", gap: 10 },
+  afterSaleCardHeader: { flexDirection: "row", alignItems: "center", gap: 8 }, afterSaleCardIcon: { width: 30, height: 30, borderRadius: 15, backgroundColor: "#FFE6EB", alignItems: "center", justifyContent: "center" }, afterSaleCardTitle: { flex: 1, color: "#111", fontSize: 14, lineHeight: 20, fontWeight: "600" },
+  afterSaleCardRows: { gap: 4 }, afterSaleCardRow: { flexDirection: "row", alignItems: "flex-start" }, afterSaleCardLabel: { width: 48, color: "#888", fontSize: 11, lineHeight: 16 }, afterSaleCardValue: { flex: 1, color: "#555", fontSize: 11, lineHeight: 16 },
   orderNotifyBubble: { maxWidth: "84%", paddingHorizontal: 0, paddingVertical: 0 },
   orderNotifyCard: { minWidth: 220, padding: 14 },
   orderNotifyTitle: { color: "#111111", fontFamily: DOUYIN_SANS, fontSize: 15, fontWeight: "600", lineHeight: 22, marginBottom: 8 },

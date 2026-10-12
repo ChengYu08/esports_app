@@ -161,6 +161,10 @@ export async function connectRongCloud(accessToken: string) {
         'ORDER_NOTIFY',
         sdk.RCIMIWNativeCustomMessagePersistentFlag.Counted,
       );
+      await engine.registerNativeCustomMessage(
+        'PZAfterSaleApply',
+        sdk.RCIMIWNativeCustomMessagePersistentFlag.Counted,
+      );
       installListeners();
     } catch {
       return false;

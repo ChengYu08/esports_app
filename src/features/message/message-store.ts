@@ -61,7 +61,7 @@ export type MessageStoreState = {
   closeConversation: () => void;
   loadOlder: (peerId: string) => Promise<void>;
   sendText: (peerId: string, text: string) => Promise<void>;
-  sendAfterSaleCard: (peerId: string, payload: import('@/features/order/after-sale-card').AfterSaleCardPayload) => Promise<void>;
+  sendAfterSaleCard: (peerId: string, payload: import('@/features/order/after-sale-card').AfterSaleCardPayload) => Promise<boolean>;
   sendImage: (peerId: string, path: string) => Promise<void>;
   retryMessage: (peerId: string, clientId: string) => Promise<void>;
   markRead: (peerId: string) => Promise<void>;
@@ -272,14 +272,15 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       },
 
       sendAfterSaleCard: async (peerId, payload) => {
-        if (get().connectionState !== 'ready') { set({ lastError: unavailableMessage }); return; }
+        if (get().connectionState !== 'ready') { set({ lastError: unavailableMessage }); return false; }
         try {
           const sendCard = adapter.sendAfterSaleCard;
-          if (!sendCard) { set({ lastError: '当前版本暂不支持售后卡片' }); return; }
+          if (!sendCard) { set({ lastError: '当前版本暂不支持售后卡片' }); return false; }
           const sent = await sendCard(peerId, payload);
           set((state) => ({ messagesByPeerId: { ...state.messagesByPeerId, [peerId]: mergeMessages(state.messagesByPeerId[peerId] || [], sent) } }));
           updateLocalPreview(peerId, sent);
-        } catch (error) { set({ lastError: error instanceof Error ? error.message : '发送售后卡片失败' }); }
+          return true;
+        } catch (error) { set({ lastError: error instanceof Error ? error.message : '发送售后卡片失败' }); return false; }
       },
 
       retryMessage: async (peerId, clientId) => {

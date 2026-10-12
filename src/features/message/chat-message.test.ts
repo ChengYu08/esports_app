@@ -68,6 +68,53 @@ describe("mapRongMessage", () => {
     });
   });
 
+  it("maps the PC-compatible after-sale custom message with its full order payload", () => {
+    expect(mapRongMessage({
+      messageUId: "after-sale-1",
+      identifier: "PZAfterSaleApply",
+      fields: {
+        data: JSON.stringify({
+          orderId: 123,
+          orderNo: "PZ20261008001",
+          companionUserId: 456,
+          companionNickname: "陪玩师小王",
+          gameName: "王者荣耀",
+          serviceDesc: "排位上分",
+          unitPrice: 68,
+          quantity: 2,
+          totalPrice: 136,
+          createTime: "2026-10-08T10:30:00",
+          remark: "尽快安排",
+          clubId: 789,
+          csUserId: 999,
+        }),
+      },
+      sentTime: new Date("2026-10-08T10:30:00").getTime(),
+      direction: 1,
+    }, { image: 4, send: 0 })).toEqual({
+      id: "after-sale-1",
+      kind: "afterSale",
+      title: "订单服务不满意，申请售后～",
+      payload: {
+        orderId: 123,
+        orderNo: "PZ20261008001",
+        companionUserId: 456,
+        companionNickname: "陪玩师小王",
+        gameName: "王者荣耀",
+        serviceDesc: "排位上分",
+        unitPrice: 68,
+        quantity: 2,
+        totalPrice: 136,
+        createTime: "2026-10-08T10:30:00",
+        remark: "尽快安排",
+        clubId: 789,
+        csUserId: 999,
+      },
+      time: "10:30",
+      isMine: false,
+    });
+  });
+
   it("keeps the SDK ID and timestamp in a confirmed outgoing message", () => {
     expect(toManagedMessage({
       messageUId: "m-1",

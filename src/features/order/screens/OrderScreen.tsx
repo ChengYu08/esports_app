@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "@esports/auth";
@@ -9,6 +9,7 @@ import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
 import { OrderCard } from "../components/OrderCard";
 import { OrderAfterSaleSheet } from "../components/OrderAfterSaleSheet";
+import { buildAfterSalePayload } from "../after-sale-card";
 import { OrderReviewSheet } from "../components/OrderReviewSheet";
 import { OrderHeader } from "../components/OrderHeader";
 import { OrderTabs } from "../components/OrderTabs";
@@ -46,6 +47,10 @@ export default function OrderScreen() {
     if (action === "cancel") setCancelTarget(item);
     if (action === "complete") setCompleteTarget(item);
     if (action === "afterSales") {
+      if (item.clubId == null) {
+        Alert.alert("暂无法申请售后", "缺少俱乐部信息，无法申请售后");
+        return;
+      }
       setAfterSaleTarget(item);
       if (token && item.clubId) {
         setAfterSaleLoading(true);
@@ -114,7 +119,8 @@ export default function OrderScreen() {
       <OrderAfterSaleSheet visible={Boolean(afterSaleTarget)} loading={afterSaleLoading} members={afterSaleMembers} onClose={() => setAfterSaleTarget(null)} onContact={(member) => {
         const order = afterSaleTarget;
         setAfterSaleTarget(null);
-        const payload = { orderId: Number(order?.id), orderNo: order?.orderNo, companionUserId: Number(order?.receiverUserId) || undefined, companionNickname: order?.sellerName, gameName: order?.gameName, serviceDesc: order?.serviceName, unitPrice: Number(order?.unitPrice), quantity: order?.quantity, totalPrice: Number(order?.totalPrice), createTime: order?.createTime, clubId: order?.clubId, csUserId: member.userId };
+        if (!order) return;
+        const payload = buildAfterSalePayload(order, member.userId);
         router.push({ pathname: "/chat/[id]", params: { id: String(member.userId), title: member.nickname || "售后客服", avatar: member.headImage || "", afterSale: JSON.stringify(payload) } });
       }} />
       <OrderReviewSheet visible={Boolean(reviewTarget)} readonly={Boolean(reviewTarget?.reviewExists)} detail={reviewDetail} onClose={() => setReviewTarget(null)} onSubmit={async (rating, content) => { if (!reviewTarget || !token) return; await submitOrderReview(reviewTarget.orderNo || reviewTarget.id, rating, content, token); setReviewTarget((current) => current ? { ...current, reviewExists: true } : current); setReviewDetail({ rating, content }); await orders.refetch(); }} />

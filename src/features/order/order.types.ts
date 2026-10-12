@@ -41,6 +41,7 @@ export type OrderItemModel = {
   unitPrice: string;
   quantity: number;
   totalPrice: string;
+  remark?: string;
   createTime?: string;
   paidTime?: string;
   acceptedTime?: string;

@@ -1,3 +1,6 @@
+import type { AfterSaleCardPayload } from "../order/after-sale-card";
+import { AFTER_SALE_CARD_TITLE } from "../order/after-sale-card";
+
 export type ChatTextMessage = {
   id: string;
   kind: "text";
@@ -18,7 +21,7 @@ export type AfterSaleCardMessage = {
   id: string;
   kind: "afterSale";
   title: string;
-  orderNo?: string;
+  payload: Partial<AfterSaleCardPayload>;
   time: string;
   isMine: boolean;
 };
@@ -69,9 +72,9 @@ export function mapRongMessage(message: RongSdkMessage, enums: { image: number; 
 
   if (message.identifier === "PZAfterSaleApply") {
     let fields = message.fields || {};
-    let payload: Record<string, string> = fields;
+    let payload: Partial<AfterSaleCardPayload> = fields;
     try { payload = JSON.parse(fields.data || "{}"); } catch { /* use fields */ }
-    return { id, kind: "afterSale", title: "订单服务不满意，申请售后～", orderNo: payload.orderNo, time, isMine };
+    return { id, kind: "afterSale", title: AFTER_SALE_CARD_TITLE, payload, time, isMine };
   }
 
   if (message.identifier === "ORDER_NOTIFY") {

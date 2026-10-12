@@ -1,5 +1,5 @@
-import { TabPlaceholderScreen } from "@/features/navigation/screens/TabPlaceholderScreen";
+import RankingScreen from "@/features/ranking/screens/RankingScreen";
 
 export default function RankingRoute() {
-  return <TabPlaceholderScreen title="排行榜" />;
+  return <RankingScreen />;
 }

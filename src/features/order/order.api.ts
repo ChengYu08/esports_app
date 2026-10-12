@@ -69,11 +69,12 @@ export function mapOrder(item: ApiOrder, index = 0): OrderItemModel {
     reviewExists,
     sellerName: stringValue(item, "sellerName", "receiverNickname", "companionName", "clubName") ?? "盼之电竞俱乐部",
     sellerAvatar: stringValue(item, "sellerAvatar", "receiverHeadImage", "clubLogo", "logoUrl", "headImage") ?? sellerAvatar,
-    serviceName: stringValue(item, "serviceName", "productName") ?? ([stringValue(item, "gameModeName"), stringValue(item, "gameLevelName")].filter(Boolean).join("-") || "陪玩服务"),
+    serviceName: stringValue(item, "title", "serviceName", "productName") ?? ([stringValue(item, "gameModeName"), stringValue(item, "gameLevelName")].filter(Boolean).join("-") || "陪玩服务"),
     gameName: stringValue(item, "gameName") ?? "未知游戏",
     unitPrice: stringValue(item, "unitPrice", "price") ?? total,
     quantity: numberValue(item, "quantity", "count", "num") ?? 1,
     totalPrice: total,
+    remark: stringValue(item, "remark", "buyerRemark"),
     ...readOrderTimeFields(item),
     actions,
   };

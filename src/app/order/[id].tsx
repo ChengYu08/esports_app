@@ -4,7 +4,7 @@ import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Toast from "react-native-root-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -12,6 +12,7 @@ import { queryClient } from "@/core/query/query-client";
 import { OrderAfterSaleSheet } from "@/features/order/components/OrderAfterSaleSheet";
 import { OrderReviewSheet } from "@/features/order/components/OrderReviewSheet";
 import { getOrderDetailAction } from "@/features/order/order-detail-actions";
+import { buildAfterSalePayload } from "@/features/order/after-sale-card";
 import {
   cancelOrder,
   completeOrder,
@@ -222,8 +223,12 @@ export default function OrderDetailRoute() {
                 } else if (action.key === "complete") {
                   setCompletePromptVisible(true);
                 } else if (action.key === "afterSales") {
+                  if (order.clubId == null) {
+                    Alert.alert("暂无法申请售后", "缺少俱乐部信息，无法申请售后");
+                    return;
+                  }
                   setAfterSaleVisible(true);
-                  if (token && order.clubId) {
+                  if (token) {
                     setAfterSaleLoading(true);
                     void fetchAfterSaleMembers(order.clubId, token)
                       .then(setAfterSaleMembers)
@@ -286,20 +291,7 @@ export default function OrderDetailRoute() {
         onClose={() => setAfterSaleVisible(false)}
         onContact={(member) => {
           setAfterSaleVisible(false);
-          const payload = {
-            orderId: Number(order.id),
-            orderNo: order.orderNo,
-            companionUserId: Number(order.receiverUserId) || undefined,
-            companionNickname: order.sellerName,
-            gameName: order.gameName,
-            serviceDesc: order.serviceName,
-            unitPrice: Number(order.unitPrice),
-            quantity: order.quantity,
-            totalPrice: Number(order.totalPrice),
-            createTime: order.createTime,
-            clubId: order.clubId,
-            csUserId: member.userId,
-          };
+          const payload = buildAfterSalePayload(order, member.userId);
           router.push({
             pathname: "/chat/[id]",
             params: {
