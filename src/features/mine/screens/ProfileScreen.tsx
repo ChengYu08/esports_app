@@ -114,8 +114,8 @@ export default function ProfileScreen() {
     : firstGameId;
 
   const gameDetailQuery = useProfileGameDetail(
-    routeParams && activeGameId
-      ? { ...routeParams, gameId: activeGameId }
+    routeParams && (detail?.clubId || routeParams.clubId) && activeGameId
+      ? { clubId: String(detail?.clubId || routeParams.clubId), userId: routeParams.userId, gameId: activeGameId }
       : null,
   );
   const reviewQuery = useProfileReviews(

@@ -68,6 +68,35 @@ describe("mapRongMessage", () => {
     });
   });
 
+  it("maps the server-persisted RC:CustomMsg shape used by the PC client", () => {
+    expect(mapRongMessage({
+      messageType: 13,
+      messageUId: "order-notify-persisted-1",
+      messageIdentifier: "RC:CustomMsg",
+      fields: {
+        name: "ORDER_NOTIFY",
+        data: JSON.stringify({
+          title: "陪玩师已接单~",
+          orderNo: "PZ20261008002",
+          gameName: "无畏契约",
+          serviceDesc: "排位上分",
+          numDesc: "1局",
+          totalPriceDesc: "68",
+          createTime: "2026-10-08T11:30:00",
+        }),
+      },
+      sentTime: new Date("2026-10-08T11:30:00").getTime(),
+      direction: 1,
+    }, { image: 4, send: 0 })).toMatchObject({
+      id: "order-notify-persisted-1",
+      kind: "orderNotify",
+      title: "陪玩师已接单~",
+      orderNo: "PZ20261008002",
+      gameName: "无畏契约",
+      isMine: false,
+    });
+  });
+
   it("maps the PC-compatible after-sale custom message with its full order payload", () => {
     expect(mapRongMessage({
       messageUId: "after-sale-1",

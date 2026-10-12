@@ -17,6 +17,7 @@ import { useClubSearch } from "../hooks/use-club-search";
 import { useUserSearch } from "../hooks/use-user-search";
 import type { SearchUser } from "../api/search.api";
 import { getSystemConversationTitle, normalizeSystemConversationId } from "@/features/message/system-conversations";
+import { getConversationDisplayTitle } from "@/features/message/message-title";
 
 type SearchType = "club" | "user" | "message";
 type SearchResult = Club | SearchUser | MessageListItemModel;
@@ -64,7 +65,7 @@ export default function ClubSearchScreen() {
     filterMessageConversations(conversations, keyword).map((conversation) => ({
       ...conversation,
       id: normalizeSystemConversationId(conversation.id),
-      title: getSystemConversationTitle(conversation.id, conversation.title),
+      title: getConversationDisplayTitle(conversation.id, conversation.title, conversation.note),
       kind: "conversation",
       avatar: conversation.avatar || defaultConversationAvatar,
     })), [conversations, keyword]);
@@ -79,6 +80,7 @@ export default function ClubSearchScreen() {
         id: normalizeSystemConversationId(item.id),
         title: getSystemConversationTitle(item.id, item.title),
         avatar: typeof item.avatar === "string" ? item.avatar : "",
+        clubId: item.clubId || "",
       },
     });
   };

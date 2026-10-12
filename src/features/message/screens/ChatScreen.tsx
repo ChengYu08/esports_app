@@ -32,7 +32,8 @@ import { useMessageStore } from "../message-store";
 import type { ManagedMessage } from "../message-state";
 import type { AfterSaleCardPayload } from "@/features/order/after-sale-card";
 import { afterSaleCardRows } from "@/features/order/after-sale-card";
-import { getSystemConversationTitle, normalizeSystemConversationId } from "../system-conversations";
+import { getSystemConversationTitle, isSystemConversationId, normalizeSystemConversationId } from "../system-conversations";
+import { getConversationDisplayTitle } from "../message-title";
 
 const defaultAvatar = require("../../../../assets/coms/avatar_default_2.png");
 const defaultMyAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
@@ -64,6 +65,7 @@ export default function ChatScreen() {
   const isNearBottom = useRef(true);
   const previousMessageCount = useRef(0);
   const conversationId = normalizeSystemConversationId(String(id || ""));
+  const canViewProfile = !isSystemConversationId(conversationId);
   const conversation = useMessageStore((state) => state.conversations.find((item) => item.id === conversationId));
   const messages = useMessageStore((state) => state.messagesByPeerId[conversationId] || EMPTY_MESSAGES);
   const connectionState = useMessageStore((state) => state.connectionState);
@@ -83,8 +85,9 @@ export default function ChatScreen() {
   const loadOlder = useMessageStore((state) => state.loadOlder);
   const historyState = useMessageStore((state) => state.historyByPeerId[conversationId]);
   const historyLoading = historyState?.loading || false;
-  const conversationTitle = getSystemConversationTitle(conversationId, title || conversation?.title || "用户聊天");
-  const conversationAvatar = resolveConversationAvatar(conversationTitle, avatar || conversation?.avatar, defaultAvatar, conversationId);
+  const conversationBaseTitle = getSystemConversationTitle(conversationId, conversation?.title || title || "用户聊天");
+  const conversationTitle = getConversationDisplayTitle(conversationId, conversationBaseTitle, conversation?.note);
+  const conversationAvatar = resolveConversationAvatar(conversationBaseTitle, avatar || conversation?.avatar, defaultAvatar, conversationId);
   const myAvatar = myAvatarUrl ? { uri: myAvatarUrl } : defaultMyAvatar;
   const imReady = connectionState === "ready";
   const isPinned = Boolean(conversation?.isPinned);
@@ -95,9 +98,9 @@ export default function ChatScreen() {
     shouldScrollToEnd.current = false;
     isNearBottom.current = true;
     previousMessageCount.current = 0;
-    if (accessToken && conversationId) void openConversation({ id: conversationId, title: conversationTitle, avatar: typeof conversationAvatar === "string" ? conversationAvatar : undefined, clubId: clubId || conversation?.clubId });
+    if (accessToken && conversationId) void openConversation({ id: conversationId, title: conversationBaseTitle, avatar: typeof conversationAvatar === "string" ? conversationAvatar : undefined, clubId: clubId || conversation?.clubId });
     return () => closeConversation();
-  }, [accessToken, closeConversation, clubId, connectionState, conversation?.clubId, conversationAvatar, conversationId, conversationTitle, openConversation]);
+  }, [accessToken, closeConversation, clubId, connectionState, conversation?.clubId, conversationAvatar, conversationBaseTitle, conversationId, openConversation]);
 
   useEffect(() => {
     if (!historyState || historyState.loading) return;
@@ -175,12 +178,12 @@ export default function ChatScreen() {
 
   const openProfile = () => {
     setSettingsVisible(false);
-    const targetClubId = clubId || conversation?.clubId;
-    if (!targetClubId || Number(targetClubId) <= 0 || !/^\d+$/.test(String(targetClubId)) || !/^\d+$/.test(conversationId)) {
+    if (!/^\d+$/.test(conversationId)) {
       Alert.alert("暂无法查看主页", "当前会话缺少主页信息，请从用户主页重新发起聊天。");
       return;
     }
-    router.push({ pathname: "/profile", params: { clubId: String(targetClubId), userId: conversationId } });
+    const targetClubId = clubId || conversation?.clubId || (afterSalePayload?.clubId ? String(afterSalePayload.clubId) : undefined);
+    router.push({ pathname: "/profile", params: { ...(targetClubId ? { clubId: String(targetClubId) } : {}), userId: conversationId } });
   };
 
   return (
@@ -283,10 +286,10 @@ export default function ChatScreen() {
                   <Image source={chatArrowRight} style={styles.sheetArrow} />
                 </View>
               </Pressable>
-              <Pressable accessibilityRole="button" onPress={openProfile} style={styles.sheetOption}>
+              {canViewProfile ? <Pressable accessibilityRole="button" onPress={openProfile} style={styles.sheetOption}>
                 <Text style={styles.sheetOptionText}>查看个人主页</Text>
                 <Image source={chatArrowRight} style={styles.sheetArrow} />
-              </Pressable>
+              </Pressable> : null}
             </View>
           </View>
       </BottomSheet>

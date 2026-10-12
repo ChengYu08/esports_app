@@ -9,7 +9,7 @@ export function filterMessageConversations(
   if (!normalizedKeyword) return conversations;
 
   return conversations.filter((conversation) =>
-    [conversation.title, getSystemConversationTitle(conversation.id, ""), conversation.id, normalizeSystemConversationId(conversation.id)].some((value) =>
+    [conversation.title, conversation.note, getSystemConversationTitle(conversation.id, ""), conversation.id, normalizeSystemConversationId(conversation.id)].filter((value): value is string => Boolean(value)).some((value) =>
       value.toLocaleLowerCase().includes(normalizedKeyword),
     ),
   );

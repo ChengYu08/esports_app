@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "@esports/auth";
@@ -105,6 +105,7 @@ export default function OrderScreen() {
         renderItem={({ item }) => (
           <OrderCard item={item} onAction={handleOrderAction} onPress={(order) => router.push(`/order/${order.id}`)} />
         )}
+        refreshControl={<RefreshControl refreshing={orders.isRefetching} onRefresh={() => void orders.refetch()} tintColor="#ff214b" />}
         showsVerticalScrollIndicator={false}
       />
       <AppPrompt

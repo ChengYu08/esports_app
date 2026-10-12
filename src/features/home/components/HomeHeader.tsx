@@ -59,7 +59,7 @@ export function HomeHeader({
           <Image source={searchIcon} style={styles.searchIcon} />
         </Pressable>
       </View>
-      <View style={styles.banner}>
+      {/* <View style={styles.banner}>
         <CachedImage
           source={
             banners[bannerIndex]?.imageUrl
@@ -69,7 +69,7 @@ export function HomeHeader({
           style={styles.bannerImage}
           contentFit="cover"
         />
-      </View>
+      </View> */}
       {tab === "home" && (
         <>
           <ScrollView
@@ -256,8 +256,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   tabCorner: { position: "absolute", width: 17, height: 17, bottom: -1 },
-  tabCornerLeft: { left: -17 },
-  tabCornerRight: { right: -17 },
+  tabCornerLeft: { left: -16 },
+  tabCornerRight: { right: -16 },
   section: {
     height: 50,
     paddingHorizontal: 16,

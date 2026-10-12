@@ -52,7 +52,7 @@ test("loads companion profile detail and maps supported games", async () => {
   }]);
   assert.deepEqual(requests, [{
     path: "/client/v1/companion/public/detail",
-    options: { method: "POST", body: { clubId: 1000003, userId: 50100028 } },
+    options: { method: "POST", body: { userId: 50100028 } },
   }]);
 });
 
@@ -155,7 +155,7 @@ test("derives route prerequisites before enabling profile requests", () => {
     userId: "50100028",
   });
   assert.equal(getProfileRouteParams({ clubId: "1000003" }), null);
-  assert.equal(getProfileRouteParams({ userId: "50100028" }), null);
+  assert.deepEqual(getProfileRouteParams({ userId: "50100028" }), { userId: "50100028" });
   assert.equal(getProfileRouteParams({ clubId: ["1000003"], userId: ["50100028"] }), null);
 });
 

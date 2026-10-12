@@ -1,6 +1,7 @@
 import type {
   ProfileDetail,
   ProfileGameDetail,
+  ProfileGameRouteParams,
   ProfileReviewPage,
   ProfileRouteParams,
 } from "./profile.types";
@@ -202,9 +203,10 @@ export function getProfileRouteParams(params: {
   clubId?: string | string[];
   userId?: string | string[];
 }): ProfileRouteParams | null {
-  if (typeof params.clubId !== "string" || typeof params.userId !== "string") return null;
-  if (!params.clubId.trim() || !params.userId.trim()) return null;
-  return { clubId: params.clubId, userId: params.userId };
+  if (typeof params.userId !== "string" || !params.userId.trim()) return null;
+  if (params.clubId !== undefined && typeof params.clubId !== "string") return null;
+  const clubId = typeof params.clubId === "string" && params.clubId.trim() ? params.clubId : undefined;
+  return { ...(clubId ? { clubId } : {}), userId: params.userId };
 }
 
 export function getFirstProfileGameId(games: { gameId: number }[]): string {
@@ -217,14 +219,14 @@ export function createProfileContract(requester: ProfileRequester) {
       const data = requireSuccess(
         await requester<ApiProfileDetail>("/client/v1/companion/public/detail", {
           method: "POST",
-          body: { clubId: toId(params.clubId, "俱乐部ID"), userId: toId(params.userId, "用户ID") },
+          body: { userId: toId(params.userId, "用户ID") },
         }),
         "个人主页加载失败",
       );
       return mapProfileDetail(data);
     },
 
-    async fetchProfileGameDetail(params: ProfileRouteParams & { gameId: string }) {
+    async fetchProfileGameDetail(params: ProfileGameRouteParams) {
       const data = requireSuccess(
         await requester<ApiProfileGameDetail>("/client/v1/companion/public/game/detail", {
           method: "POST",

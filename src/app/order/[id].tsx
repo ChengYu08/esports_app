@@ -318,7 +318,6 @@ export default function OrderDetailRoute() {
             token,
           );
           setReviewDetail({ rating, content });
-          setReviewVisible(false);
           await detail.refetch();
         }}
       />

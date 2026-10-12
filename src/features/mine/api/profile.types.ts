@@ -1,6 +1,12 @@
 export type ProfileRouteParams = {
+  clubId?: string;
+  userId: string;
+};
+
+export type ProfileGameRouteParams = {
   clubId: string;
   userId: string;
+  gameId: string;
 };
 
 export type ProfileGame = {

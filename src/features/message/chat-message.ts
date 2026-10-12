@@ -55,8 +55,28 @@ export type RongSdkMessage = {
   remote?: string;
   mediaUrl?: string;
   identifier?: string;
-  fields?: Record<string, string>;
+  messageIdentifier?: string;
+  name?: string;
+  data?: string | Record<string, unknown>;
+  fields?: Record<string, string | Record<string, unknown>>;
 };
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? value as Record<string, unknown> : {};
+}
+
+function parsePayload(value: unknown): Record<string, unknown> {
+  if (typeof value === "string") {
+    try { return asRecord(JSON.parse(value)); } catch { return {}; }
+  }
+  return asRecord(value);
+}
+
+function mergeCustomPayload(fields: Record<string, unknown>, payload: Record<string, unknown>) {
+  const metadata = new Set(["name", "data", "identifier", "messageIdentifier"]);
+  const businessFields = Object.fromEntries(Object.entries(fields).filter(([key]) => !metadata.has(key)));
+  return { ...businessFields, ...payload };
+}
 
 export function mapRongMessage(message: RongSdkMessage, enums: { image: number; send: number }): ChatMessage | null {
   const id = message.messageUId || String(message.messageId || `${message.sentTime}-${message.senderUserId}`);
@@ -70,27 +90,37 @@ export function mapRongMessage(message: RongSdkMessage, enums: { image: number; 
     return imageUrl ? { id, kind: "image", imageUrl, time, isMine } : null;
   }
 
-  if (message.identifier === "PZAfterSaleApply") {
-    let fields = message.fields || {};
-    let payload: Partial<AfterSaleCardPayload> = fields;
-    try { payload = JSON.parse(fields.data || "{}"); } catch { /* use fields */ }
+  const fields = asRecord(message.fields);
+  // Server-persisted RC:CustomMsg uses fields.name + fields.data. Native
+  // messages use identifier/messageIdentifier, so accept both SDK shapes.
+  const customIdentifier = String(
+    message.identifier
+      || message.messageIdentifier
+      || message.name
+      || fields.identifier
+      || fields.name
+      || "",
+  );
+  const customName = customIdentifier === "RC:CustomMsg" ? String(fields.name || "") : customIdentifier;
+  const customPayload = parsePayload(message.data ?? fields.data);
+
+  if (customName === "PZAfterSaleApply") {
+    const payload = mergeCustomPayload(fields, customPayload) as Partial<AfterSaleCardPayload>;
     return { id, kind: "afterSale", title: AFTER_SALE_CARD_TITLE, payload, time, isMine };
   }
 
-  if (message.identifier === "ORDER_NOTIFY") {
-    let fields = message.fields || {};
-    let payload: Record<string, string> = fields;
-    try { payload = JSON.parse(fields.data || "{}"); } catch { /* use fields */ }
+  if (customName === "ORDER_NOTIFY") {
+    const payload = mergeCustomPayload(fields, customPayload);
     return {
       id,
       kind: "orderNotify",
-      title: payload.title || "订单状态通知",
-      orderNo: payload.orderNo,
-      gameName: payload.gameName,
-      serviceDesc: payload.serviceDesc,
-      numDesc: payload.numDesc,
-      totalPriceDesc: payload.totalPriceDesc,
-      createTime: payload.createTime,
+      title: String(payload.title || "订单状态通知"),
+      orderNo: payload.orderNo == null ? undefined : String(payload.orderNo),
+      gameName: payload.gameName == null ? undefined : String(payload.gameName),
+      serviceDesc: payload.serviceDesc == null ? undefined : String(payload.serviceDesc),
+      numDesc: payload.numDesc == null ? undefined : String(payload.numDesc),
+      totalPriceDesc: payload.totalPriceDesc == null ? undefined : String(payload.totalPriceDesc),
+      createTime: payload.createTime == null ? undefined : String(payload.createTime),
       time,
       isMine,
     };
