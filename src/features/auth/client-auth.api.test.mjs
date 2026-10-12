@@ -74,23 +74,19 @@ test("verifies real name and logs out with the business token", async () => {
   ]);
 });
 
-test("checks account cancellation status and returns blocking reasons", async () => {
+test("prechecks account cancellation through the client cancellation API", async () => {
   const requests = [];
   const api = createClientAuthContract(async (path, options) => {
     requests.push({ path, options });
-    return {
-      success: true,
-      code: "SUCCESS",
-      data: ["存在未完成订单", "还有待处理的售后"],
-    };
+    return { success: true, code: "SUCCESS" };
   });
 
   const reasons = await api.checkAccountCancellation("business-token");
 
-  assert.deepEqual(reasons, ["存在未完成订单", "还有待处理的售后"]);
+  assert.deepEqual(reasons, []);
   assert.deepEqual(requests, [{
-    path: "/h5-client/v2/user/write/off/check",
-    options: { method: "POST", token: "business-token", body: { action: {} }, signed: true },
+    path: "/client/v1/user/cancellation/apply",
+    options: { method: "POST", token: "business-token" },
   }]);
 });
 
@@ -98,7 +94,7 @@ test("sends cancellation sms and submits the verified cancellation request", asy
   const requests = [];
   const api = createClientAuthContract(async (path, options) => {
     requests.push({ path, options });
-    return { success: true, code: "SUCCESS", data: true };
+    return { success: true, code: "SUCCESS" };
   });
 
   await api.sendAccountCancellationSms("business-token");
@@ -106,21 +102,15 @@ test("sends cancellation sms and submits the verified cancellation request", asy
 
   assert.deepEqual(requests, [
     {
-      path: "/h5-client/v2/common/sms",
-      options: {
-        method: "POST",
-        token: "business-token",
-        body: { action: { smsTemplate: "WRITE_OFF" } },
-        signed: true,
-      },
+      path: "/client/v1/user/cancellation/sms/send",
+      options: { method: "POST", token: "business-token" },
     },
     {
-      path: "/h5-client/v2/user/write/off",
+      path: "/client/v1/user/cancellation/verify",
       options: {
         method: "POST",
         token: "business-token",
-        body: { action: { smsCode: "123456" } },
-        signed: true,
+        body: { action: { code: "123456" } },
       },
     },
   ]);

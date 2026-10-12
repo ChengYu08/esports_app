@@ -93,25 +93,20 @@ export function createClientAuthContract(requester: AuthRequester) {
       }));
     },
     async checkAccountCancellation(token: string) {
-      const reasons = unwrap(await requester<unknown>('/h5-client/v2/user/write/off/check', {
-        method: 'POST', token, body: { action: {} }, signed: true,
+      await unwrap(await requester<unknown>('/client/v1/user/cancellation/apply', {
+        method: 'POST', token,
       }));
-      return Array.isArray(reasons)
-        ? reasons.map((reason) => String(reason).trim()).filter(Boolean)
-        : [];
+      return [];
     },
     async sendAccountCancellationSms(token: string) {
-      return unwrap(await requester<boolean>('/h5-client/v2/common/sms', {
+      return unwrap(await requester<unknown>('/client/v1/user/cancellation/sms/send', {
         method: 'POST', token,
-        body: { action: { smsTemplate: 'WRITE_OFF' } },
-        signed: true,
       }));
     },
     async cancelAccount(token: string, smsCode: string) {
-      return unwrap(await requester<boolean>('/h5-client/v2/user/write/off', {
+      return unwrap(await requester<unknown>('/client/v1/user/cancellation/verify', {
         method: 'POST', token,
-        body: { action: { smsCode } },
-        signed: true,
+        body: { action: { code: smsCode } },
       }));
     },
     async getImToken(token: string) {

@@ -1,22 +1,29 @@
+import { useAuthStore } from "@esports/auth";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useFonts } from "expo-font";
 import { Image } from "expo-image";
 import { Stack } from "expo-router";
-import { View } from "react-native";
-import { SafeAreaProvider } from "react-native-safe-area-context";
-import { RootSiblingParent } from "react-native-root-siblings";
 import { useEffect, useState } from "react";
-import { useAuthStore } from "@esports/auth";
+import { View } from "react-native";
+import { RootSiblingParent } from "react-native-root-siblings";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
-import { queryClient } from "@/core/query/query-client";
 import { ApiError } from "@/core/network/api-client";
-import { clientAuthApi } from "@/features/auth/client-auth.api";
+import { queryClient } from "@/core/query/query-client";
 import { toAuthUser } from "@/features/auth/client-auth-flow";
-import { clearAuthSession, readAuthSession, saveAuthSession } from "@/features/auth/session-persistence";
+import { clientAuthApi } from "@/features/auth/client-auth.api";
+import {
+  clearAuthSession,
+  readAuthSession,
+  saveAuthSession,
+} from "@/features/auth/session-persistence";
+import {
+  messageStore,
+  useMessageStore,
+} from "@/features/message/message-store";
 import { PrivacyConsentGate } from "@/features/privacy/components/PrivacyConsentGate";
 import { readPrivacyConsent } from "@/features/privacy/privacy-consent";
-import { messageStore, useMessageStore } from "@/features/message/message-store";
+import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const STARTUP_TIMEOUT_MS = 8000;
 
@@ -36,7 +43,7 @@ function withStartupTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
 }
 
 const fonts = {
-  [DOUYIN_SANS]: require("../../assets/fonts/Douyin Sans.otf"),
+  [DOUYIN_SANS]: require("../../assets/fonts/Douyin Sans.ttf"),
 };
 const splashImage = require("../../assets/images/splash-screen.png");
 
@@ -54,12 +61,21 @@ export default function RootLayout() {
   useEffect(() => {
     if (accessToken && privacyAccepted) void initializeMessages(accessToken);
     else if (privacyReady) void resetMessages();
-  }, [accessToken, initializeMessages, privacyAccepted, privacyReady, resetMessages]);
+  }, [
+    accessToken,
+    initializeMessages,
+    privacyAccepted,
+    privacyReady,
+    resetMessages,
+  ]);
 
   useEffect(() => {
     let active = true;
     void (async () => {
-      const hasPrivacyConsent = await withStartupTimeout(readPrivacyConsent(), false);
+      const hasPrivacyConsent = await withStartupTimeout(
+        readPrivacyConsent(),
+        false,
+      );
       if (active) {
         setPrivacyAccepted(hasPrivacyConsent);
         setPrivacyReady(true);
@@ -76,12 +92,23 @@ export default function RootLayout() {
 
       setSession(session);
       try {
-        const profile = await withStartupTimeout(clientAuthApi.fetchCurrentUser(session.accessToken), null);
+        const profile = await withStartupTimeout(
+          clientAuthApi.fetchCurrentUser(session.accessToken),
+          null,
+        );
         if (!profile) {
           if (active) setSessionReady(true);
           return;
         }
-        const refreshedSession = { accessToken: session.accessToken, user: toAuthUser(profile, typeof session.user.phone === "string" ? session.user.phone : undefined) };
+        const refreshedSession = {
+          accessToken: session.accessToken,
+          user: toAuthUser(
+            profile,
+            typeof session.user.phone === "string"
+              ? session.user.phone
+              : undefined,
+          ),
+        };
         await saveAuthSession(refreshedSession);
         if (active) setSession(refreshedSession);
       } catch (requestError) {
@@ -93,10 +120,17 @@ export default function RootLayout() {
         if (active) setSessionReady(true);
       }
     })();
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [clearSession, setSession]);
 
-  useEffect(() => () => { void messageStore.getState().reset(); }, []);
+  useEffect(
+    () => () => {
+      void messageStore.getState().reset();
+    },
+    [],
+  );
 
   if ((!loaded && !error) || !sessionReady || !privacyReady) {
     return (
