@@ -2,8 +2,8 @@ import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
-import { Image } from "expo-image";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -16,7 +16,7 @@ import {
   StyleSheet,
   Text,
   View,
-  useWindowDimensions
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { CompanionFilters, GameKey } from "../api/home.types";
@@ -1045,13 +1045,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 2,
-    minHeight: 14,
-    maxHeight: 14,
+    minHeight: 18,
+    maxHeight: 18,
     paddingHorizontal: 4,
     paddingVertical: 2,
     borderRadius: 3,
   },
-  statusText: { fontFamily: DOUYIN_SANS, fontSize: 10 },
+  statusText: { fontFamily: DOUYIN_SANS, fontSize: 10, lineHeight: 14 },
   memberDesc: {
     marginTop: 4,
     color: "#777",

@@ -18,7 +18,7 @@ type Props = { item: RankingItem; board: RankingBoard; onViewProfile: (item: Ran
 
 export const RankingCard = memo(function RankingCard({ item, board, onViewProfile }: Props) {
   const medal = medals[item.rankNo - 1];
-  const canViewProfile = board !== "GOD" && getRankingProfileParams(item) !== null;
+  const canViewProfile = getRankingProfileParams(item) !== null;
   const metricLabel = getRankingBoard(board).metricLabel;
   return (
     <View style={[styles.card, medal && { backgroundColor: medal.tint }]}>
@@ -31,7 +31,16 @@ export const RankingCard = memo(function RankingCard({ item, board, onViewProfil
             </LinearGradient>
           ) : <Text style={styles.rank}>NO.{item.rankNo}</Text>}
         </View>
-        <RankingAvatar uri={item.avatar} />
+        {canViewProfile ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`查看${item.nickname}的主页`}
+            onPress={() => onViewProfile(item)}
+            style={({ pressed }) => [styles.avatarButton, pressed && styles.pressed]}
+          >
+            <RankingAvatar uri={item.avatar} />
+          </Pressable>
+        ) : <RankingAvatar uri={item.avatar} />}
         <View style={styles.identity}>
           <Text numberOfLines={1} style={styles.name}>{item.nickname}</Text>
           {board !== "GOD" && <Text numberOfLines={1} style={styles.club}>{item.clubName || "暂无俱乐部"}</Text>}
@@ -69,6 +78,7 @@ const styles = StyleSheet.create({
   card: { paddingHorizontal: 12, paddingTop: 16, paddingBottom: 2, marginBottom: 10, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: "#F0F0F2" },
   main: { flexDirection: "row", alignItems: "center", gap: 8 },
   rankColumn: { width: 34, alignItems: "center", flexShrink: 0 },
+  avatarButton: { width: 42, height: 42, borderRadius: 21 },
   medal: { width: 30, height: 38, borderRadius: 5, borderBottomLeftRadius: 12, borderBottomRightRadius: 12, alignItems: "center", justifyContent: "center" },
   top: { fontSize: 8, fontWeight: "700", color: "#FFF" },
   medalNumber: { fontFamily: DOUYIN_SANS, fontSize: 18, lineHeight: 22, fontWeight: "700", color: "#FFF" },

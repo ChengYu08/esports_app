@@ -1,3 +1,4 @@
+import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
   Edit24Regular,
@@ -6,7 +7,6 @@ import {
   PersonProhibited24Regular,
 } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
-import { CachedImage } from "@/shared/ui/CachedImage";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -62,9 +62,9 @@ import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { requireLogin } from "@/shared/navigation/require-login";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
-import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { EmptyState } from "@/shared/ui/AsyncStates";
+import { BottomSheet } from "@/shared/ui/BottomSheet";
 import Toast from "react-native-root-toast";
 
 const fallbackAvatar = require("../../../../assets/mine/figma/profile-avatar.png");
@@ -658,7 +658,10 @@ function GameSelector({
             style={[styles.gameTag, active && styles.gameTagActive]}
           >
             {game.iconUrl ? (
-              <CachedImage source={{ uri: game.iconUrl }} style={styles.gameLogo} />
+              <CachedImage
+                source={{ uri: game.iconUrl }}
+                style={styles.gameLogo}
+              />
             ) : null}
             <Text style={[styles.gameText, active && styles.gameTextActive]}>
               {game.gameName}
@@ -1142,42 +1145,46 @@ function StarPaymentSheet({
 
   return (
     <>
-    <BottomSheet visible={visible} onClose={() => void onClose()} contentStyle={[styles.paymentModal, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-          <View style={styles.paymentModalHeader}>
-            <View style={styles.paymentModalHeading}>
-              <Text style={styles.paymentModalTitle}>星钻支付</Text>
-              <Text style={styles.paymentModalHint}>
-                请在5分钟内支付，否则订单自动取消
-              </Text>
-            </View>
-            <Pressable
-              accessibilityLabel="关闭星钻支付"
-              hitSlop={8}
-              onPress={() => void onClose()}
-              style={styles.paymentClose}
-            >
-              <Image
-                source={paymentCloseIcon}
-                style={styles.paymentCloseIcon}
-              />
-            </Pressable>
-          </View>
-          <View style={styles.orderPaymentContent}>
-            <Text style={styles.orderPayAmount}>支付 {order.total} 星钻</Text>
-            <Text style={styles.orderBalance}>
-              当前余额：{balance ?? "加载中..."} 星钻
+      <BottomSheet
+        visible={visible}
+        onClose={() => void onClose()}
+        contentStyle={[
+          styles.paymentModal,
+          { paddingBottom: Math.max(insets.bottom, 16) },
+        ]}
+      >
+        <View style={styles.paymentModalHeader}>
+          <View style={styles.paymentModalHeading}>
+            <Text style={styles.paymentModalTitle}>星钻支付</Text>
+            <Text style={styles.paymentModalHint}>
+              请在5分钟内支付，否则订单自动取消
             </Text>
-            <Pressable
-              style={styles.orderSubmit}
-              onPress={() => void pay()}
-              disabled={paying || balance === null}
-            >
-              <Text style={styles.orderSubmitText}>
-                {paying ? "支付中..." : "确认支付"}
-              </Text>
-            </Pressable>
           </View>
-    </BottomSheet>
+          <Pressable
+            accessibilityLabel="关闭星钻支付"
+            hitSlop={8}
+            onPress={() => void onClose()}
+            style={styles.paymentClose}
+          >
+            <Image source={paymentCloseIcon} style={styles.paymentCloseIcon} />
+          </Pressable>
+        </View>
+        <View style={styles.orderPaymentContent}>
+          <Text style={styles.orderPayAmount}>支付 {order.total} 星钻</Text>
+          <Text style={styles.orderBalance}>
+            当前余额：{balance ?? "加载中..."} 星钻
+          </Text>
+          <Pressable
+            style={styles.orderSubmit}
+            onPress={() => void pay()}
+            disabled={paying || balance === null}
+          >
+            <Text style={styles.orderSubmitText}>
+              {paying ? "支付中..." : "确认支付"}
+            </Text>
+          </Pressable>
+        </View>
+      </BottomSheet>
       <AppPrompt
         visible={Boolean(prompt)}
         title={prompt?.title}
@@ -1463,14 +1470,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 2,
-    minHeight: 14,
-    maxHeight: 14,
+    minHeight: 18,
+    maxHeight: 18,
     borderRadius: 3,
     paddingHorizontal: 4,
-    paddingVertical: 2,
+    paddingVertical: 4,
   },
   onlineIcon: { width: 12, height: 12 },
-  onlineText: { fontFamily: DOUYIN_SANS, fontSize: 10 },
+  onlineText: {
+    fontFamily: DOUYIN_SANS,
+    fontSize: 10,
+    lineHeight: 12,
+  },
   clubLine: { flexDirection: "row", alignItems: "center", gap: 6 },
   clubIcon: { width: 14, height: 14, tintColor: "#D7DCE2" },
   club: {
