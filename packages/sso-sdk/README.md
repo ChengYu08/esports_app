@@ -16,13 +16,13 @@ const client = new SsoClient({
   clientAppId: "android",
   clientSecret: runtimeSecret,
   os: "Android",
-  sourceType: "GUHAO_ANDROID",
+  sourceType: "dianjing-android",
 });
 ```
 
 `clientSecret` 由宿主注入，不写入包源码。阿里 H5 一键登录依赖浏览器 SDK，未在此包中实现；原生一键登录应通过平台原生 SDK Adapter 接入。
 
-每次认证请求都会携带 `sourceType`：iOS 使用 `GUHAO_IOS`，Android 使用 `GUHAO_ANDROID`。未显式传入时会根据 `os` 自动推断。
+每次认证请求都会携带 `sourceType`：iOS 使用 `dianjing-ios`，Android 使用 `dianjing-android`。未显式传入时会根据 `os` 自动推断。
 
 ## 原生一键登录 Adapter
 

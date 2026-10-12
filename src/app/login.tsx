@@ -1,15 +1,20 @@
-import { createAuthSsoAdapter, LoginScreen, useAuthStore } from "@esports/auth";
-import { createNativeQuickLoginProvider, SsoClient } from "@esports/sso-sdk";
 import { env } from "@/core/config/env";
 import { APP_LINKS } from "@/core/config/links";
 import { completeClientLogin } from "@/features/auth/client-auth-flow";
 import { getPasswordLoginErrorMessage } from "@/features/auth/password-login-error";
-import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { openExternalLink } from "@/shared/navigation/open-external-link";
-import { Stack, router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import Toast from "react-native-root-toast";
+import { AppPrompt } from "@/shared/ui/AppPrompt";
+import { createAuthSsoAdapter, LoginScreen, useAuthStore } from "@esports/auth";
+import { createNativeQuickLoginProvider, SsoClient } from "@esports/sso-sdk";
+import {
+  router,
+  Stack,
+  useFocusEffect,
+  useLocalSearchParams,
+} from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { BackHandler, Platform } from "react-native";
+import Toast from "react-native-root-toast";
 
 export default function LoginRoute() {
   const params = useLocalSearchParams<{ mode?: string; phone?: string }>();
@@ -17,26 +22,43 @@ export default function LoginRoute() {
   const initialPhone = typeof params.phone === "string" ? params.phone : "";
   const setSession = useAuthStore((state) => state.setSession);
   const setCompanionStatus = useAuthStore((state) => state.setCompanionStatus);
-  const [passwordLoginError, setPasswordLoginError] = useState<string | null>(null);
-  const sso = useMemo(() => env.ssoClientSecret ? new SsoClient({
-    baseUrl: env.ssoBaseUrl,
-    clientAppId: env.ssoClientAppId,
-    clientSecret: env.ssoClientSecret,
-    os: Platform.OS === "ios" ? "iOS" : "Android",
-    sourceType: Platform.OS === "ios" ? "GUHAO_IOS" : "GUHAO_ANDROID",
-    onRequestLog: (log) => console.log("[SSO]", JSON.stringify(log)),
-  }) : null, []);
+  const [passwordLoginError, setPasswordLoginError] = useState<string | null>(
+    null,
+  );
+  const sso = useMemo(
+    () =>
+      env.ssoClientSecret
+        ? new SsoClient({
+            baseUrl: env.ssoBaseUrl,
+            clientAppId: env.ssoClientAppId,
+            clientSecret: env.ssoClientSecret,
+            os: Platform.OS === "ios" ? "iOS" : "Android",
+            sourceType:
+              Platform.OS === "ios" ? "dianjing-ios" : "dianjing-android",
+            onRequestLog: (log) => console.log("[SSO]", JSON.stringify(log)),
+          })
+        : null,
+    [],
+  );
   const adapter = sso ? createAuthSsoAdapter(sso) : null;
-  const quickLoginProvider = useMemo(() => createNativeQuickLoginProvider(), []);
-  useFocusEffect(useCallback(() => {
-    if (Platform.OS !== "android") return;
-    // Tabs replace themselves with login, so the system back action needs a home fallback.
-    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
-      router.replace("/");
-      return true;
-    });
-    return () => subscription.remove();
-  }, []));
+  const quickLoginProvider = useMemo(
+    () => createNativeQuickLoginProvider(),
+    [],
+  );
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS !== "android") return;
+      // Tabs replace themselves with login, so the system back action needs a home fallback.
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        () => {
+          router.replace("/");
+          return true;
+        },
+      );
+      return () => subscription.remove();
+    }, []),
+  );
 
   return (
     <>
@@ -48,7 +70,9 @@ export default function LoginRoute() {
         onSkip={() => router.replace("/")}
         onSendCode={async (phone) => {
           if (!adapter) {
-            Toast.show("验证码发送失败，请先配置 SSO client secret。", { duration: Toast.durations.SHORT });
+            Toast.show("验证码发送失败，请先配置 SSO client secret。", {
+              duration: Toast.durations.SHORT,
+            });
             throw new Error("SSO client secret is not configured");
           }
           try {
@@ -68,7 +92,13 @@ export default function LoginRoute() {
           }
           try {
             const token = await adapter.passwordLogin(payload);
-            await completeClientLogin(token, "PASSWORD", setSession, setCompanionStatus, payload.username);
+            await completeClientLogin(
+              token,
+              "PASSWORD",
+              setSession,
+              setCompanionStatus,
+              payload.username,
+            );
             router.replace("/");
           } catch (error) {
             setPasswordLoginError(getPasswordLoginErrorMessage(error));
@@ -77,16 +107,28 @@ export default function LoginRoute() {
         onForgotPassword={(phone) =>
           router.push({ pathname: "/forgot-password", params: { phone } })
         }
-        onUserAgreementPress={() => void openExternalLink(APP_LINKS.userAgreement)}
-        onPrivacyPolicyPress={() => void openExternalLink(APP_LINKS.privacyPolicy)}
+        onUserAgreementPress={() =>
+          void openExternalLink(APP_LINKS.userAgreement)
+        }
+        onPrivacyPolicyPress={() =>
+          void openExternalLink(APP_LINKS.privacyPolicy)
+        }
         onQuickLogin={async () => {
           if (!adapter) {
-            Toast.show("暂无法一键登录，请先配置 SSO client secret。", { duration: Toast.durations.SHORT });
+            Toast.show("暂无法一键登录，请先配置 SSO client secret。", {
+              duration: Toast.durations.SHORT,
+            });
             return;
           }
           try {
             const token = await adapter.quickLogin(quickLoginProvider);
-            await completeClientLogin(token, "ONE_CLICK_LOGIN", setSession, setCompanionStatus, token.phone);
+            await completeClientLogin(
+              token,
+              "ONE_CLICK_LOGIN",
+              setSession,
+              setCompanionStatus,
+              token.phone,
+            );
             router.replace("/");
           } catch (error) {
             Toast.show(
@@ -97,12 +139,20 @@ export default function LoginRoute() {
         }}
         onLogin={async (payload) => {
           if (!adapter) {
-            Toast.show("登录失败，请先配置 SSO client secret。", { duration: Toast.durations.SHORT });
+            Toast.show("登录失败，请先配置 SSO client secret。", {
+              duration: Toast.durations.SHORT,
+            });
             return;
           }
           try {
             const token = await adapter.login(payload);
-            await completeClientLogin(token, "SMS_CODE", setSession, setCompanionStatus, payload.phone);
+            await completeClientLogin(
+              token,
+              "SMS_CODE",
+              setSession,
+              setCompanionStatus,
+              payload.phone,
+            );
             router.replace("/");
           } catch (error) {
             Toast.show(

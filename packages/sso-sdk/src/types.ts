@@ -9,7 +9,7 @@ export type SsoToken = {
   expires_in?: number;
 };
 
-export type SsoSourceType = "GUHAO_IOS" | "GUHAO_ANDROID";
+export type SsoSourceType = "dianjing-ios" | "dianjing-android";
 
 export type SsoRequestLog = {
   method: HttpMethod;
@@ -45,12 +45,18 @@ export type QuickLoginAuthToken = { jwtToken: string; accessToken: string };
 
 export type QuickLoginProvider = {
   checkLoginAvailable: (tokens: QuickLoginAuthToken) => Promise<boolean>;
-  getLoginToken: (tokens: QuickLoginAuthToken) => Promise<{ spToken: string; phone?: string }>;
+  getLoginToken: (
+    tokens: QuickLoginAuthToken,
+  ) => Promise<{ spToken: string; phone?: string }>;
   cancel?: () => Promise<void> | void;
 };
 
 export class SsoError extends Error {
-  constructor(message: string, public readonly status?: number, public readonly code?: string) {
+  constructor(
+    message: string,
+    public readonly status?: number,
+    public readonly code?: string,
+  ) {
     super(message);
     this.name = "SsoError";
   }
