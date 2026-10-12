@@ -23,7 +23,7 @@ export function AppPrompt({
       animationType="fade"
       transparent
       visible={visible}
-      onRequestClose={onConfirm}
+      onRequestClose={onCancel ?? onConfirm}
     >
       <View style={styles.backdrop}>
         <View style={styles.dialog}>

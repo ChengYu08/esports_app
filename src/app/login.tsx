@@ -6,10 +6,10 @@ import { completeClientLogin } from "@/features/auth/client-auth-flow";
 import { getPasswordLoginErrorMessage } from "@/features/auth/password-login-error";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { openExternalLink } from "@/shared/navigation/open-external-link";
-import { Stack, router, useLocalSearchParams } from "expo-router";
+import { Stack, router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import Toast from "react-native-root-toast";
-import { useMemo, useState } from "react";
-import { Platform } from "react-native";
+import { useCallback, useMemo, useState } from "react";
+import { BackHandler, Platform } from "react-native";
 
 export default function LoginRoute() {
   const params = useLocalSearchParams<{ mode?: string; phone?: string }>();
@@ -28,6 +28,16 @@ export default function LoginRoute() {
   }) : null, []);
   const adapter = sso ? createAuthSsoAdapter(sso) : null;
   const quickLoginProvider = useMemo(() => createNativeQuickLoginProvider(), []);
+  useFocusEffect(useCallback(() => {
+    if (Platform.OS !== "android") return;
+    // Tabs replace themselves with login, so the system back action needs a home fallback.
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      router.replace("/");
+      return true;
+    });
+    return () => subscription.remove();
+  }, []));
+
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />

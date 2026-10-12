@@ -1,10 +1,10 @@
 <libraries>
   <library
       name=":@@:expo-modules-core::release"
-      jars="/Users/yucheng/.gradle/caches/9.3.1/transforms/b7ae29e5dadda77071d76adcb5b2a8ec/transformed/out/jars/classes.jar:/Users/yucheng/.gradle/caches/9.3.1/transforms/b7ae29e5dadda77071d76adcb5b2a8ec/transformed/out/jars/libs/R.jar"
+      jars="/Users/yucheng/.gradle/caches/9.3.1/transforms/77a823b2eb3a334afbf637224832f73f/transformed/out/jars/classes.jar:/Users/yucheng/.gradle/caches/9.3.1/transforms/77a823b2eb3a334afbf637224832f73f/transformed/out/jars/libs/R.jar"
       resolved="host.exp.exponent:expo-modules-core:57.0.18"
       provided="true"
-      folder="/Users/yucheng/.gradle/caches/9.3.1/transforms/b7ae29e5dadda77071d76adcb5b2a8ec/transformed/out"
+      folder="/Users/yucheng/.gradle/caches/9.3.1/transforms/77a823b2eb3a334afbf637224832f73f/transformed/out"
       manifest="AndroidManifest.xml"
       resFolder="res"
       assetsFolder="assets"
