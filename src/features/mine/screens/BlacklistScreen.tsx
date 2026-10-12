@@ -1,13 +1,11 @@
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { GestureHandlerRootView, Swipeable } from "react-native-gesture-handler";
+  GestureHandlerRootView,
+  Swipeable,
+} from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -42,8 +40,18 @@ export default function BlacklistScreen() {
 
   return (
     <GestureHandlerRootView style={styles.screen}>
-      <View style={[styles.header, { height: 44 + insets.top, paddingTop: insets.top }]}>
-        <Pressable accessibilityLabel="返回" hitSlop={12} onPress={() => router.back()} style={styles.backButton}>
+      <View
+        style={[
+          styles.header,
+          { height: 44 + insets.top, paddingTop: insets.top },
+        ]}
+      >
+        <Pressable
+          accessibilityLabel="返回"
+          hitSlop={12}
+          onPress={() => router.back()}
+          style={styles.backButton}
+        >
           <Image source={backIcon} style={styles.backIcon} />
         </Pressable>
         <Text style={styles.headerTitle}>黑名单</Text>
@@ -51,12 +59,19 @@ export default function BlacklistScreen() {
       </View>
       {entries.length === 0 ? (
         <View style={styles.empty}>
-          <EmptyState message="暂无黑名单用户" hint="你拉黑的用户会显示在这里" />
+          <EmptyState
+            message="暂无黑名单用户"
+            hint="你拉黑的用户会显示在这里"
+          />
         </View>
       ) : (
         <View style={styles.list}>
           {entries.map((entry) => (
-            <BlacklistRow key={entry.userId} entry={entry} onRemove={removeEntry} />
+            <BlacklistRow
+              key={entry.userId}
+              entry={entry}
+              onRemove={removeEntry}
+            />
           ))}
         </View>
       )}
@@ -112,16 +127,35 @@ function BlacklistRow({
   );
 }
 
-const fallbackAvatar = require("../../../../assets/mine/figma/profile-avatar.png");
+const fallbackAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F7F7" },
-  header: { backgroundColor: "#FFF", flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#EBEBEB" },
+  header: {
+    backgroundColor: "#FFF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#EBEBEB",
+  },
   backButton: { width: 28, height: 28, justifyContent: "center" },
   backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
   headerSpace: { width: 28 },
-  headerTitle: { color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 17, lineHeight: 24, fontWeight: "600" },
-  empty: { flex: 1, alignItems: "center", justifyContent: "center", paddingBottom: 80 },
+  headerTitle: {
+    color: "#0A0A0A",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: "600",
+  },
+  empty: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingBottom: 80,
+  },
   list: { paddingTop: 12 },
   rowClip: {
     height: 76,
@@ -139,7 +173,12 @@ const styles = StyleSheet.create({
   },
   avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: "#EEE" },
   copy: { flex: 1, minWidth: 0, marginLeft: 12, gap: 5 },
-  nickname: { color: "#222", fontFamily: DOUYIN_SANS, fontSize: 16, fontWeight: "600" },
+  nickname: {
+    color: "#222",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 16,
+    fontWeight: "600",
+  },
   clubName: { color: "#999", fontFamily: DOUYIN_SANS, fontSize: 13 },
   removeButton: {
     width: REMOVE_ACTION_WIDTH,
@@ -149,5 +188,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#FF3158",
   },
   swipeable: { height: 76, backgroundColor: "#FF3158" },
-  removeText: { color: "#FFF", fontFamily: DOUYIN_SANS, fontSize: 14, fontWeight: "600" },
+  removeText: {
+    color: "#FFF",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 14,
+    fontWeight: "600",
+  },
 });

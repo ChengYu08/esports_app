@@ -66,8 +66,8 @@ import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import Toast from "react-native-root-toast";
-
-const fallbackAvatar = require("../../../../assets/mine/figma/profile-avatar.png");
+// mine-avatar
+const fallbackAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const background = require("../../../../assets/mine/figma/profile-bg.png");
 const maleIcon = require("../../../../assets/home/club-detail/male.svg");
 const femaleIcon = require("../../../../assets/mine/figma/mine-female.svg");
@@ -115,7 +115,11 @@ export default function ProfileScreen() {
 
   const gameDetailQuery = useProfileGameDetail(
     routeParams && (detail?.clubId || routeParams.clubId) && activeGameId
-      ? { clubId: String(detail?.clubId || routeParams.clubId), userId: routeParams.userId, gameId: activeGameId }
+      ? {
+          clubId: String(detail?.clubId || routeParams.clubId),
+          userId: routeParams.userId,
+          gameId: activeGameId,
+        }
       : null,
   );
   const reviewQuery = useProfileReviews(
@@ -127,6 +131,10 @@ export default function ProfileScreen() {
   const profile = detail ?? localProfile;
   const gameDetail = gameDetailQuery.data;
   const games = detail?.games ?? [];
+  const coverImageUrl = gameDetail?.backgroundUrl?.trim();
+  const coverPreviewParams = coverImageUrl
+    ? createImagePreviewParams([coverImageUrl], 0)
+    : null;
 
   if (routeParams && detailQuery.isLoading) {
     return <ProfileState text="加载中..." />;
@@ -145,16 +153,31 @@ export default function ProfileScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.cover}>
-        <Image
-          source={
-            gameDetail?.backgroundUrl
-              ? { uri: gameDetail.backgroundUrl }
-              : background
-          }
-          contentFit="cover"
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={styles.coverShade} />
+        {coverPreviewParams ? (
+          <Pressable
+            accessibilityLabel="预览主页背景图"
+            accessibilityRole="button"
+            onPress={() =>
+              router.push({
+                pathname: "/image-preview",
+                params: coverPreviewParams,
+              })
+            }
+            style={StyleSheet.absoluteFill}
+          >
+            <Image
+              source={{ uri: coverImageUrl }}
+              contentFit="cover"
+              style={StyleSheet.absoluteFill}
+            />
+            <View pointerEvents="none" style={styles.coverShade} />
+          </Pressable>
+        ) : (
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+            <Image source={background} contentFit="cover" style={StyleSheet.absoluteFill} />
+            <View style={styles.coverShade} />
+          </View>
+        )}
         <View style={[styles.navbar, { paddingTop: insets.top }]}>
           <Pressable
             accessibilityLabel="返回"

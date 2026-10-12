@@ -10,7 +10,7 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-const banner = require("../../../../assets/home/h_banner.png");
+// const banner = require("../../../../assets/home/h_banner.png");
 const searchIcon = require("../../../../assets/home/h_search.svg");
 const filterIcon = require("../../../../assets/home/h_filter_list.svg");
 const tabLeftCorner = require("../../../../assets/home/h_tab_left.svg");

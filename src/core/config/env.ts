@@ -7,6 +7,8 @@ const envSchema = z.object({
   environment: z.enum(['development', 'preview', 'production']).default('development'),
   ssoClientAppId: z.string().default('android'),
   ssoClientSecret: z.string().default(''),
+  aliyunIosAuthKey: z.string().default(''),
+  aliyunAndroidAuthKey: z.string().default(''),
   rongCloudAppKey: z.string().default(''),
 });
 
@@ -18,5 +20,7 @@ export const env = envSchema.parse({
   environment: extra.environment ?? process.env.EXPO_PUBLIC_ENVIRONMENT,
   ssoClientAppId: extra.ssoClientAppId ?? process.env.EXPO_PUBLIC_SSO_CLIENT_APP_ID,
   ssoClientSecret: extra.ssoClientSecret ?? process.env.EXPO_PUBLIC_SSO_CLIENT_SECRET,
+  aliyunIosAuthKey: extra.aliyunIosAuthKey ?? process.env.EXPO_PUBLIC_ALIYUN_IOS_AUTH_KEY,
+  aliyunAndroidAuthKey: extra.aliyunAndroidAuthKey ?? process.env.EXPO_PUBLIC_ALIYUN_ANDROID_AUTH_KEY,
   rongCloudAppKey: extra.rongCloudAppKey ?? process.env.EXPO_PUBLIC_RONGCLOUD_APP_KEY,
 });
