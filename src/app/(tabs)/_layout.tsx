@@ -1,4 +1,4 @@
-import { Tabs, usePathname } from "expo-router";
+import { router, Tabs } from "expo-router";
 import { AppTabBar } from "@/shared/ui/AppTabBar";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { useEffect, useState } from "react";
@@ -7,28 +7,24 @@ import { useAuthStore } from "@esports/auth";
 
 export default function TabsLayout() {
   const [exitPromptVisible, setExitPromptVisible] = useState(false);
-  const pathname = usePathname();
   const isAuthenticated = useAuthStore(
     (state) => Boolean(state.accessToken && state.user),
   );
 
   useEffect(() => {
-    if (
-      Platform.OS !== "android" ||
-      !["/", "/order", "/message", "/mine"].includes(pathname)
-    ) {
-      return;
-    }
+    if (Platform.OS !== "android") return;
 
     const subscription = BackHandler.addEventListener(
       "hardwareBackPress",
       () => {
+        if (router.canGoBack()) return false;
+
         setExitPromptVisible(true);
         return true;
       },
     );
     return () => subscription.remove();
-  }, [pathname]);
+  }, []);
 
   return (
     <>
