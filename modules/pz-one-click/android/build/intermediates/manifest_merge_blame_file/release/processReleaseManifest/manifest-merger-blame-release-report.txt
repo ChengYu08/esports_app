@@ -4,4 +4,46 @@
 4
 5    <uses-sdk android:minSdkVersion="24" />
 6
-7</manifest>
+7    <application>
+7-->/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:2:3-22:17
+8        <activity
+8-->/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:3:5-9:56
+9            android:name="com.mobile.auth.gatewayauth.LoginAuthActivity"
+9-->/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:4:7-67
+10            android:configChanges="orientation|keyboardHidden|screenSize|uiMode|fontScale"
+10-->/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:5:7-85
+11            android:exported="false"
+11-->/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:6:7-31
+12            android:launchMode="singleTop"
+12-->/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:7:7-37
+13            android:screenOrientation="behind"
+13-->/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:8:7-41
+14            android:theme="@style/authsdk_activity_dialog" />
+14-->/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:9:7-53
+15        <activity
+15-->/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:10:5-16:56
+16            android:name="com.mobile.auth.gatewayauth.PrivacyDialogActivity"
+16-->/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:11:7-71
+17            android:configChanges="orientation|keyboardHidden|screenSize"
+17-->/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:12:7-68
+18            android:exported="false"
+18-->/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:13:7-31
+19            android:launchMode="singleTop"
+19-->/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:14:7-37
+20            android:screenOrientation="behind"
+20-->/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:15:7-41
+21            android:theme="@style/authsdk_activity_dialog" />
+21-->/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:16:7-53
+22        <activity
+22-->/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:17:5-21:44
+23            android:name="com.mobile.auth.gatewayauth.activity.AuthWebVeiwActivity"
+23-->/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:18:7-78
+24            android:configChanges="orientation|keyboardHidden|screenSize"
+24-->/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:19:7-68
+25            android:exported="false"
+25-->/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:20:7-31
+26            android:screenOrientation="behind" />
+26-->/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:21:7-41
+27    </application>
+28
+29</manifest>

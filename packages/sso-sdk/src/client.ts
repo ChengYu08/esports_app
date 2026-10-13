@@ -169,7 +169,7 @@ export class SsoClient {
       available,
     });
     if (!available)
-      throw new SsoError("当前原生模块尚未集成阿里云号码认证 SDK");
+      throw new SsoError("当前设备暂不支持一键登录，请使用验证码登录");
     console.info("[DEBUG-QUICK-LOGIN] requesting carrier authorization");
     const result = await provider.getLoginToken(authToken);
     console.info("[DEBUG-QUICK-LOGIN] carrier authorization completed", {

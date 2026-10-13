@@ -42,7 +42,12 @@ export default function LoginRoute() {
   );
   const adapter = sso ? createAuthSsoAdapter(sso) : null;
   const quickLoginProvider = useMemo(
-    () => createNativeQuickLoginProvider(),
+    () =>
+      createNativeQuickLoginProvider(
+        Platform.OS === "ios"
+          ? env.aliyunIosAuthKey
+          : env.aliyunAndroidAuthKey,
+      ),
     [],
   );
   useFocusEffect(

@@ -3,8 +3,8 @@ import { NativeModule, requireOptionalNativeModule } from 'expo';
 import { PzOneClickModuleEvents, QuickLoginAuthToken, QuickLoginResult } from './PzOneClick.types';
 
 declare class PzOneClickModule extends NativeModule<PzOneClickModuleEvents> {
-  checkLoginAvailableAsync(tokens: QuickLoginAuthToken): Promise<boolean>;
-  authorizeAsync(tokens: QuickLoginAuthToken): Promise<QuickLoginResult>;
+  checkLoginAvailableAsync(tokens: QuickLoginAuthToken, authSDKKey: string): Promise<boolean>;
+  authorizeAsync(tokens: QuickLoginAuthToken, authSDKKey: string): Promise<QuickLoginResult>;
   cancelAsync(): Promise<void>;
 }
 

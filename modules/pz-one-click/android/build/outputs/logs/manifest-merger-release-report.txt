@@ -1,9 +1,51 @@
 -- Merging decision tree log ---
 manifest
-ADDED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:1:1-2:12
-INJECTED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:1:1-2:12
+ADDED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:1:1-23:12
+INJECTED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:1:1-23:12
 	package
 		INJECTED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml
+	xmlns:android
+		ADDED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:1:11-69
+application
+ADDED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:2:3-22:17
+activity#com.mobile.auth.gatewayauth.LoginAuthActivity
+ADDED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:3:5-9:56
+	android:screenOrientation
+		ADDED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:8:7-41
+	android:launchMode
+		ADDED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:7:7-37
+	android:exported
+		ADDED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:6:7-31
+	android:configChanges
+		ADDED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:5:7-85
+	android:theme
+		ADDED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:9:7-53
+	android:name
+		ADDED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:4:7-67
+activity#com.mobile.auth.gatewayauth.PrivacyDialogActivity
+ADDED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:10:5-16:56
+	android:screenOrientation
+		ADDED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:15:7-41
+	android:launchMode
+		ADDED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:14:7-37
+	android:exported
+		ADDED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:13:7-31
+	android:configChanges
+		ADDED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:12:7-68
+	android:theme
+		ADDED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:16:7-53
+	android:name
+		ADDED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:11:7-71
+activity#com.mobile.auth.gatewayauth.activity.AuthWebVeiwActivity
+ADDED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:17:5-21:44
+	android:screenOrientation
+		ADDED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:21:7-41
+	android:exported
+		ADDED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:20:7-31
+	android:configChanges
+		ADDED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:19:7-68
+	android:name
+		ADDED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml:18:7-78
 uses-sdk
 INJECTED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from /Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/src/main/AndroidManifest.xml

@@ -273,11 +273,11 @@ export function LoginScreen({
           </View>
         </View>
         <View style={styles.other}>
-          <LoginMethod
+          {/* <LoginMethod
             icon={phoneIcon}
             label="一键登录"
             onPress={onQuickLogin}
-          />
+          /> */}
           <LoginMethod
             icon={lockIcon}
             label={isPasswordMode ? "验证码登录" : "密码登录"}

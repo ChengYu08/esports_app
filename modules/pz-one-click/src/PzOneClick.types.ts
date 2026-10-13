@@ -12,4 +12,4 @@ export type QuickLoginResult = {
   phone?: string;
 };
 
-export type StateChangePayload = { state: "checking" | "authorizing" | "cancelled" | "unavailable" };
+export type StateChangePayload = { state: "checking" | "available" | "authorizing" | "cancelled" | "unavailable" };

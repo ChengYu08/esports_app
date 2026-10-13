@@ -1,6 +1,15 @@
 <dependencies>
   <compile
-      roots=":@@:expo-modules-core::release,io.github.lukmccall.pika:pika-api:0.3.2@jar,androidx.core:core-ktx:1.17.0@aar,androidx.core:core:1.17.0@aar,org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.10.2@jar,androidx.lifecycle:lifecycle-runtime:2.6.2@aar,androidx.lifecycle:lifecycle-common:2.6.2@jar,org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2@jar,androidx.versionedparcelable:versionedparcelable:1.1.1@aar,androidx.arch.core:core-common:2.2.0@jar,androidx.collection:collection:1.0.0@jar,androidx.annotation:annotation-jvm:1.8.1@jar,androidx.annotation:annotation-experimental:1.4.1@aar,androidx.core:core-viewtree:1.0.0@aar,org.jetbrains.kotlin:kotlin-stdlib:2.1.20@jar,org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.1.20@jar,org.jetbrains:annotations:23.0.0@jar,com.google.guava:listenablefuture:1.0@jar,org.jspecify:jspecify:1.0.0@jar">
+      roots="__local_aars__:/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/libs/main-2.2.3-release.aar:unspecified@jar,__local_aars__:/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/libs/logger-2.2.2-release.aar:unspecified@jar,__local_aars__:/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/libs/auth_number_product-2.14.24-log-online-standard-cuum-release.aar:unspecified@jar,:@@:expo-modules-core::release,io.github.lukmccall.pika:pika-api:0.3.2@jar,androidx.core:core-ktx:1.17.0@aar,androidx.core:core:1.17.0@aar,org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.10.2@jar,androidx.lifecycle:lifecycle-runtime:2.6.2@aar,androidx.lifecycle:lifecycle-common:2.6.2@jar,org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2@jar,androidx.versionedparcelable:versionedparcelable:1.1.1@aar,androidx.arch.core:core-common:2.2.0@jar,androidx.collection:collection:1.0.0@jar,androidx.annotation:annotation-jvm:1.8.1@jar,androidx.annotation:annotation-experimental:1.4.1@aar,androidx.core:core-viewtree:1.0.0@aar,org.jetbrains.kotlin:kotlin-stdlib:2.1.20@jar,org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.1.20@jar,org.jetbrains:annotations:23.0.0@jar,com.google.guava:listenablefuture:1.0@jar,org.jspecify:jspecify:1.0.0@jar">
+    <dependency
+        name="__local_aars__:/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/libs/main-2.2.3-release.aar:unspecified@jar"
+        simpleName="__local_aars__:/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/libs/main-2.2.3-release.aar"/>
+    <dependency
+        name="__local_aars__:/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/libs/logger-2.2.2-release.aar:unspecified@jar"
+        simpleName="__local_aars__:/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/libs/logger-2.2.2-release.aar"/>
+    <dependency
+        name="__local_aars__:/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/libs/auth_number_product-2.14.24-log-online-standard-cuum-release.aar:unspecified@jar"
+        simpleName="__local_aars__:/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/libs/auth_number_product-2.14.24-log-online-standard-cuum-release.aar"/>
     <dependency
         name=":@@:expo-modules-core::release"
         simpleName="host.exp.exponent:expo-modules-core"/>
@@ -60,7 +69,16 @@
         simpleName="org.jspecify:jspecify"/>
   </compile>
   <package
-      roots="io.github.lukmccall.pika:pika-api:0.3.2@jar,org.jetbrains.kotlin:kotlin-stdlib:2.1.20@jar,org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.1.20@jar,org.jetbrains:annotations:23.0.0@jar">
+      roots="__local_aars__:/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/libs/main-2.2.3-release.aar:unspecified@jar,__local_aars__:/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/libs/logger-2.2.2-release.aar:unspecified@jar,__local_aars__:/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/libs/auth_number_product-2.14.24-log-online-standard-cuum-release.aar:unspecified@jar,io.github.lukmccall.pika:pika-api:0.3.2@jar,org.jetbrains.kotlin:kotlin-stdlib:2.1.20@jar,org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.1.20@jar,org.jetbrains:annotations:23.0.0@jar">
+    <dependency
+        name="__local_aars__:/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/libs/main-2.2.3-release.aar:unspecified@jar"
+        simpleName="__local_aars__:/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/libs/main-2.2.3-release.aar"/>
+    <dependency
+        name="__local_aars__:/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/libs/logger-2.2.2-release.aar:unspecified@jar"
+        simpleName="__local_aars__:/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/libs/logger-2.2.2-release.aar"/>
+    <dependency
+        name="__local_aars__:/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/libs/auth_number_product-2.14.24-log-online-standard-cuum-release.aar:unspecified@jar"
+        simpleName="__local_aars__:/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/libs/auth_number_product-2.14.24-log-online-standard-cuum-release.aar"/>
     <dependency
         name="io.github.lukmccall.pika:pika-api:0.3.2@jar"
         simpleName="io.github.lukmccall.pika:pika-api"/>

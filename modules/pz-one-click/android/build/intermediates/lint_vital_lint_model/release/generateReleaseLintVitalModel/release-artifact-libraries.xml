@@ -1,5 +1,44 @@
 <libraries>
   <library
+      name="__local_aars__:/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/libs/main-2.2.3-release.aar:unspecified@jar"
+      jars="/Users/yucheng/.gradle/caches/9.3.1/transforms/310679c2deedd688ab226efcfda34fe0/transformed/main-2.2.3-release/jars/classes.jar"
+      resolved="__local_aars__:/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/libs/main-2.2.3-release.aar:unspecified"
+      folder="/Users/yucheng/.gradle/caches/9.3.1/transforms/310679c2deedd688ab226efcfda34fe0/transformed/main-2.2.3-release"
+      manifest="AndroidManifest.xml"
+      resFolder="res"
+      assetsFolder="assets"
+      lintJar="lint.jar"
+      publicResources="public.txt"
+      symbolFile="R.txt"
+      externalAnnotations="annotations.zip"
+      proguardRules="proguard.txt"/>
+  <library
+      name="__local_aars__:/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/libs/logger-2.2.2-release.aar:unspecified@jar"
+      jars="/Users/yucheng/.gradle/caches/9.3.1/transforms/108526c106e3e8a5540c3563afb31a0f/transformed/logger-2.2.2-release/jars/classes.jar"
+      resolved="__local_aars__:/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/libs/logger-2.2.2-release.aar:unspecified"
+      folder="/Users/yucheng/.gradle/caches/9.3.1/transforms/108526c106e3e8a5540c3563afb31a0f/transformed/logger-2.2.2-release"
+      manifest="AndroidManifest.xml"
+      resFolder="res"
+      assetsFolder="assets"
+      lintJar="lint.jar"
+      publicResources="public.txt"
+      symbolFile="R.txt"
+      externalAnnotations="annotations.zip"
+      proguardRules="proguard.txt"/>
+  <library
+      name="__local_aars__:/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/libs/auth_number_product-2.14.24-log-online-standard-cuum-release.aar:unspecified@jar"
+      jars="/Users/yucheng/.gradle/caches/9.3.1/transforms/98ddc08d72ae0c8d0ca7043ac0df96c0/transformed/auth_number_product-2.14.24-log-online-standard-cuum-release/jars/classes.jar"
+      resolved="__local_aars__:/Users/yucheng/Desktop/盼之电竞/esports_app/modules/pz-one-click/android/libs/auth_number_product-2.14.24-log-online-standard-cuum-release.aar:unspecified"
+      folder="/Users/yucheng/.gradle/caches/9.3.1/transforms/98ddc08d72ae0c8d0ca7043ac0df96c0/transformed/auth_number_product-2.14.24-log-online-standard-cuum-release"
+      manifest="AndroidManifest.xml"
+      resFolder="res"
+      assetsFolder="assets"
+      lintJar="lint.jar"
+      publicResources="public.txt"
+      symbolFile="R.txt"
+      externalAnnotations="annotations.zip"
+      proguardRules="proguard.txt"/>
+  <library
       name=":@@:expo-modules-core::release"
       project=":expo-modules-core"
       provided="true"/>

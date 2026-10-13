@@ -1,2 +1,23 @@
-<manifest>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <activity
+      android:name="com.mobile.auth.gatewayauth.LoginAuthActivity"
+      android:configChanges="orientation|keyboardHidden|screenSize|uiMode|fontScale"
+      android:exported="false"
+      android:launchMode="singleTop"
+      android:screenOrientation="behind"
+      android:theme="@style/authsdk_activity_dialog" />
+    <activity
+      android:name="com.mobile.auth.gatewayauth.PrivacyDialogActivity"
+      android:configChanges="orientation|keyboardHidden|screenSize"
+      android:exported="false"
+      android:launchMode="singleTop"
+      android:screenOrientation="behind"
+      android:theme="@style/authsdk_activity_dialog" />
+    <activity
+      android:name="com.mobile.auth.gatewayauth.activity.AuthWebVeiwActivity"
+      android:configChanges="orientation|keyboardHidden|screenSize"
+      android:exported="false"
+      android:screenOrientation="behind" />
+  </application>
 </manifest>
