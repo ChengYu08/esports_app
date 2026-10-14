@@ -26,5 +26,9 @@ Pod::Spec.new do |s|
     'OTHER_LDFLAGS' => '-ObjC',
   }
 
-  s.source_files = "**/*.{h,m,mm,swift,hpp,cpp}"
+  # Keep vendored framework headers out of the pod's source glob. Including
+  # Vendor/**/*.h here makes CocoaPods expose the same SDK headers both from
+  # the source tree and from the copied XCFrameworks, which causes duplicate
+  # Objective-C declarations during Swift Release archives.
+  s.source_files = 'PzOneClickModule.swift'
 end
