@@ -1,6 +1,16 @@
 # RongCloud references these optional push provider SDKs, which are not installed.
 # Only suppress the exact absent types reported by R8; do not ignore all warnings.
 # Add the actual provider SDK/configuration before enabling vendor offline push.
+
+# RongCloud 5.34 discovers built-in and custom message classes through the
+# runtime-retained MessageTag annotation. The SDK does not ship consumer rules
+# for this annotation, so R8 can remove the annotation from a kept message
+# class. RongCoreClientImpl then receives null from getAnnotation() and crashes
+# while calling MessageTag.value() in minified builds.
+-keepattributes RuntimeVisibleAnnotations,AnnotationDefault
+-keep @interface io.rong.imlib.MessageTag { *; }
+-keep @io.rong.imlib.MessageTag class * { *; }
+
 -dontwarn com.google.android.gms.common.GoogleApiAvailability
 -dontwarn com.google.android.gms.iid.InstanceID
 -dontwarn com.google.android.gms.tasks.OnCompleteListener
