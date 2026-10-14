@@ -3,6 +3,6 @@
  * Update this file when the hosted agreement pages move.
  */
 export const APP_LINKS = {
-  userAgreement: "https://www.luanfengxuan.cn/vpi/pages/pzdj_user",
-  privacyPolicy: "https://www.luanfengxuan.cn/vpi/pages/pzdj_privacy",
+  userAgreement: "https://djpc.jlgkj.top/user.html",
+  privacyPolicy: "https://djpc.jlgkj.top//privacy.html",
 } as const;
