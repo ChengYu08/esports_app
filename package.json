@@ -3,7 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "dependencies": {
-    "@esportsapp/sso-sdk": "*",
+    "@esports/sso-sdk": "*",
     "@expo/ui": "~57.0.19",
     "@fluentui/react-native-icons": "^2.0.343",
     "@likashefqet/react-native-image-zoom": "^4.3.0",
