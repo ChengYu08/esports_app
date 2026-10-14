@@ -19,11 +19,7 @@ npx expo run:android
 准备发布apk
 scripts/build_apk.sh
 
-用户协议
-https://www.luanfengxuan.cn/vpi/pages/pzdj_privacy
-
-服务协议
-https://www.luanfengxuan.cn/vpi/pages/pzdj_user
+https://djpc.jlgkj.top/privacy.html
 
 1、注销登录 ✅
 

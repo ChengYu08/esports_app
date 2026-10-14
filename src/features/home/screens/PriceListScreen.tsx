@@ -1,7 +1,7 @@
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { usePriceList } from "../hooks/use-home-data";
@@ -18,7 +18,16 @@ export default function PriceListScreen() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const contentRef = useRef<ScrollView>(null);
   const tabs = useMemo(() => query.data ?? [], [query.data]);
-  const selectedTab = tabs[selectedIndex] ?? tabs[0];
+  const activeIndex = selectedIndex < tabs.length ? selectedIndex : 0;
+  const selectedTab = tabs[activeIndex];
+
+  useEffect(() => {
+    if (tabs.length === 0) return;
+
+    // Load all price list images once the tab data arrives so switching tabs
+    // can display the cached image immediately instead of waiting for a request.
+    void Image.prefetch(tabs.map((tab) => tab.imageUrl), "memory-disk");
+  }, [tabs]);
 
   const content = useMemo(() => {
     if (query.isLoading) return <LoadingState />;
@@ -26,17 +35,18 @@ export default function PriceListScreen() {
     if (!selectedTab) return <EmptyState message="暂无价目表" />;
     return (
       <PriceImage
+        key={selectedTab.imageUrl}
         uri={selectedTab.imageUrl}
         onPress={() => {
           const images = tabs.map((tab) => tab.imageUrl);
           router.push({
             pathname: "/image-preview",
-            params: createImagePreviewParams(images, selectedIndex),
+                params: createImagePreviewParams(images, activeIndex),
           });
         }}
       />
     );
-  }, [query, selectedIndex, selectedTab, tabs]);
+  }, [activeIndex, query, selectedTab, tabs]);
 
   return (
     <View style={styles.screen}>
@@ -51,8 +61,8 @@ export default function PriceListScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabs}>
           {tabs.map((tab, index) => (
             <Pressable key={`${tab.menuTitle}-${tab.sortNo}`} onPress={() => { setSelectedIndex(index); contentRef.current?.scrollTo({ y: 0, animated: false }); }} style={styles.tab}>
-              <Text numberOfLines={1} style={[styles.tabText, index === selectedIndex && styles.tabTextActive]}>{tab.menuTitle}</Text>
-              {index === selectedIndex && <View style={styles.tabIndicator} />}
+              <Text numberOfLines={1} style={[styles.tabText, index === activeIndex && styles.tabTextActive]}>{tab.menuTitle}</Text>
+              {index === activeIndex && <View style={styles.tabIndicator} />}
             </Pressable>
           ))}
         </ScrollView>
@@ -70,6 +80,7 @@ function PriceImage({ uri, onPress }: { uri: string; onPress: () => void }) {
     <Pressable accessibilityLabel="预览价目表图片" onPress={onPress}>
       <CachedImage
         source={{ uri }}
+        recyclingKey={uri}
         contentFit="contain"
         style={[styles.priceImage, { aspectRatio: ratio }]}
         onLoad={(event) => {
