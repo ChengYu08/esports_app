@@ -62,32 +62,40 @@ public class PzOneClickModule: Module {
         }
 
         let model = self.makeAuthPageModel()
+        var didFinish = false
         self.authHandler.getLoginToken(withTimeout: 8, controller: controller, model: model) { result in
+          guard !didFinish else { return }
           let code = self.resultCode(result)
           if code == "600001" {
             NSLog("\(quickLoginTag) iOS authorization page presented")
             return
           }
+          // UI interaction callbacks precede the final token or failure callback.
+          if ["700002", "700003", "700004", "700006", "700007", "700008", "700009"].contains(code) {
+            return
+          }
           if code == "600000", let spToken = result["token"] as? String, !spToken.isEmpty {
+            didFinish = true
             NSLog("\(quickLoginTag) iOS carrier authorization succeeded")
-            self.authHandler.cancelLoginVCAnimated(true, complete: nil)
+            self.authHandler.cancelLoginVC(animated: true, complete: nil)
             promise.resolve(["spToken": spToken])
             return
           }
 
-          let cancelled = code == "700000" || code == "700001" || code == "700020"
+          didFinish = true
+          let cancelled = code == "700000" || code == "700001" || code == "700010" || code == "700020"
           NSLog("\(quickLoginTag) iOS authorization ended: code=\(code), cancelled=\(cancelled)")
           self.sendEvent("onStateChange", ["state": cancelled ? "cancelled" : "unavailable"])
-          self.authHandler.cancelLoginVCAnimated(true, complete: nil)
+          self.authHandler.cancelLoginVC(animated: true, complete: nil)
           promise.reject(cancelled ? "USER_CANCELLED" : "AUTHORIZATION_FAILED", "一键登录失败，请使用其他登录方式")
         }
       }
     }.runOnQueue(DispatchQueue.main)
 
     AsyncFunction("cancelAsync") { (promise: Promise) in
-      self.authHandler.cancelLoginVCAnimated(true) {
+      self.authHandler.cancelLoginVC(animated: true, complete: {
         self.sendEvent("onStateChange", ["state": "cancelled"])
-      }
+      })
       promise.resolve(nil)
     }.runOnQueue(DispatchQueue.main)
   }
