@@ -48,7 +48,7 @@
 3. **依赖安装**: 根据包管理器类型执行相应的安装命令（`npm ci` / `yarn install --frozen-lockfile` / `pnpm install --frozen-lockfile`）
 4. **Metro 缓存**: 默认启用 Metro bundler 缓存以加速构建，可通过 `metro_cache` 输入禁用
 5. **Hermes 引擎**: 保留 Podfile 中的项目配置，不通过文本替换强制切换引擎。
-6. **发布打包**: 统一执行 Release 的 `xcodebuild archive` 和 `xcodebuild -exportArchive`，由工程中的 React Native bundle build phase 生成 JS bundle。
+6. **发布打包**: 统一执行 Release 的 `xcodebuild archive` 和 `xcodebuild -exportArchive`，由工程中的 React Native bundle build phase 生成 JS bundle。Archive 失败时控制台只显示关键诊断，完整日志可从 `ios-archive-log` artifact 下载。
 
 ### React Native 发布预检
 
@@ -59,7 +59,7 @@
 - 通过 `xcodebuild -showBuildSettings -json` 检查实际生效的 Release、平台、设备族和签名配置；检查失败会停止构建。
 - 导出后校验非空 `main.jsbundle`、iPhoneOS 平台、iPhone 设备族、签名、Distribution 身份、Bundle ID、Team ID、发布权限与 Profile 有效期；失败会阻止上传。
 - 当前模板采用单个 App Store Profile；包含扩展 Target 的项目会在预检中明确失败，需要先定制多 Profile 签名方案。
-- Expo 项目必须先生成并提交 `ios/`。自定义 JS bundle 文件名或自定义打包阶段需要相应调整预检；标准模板要求 `main.jsbundle`。
+- Expo 项目缺少 `ios/Podfile` 时，CI 会先运行 `npx expo prebuild --platform ios --no-install`。自定义 JS bundle 文件名或自定义打包阶段需要相应调整预检；标准模板要求 `main.jsbundle`。
 - 工程设置不代替 App Store Connect 的分发可用性设置；不希望在 Mac 或 Apple Vision Pro 商店提供应用时，还需在 App Store Connect 关闭对应可用性。
 
 本地先安装 JS 依赖及 CocoaPods，再执行：

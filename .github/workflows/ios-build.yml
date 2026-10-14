@@ -452,6 +452,7 @@ jobs:
           cp build/ios/ipa/*.ipa "$EXPORT_PATH"/
 
       - name: Archive iOS app
+        id: archive
         if: ${{ hashFiles('pubspec.yaml') == '' || inputs.flutter_build_mode == 'xcodebuild-archive' }}
         run: |
           signing_args=()
@@ -459,7 +460,7 @@ jobs:
             signing_args=(CODE_SIGN_STYLE=Manual "DEVELOPMENT_TEAM=$DEVELOPMENT_TEAM" "CODE_SIGN_IDENTITY=$IOS_SIGNING_IDENTITY" "PROVISIONING_PROFILE_SPECIFIER=$IOS_PROVISION_PROFILE_NAME")
           fi
           if [ -d "$XCODE_WORKSPACE" ]; then
-            xcodebuild archive               -workspace "$XCODE_WORKSPACE"               -scheme "$XCODE_SCHEME"               -configuration "$IOS_BUILD_CONFIGURATION"               -destination generic/platform=iOS               -archivePath "$ARCHIVE_PATH" "${signing_args[@]}"
+            archive_source=(-workspace "$XCODE_WORKSPACE")
           else
             XCODE_PROJECT="${XCODE_PROJECT_FILE%/project.pbxproj}"
             if [ ! -d "$XCODE_PROJECT" ]; then
@@ -467,8 +468,42 @@ jobs:
               echo "Derived Xcode project not found: $XCODE_PROJECT" >&2
               exit 1
             fi
-            xcodebuild archive               -project "$XCODE_PROJECT"               -scheme "$XCODE_SCHEME"               -configuration "$IOS_BUILD_CONFIGURATION"               -destination generic/platform=iOS               -archivePath "$ARCHIVE_PATH" "${signing_args[@]}"
+            archive_source=(-project "$XCODE_PROJECT")
           fi
+
+          archive_log="$RUNNER_TEMP/ios-archive.log"
+          archive_args=(archive "${archive_source[@]}" -scheme "$XCODE_SCHEME" -configuration "$IOS_BUILD_CONFIGURATION" -destination generic/platform=iOS -archivePath "$ARCHIVE_PATH" "${signing_args[@]}")
+          echo "Archiving $XCODE_SCHEME ($IOS_BUILD_CONFIGURATION); full log will be saved to the workflow artifact on failure."
+          if xcodebuild "${archive_args[@]}" > "$archive_log" 2>&1; then
+            echo "Archive succeeded: $ARCHIVE_PATH"
+          else
+            echo "::error::xcodebuild archive failed. Key diagnostics from $archive_log:"
+            awk '
+              function emit(line) {
+                if (count >= 60) return
+                gsub(/\r/, "", line)
+                if (length(line) > 600) line = substr(line, 1, 600) " ..."
+                printf "%d:%s\n", NR, line
+                count++
+              }
+              /The following build commands failed:/ { remaining = 8; emit($0); next }
+              remaining > 0 { emit($0); remaining--; next }
+              /error:|fatal error:|Undefined symbols for architecture|ld: |failed with a nonzero exit code|Error Domain=|\*\* ARCHIVE FAILED \*\*/ { emit($0); context = 8; next }
+              context > 0 { if ($0 ~ /note:/) emit($0); context-- }
+              END { if (count == 0) print "No error marker found; download the full archive log artifact." }
+            ' "$archive_log"
+            echo "Full log: workflow artifact ios-archive-log"
+            exit 1
+          fi
+
+      - name: Upload archive log on failure
+        if: ${{ failure() && steps.archive.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-archive-log
+          path: ${{ runner.temp }}/ios-archive.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Export IPA
         if: ${{ hashFiles('pubspec.yaml') == '' || inputs.flutter_build_mode == 'xcodebuild-archive' }}
