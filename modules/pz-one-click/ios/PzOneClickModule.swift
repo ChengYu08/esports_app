@@ -31,7 +31,7 @@ public class PzOneClickModule: Module {
           return
         }
 
-        self.authHandler.checkEnvAvailable(withAuthType: .loginToken, complete: { result in
+        self.authHandler.checkEnvAvailable(with: .loginToken, complete: { result in
           let code = self.resultCode(result)
           let available = code == "600000"
           NSLog("\(quickLoginTag) iOS environment check completed: code=\(code), available=\(available)")
