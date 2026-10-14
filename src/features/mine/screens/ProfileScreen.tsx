@@ -23,7 +23,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { queryClient } from "@/core/query/query-client";
 import {
   buildCreateOrderAction,
   createCompanionOrder,
@@ -58,6 +57,7 @@ import {
 import { createProfileAvatarPreviewParams } from "@/features/mine/profile-avatar-preview";
 import { createProfileChatParams } from "@/features/mine/profile-chat";
 import { cancelOrder } from "@/features/order/order.api";
+import { invalidateOrderQueries } from "@/features/order/order-query";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { requireLogin } from "@/shared/navigation/require-login";
@@ -401,7 +401,7 @@ export default function ProfileScreen() {
             setPaymentSheetVisible(false);
             setPaymentOrder(null);
             setPaymentError(null);
-            void queryClient.invalidateQueries({ queryKey: ["orders"] });
+            void invalidateOrderQueries(paymentOrder.orderId);
             setPaymentSuccess(true);
           }}
           onPaymentFailed={(message) => setPaymentError(message)}
@@ -442,7 +442,7 @@ export default function ProfileScreen() {
     paymentCancelingRef.current = true;
     try {
       await cancelOrder(String(pendingOrder.orderId), token);
-      void queryClient.invalidateQueries({ queryKey: ["orders"] });
+      void invalidateOrderQueries(pendingOrder.orderId);
     } catch (error) {
       setPaymentSuccess(false);
       setPaymentOrder(null);

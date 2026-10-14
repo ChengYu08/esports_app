@@ -14,6 +14,7 @@ import { OrderReviewSheet } from "../components/OrderReviewSheet";
 import { OrderHeader } from "../components/OrderHeader";
 import { OrderTabs } from "../components/OrderTabs";
 import { useOrderPage } from "../hooks/use-order-page";
+import { invalidateOrderQueries } from "../order-query";
 import { cancelOrder as cancelOrderRequest, completeOrder as completeOrderRequest, fetchAfterSaleMembers, fetchOrderReview, submitOrderReview, type AfterSaleMember, type OrderReview } from "../order.api";
 import { fetchStarBalance, payCompanionOrder } from "@/features/mine/api/companion-order.api";
 import type {
@@ -71,6 +72,7 @@ export default function OrderScreen() {
     setCancelTarget(null);
     try {
       await cancelOrderRequest(target.id, token);
+      await invalidateOrderQueries(target.id);
       await orders.refetch();
     } catch (error) {
       setPrompt({ title: "取消订单失败", message: error instanceof Error ? error.message : "请稍后重试" });
@@ -83,6 +85,7 @@ export default function OrderScreen() {
     setCompleteTarget(null);
     try {
       await completeOrderRequest(target.id, token);
+      await invalidateOrderQueries(target.id);
       await orders.refetch();
     } catch (error) {
       setPrompt({ title: "完成订单失败", message: error instanceof Error ? error.message : "请稍后重试" });
@@ -145,7 +148,10 @@ export default function OrderScreen() {
           if (!target || !token || cancelingPaymentRef.current) return;
           cancelingPaymentRef.current = true;
           void cancelOrderRequest(target.id, token)
-            .then(() => orders.refetch())
+            .then(async () => {
+              await invalidateOrderQueries(target.id);
+              await orders.refetch();
+            })
             .catch((error) => setPrompt({ title: "取消订单失败", message: error instanceof Error ? error.message : "请稍后重试" }))
             .finally(() => { cancelingPaymentRef.current = false; });
         }}

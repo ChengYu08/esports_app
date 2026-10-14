@@ -8,10 +8,10 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-nati
 import Toast from "react-native-root-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { queryClient } from "@/core/query/query-client";
 import { OrderAfterSaleSheet } from "@/features/order/components/OrderAfterSaleSheet";
 import { OrderReviewSheet } from "@/features/order/components/OrderReviewSheet";
 import { getOrderDetailAction } from "@/features/order/order-detail-actions";
+import { invalidateOrderQueries, orderDetailQueryKey } from "@/features/order/order-query";
 import { buildAfterSalePayload } from "@/features/order/after-sale-card";
 import {
   cancelOrder,
@@ -50,7 +50,7 @@ export default function OrderDetailRoute() {
     message: string;
   } | null>(null);
   const detail = useQuery({
-    queryKey: ["order-detail", id],
+    queryKey: orderDetailQueryKey(id),
     queryFn: async () => mapOrder(await fetchOrderDetail(id, token as string)),
     enabled: Boolean(id && token),
   });
@@ -273,7 +273,7 @@ export default function OrderDetailRoute() {
           if (!token) return;
           void cancelOrder(String(order.id), token)
             .then(async () => {
-              await queryClient.invalidateQueries({ queryKey: ["orders"] });
+              await invalidateOrderQueries(order.id);
               await detail.refetch();
             })
             .catch((error) => {
@@ -333,7 +333,7 @@ export default function OrderDetailRoute() {
           if (!token) return;
           void completeOrder(order.id, token)
             .then(async () => {
-              await queryClient.invalidateQueries({ queryKey: ["orders"] });
+              await invalidateOrderQueries(order.id);
               await detail.refetch();
             })
             .catch((error) =>

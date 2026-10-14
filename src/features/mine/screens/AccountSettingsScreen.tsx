@@ -6,9 +6,7 @@ import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -333,11 +331,13 @@ export default function AccountSettingsScreen() {
         </ScrollView>
       )}
 
-      <BottomSheet visible={editing !== null} onClose={() => setEditing(null)} contentStyle={styles.modalCard}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
-          <View>
+      <BottomSheet
+        keyboardAvoiding
+        visible={editing !== null}
+        onClose={() => setEditing(null)}
+        contentStyle={styles.modalCard}
+      >
+        <View>
             <Text style={styles.modalTitle}>{editTitle(editing)}</Text>
             {editing === "gender" ? (
               <View style={styles.genderOptions}>
@@ -395,8 +395,7 @@ export default function AccountSettingsScreen() {
                 </Text>
               </Pressable>
             </View>
-          </View>
-        </KeyboardAvoidingView>
+        </View>
       </BottomSheet>
       <RealNameVerificationSheet
         visible={realNameVisible}
