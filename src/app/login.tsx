@@ -44,9 +44,7 @@ export default function LoginRoute() {
   const quickLoginProvider = useMemo(
     () =>
       createNativeQuickLoginProvider(
-        Platform.OS === "ios"
-          ? env.aliyunIosAuthKey
-          : env.aliyunAndroidAuthKey,
+        Platform.OS === "ios" ? env.aliyunIosAuthKey : env.aliyunAndroidAuthKey,
       ),
     [],
   );

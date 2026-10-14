@@ -9,7 +9,7 @@ const Redis = require("redis");
 
 // API 配置
 const API = "https://api.jinliwangluo.com";
-const CLIENT_ID = "dianjing-pc";
+const CLIENT_ID = "dianjing-android";
 const CLIENT_SECRET = "NgMI47zZU0dJyGQvzygjU1eVE06PalWa";
 const ACCESS_KEY = "3qXyB7uf";
 const VERSION = "0.1.0";

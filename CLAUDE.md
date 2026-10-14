@@ -151,7 +151,7 @@ npx eas-cli build --profile development  # Cloud build via EAS
 
 **app.json**:
 
-- Package ID: `com.esportsapp.app`
+- Package ID: `com.esportsapp.apps`
 - Scheme: `esportsapp`
 - Custom plugin: `./plugins/withNodeCommandUtf8` (fixes Gradle encoding on Windows)
 - Permissions: Audio recording (for voice messages)

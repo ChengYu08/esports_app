@@ -22,7 +22,7 @@ fi
 
 (
   cd android
-  ./gradlew assembleRelease \
+  ./gradlew :app:assembleRelease \
     '-Dorg.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m' \
     --max-workers=4 \
     -Pkotlin.compiler.execution.strategy=in-process \

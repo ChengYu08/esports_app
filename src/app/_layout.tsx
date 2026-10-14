@@ -1,10 +1,9 @@
 import { useAuthStore } from "@esports/auth";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useFonts } from "expo-font";
-import { Image } from "expo-image";
 import { Stack } from "expo-router";
-import { useEffect, useState } from "react";
-import { View } from "react-native";
+import * as SplashScreen from "expo-splash-screen";
+import { useCallback, useEffect, useState } from "react";
 import { RootSiblingParent } from "react-native-root-siblings";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -24,6 +23,10 @@ import {
 import { PrivacyConsentGate } from "@/features/privacy/components/PrivacyConsentGate";
 import { readPrivacyConsent } from "@/features/privacy/privacy-consent";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { StartupSplash } from "@/shared/ui/StartupSplash";
+
+// Keep the native screen until the full-screen artwork is ready to display.
+void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 const STARTUP_TIMEOUT_MS = 8000;
 
@@ -45,10 +48,11 @@ function withStartupTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
 const fonts = {
   [DOUYIN_SANS]: require("../../assets/fonts/Douyin Sans.ttf"),
 };
-const splashImage = require("../../assets/images/splash-screen.png");
 
 export default function RootLayout() {
   const [loaded, error] = useFonts(fonts);
+  const [splashReady, setSplashReady] = useState(false);
+  const finishSplash = useCallback(() => setSplashReady(true), []);
   const [sessionReady, setSessionReady] = useState(false);
   const [privacyReady, setPrivacyReady] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
@@ -132,17 +136,8 @@ export default function RootLayout() {
     [],
   );
 
-  if ((!loaded && !error) || !sessionReady || !privacyReady) {
-    return (
-      <View style={{ flex: 1, backgroundColor: "#2A1013" }}>
-        <Image
-          accessibilityIgnoresInvertColors
-          contentFit="cover"
-          source={splashImage}
-          style={{ flex: 1, width: "100%" }}
-        />
-      </View>
-    );
+  if (!splashReady || (!loaded && !error) || !sessionReady || !privacyReady) {
+    return <StartupSplash onFinished={finishSplash} />;
   }
 
   return (

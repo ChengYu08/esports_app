@@ -13,7 +13,7 @@ React Native 统一认证客户端，按 Web SSO 的 OAuth2 接口和签名协�
 ```ts
 const client = new SsoClient({
   baseUrl: "https://auth.yingbowl.com",
-  clientAppId: "android",
+  clientAppId: "dianjing-android",
   clientSecret: runtimeSecret,
   os: "Android",
   sourceType: "dianjing-android",
@@ -21,6 +21,8 @@ const client = new SsoClient({
 ```
 
 `clientSecret` 由宿主注入，不写入包源码。阿里 H5 一键登录依赖浏览器 SDK，未在此包中实现；原生一键登录应通过平台原生 SDK Adapter 接入。
+
+`clientSecret` 必须是 `Base64(client_id:原始 client_secret)`（含英文冒号），不是原始 Secret，也不是仅对 Secret 做 Base64。SDK 会直接发送 `AUTHORIZATION: basic <clientSecret>`，不会再次编码。移动端分别通过 `EXPO_PUBLIC_SSO_IOS_CLIENT_SECRET` 和 `EXPO_PUBLIC_SSO_ANDROID_CLIENT_SECRET` 注入，编码中的 `client_id` 必须与当前平台的 `clientAppId` 一致。
 
 每次认证请求都会携带 `sourceType`：iOS 使用 `dianjing-ios`，Android 使用 `dianjing-android`。未显式传入时会根据 `os` 自动推断。
 

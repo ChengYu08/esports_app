@@ -7,6 +7,8 @@ export const colors = {
   textSecondary: "#666",
   surface: "#fff",
   border: "#e7e7e7",
+  skeleton: "#eeeeee",
+  skeletonHighlight: "#f8f8f8",
 } as const;
 
 export const spacing = {

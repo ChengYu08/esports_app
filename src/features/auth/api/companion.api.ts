@@ -5,7 +5,7 @@ export async function fetchUserDetail(
   userId: string,
   token: string,
 ): Promise<UserDetailResponse> {
-  return apiClient<UserDetailResponse>('/companion/public/detail', {
+  return apiClient<UserDetailResponse>('/client/v1/companion/public/detail', {
     method: 'POST',
     body: { userId },
     token,

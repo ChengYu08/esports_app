@@ -23,6 +23,7 @@ export type SsoRequestLog = {
 export type SsoClientConfig = {
   baseUrl: string;
   clientAppId: string;
+  /** Base64(client_id:raw client_secret), without the Basic prefix. */
   clientSecret: string;
   appVersion?: string;
   os?: "Android" | "iOS" | "Harmony" | "Unknown";

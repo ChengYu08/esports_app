@@ -15,7 +15,7 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
-      "package": "com.esportsapp.app",
+      "package": "com.esportsapp.apps",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -35,6 +35,7 @@
           "backgroundColor": "#2A1013",
           "enableFullScreenImage_legacy": true,
           "android": {
+            "backgroundColor": "#FFFFFF",
             "image": "./assets/images/splash-icon.png",
             "resizeMode": "cover",
             "imageWidth": 288

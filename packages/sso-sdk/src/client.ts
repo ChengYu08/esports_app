@@ -149,10 +149,13 @@ export class SsoClient {
     );
     const token = body.data ?? (body as unknown as QuickLoginAuthToken);
     if (!token.jwtToken || !token.accessToken) {
-      console.warn("[DEBUG-QUICK-LOGIN] SSO auth token response is incomplete", {
-        hasJwtToken: Boolean(token.jwtToken),
-        hasAccessToken: Boolean(token.accessToken),
-      });
+      console.warn(
+        "[DEBUG-QUICK-LOGIN] SSO auth token response is incomplete",
+        {
+          hasJwtToken: Boolean(token.jwtToken),
+          hasAccessToken: Boolean(token.accessToken),
+        },
+      );
       throw new SsoError("一键登录鉴权 token 不完整");
     }
     console.info("[DEBUG-QUICK-LOGIN] SSO auth token received");
