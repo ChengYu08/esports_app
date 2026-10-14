@@ -1,0 +1,9 @@
+# Ignore real signing materials stored here.
+*
+!.gitignore
+!certs/
+!certs/.gitkeep
+!profiles/
+!profiles/.gitkeep
+!scripts/
+!scripts/**
