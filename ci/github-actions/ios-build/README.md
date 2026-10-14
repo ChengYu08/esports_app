@@ -83,11 +83,11 @@ workflow 会按以下优先级检测包管理器：
 构建行为补充说明：
 
 - Flutter 项目默认安装 Flutter stable 最新版；手动触发 workflow 时填写 `flutter_version` 可以固定到指定版本，例如 `3.32.0`
-- IPA 版本默认读取 `pubspec.yaml`；如果要像 `1.0.0` 这样固定版本名，手动触发 workflow 时填写 `app_version`
-- IPA 构建号默认读取 `pubspec.yaml` 的 `version:`。例如 `version: 1.2.3+45` 会生成 `--build-name=1.2.3` 和 `--build-number=45`；手动触发 workflow 时填写 `app_build_number` 可以覆盖构建号
+- Flutter 项目的 IPA 版本和构建号默认读取 `pubspec.yaml` 的 `version:`；手动触发 workflow 时填写 `app_version` 和 `app_build_number` 可以覆盖它们
+- React Native / Expo 项目没有 `pubspec.yaml`，版本默认读取 `app.json`，构建号默认是 Expo 的 `1`；手动触发 workflow 时填写 `app_version` 和 `app_build_number`，workflow 会在 `expo prebuild` 前通过 `app.config.js` 写入生成的 iOS `Info.plist`
 - IPA 文件名默认保留 Flutter/Xcode 生成的名称；手动触发 workflow 时填写 `ipa_file_name` 可统一重命名（可省略 `.ipa`，不能包含路径）
 - 重命名目标默认允许覆盖；将 `ipa_overwrite` 设为 `false` 可在目标文件已存在时让 workflow 失败，避免静默覆盖
-- 非 Flutter / Xcode 归档分支会把 `app_version` 写入 `MARKETING_VERSION`，把 `app_build_number` 写入 `CURRENT_PROJECT_VERSION`
+- 非 Flutter / Xcode 归档分支会把 `app_version` 写入 Expo 生成的 `CFBundleShortVersionString`，把 `app_build_number` 写入 `CFBundleVersion`，并同步 Release 的 `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION`
 - iOS 预检清理会把 Xcode 工程的 `TARGETED_DEVICE_FAMILY` 规范为 `1`，即只保留 iPhone，去掉 iPad 等其它设备族。
 - CI 上默认禁用 Swift Package Manager（`flutter config --no-enable-swift-package-manager`），统一走 CocoaPods，规避 xcodebuild 静默解析远程 SPM 包导致卡死。手动触发 workflow 时可把 `disable_swift_package_manager` 切到 `false` 以启用 SPM（仅当项目存在 SPM-only 插件时才需要）
 - CocoaPods 缓存以 `ios/Podfile.lock` 为 key 命中 `~/Library/Caches/CocoaPods` 与 `~/.cocoapods/repos`，加速重复构建
