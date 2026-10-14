@@ -53,9 +53,19 @@ abort 'SKIP_BUNDLING must be unset for Release.' unless ENV.fetch('SKIP_BUNDLING
 abort 'DEV=true is not allowed for Release.' if ENV['DEV'] == 'true'
 sources = scripts + ['ios/.xcode.env', 'ios/.xcode.env.local'].select { |f| File.file?(f) }.map { |f| File.read(f) }
 sources.each do |source|
+  debug_guard = false
   source.lines.reject { |line| line.lstrip.start_with?('#') }.each do |line|
+    stripped = line.strip
+    # Expo's generated React Native phase intentionally skips bundling for
+    # Debug builds. That assignment is harmless for Release packaging; only
+    # assignments that can execute in Release should fail this check.
+    debug_guard = true if stripped.match?(/\Aif\b.*\$CONFIGURATION.*Debug.*then\s*\z/)
+    if stripped.match?(/\Afi\b/)
+      debug_guard = false
+      next
+    end
     if line.match?(/\bSKIP_BUNDLING\s*=\s*(?!["']{2}(?:\s|;|$))[^\s;#]+/)
-      abort 'SKIP_BUNDLING assignment found in Xcode environment/build phase. Remove it for Release packaging.'
+      abort 'SKIP_BUNDLING assignment found in Xcode environment/build phase. Remove it for Release packaging.' unless debug_guard
     end
     abort 'DEV=true or --dev true is not allowed in a Release bundle build phase.' if line.match?(/\bDEV\s*=\s*["']?true\b|--dev(?:\s+|=)["']?true\b/)
   end
