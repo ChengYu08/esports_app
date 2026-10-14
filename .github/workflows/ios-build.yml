@@ -480,17 +480,33 @@ jobs:
             echo "::error::xcodebuild archive failed. Key diagnostics from $archive_log:"
             awk '
               function emit(line) {
-                if (count >= 60) return
                 gsub(/\r/, "", line)
-                if (length(line) > 600) line = substr(line, 1, 600) " ..."
+                if (length(line) > 500) line = substr(line, 1, 500) " ..."
                 printf "%d:%s\n", NR, line
-                count++
               }
-              /The following build commands failed:/ { remaining = 8; emit($0); next }
-              remaining > 0 { emit($0); remaining--; next }
-              /error:|fatal error:|Undefined symbols for architecture|ld: |failed with a nonzero exit code|Error Domain=|\*\* ARCHIVE FAILED \*\*/ { emit($0); context = 8; next }
-              context > 0 { if ($0 ~ /note:/) emit($0); context-- }
-              END { if (count == 0) print "No error marker found; download the full archive log artifact." }
+              /The following build commands failed:/ { failure_count = 0; collecting_failure = 1; next }
+              collecting_failure && failure_count < 8 { failure[++failure_count] = $0; next }
+              /(^|[[:space:]])(fatal )?error:|^ld: |^Undefined symbols for architecture|^Error Domain=/ {
+                if (error_count < 20 && !seen[$0]++) {
+                  emit($0)
+                  error_count++
+                  context = 2
+                }
+                next
+              }
+              context > 0 {
+                if (length($0) < 240 && $0 ~ /^[[:space:]]+[^[:space:]]/) emit($0)
+                context--
+              }
+              END {
+                if (error_count > 0) exit
+                if (failure_count > 0) {
+                  print "No compiler error line found. Failed commands:"
+                  for (i = 1; i <= failure_count; i++) print failure[i]
+                } else {
+                  print "No error marker found; download the full archive log artifact."
+                }
+              }
             ' "$archive_log"
             echo "Full log: workflow artifact ios-archive-log"
             exit 1
