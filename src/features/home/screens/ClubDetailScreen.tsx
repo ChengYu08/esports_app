@@ -1,8 +1,12 @@
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
-import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
+import { EmptyState, ErrorState } from "@/shared/ui/AsyncStates";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import {
+  ClubDetailMemberSkeletonList,
+  ClubDetailSkeleton,
+} from "@/features/home/components/ClubDetailSkeleton";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
@@ -153,7 +157,13 @@ export default function ClubDetailScreen() {
     });
   }
 
-  if (clubQuery.isLoading) return <LoadingState />;
+  if (clubQuery.isLoading)
+    return (
+      <ClubDetailSkeleton
+        topInset={insets.top}
+        bottomInset={insets.bottom}
+      />
+    );
   if (clubQuery.isError || !club)
     return <ErrorState onRetry={() => void clubQuery.refetch()} />;
   return (
@@ -505,6 +515,7 @@ export default function ClubDetailScreen() {
               }
             />
           ))}
+          {companionsQuery.isLoading ? <ClubDetailMemberSkeletonList /> : null}
           {!companionsQuery.isLoading && members.length === 0 && (
             <EmptyState message="暂无大神" style={styles.memberEmpty} />
           )}

@@ -65,6 +65,10 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
+import {
+  ProfileGameSkeleton,
+  ProfileSkeleton,
+} from "@/features/mine/components/ProfileSkeleton";
 import Toast from "react-native-root-toast";
 // mine-avatar
 const fallbackAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
@@ -137,7 +141,13 @@ export default function ProfileScreen() {
     : null;
 
   if (routeParams && detailQuery.isLoading) {
-    return <ProfileState text="加载中..." />;
+    return (
+      <ProfileSkeleton
+        topInset={insets.top}
+        bottomInset={insets.bottom}
+        isMine={isMine}
+      />
+    );
   }
 
   if (routeParams && (detailQuery.isError || !detail)) {
@@ -706,7 +716,7 @@ function SkillsContent({
   onOrder: (card: ProfileSkillCard) => void;
 }) {
   const voicePlayer = useVoicePlayer();
-  if (query.isLoading) return <InlineState text="游戏技能加载中..." />;
+  if (query.isLoading) return <ProfileGameSkeleton />;
   if (query.isError || !detail) {
     return (
       <InlineState
@@ -763,7 +773,7 @@ function ReviewsContent({
   };
   reviews: ProfileReview[];
 }) {
-  if (query.isLoading) return <InlineState text="评价加载中..." />;
+  if (query.isLoading) return <ProfileGameSkeleton reviews />;
   if (query.isError) {
     return (
       <InlineState
