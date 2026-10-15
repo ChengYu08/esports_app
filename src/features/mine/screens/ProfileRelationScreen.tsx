@@ -1,4 +1,5 @@
 import { useAuthStore } from "@esports/auth";
+import { Image } from "expo-image";
 import { useLocalSearchParams, router } from "expo-router";
 import { useState } from "react";
 import {
@@ -26,6 +27,7 @@ import { CachedImage } from "@/shared/ui/CachedImage";
 import { EmptyState, ErrorState } from "@/shared/ui/AsyncStates";
 
 const fallbackAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
+const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 
 export default function ProfileRelationScreen() {
   const insets = useSafeAreaInsets();
@@ -110,7 +112,7 @@ export default function ProfileRelationScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Text style={styles.backText}>‹</Text>
+          <Image source={backIcon} style={styles.backIcon} />
         </Pressable>
         <Text style={styles.headerTitle}>{title}</Text>
         <View style={styles.headerSpace} />
@@ -287,12 +289,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  backText: {
-    color: "#222222",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 34,
-    lineHeight: 38,
-  },
+  backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
   headerTitle: {
     color: "#111111",
     fontFamily: DOUYIN_SANS,

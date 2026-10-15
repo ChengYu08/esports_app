@@ -11,13 +11,13 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import type { ForgotPasswordPayload } from "./sso-adapter";
 import {
   sanitizeCode,
   sanitizePhone,
   validateForgotPasswordForm,
   validatePhone,
 } from "./password-validation";
+import type { ForgotPasswordPayload } from "./sso-adapter";
 import { DOUYIN_SANS } from "./typography";
 
 const backIcon = require("../assets/back.svg");
@@ -49,7 +49,9 @@ export function ForgotPasswordScreen({
   const [countdown, setCountdown] = useState(0);
   const [sending, setSending] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [validationMessage, setValidationMessage] = useState<string | null>(null);
+  const [validationMessage, setValidationMessage] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -206,7 +208,9 @@ export function ForgotPasswordScreen({
                 style={styles.input}
               />
               <Pressable
-                accessibilityLabel={passwordVisible ? "隐藏新密码" : "显示新密码"}
+                accessibilityLabel={
+                  passwordVisible ? "隐藏新密码" : "显示新密码"
+                }
                 accessibilityRole="button"
                 hitSlop={8}
                 onPress={() => setPasswordVisible((visible) => !visible)}
@@ -328,7 +332,6 @@ const styles = StyleSheet.create({
     height: 46,
     padding: 0,
     color: "#333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
   },
   divider: { width: 1, height: 16, backgroundColor: "#ddd" },

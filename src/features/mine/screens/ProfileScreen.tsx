@@ -49,14 +49,14 @@ import {
   ProfileSkeleton,
 } from "@/features/mine/components/ProfileSkeleton";
 import {
-  useToggleUserFollow,
-  useUserFollowState,
-} from "@/features/mine/hooks/use-user-follow";
-import {
   useProfileDetail,
   useProfileGameDetail,
   useProfileReviews,
 } from "@/features/mine/hooks/use-profile-data";
+import {
+  useToggleUserFollow,
+  useUserFollowState,
+} from "@/features/mine/hooks/use-user-follow";
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import {
   handleOrderFailurePromptConfirm,
@@ -360,7 +360,9 @@ export default function ProfileScreen() {
         >
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={followStateQuery.data?.followed ? "已关注" : "关注"}
+            accessibilityLabel={
+              followStateQuery.data?.followed ? "已关注" : "关注"
+            }
             accessibilityState={{
               disabled: followStateQuery.isLoading || followMutation.isPending,
               busy: followMutation.isPending,
@@ -1561,7 +1563,6 @@ const styles = StyleSheet.create({
   name: {
     flexShrink: 1,
     color: "#fff",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 22,
     fontWeight: "600",

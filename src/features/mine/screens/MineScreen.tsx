@@ -1,4 +1,5 @@
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
   BuildingPeople24Regular,
@@ -11,7 +12,6 @@ import {
 } from "@fluentui/react-native-icons";
 import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
-import { CachedImage } from "@/shared/ui/CachedImage";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import {
@@ -101,6 +101,10 @@ export default function MineScreen() {
         ...(user.clubInfo?.id ? { clubId: String(user.clubInfo.id) } : {}),
       },
     });
+  };
+  const openStarRecharge = () => {
+    if (!requireLogin()) return;
+    router.push("/star-recharge");
   };
   const menuItems = [
     {
@@ -214,10 +218,18 @@ export default function MineScreen() {
           </Pressable>
         </View>
         <View style={styles.statsCard}>
-          <View style={styles.stat}>
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel="星钻余额，点击充值"
+            onPress={openStarRecharge}
+            style={styles.stat}
+          >
             <Text style={styles.statValue}>{user?.starBalance ?? "--"}</Text>
-            <Text style={styles.statLabel}>星钻</Text>
-          </View>
+            <View style={styles.statLabelRow}>
+              <Text style={styles.statLabel}>星钻</Text>
+              {/* <Text style={styles.rechargeHint}>充值 ›</Text> */}
+            </View>
+          </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="关注列表"
@@ -428,6 +440,13 @@ const styles = StyleSheet.create({
   statLabel: {
     fontFamily: DOUYIN_SANS,
     color: "#999",
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  statLabelRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  rechargeHint: {
+    fontFamily: DOUYIN_SANS,
+    color: "#FF3158",
     fontSize: 11,
     lineHeight: 16,
   },

@@ -1,6 +1,6 @@
+import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
-import Toast from "react-native-root-toast";
 import { useRef, useState } from "react";
 import {
   Keyboard,
@@ -10,11 +10,11 @@ import {
   TextInput,
   View,
 } from "react-native";
+import Toast from "react-native-root-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BottomSheet } from "@/shared/ui/BottomSheet";
 
-import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { toAuthUser } from "@/features/auth/client-auth-flow";
+import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { saveAuthSession } from "@/features/auth/session-persistence";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
@@ -39,7 +39,9 @@ export function RealNameVerificationSheet({
   const [idCard, setIdCard] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [validationPromptVisible, setValidationPromptVisible] = useState(false);
-  const [focusedField, setFocusedField] = useState<"name" | "idCard" | null>(null);
+  const [focusedField, setFocusedField] = useState<"name" | "idCard" | null>(
+    null,
+  );
   const idCardInputRef = useRef<TextInput>(null);
 
   const close = () => {
@@ -188,11 +190,13 @@ function isValidIdCard(value: string) {
   const birth = `${value.slice(6, 10)}-${value.slice(10, 12)}-${value.slice(12, 14)}`;
   const [year, month, day] = birth.split("-").map(Number);
   const date = new Date(year, month - 1, day);
-  return year >= 1900
-    && date.getFullYear() === year
-    && date.getMonth() === month - 1
-    && date.getDate() === day
-    && date <= new Date();
+  return (
+    year >= 1900 &&
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day &&
+    date <= new Date()
+  );
 }
 
 const styles = StyleSheet.create({
@@ -263,12 +267,10 @@ const styles = StyleSheet.create({
     height: "100%",
     paddingVertical: 0,
     color: "#17191D",
-    fontFamily: DOUYIN_SANS,
     fontSize: 15,
   },
   inputCount: {
     color: "#A1A5AE",
-    fontFamily: DOUYIN_SANS,
     fontSize: 11,
     marginLeft: 8,
   },

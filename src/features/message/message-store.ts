@@ -25,7 +25,16 @@ import {
   type MessageHistoryPage,
 } from './message-state';
 import type { AfterSaleCardPayload } from '@/features/order/after-sale-card';
-import { getSystemConversationTitle, normalizeSystemConversationId } from './system-conversations';
+import {
+  readBlacklist,
+  subscribeBlacklist,
+  type BlacklistEntry,
+} from '@/features/mine/blacklist';
+import {
+  getSystemConversationTitle,
+  isSystemConversationId,
+  normalizeSystemConversationId,
+} from './system-conversations';
 
 export type MessageConnectionState = 'idle' | 'connecting' | 'ready' | 'unavailable' | 'error';
 
@@ -52,13 +61,15 @@ type HistoryState = {
 export type MessageStoreState = {
   connectionState: MessageConnectionState;
   conversations: MessageConversation[];
+  blacklistedUserIds: string[];
   messagesByPeerId: Record<string, ManagedMessage[]>;
   historyByPeerId: Record<string, HistoryState>;
+  openPeerIds: string[];
   activePeerId: string | null;
   lastError: string | null;
   initialize: (token: string) => Promise<void>;
   openConversation: (conversation: Pick<MessageConversation, 'id' | 'title' | 'avatar' | 'clubId'>) => Promise<void>;
-  closeConversation: () => void;
+  closeConversation: (peerId?: string) => void;
   loadOlder: (peerId: string) => Promise<void>;
   sendText: (peerId: string, text: string) => Promise<void>;
   sendAfterSaleCard: (peerId: string, payload: import('@/features/order/after-sale-card').AfterSaleCardPayload) => Promise<boolean>;
@@ -121,24 +132,40 @@ function createAdapter(): MessageAdapter {
 }
 
 export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageStoreState> {
-  let stopConversationSubscription: (() => void) | undefined;
   let stopMessageSubscription: (() => void) | undefined;
+  let stopBlacklistSubscription: (() => void) | undefined;
+  let blacklistRevision = 0;
 
   const store = createStore<MessageStoreState>((set, get) => {
-    const receiveConversation = (conversation: MessageConversation) => {
-      const normalizedConversation = {
-        ...conversation,
-        id: normalizeSystemConversationId(conversation.id),
-        title: getSystemConversationTitle(conversation.id, conversation.title),
-      };
-      set((state) => {
-        const existing = state.conversations.find((item) => item.id === normalizedConversation.id || normalizeSystemConversationId(item.id) === normalizedConversation.id);
-        return { conversations: mergeConversations(state.conversations, { ...normalizedConversation, unreadCount: existing?.unreadCount || 0 }) };
-      });
+    const applyBlacklist = (entries: BlacklistEntry[]) => {
+      const userIds = [...new Set(entries.map((entry) => entry.userId))];
+      const previousUserIds = new Set(get().blacklistedUserIds);
+      const newlyBlocked = userIds.filter((userId) => !previousUserIds.has(userId));
+      const blockedUserIds = new Set(userIds);
+      set((state) => ({
+        blacklistedUserIds: userIds,
+        conversations: state.conversations.map((conversation) =>
+          !isSystemConversationId(conversation.id) && blockedUserIds.has(conversation.id)
+            ? { ...conversation, unreadCount: 0 }
+            : conversation,
+        ),
+      }));
+      if (get().connectionState === 'ready') {
+        newlyBlocked.forEach((peerId) => {
+          void adapter.markRead(peerId).catch(() => undefined);
+        });
+      }
     };
 
     const receiveMessage = (peerId: string, message: ManagedMessage, conversation: MessageConversation) => {
       const normalizedPeerId = normalizeSystemConversationId(peerId);
+      if (
+        !isSystemConversationId(normalizedPeerId)
+        && get().blacklistedUserIds.includes(normalizedPeerId)
+      ) {
+        void adapter.markRead(normalizedPeerId).catch(() => undefined);
+        return;
+      }
       const normalizedConversation = { ...conversation, id: normalizedPeerId, title: getSystemConversationTitle(normalizedPeerId, conversation.title) };
       const isActive = get().activePeerId === normalizedPeerId;
       set((state) => {
@@ -151,7 +178,9 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           updatedAt: message.sentAt,
         };
         return {
-          messagesByPeerId: { ...state.messagesByPeerId, [normalizedPeerId]: mergeMessages(state.messagesByPeerId[normalizedPeerId] || [], message) },
+          messagesByPeerId: state.openPeerIds.includes(normalizedPeerId)
+            ? { ...state.messagesByPeerId, [normalizedPeerId]: mergeMessages(state.messagesByPeerId[normalizedPeerId] || [], message) }
+            : state.messagesByPeerId,
           conversations: mergeConversations(state.conversations, nextConversation),
         };
       });
@@ -172,21 +201,35 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
 
     const loadHistory = async (peerId: string, beforeSentTime?: number) => {
       const page = await adapter.getMessages(peerId, beforeSentTime);
-      set((state) => ({
-        messagesByPeerId: { ...state.messagesByPeerId, [peerId]: beforeSentTime ? prependHistory(state.messagesByPeerId[peerId] || [], page.messages) : page.messages },
-        historyByPeerId: { ...state.historyByPeerId, [peerId]: { nextCursor: page.nextCursor, hasMore: page.hasMore, loading: false } },
-      }));
+      set((state) => {
+        if (!state.openPeerIds.includes(peerId)) return state;
+        return {
+          messagesByPeerId: { ...state.messagesByPeerId, [peerId]: beforeSentTime ? prependHistory(state.messagesByPeerId[peerId] || [], page.messages) : page.messages },
+          historyByPeerId: { ...state.historyByPeerId, [peerId]: { nextCursor: page.nextCursor, hasMore: page.hasMore, loading: false } },
+        };
+      });
     };
 
     return {
       connectionState: 'idle',
       conversations: [],
+      blacklistedUserIds: [],
       messagesByPeerId: {},
       historyByPeerId: {},
+      openPeerIds: [],
       activePeerId: null,
       lastError: null,
 
       initialize: async (token) => {
+        if (!stopBlacklistSubscription) {
+          stopBlacklistSubscription = subscribeBlacklist((entries) => {
+            blacklistRevision += 1;
+            applyBlacklist(entries);
+          });
+        }
+        const revision = blacklistRevision;
+        const entries = await readBlacklist();
+        if (revision === blacklistRevision) applyBlacklist(entries);
         if (!token) return;
         if (get().connectionState === 'connecting' || get().connectionState === 'ready') return;
         if (!adapter.available()) {
@@ -202,10 +245,24 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           }
           set({ connectionState: 'ready', lastError: null });
           const conversations = await adapter.getConversations();
-          set((state) => ({ conversations: conversations.reduce(mergeConversations, state.conversations) }));
-          stopConversationSubscription?.();
+          const blockedUserIds = new Set(get().blacklistedUserIds);
+          const blockedConversationIds = conversations
+            .filter((conversation) =>
+              !isSystemConversationId(conversation.id)
+              && blockedUserIds.has(conversation.id),
+            )
+            .map((conversation) => conversation.id);
+          set((state) => ({
+            conversations: conversations
+              .map((conversation) =>
+                !isSystemConversationId(conversation.id) && blockedUserIds.has(conversation.id)
+                  ? { ...conversation, unreadCount: 0 }
+                  : conversation,
+              )
+              .reduce(mergeConversations, state.conversations),
+          }));
+          await Promise.allSettled(blockedConversationIds.map((peerId) => adapter.markRead(peerId)));
           stopMessageSubscription?.();
-          stopConversationSubscription = adapter.subscribeConversations(receiveConversation);
           stopMessageSubscription = adapter.subscribeMessages(receiveMessage);
         } catch (error) {
           set({ connectionState: 'error', lastError: error instanceof Error ? error.message : '即时消息连接失败，请稍后重试' });
@@ -215,30 +272,60 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       openConversation: async (conversation) => {
         set((state) => {
           const current = state.conversations.find((item) => item.id === conversation.id);
-          return { activePeerId: conversation.id, conversations: mergeConversations(state.conversations, { ...(current || toConversationShell(conversation)), ...conversation }) };
+          return {
+            activePeerId: conversation.id,
+            openPeerIds: [...state.openPeerIds, conversation.id],
+            conversations: mergeConversations(state.conversations, { ...(current || toConversationShell(conversation)), ...conversation }),
+          };
         });
         if (get().connectionState !== 'ready') return;
         const previous = get().historyByPeerId[conversation.id];
         if (!previous) {
           set((state) => ({ historyByPeerId: { ...state.historyByPeerId, [conversation.id]: { nextCursor: null, hasMore: true, loading: true } } }));
           try { await loadHistory(conversation.id); } catch (error) {
-            set((state) => ({
-              historyByPeerId: { ...state.historyByPeerId, [conversation.id]: { nextCursor: null, hasMore: false, loading: false } },
-              lastError: error instanceof Error ? error.message : '历史消息加载失败',
-            }));
+            set((state) => {
+              if (!state.openPeerIds.includes(conversation.id)) return state;
+              return {
+                historyByPeerId: { ...state.historyByPeerId, [conversation.id]: { nextCursor: null, hasMore: false, loading: false } },
+                lastError: error instanceof Error ? error.message : '历史消息加载失败',
+              };
+            });
           }
         }
         await get().markRead(conversation.id);
       },
 
-      closeConversation: () => set({ activePeerId: null }),
+      closeConversation: (peerId) => {
+        const state = get();
+        const closingPeerId = peerId || state.activePeerId || state.openPeerIds.at(-1);
+        if (!closingPeerId) return;
+
+        const closingIndex = state.openPeerIds.lastIndexOf(closingPeerId);
+        if (closingIndex < 0) return;
+        const openPeerIds = state.openPeerIds.filter((_, index) => index !== closingIndex);
+        const stillOpen = openPeerIds.includes(closingPeerId);
+        const messagesByPeerId = { ...state.messagesByPeerId };
+        const historyByPeerId = { ...state.historyByPeerId };
+        if (!stillOpen) {
+          delete messagesByPeerId[closingPeerId];
+          delete historyByPeerId[closingPeerId];
+        }
+
+        const activePeerId = state.activePeerId === closingPeerId
+          ? (stillOpen ? closingPeerId : openPeerIds.at(-1)) || null
+          : state.activePeerId;
+        set({ activePeerId, openPeerIds, messagesByPeerId, historyByPeerId });
+        if (state.activePeerId === closingPeerId && activePeerId) {
+          void get().markRead(activePeerId);
+        }
+      },
 
       loadOlder: async (peerId) => {
         if (get().connectionState !== 'ready') return;
         const history = get().historyByPeerId[peerId];
         if (!history || history.loading || !history.hasMore) return;
         set((state) => ({ historyByPeerId: { ...state.historyByPeerId, [peerId]: { ...history, loading: true } } }));
-        try { await loadHistory(peerId, history.nextCursor || undefined); } catch (error) { set((state) => ({ historyByPeerId: { ...state.historyByPeerId, [peerId]: { ...history, loading: false } }, lastError: error instanceof Error ? error.message : '历史消息加载失败' })); }
+        try { await loadHistory(peerId, history.nextCursor || undefined); } catch (error) { set((state) => state.openPeerIds.includes(peerId) ? ({ historyByPeerId: { ...state.historyByPeerId, [peerId]: { ...history, loading: false } }, lastError: error instanceof Error ? error.message : '历史消息加载失败' }) : state); }
       },
 
       sendText: async (peerId, text) => {
@@ -328,12 +415,12 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       },
 
       reset: async () => {
-        stopConversationSubscription?.();
         stopMessageSubscription?.();
-        stopConversationSubscription = undefined;
+        stopBlacklistSubscription?.();
         stopMessageSubscription = undefined;
+        stopBlacklistSubscription = undefined;
         await adapter.disconnect();
-        set({ connectionState: 'idle', conversations: [], messagesByPeerId: {}, historyByPeerId: {}, activePeerId: null, lastError: null });
+        set({ connectionState: 'idle', conversations: [], blacklistedUserIds: [], messagesByPeerId: {}, historyByPeerId: {}, openPeerIds: [], activePeerId: null, lastError: null });
       },
     };
   });

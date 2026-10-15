@@ -453,7 +453,6 @@ const styles = StyleSheet.create({
     height: 22,
     padding: 0,
     color: "#333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
   },
   divider: { width: 1, height: 16, backgroundColor: "#ddd" },

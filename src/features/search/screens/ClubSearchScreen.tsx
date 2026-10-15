@@ -3,12 +3,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-    FlatList,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -20,8 +20,8 @@ import { useMessageStore } from "@/features/message/message-store";
 import { getConversationDisplayTitle } from "@/features/message/message-title";
 import type { MessageListItemModel } from "@/features/message/message.types";
 import {
-    isSelfConversationId,
-    normalizeSystemConversationId,
+  isSelfConversationId,
+  normalizeSystemConversationId,
 } from "@/features/message/system-conversations";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
@@ -51,6 +51,7 @@ export default function ClubSearchScreen() {
   const [history, setHistory] = useState<string[]>([]);
   const userId = useAuthStore((state) => state.user?.id);
   const conversations = useMessageStore((state) => state.conversations);
+  const blacklistedUserIds = useMessageStore((state) => state.blacklistedUserIds);
   const clubSearch = useClubSearch(searchType === "club" ? keyword : "");
   const userSearch = useUserSearch(searchType === "user" ? keyword : "");
 
@@ -86,7 +87,7 @@ export default function ClubSearchScreen() {
   const searching = searchType === "message" || keyword.length > 0;
   const messageItems = useMemo<MessageListItemModel[]>(
     () =>
-      filterMessageConversations(conversations, keyword, userId).map(
+      filterMessageConversations(conversations, keyword, userId, blacklistedUserIds).map(
         (conversation) => ({
           ...conversation,
           id: normalizeSystemConversationId(conversation.id),
@@ -99,7 +100,7 @@ export default function ClubSearchScreen() {
           avatar: conversation.avatar || defaultConversationAvatar,
         }),
       ),
-    [conversations, keyword, userId],
+    [blacklistedUserIds, conversations, keyword, userId],
   );
   const search = searchType === "club" ? clubSearch : userSearch;
   const items =
@@ -291,7 +292,6 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
     borderRadius: 8,
     backgroundColor: "#F7F7F7",
-    fontFamily: DOUYIN_SANS,
     color: "#111",
     fontSize: 14,
   },

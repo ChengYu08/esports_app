@@ -9,6 +9,17 @@ export type BlacklistEntry = {
 };
 
 const BLACKLIST_STORAGE_KEY = "esports.mine.blacklist";
+type BlacklistListener = (entries: BlacklistEntry[]) => void;
+const blacklistListeners = new Set<BlacklistListener>();
+
+function notifyBlacklistChanged(entries: BlacklistEntry[]) {
+  blacklistListeners.forEach((listener) => listener(entries));
+}
+
+export function subscribeBlacklist(listener: BlacklistListener) {
+  blacklistListeners.add(listener);
+  return () => blacklistListeners.delete(listener);
+}
 
 function isBlacklistEntry(value: unknown): value is BlacklistEntry {
   if (!value || typeof value !== "object") return false;
@@ -33,12 +44,12 @@ export async function addToBlacklist(entry: BlacklistEntry): Promise<void> {
   const current = await readBlacklist();
   const next = [entry, ...current.filter((item) => item.userId !== entry.userId)];
   await storage.set(BLACKLIST_STORAGE_KEY, JSON.stringify(next));
+  notifyBlacklistChanged(next);
 }
 
 export async function removeFromBlacklist(userId: string): Promise<void> {
   const current = await readBlacklist();
-  await storage.set(
-    BLACKLIST_STORAGE_KEY,
-    JSON.stringify(current.filter((item) => item.userId !== userId)),
-  );
+  const next = current.filter((item) => item.userId !== userId);
+  await storage.set(BLACKLIST_STORAGE_KEY, JSON.stringify(next));
+  notifyBlacklistChanged(next);
 }

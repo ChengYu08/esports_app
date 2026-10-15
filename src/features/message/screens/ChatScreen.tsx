@@ -3,7 +3,7 @@ import { HeadphonesRegular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -85,6 +85,13 @@ export default function ChatScreen() {
   const messages = useMessageStore(
     (state) => state.messagesByPeerId[conversationId] || EMPTY_MESSAGES,
   );
+  const isPeerBlacklisted = useMessageStore((state) =>
+    state.blacklistedUserIds.includes(conversationId),
+  );
+  const visibleMessages = useMemo(
+    () => isPeerBlacklisted ? messages.filter((message) => message.isMine) : messages,
+    [isPeerBlacklisted, messages],
+  );
   const connectionState = useMessageStore((state) => state.connectionState);
   const lastError = useMessageStore((state) => state.lastError);
   const openConversation = useMessageStore((state) => state.openConversation);
@@ -143,7 +150,7 @@ export default function ChatScreen() {
     previousMessageCount.current = 0;
     if (isSelfConversation) {
       router.back();
-      return () => closeConversation();
+      return () => closeConversation(conversationId);
     }
     if (accessToken && conversationId)
       void openConversation({
@@ -155,7 +162,7 @@ export default function ChatScreen() {
             : undefined,
         clubId: clubId || conversation?.clubId,
       });
-    return () => closeConversation();
+    return () => closeConversation(conversationId);
   }, [
     accessToken,
     closeConversation,
@@ -174,21 +181,21 @@ export default function ChatScreen() {
 
     if (!initialHistoryLoaded.current) {
       initialHistoryLoaded.current = true;
-      previousMessageCount.current = messages.length;
+      previousMessageCount.current = visibleMessages.length;
       shouldScrollToEnd.current = true;
       scrollToLatest();
       return;
     }
 
     if (
-      messages.length > previousMessageCount.current &&
+      visibleMessages.length > previousMessageCount.current &&
       isNearBottom.current
     ) {
       shouldScrollToEnd.current = true;
       scrollToLatest();
     }
-    previousMessageCount.current = messages.length;
-  }, [historyState, messages.length]);
+    previousMessageCount.current = visibleMessages.length;
+  }, [historyState, visibleMessages.length]);
 
   const sendMessage = async () => {
     if (isSelfConversation) return;
@@ -326,7 +333,7 @@ export default function ChatScreen() {
       <FlatList
         ref={listRef}
         contentContainerStyle={styles.messageList}
-        data={messages}
+        data={visibleMessages}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <ChatBubble
@@ -821,7 +828,6 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 12,
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     textAlignVertical: "top",

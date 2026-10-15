@@ -47,25 +47,72 @@ export function mergeConversations(items: MessageConversation[], updated: Messag
     .sort((left, right) => Number(Boolean(right.isPinned)) - Number(Boolean(left.isPinned)) || right.updatedAt - left.updatedAt);
 }
 
-function mergeById(items: ManagedMessage[]) {
-  const messages = new Map<string, ManagedMessage>();
-  for (const item of items) {
-    const key = item.id || item.clientId;
-    if (key) messages.set(key, item);
+function messageKey(item: ManagedMessage) {
+  return item.id || item.clientId;
+}
+
+function insertSortedMessage(items: ManagedMessage[], incoming: ManagedMessage) {
+  const key = messageKey(incoming);
+  if (!key) return items;
+
+  const existingIndex = items.findIndex((item) => messageKey(item) === key);
+  if (existingIndex >= 0 && items[existingIndex].sentAt === incoming.sentAt) {
+    const next = items.slice();
+    next[existingIndex] = incoming;
+    return next;
   }
-  return [...messages.values()].sort((left, right) => left.sentAt - right.sentAt);
+
+  const remaining = existingIndex >= 0
+    ? items.filter((_, index) => index !== existingIndex)
+    : items;
+  let low = 0;
+  let high = remaining.length;
+  while (low < high) {
+    const middle = (low + high) >>> 1;
+    if (remaining[middle].sentAt <= incoming.sentAt) low = middle + 1;
+    else high = middle;
+  }
+
+  return [...remaining.slice(0, low), incoming, ...remaining.slice(low)];
 }
 
 export function mergeMessages(items: ManagedMessage[], incoming: ManagedMessage) {
-  return mergeById([...items, incoming]);
+  return insertSortedMessage(items, incoming);
 }
 
 export function prependHistory(items: ManagedMessage[], history: ManagedMessage[]) {
-  return mergeById([...history, ...items]);
+  const existingKeys = new Set(items.map(messageKey).filter((key): key is string => Boolean(key)));
+  const uniqueHistory: ManagedMessage[] = [];
+  for (const item of history) {
+    const key = messageKey(item);
+    if (!key || existingKeys.has(key)) continue;
+    existingKeys.add(key);
+    uniqueHistory.push(item);
+  }
+
+  const merged: ManagedMessage[] = [];
+  let historyIndex = 0;
+  let itemIndex = 0;
+  while (historyIndex < uniqueHistory.length && itemIndex < items.length) {
+    if (uniqueHistory[historyIndex].sentAt <= items[itemIndex].sentAt) {
+      merged.push(uniqueHistory[historyIndex]);
+      historyIndex += 1;
+    } else {
+      merged.push(items[itemIndex]);
+      itemIndex += 1;
+    }
+  }
+  merged.push(...uniqueHistory.slice(historyIndex), ...items.slice(itemIndex));
+  return merged;
 }
 
 export function replacePendingMessage(items: ManagedMessage[], clientId: string, sent: ManagedMessage) {
-  return mergeById(items.map((item) => item.clientId === clientId ? sent : item));
+  if (!items.some((item) => item.clientId === clientId)) return items;
+  const sentKey = messageKey(sent);
+  const remaining = items.filter((item) =>
+    item.clientId !== clientId && messageKey(item) !== sentKey,
+  );
+  return insertSortedMessage(remaining, sent);
 }
 
 export function markMessageFailed(items: ManagedMessage[], clientId: string) {

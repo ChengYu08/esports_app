@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { HomeBackground } from "@/features/home/components/HomeBackground";
@@ -18,7 +18,7 @@ export default function HomeScreen() {
   const [bannerIndex, setBannerIndex] = useState(0);
   const banners = useHomeBanners(topTab);
   const clubs = useHomeClubs(topTab, selectedGame);
-  const bannerItems = banners.data ?? [];
+  const bannerItems = useMemo(() => banners.data ?? [], [banners.data]);
 
   useEffect(() => {
     if (bannerItems.length < 2) return undefined;
@@ -27,8 +27,15 @@ export default function HomeScreen() {
   }, [bannerItems.length]);
 
   const clubItems = useMemo(() => clubs.data?.pages.flatMap((page) => page.items) ?? [], [clubs.data]);
-  const selectTopTab = (tab: HomeTab) => { setBannerIndex(0); setTopTab(tab); };
-  const header = <HomeHeader tab={topTab} game={selectedGame} games={games.data ?? []} bannerIndex={bannerIndex} banners={bannerItems} onTabChange={selectTopTab} onGameChange={setGame} />;
+  const selectTopTab = useCallback((tab: HomeTab) => { setBannerIndex(0); setTopTab(tab); }, []);
+  const renderClub = useCallback(
+    ({ item }: { item: (typeof clubItems)[number] }) => <ClubCard club={item} />,
+    [],
+  );
+  const header = useMemo(
+    () => <HomeHeader tab={topTab} game={selectedGame} games={games.data ?? []} bannerIndex={bannerIndex} banners={bannerItems} onTabChange={selectTopTab} onGameChange={setGame} />,
+    [topTab, selectedGame, games.data, bannerIndex, bannerItems, selectTopTab],
+  );
   const isHomeLoading = games.isLoading || banners.isLoading || (selectedGame.length > 0 && clubs.isLoading);
 
   return (
@@ -42,7 +49,7 @@ export default function HomeScreen() {
         <FlatList
           data={clubItems}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <ClubCard club={item} />}
+          renderItem={renderClub}
           ListHeaderComponent={header}
           contentContainerStyle={{ flexGrow: 1, paddingBottom: 100 + insets.bottom }}
           refreshControl={<RefreshControl refreshing={clubs.isRefetching && !clubs.isFetchingNextPage} onRefresh={() => void clubs.refetch()} tintColor="#ff214b" />}

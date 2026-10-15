@@ -1,12 +1,23 @@
 import type { MessageConversation } from "./message-state";
-import { getSystemConversationTitle, isSelfConversationId, normalizeSystemConversationId } from "./system-conversations";
+import {
+  getSystemConversationTitle,
+  isSelfConversationId,
+  isSystemConversationId,
+  normalizeSystemConversationId,
+} from "./system-conversations";
 
 export function filterMessageConversations(
   conversations: MessageConversation[],
   keyword: string,
   userId?: string | null,
+  blacklistedUserIds: readonly string[] = [],
 ): MessageConversation[] {
-  const visibleConversations = conversations.filter((conversation) => !isSelfConversationId(conversation.id, userId));
+  const blacklisted = new Set(blacklistedUserIds);
+  const visibleConversations = conversations.filter((conversation) =>
+    !isSelfConversationId(conversation.id, userId)
+    && (isSystemConversationId(conversation.id)
+      || !blacklisted.has(normalizeSystemConversationId(conversation.id))),
+  );
   const normalizedKeyword = keyword.trim().toLocaleLowerCase();
   if (!normalizedKeyword) return visibleConversations;
 

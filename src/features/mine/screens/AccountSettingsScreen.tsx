@@ -1,6 +1,6 @@
+import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
-import { CachedImage } from "@/shared/ui/CachedImage";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
@@ -338,63 +338,57 @@ export default function AccountSettingsScreen() {
         contentStyle={styles.modalCard}
       >
         <View>
-            <Text style={styles.modalTitle}>{editTitle(editing)}</Text>
-            {editing === "gender" ? (
-              <View style={styles.genderOptions}>
-                {[
-                  [1, "男"],
-                  [2, "女"],
-                  [0, "保密"],
-                ].map(([value, label]) => (
-                  <Pressable
-                    key={String(value)}
-                    onPress={() => setDraft(String(value))}
-                    style={[
-                      styles.genderOption,
-                      draft === String(value) && styles.genderOptionActive,
-                    ]}
-                  >
-                    <Text style={styles.genderOptionText}>{label}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : (
-              <TextInput
-                autoFocus
-                value={draft}
-                onChangeText={setDraft}
-                maxLength={
-                  editing === "signature"
-                    ? 60
-                    : editing === "nickname"
-                      ? 20
-                      : 10
-                }
-                placeholder={
-                  editing === "birth"
-                    ? "请输入出生日期，如 2000-01-01"
-                    : "请输入"
-                }
-                style={styles.input}
-              />
-            )}
-            <View style={styles.modalActions}>
-              <Pressable
-                onPress={() => setEditing(null)}
-                style={styles.cancelButton}
-              >
-                <Text style={styles.cancelText}>取消</Text>
-              </Pressable>
-              <Pressable
-                disabled={saving}
-                onPress={() => void saveEdit()}
-                style={styles.confirmButton}
-              >
-                <Text style={styles.confirmText}>
-                  {saving ? "保存中" : "保存"}
-                </Text>
-              </Pressable>
+          <Text style={styles.modalTitle}>{editTitle(editing)}</Text>
+          {editing === "gender" ? (
+            <View style={styles.genderOptions}>
+              {[
+                [1, "男"],
+                [2, "女"],
+                [0, "保密"],
+              ].map(([value, label]) => (
+                <Pressable
+                  key={String(value)}
+                  onPress={() => setDraft(String(value))}
+                  style={[
+                    styles.genderOption,
+                    draft === String(value) && styles.genderOptionActive,
+                  ]}
+                >
+                  <Text style={styles.genderOptionText}>{label}</Text>
+                </Pressable>
+              ))}
             </View>
+          ) : (
+            <TextInput
+              autoFocus
+              value={draft}
+              onChangeText={setDraft}
+              maxLength={
+                editing === "signature" ? 60 : editing === "nickname" ? 20 : 10
+              }
+              placeholder={
+                editing === "birth" ? "请输入出生日期，如 2000-01-01" : "请输入"
+              }
+              style={styles.input}
+            />
+          )}
+          <View style={styles.modalActions}>
+            <Pressable
+              onPress={() => setEditing(null)}
+              style={styles.cancelButton}
+            >
+              <Text style={styles.cancelText}>取消</Text>
+            </Pressable>
+            <Pressable
+              disabled={saving}
+              onPress={() => void saveEdit()}
+              style={styles.confirmButton}
+            >
+              <Text style={styles.confirmText}>
+                {saving ? "保存中" : "保存"}
+              </Text>
+            </Pressable>
+          </View>
         </View>
       </BottomSheet>
       <RealNameVerificationSheet
@@ -732,7 +726,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 15,
   },
   genderOptions: { flexDirection: "row", gap: 10 },

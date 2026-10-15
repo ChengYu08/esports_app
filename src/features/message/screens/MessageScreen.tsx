@@ -14,6 +14,7 @@ import { getConversationDisplayTitle } from "../message-title";
 import type { MessageListItemModel } from "../message.types";
 import {
   isSelfConversationId,
+  isSystemConversationId,
   normalizeSystemConversationId,
 } from "../system-conversations";
 
@@ -27,6 +28,7 @@ export default function MessageScreen() {
   const connectionState = useMessageStore((state) => state.connectionState);
   const lastError = useMessageStore((state) => state.lastError);
   const conversations = useMessageStore((state) => state.conversations);
+  const blacklistedUserIds = useMessageStore((state) => state.blacklistedUserIds);
   const clearAllUnread = useMessageStore((state) => state.clearAllUnread);
 
   const handleClear = async () => {
@@ -41,7 +43,11 @@ export default function MessageScreen() {
   const items = useMemo<MessageListItemModel[]>(
     () =>
       conversations
-        .filter((item) => !isSelfConversationId(item.id, userId))
+        .filter((item) =>
+          !isSelfConversationId(item.id, userId)
+          && (isSystemConversationId(item.id)
+            || !blacklistedUserIds.includes(normalizeSystemConversationId(item.id))),
+        )
         .map((item) => {
           const id = normalizeSystemConversationId(item.id);
           const title = getConversationDisplayTitle(id, item.title, item.note);
@@ -59,7 +65,7 @@ export default function MessageScreen() {
             avatar: typeof avatar === "string" ? { uri: avatar } : avatar,
           };
         }),
-    [conversations, userId],
+    [blacklistedUserIds, conversations, userId],
   );
   const handleMessagePress = (item: MessageListItemModel) => {
     if (item.kind !== "conversation" || isSelfConversationId(item.id, userId))
