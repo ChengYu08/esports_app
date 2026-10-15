@@ -5,6 +5,8 @@ import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { formatUnreadCount } from "@/features/message/message-unread";
+import { useMessageStore } from "@/features/message/message-store";
 import {
   getTabPressAction,
   type AppTab,
@@ -53,6 +55,13 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
   const isAuthenticated = useAuthStore((authState) =>
     Boolean(authState.accessToken && authState.user),
   );
+  const unreadCount = useMessageStore((messageState) =>
+    messageState.conversations.reduce(
+      (total, conversation) => total + conversation.unreadCount,
+      0,
+    ),
+  );
+  const unreadLabel = formatUnreadCount(unreadCount);
   const activeRoute = state.routes[state.index]?.name;
 
   const handleTabPress = (tab: AppTab) => {
@@ -78,15 +87,26 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
           <Pressable
             key={item.route}
             accessibilityRole="tab"
-            accessibilityLabel={item.label}
+            accessibilityLabel={
+              item.route === "message" && unreadLabel
+                ? `${item.label}，${unreadLabel}条未读`
+                : item.label
+            }
             accessibilityState={{ selected }}
             style={styles.bottomItem}
             onPress={() => handleTabPress(item.route)}
           >
-            <Image
-              source={selected ? item.selectedIcon : item.icon}
-              style={styles.bottomIcon}
-            />
+            <View style={styles.iconContainer}>
+              <Image
+                source={selected ? item.selectedIcon : item.icon}
+                style={styles.bottomIcon}
+              />
+              {item.route === "message" && unreadLabel ? (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{unreadLabel}</Text>
+                </View>
+              ) : null}
+            </View>
             <Text style={[styles.bottomLabel, selected && styles.bottomActive]}>
               {item.label}
             </Text>
@@ -121,7 +141,29 @@ const styles = StyleSheet.create({
     paddingTop: 1,
     gap: 1,
   },
+  iconContainer: { width: 30, height: 30, position: "relative" },
   bottomIcon: { width: 30, height: 30 },
+  badge: {
+    position: "absolute",
+    top: -3,
+    right: -7,
+    minWidth: 17,
+    height: 17,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FE1F4C",
+  },
+  badgeText: {
+    color: "#FFFFFF",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: "600",
+  },
   bottomLabel: { fontFamily: DOUYIN_SANS, color: "#c8c8cc", fontSize: 11 },
   bottomActive: { fontFamily: DOUYIN_SANS, color: "#333" },
 });

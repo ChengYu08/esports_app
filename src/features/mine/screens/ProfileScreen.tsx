@@ -45,6 +45,14 @@ import type {
 } from "@/features/mine/api/profile.types";
 import { addToBlacklist } from "@/features/mine/blacklist";
 import {
+  ProfileGameSkeleton,
+  ProfileSkeleton,
+} from "@/features/mine/components/ProfileSkeleton";
+import {
+  useToggleUserFollow,
+  useUserFollowState,
+} from "@/features/mine/hooks/use-user-follow";
+import {
   useProfileDetail,
   useProfileGameDetail,
   useProfileReviews,
@@ -56,8 +64,8 @@ import {
 } from "@/features/mine/order-real-name";
 import { createProfileAvatarPreviewParams } from "@/features/mine/profile-avatar-preview";
 import { createProfileChatParams } from "@/features/mine/profile-chat";
-import { cancelOrder } from "@/features/order/order.api";
 import { invalidateOrderQueries } from "@/features/order/order-query";
+import { cancelOrder } from "@/features/order/order.api";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { requireLogin } from "@/shared/navigation/require-login";
@@ -65,10 +73,6 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
-import {
-  ProfileGameSkeleton,
-  ProfileSkeleton,
-} from "@/features/mine/components/ProfileSkeleton";
 import Toast from "react-native-root-toast";
 // mine-avatar
 const fallbackAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
@@ -110,6 +114,10 @@ export default function ProfileScreen() {
   const paymentCancelingRef = useRef(false);
   const detailQuery = useProfileDetail(routeParams);
   const detail = detailQuery.data;
+  const followStateQuery = useUserFollowState(
+    !isMine && detail ? String(detail.userId) : undefined,
+  );
+  const followMutation = useToggleUserFollow();
   const firstGameId = getFirstProfileGameId(detail?.games ?? []);
   const activeGameId = detail?.games.some(
     (game) => String(game.gameId) === selectedGameId,
@@ -139,6 +147,42 @@ export default function ProfileScreen() {
   const coverPreviewParams = coverImageUrl
     ? createImagePreviewParams([coverImageUrl], 0)
     : null;
+  const openProfileRelation = (type: "following" | "fans") => {
+    if (profile.userId <= 0) return;
+    router.push({
+      pathname: "/profile-relations",
+      params: {
+        userId: String(profile.userId),
+        type,
+        ...(profile.clubId > 0
+          ? { clubId: String(profile.clubId) }
+          : routeParams?.clubId
+            ? { clubId: routeParams.clubId }
+            : {}),
+      },
+    });
+  };
+  const handleFollowPress = async () => {
+    if (!requireLogin() || !detail || followMutation.isPending) return;
+    const session = useAuthStore.getState();
+    if (!session.accessToken || !session.user) return;
+
+    try {
+      const state = await followMutation.mutateAsync({
+        followUserId: String(detail.userId),
+        currentlyFollowed: followStateQuery.data?.followed ?? false,
+        token: session.accessToken,
+        viewerUserId: session.user.id,
+      });
+      Toast.show(state.followed ? "关注成功" : "已取消关注", {
+        duration: Toast.durations.SHORT,
+      });
+    } catch (error) {
+      Toast.show(error instanceof Error ? error.message : "操作失败", {
+        duration: Toast.durations.SHORT,
+      });
+    }
+  };
 
   if (routeParams && detailQuery.isLoading) {
     return (
@@ -184,7 +228,11 @@ export default function ProfileScreen() {
           </Pressable>
         ) : (
           <View style={StyleSheet.absoluteFill} pointerEvents="none">
-            <Image source={background} contentFit="cover" style={StyleSheet.absoluteFill} />
+            <Image
+              source={background}
+              contentFit="cover"
+              style={StyleSheet.absoluteFill}
+            />
             <View style={styles.coverShade} />
           </View>
         )}
@@ -225,8 +273,16 @@ export default function ProfileScreen() {
       >
         <View style={styles.scrollIntro}>
           <View style={styles.stats}>
-            <Stat value={profile.followCount} label="关注" />
-            <Stat value={profile.fansCount} label="粉丝" />
+            <Stat
+              value={profile.followCount}
+              label="关注"
+              onPress={() => openProfileRelation("following")}
+            />
+            <Stat
+              value={profile.fansCount}
+              label="粉丝"
+              onPress={() => openProfileRelation("fans")}
+            />
           </View>
           <Text style={styles.signature}>
             {profile.signature || "暂无个人简介"}
@@ -302,9 +358,21 @@ export default function ProfileScreen() {
             { paddingBottom: Math.max(insets.bottom, 12) },
           ]}
         >
-          {/* <Pressable style={styles.followButton} onPress={() => undefined}>
-            <Text style={styles.followText}>关注</Text>
-          </Pressable> */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={followStateQuery.data?.followed ? "已关注" : "关注"}
+            accessibilityState={{
+              disabled: followStateQuery.isLoading || followMutation.isPending,
+              busy: followMutation.isPending,
+            }}
+            disabled={followStateQuery.isLoading || followMutation.isPending}
+            style={styles.followButton}
+            onPress={() => void handleFollowPress()}
+          >
+            <Text style={styles.followText}>
+              {followStateQuery.data?.followed ? "已关注" : "关注"}
+            </Text>
+          </Pressable>
           <Pressable
             style={styles.chatButton}
             onPress={() => {
@@ -658,12 +726,25 @@ function ProfileIdentity({ profile }: { profile: ProfileDetail }) {
   );
 }
 
-function Stat({ value, label }: { value: number; label: string }) {
+function Stat({
+  value,
+  label,
+  onPress,
+}: {
+  value: number;
+  label: string;
+  onPress: () => void;
+}) {
   return (
-    <View style={styles.stat}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${label}列表，${value}人`}
+      onPress={onPress}
+      style={styles.stat}
+    >
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
-    </View>
+    </Pressable>
   );
 }
 

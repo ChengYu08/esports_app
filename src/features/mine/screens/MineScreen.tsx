@@ -28,6 +28,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { clearAuthSession } from "@/features/auth/session-persistence";
 import { messageStore } from "@/features/message/message-store";
+import { useUserFollowCount } from "@/features/mine/hooks/use-user-follow";
+import { requireLogin } from "@/shared/navigation/require-login";
 
 const avatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const female = require("../../../../assets/mine/figma/mine-female.svg");
@@ -52,6 +54,7 @@ export default function MineScreen() {
   const user = useAuthStore((state) => state.user);
   const accessToken = useAuthStore((state) => state.accessToken);
   const clearSession = useAuthStore((state) => state.clearSession);
+  const followCountQuery = useUserFollowCount(user?.id);
   const [logoutVisible, setLogoutVisible] = useState(false);
   const [qrCodeModal, setQrCodeModal] = useState<QrCodeModalType | null>(null);
   const displayName = useMemo(
@@ -87,6 +90,17 @@ export default function MineScreen() {
 
   const logout = () => {
     setLogoutVisible(true);
+  };
+  const openRelations = (type: "following" | "fans") => {
+    if (!requireLogin() || !user?.id) return;
+    router.push({
+      pathname: "/profile-relations",
+      params: {
+        userId: String(user.id),
+        type,
+        ...(user.clubInfo?.id ? { clubId: String(user.clubInfo.id) } : {}),
+      },
+    });
   };
   const menuItems = [
     {
@@ -204,14 +218,28 @@ export default function MineScreen() {
             <Text style={styles.statValue}>{user?.starBalance ?? "--"}</Text>
             <Text style={styles.statLabel}>星钻</Text>
           </View>
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>0</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="关注列表"
+            onPress={() => openRelations("following")}
+            style={styles.stat}
+          >
+            <Text style={styles.statValue}>
+              {followCountQuery.data?.followCount ?? "--"}
+            </Text>
             <Text style={styles.statLabel}>关注</Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>0</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="粉丝列表"
+            onPress={() => openRelations("fans")}
+            style={styles.stat}
+          >
+            <Text style={styles.statValue}>
+              {followCountQuery.data?.fansCount ?? "--"}
+            </Text>
             <Text style={styles.statLabel}>粉丝</Text>
-          </View>
+          </Pressable>
         </View>
         <View style={styles.sectionCard}>
           {menuItems.map((item) => (
