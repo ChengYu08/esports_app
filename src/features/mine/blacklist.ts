@@ -40,6 +40,12 @@ export async function readBlacklist(): Promise<BlacklistEntry[]> {
   }
 }
 
+export async function isUserBlacklisted(userId: string | number): Promise<boolean> {
+  const normalizedUserId = String(userId);
+  const entries = await readBlacklist();
+  return entries.some((entry) => entry.userId === normalizedUserId);
+}
+
 export async function addToBlacklist(entry: BlacklistEntry): Promise<void> {
   const current = await readBlacklist();
   const next = [entry, ...current.filter((item) => item.userId !== entry.userId)];

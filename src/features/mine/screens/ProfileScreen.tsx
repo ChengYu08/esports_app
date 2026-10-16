@@ -8,10 +8,11 @@ import {
 } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactElement, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Easing,
+  FlatList,
   Modal,
   Pressable,
   ScrollView,
@@ -43,7 +44,7 @@ import type {
   ProfileReview,
   ProfileSkillCard,
 } from "@/features/mine/api/profile.types";
-import { addToBlacklist } from "@/features/mine/blacklist";
+import { addToBlacklist, isUserBlacklisted } from "@/features/mine/blacklist";
 import {
   ProfileGameSkeleton,
   ProfileSkeleton,
@@ -86,6 +87,7 @@ const idleStatusIcon = require("../../../../assets/home/club-detail/status-idle.
 const playingStatusIcon = require("../../../../assets/home/club-detail/status-playing.svg");
 const paymentCloseIcon = require("../../../../assets/mine/payment-close.svg");
 type ProfileTab = "技能" | "评价";
+type ProfileListItem = { key: string; content: ReactElement };
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -144,9 +146,15 @@ export default function ProfileScreen() {
   const gameDetail = gameDetailQuery.data;
   const games = detail?.games ?? [];
   const coverImageUrl = gameDetail?.backgroundUrl?.trim();
+  const voicePlayer = useVoicePlayer();
+  const stopVoice = voicePlayer.stop;
   const coverPreviewParams = coverImageUrl
     ? createImagePreviewParams([coverImageUrl], 0)
     : null;
+
+  useEffect(() => {
+    if (tab !== "技能") stopVoice();
+  }, [tab, stopVoice]);
   const openProfileRelation = (type: "following" | "fans") => {
     if (profile.userId <= 0) return;
     router.push({
@@ -203,6 +211,206 @@ export default function ProfileScreen() {
       />
     );
   }
+
+  const profileIntro = (
+    <View style={styles.scrollIntro}>
+      <View style={styles.stats}>
+        <Stat
+          value={profile.followCount}
+          label="关注"
+          onPress={() => openProfileRelation("following")}
+        />
+        <Stat
+          value={profile.fansCount}
+          label="粉丝"
+          onPress={() => openProfileRelation("fans")}
+        />
+      </View>
+      <Text style={styles.signature}>
+        {profile.signature || "暂无个人简介"}
+      </Text>
+    </View>
+  );
+
+  const profileTabs = (
+    <View style={styles.stickyTabs}>
+      <View style={styles.tabs}>
+        {(["技能", "评价"] as ProfileTab[]).map((item) => (
+          <Pressable
+            key={item}
+            onPress={() => setTab(item)}
+            style={styles.tabButton}
+          >
+            <Text
+              style={[styles.tabText, tab === item && styles.tabTextActive]}
+            >
+              {item}
+            </Text>
+            {tab === item ? <View style={styles.tabIndicator} /> : null}
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+
+  const profileListItems: ProfileListItem[] = [
+    { key: "profile-tabs", content: profileTabs },
+  ];
+
+  if (games.length > 0) {
+    profileListItems.push({
+      key: "game-selector",
+      content: (
+        <View style={styles.scrollBody}>
+          <GameSelector
+            games={games}
+            selectedGameId={activeGameId}
+            onSelect={setSelectedGameId}
+          />
+        </View>
+      ),
+    });
+
+    if (tab === "技能") {
+      if (gameDetailQuery.isLoading) {
+        profileListItems.push({
+          key: "skills-loading",
+          content: (
+            <View style={styles.scrollBody}>
+              <ProfileGameSkeleton />
+            </View>
+          ),
+        });
+      } else if (gameDetailQuery.isError || !gameDetail) {
+        profileListItems.push({
+          key: "skills-error",
+          content: (
+            <View style={styles.scrollBody}>
+              <InlineState
+                text="游戏技能加载失败"
+                actionLabel="重试"
+                onAction={() => void gameDetailQuery.refetch()}
+              />
+            </View>
+          ),
+        });
+      } else {
+        profileListItems.push(
+          {
+            key: "skills-summary",
+            content: (
+              <View style={styles.scrollBody}>
+                <SkillsSummary detail={gameDetail} voicePlayer={voicePlayer} />
+              </View>
+            ),
+          },
+          {
+            key: "services-title",
+            content: (
+              <View style={styles.scrollBody}>
+                <Text style={[styles.sectionTitle, styles.serviceTitle]}>
+                  陪玩服务
+                </Text>
+              </View>
+            ),
+          },
+        );
+
+        if (gameDetail.skillCards.length > 0) {
+          profileListItems.push(
+            ...gameDetail.skillCards.map((card) => ({
+              key: `service-${card.companionServiceId}-${card.gameLevelId}`,
+              content: (
+                <View style={styles.scrollBody}>
+                  <ServiceCard
+                    card={card}
+                    onOrder={() => void openOrder(card)}
+                  />
+                </View>
+              ),
+            })),
+          );
+        } else {
+          profileListItems.push({
+            key: "services-empty",
+            content: (
+              <View style={styles.scrollBody}>
+                <EmptyState message="暂无大神服务" />
+              </View>
+            ),
+          });
+        }
+      }
+    } else if (reviewQuery.isLoading) {
+      profileListItems.push({
+        key: "reviews-loading",
+        content: (
+          <View style={styles.scrollBody}>
+            <ProfileGameSkeleton reviews />
+          </View>
+        ),
+      });
+    } else if (reviewQuery.isError) {
+      profileListItems.push({
+        key: "reviews-error",
+        content: (
+          <View style={styles.scrollBody}>
+            <InlineState
+              text="评价加载失败"
+              actionLabel="重试"
+              onAction={() => void reviewQuery.refetch()}
+            />
+          </View>
+        ),
+      });
+    } else {
+      const reviews = reviewQuery.data?.items ?? [];
+      if (reviews.length === 0) {
+        profileListItems.push({
+          key: "reviews-empty",
+          content: (
+            <View style={styles.scrollBody}>
+              <EmptyState message="暂无评价" hint="完成订单后会显示评价内容" />
+            </View>
+          ),
+        });
+      } else {
+        profileListItems.push(
+          ...reviews.map((review, index) => ({
+            key: `review-${review.id}-${index}`,
+            content: (
+              <View
+                style={index === 0 ? styles.reviewList : styles.reviewListItem}
+              >
+                <ReviewCard review={review} />
+              </View>
+            ),
+          })),
+        );
+      }
+    }
+  } else {
+    profileListItems.push({
+      key: "games-empty",
+      content: (
+        <View style={styles.scrollBody}>
+          <EmptyState message="暂无支持的游戏" />
+        </View>
+      ),
+    });
+  }
+
+  const editProfileButton = isMine ? (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="编辑个人资料"
+      onPress={() => router.push("/edit-profile")}
+      style={styles.editProfileButton}
+    >
+      <Edit24Regular color="#0A0A0A" height={20} width={20} />
+      <Text style={styles.editProfileText}>编辑个人资料</Text>
+    </Pressable>
+  ) : null;
 
   return (
     <View style={styles.screen}>
@@ -262,94 +470,24 @@ export default function ProfileScreen() {
         <ProfileIdentity profile={profile} />
       </View>
 
-      <ScrollView
+      <FlatList
         style={styles.scrollView}
+        data={profileListItems}
+        keyExtractor={(item) => item.key}
+        renderItem={({ item }) => item.content}
+        ListHeaderComponent={profileIntro}
+        ListFooterComponent={editProfileButton}
+        ListFooterComponentStyle={isMine ? styles.profileListFooter : undefined}
         stickyHeaderIndices={[1]}
+        initialNumToRender={6}
+        maxToRenderPerBatch={5}
+        windowSize={5}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           flexGrow: 1,
           paddingBottom: isMine ? 24 + insets.bottom : 88 + insets.bottom,
         }}
-      >
-        <View style={styles.scrollIntro}>
-          <View style={styles.stats}>
-            <Stat
-              value={profile.followCount}
-              label="关注"
-              onPress={() => openProfileRelation("following")}
-            />
-            <Stat
-              value={profile.fansCount}
-              label="粉丝"
-              onPress={() => openProfileRelation("fans")}
-            />
-          </View>
-          <Text style={styles.signature}>
-            {profile.signature || "暂无个人简介"}
-          </Text>
-        </View>
-
-        <View style={styles.stickyTabs}>
-          <View style={styles.tabs}>
-            {(["技能", "评价"] as ProfileTab[]).map((item) => (
-              <Pressable
-                key={item}
-                onPress={() => setTab(item)}
-                style={styles.tabButton}
-              >
-                <Text
-                  style={[styles.tabText, tab === item && styles.tabTextActive]}
-                >
-                  {item}
-                </Text>
-                {tab === item ? <View style={styles.tabIndicator} /> : null}
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.scrollBody}>
-          {games.length > 0 ? (
-            <GameSelector
-              games={games}
-              selectedGameId={activeGameId}
-              onSelect={setSelectedGameId}
-            />
-          ) : (
-            <EmptyState message="暂无支持的游戏" />
-          )}
-
-          {games.length > 0 ? (
-            tab === "技能" ? (
-              <SkillsContent
-                query={gameDetailQuery}
-                detail={gameDetail}
-                onOrder={(card) => {
-                  if (!requireLogin()) return;
-                  setOrderCard(card);
-                }}
-              />
-            ) : (
-              <ReviewsContent
-                query={reviewQuery}
-                reviews={reviewQuery.data?.items ?? []}
-              />
-            )
-          ) : null}
-        </View>
-
-        {isMine ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="编辑个人资料"
-            onPress={() => router.push("/edit-profile")}
-            style={styles.editProfileButton}
-          >
-            <Edit24Regular color="#0A0A0A" height={20} width={20} />
-            <Text style={styles.editProfileText}>编辑个人资料</Text>
-          </Pressable>
-        ) : null}
-      </ScrollView>
+      />
 
       {!isMine ? (
         <View
@@ -523,6 +661,23 @@ export default function ProfileScreen() {
       );
     } finally {
       paymentCancelingRef.current = false;
+    }
+  }
+
+  async function openOrder(card: ProfileSkillCard) {
+    if (!requireLogin()) return;
+    try {
+      if (await isUserBlacklisted(profile.userId)) {
+        Toast.show("该用户已在黑名单中，无法下单", {
+          duration: Toast.durations.SHORT,
+        });
+        return;
+      }
+      setOrderCard(card);
+    } catch {
+      Toast.show("黑名单状态读取失败，请稍后重试", {
+        duration: Toast.durations.SHORT,
+      });
     }
   }
 }
@@ -789,27 +944,13 @@ function GameSelector({
   );
 }
 
-function SkillsContent({
-  query,
+function SkillsSummary({
   detail,
-  onOrder,
+  voicePlayer,
 }: {
-  query: { isLoading: boolean; isError: boolean; refetch: () => unknown };
-  detail?: ProfileGameDetail;
-  onOrder: (card: ProfileSkillCard) => void;
+  detail: ProfileGameDetail;
+  voicePlayer: ReturnType<typeof useVoicePlayer>;
 }) {
-  const voicePlayer = useVoicePlayer();
-  if (query.isLoading) return <ProfileGameSkeleton />;
-  if (query.isError || !detail) {
-    return (
-      <InlineState
-        text="游戏技能加载失败"
-        actionLabel="重试"
-        onAction={() => void query.refetch()}
-      />
-    );
-  }
-
   return (
     <>
       <View style={styles.sectionHeader}>
@@ -828,53 +969,7 @@ function SkillsContent({
         {detail.skillIntro || "暂无能力介绍"}
       </Text>
       <ImageGallery images={detail.images.map((image) => image.imageUrl)} />
-      <Text style={[styles.sectionTitle, styles.serviceTitle]}>陪玩服务</Text>
-      {detail.skillCards.length > 0 ? (
-        detail.skillCards.map((card) => (
-          <ServiceCard
-            key={`${card.companionServiceId}-${card.gameLevelId}`}
-            card={card}
-            onOrder={() => onOrder(card)}
-          />
-        ))
-      ) : (
-        <EmptyState message="暂无大神服务" />
-      )}
     </>
-  );
-}
-
-function ReviewsContent({
-  query,
-  reviews,
-}: {
-  query: {
-    isLoading: boolean;
-    isError: boolean;
-    data?: { items: ProfileReview[] };
-    refetch: () => unknown;
-  };
-  reviews: ProfileReview[];
-}) {
-  if (query.isLoading) return <ProfileGameSkeleton reviews />;
-  if (query.isError) {
-    return (
-      <InlineState
-        text="评价加载失败"
-        actionLabel="重试"
-        onAction={() => void query.refetch()}
-      />
-    );
-  }
-  if (reviews.length === 0) {
-    return <EmptyState message="暂无评价" hint="完成订单后会显示评价内容" />;
-  }
-  return (
-    <View style={styles.reviewList}>
-      {reviews.map((review) => (
-        <ReviewCard key={review.id} review={review} />
-      ))}
-    </View>
   );
 }
 
@@ -1635,6 +1730,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 8,
   },
+  profileListFooter: { flexGrow: 1 },
   editProfileText: {
     color: "#0A0A0A",
     fontFamily: DOUYIN_SANS,
@@ -1991,6 +2087,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   reviewList: { marginHorizontal: -16, marginTop: 8 },
+  reviewListItem: { marginHorizontal: -16 },
   reviewCard: {
     flexDirection: "row",
     gap: 8,

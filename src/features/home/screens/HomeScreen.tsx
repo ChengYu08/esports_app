@@ -36,7 +36,7 @@ export default function HomeScreen() {
     () => <HomeHeader tab={topTab} game={selectedGame} games={games.data ?? []} bannerIndex={bannerIndex} banners={bannerItems} onTabChange={selectTopTab} onGameChange={setGame} />,
     [topTab, selectedGame, games.data, bannerIndex, bannerItems, selectTopTab],
   );
-  const isHomeLoading = games.isLoading || banners.isLoading || (selectedGame.length > 0 && clubs.isLoading);
+  const isHomeLoading = games.isLoading || banners.isLoading;
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>

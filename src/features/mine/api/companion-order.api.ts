@@ -1,4 +1,5 @@
 import { apiClient } from "@/core/network/api-client";
+import { isUserBlacklisted } from "@/features/mine/blacklist";
 import { buildCreateOrderAction } from "./companion-order.payload";
 import type { CompanionOrderContext, CompanionServiceOption } from "./companion-order.types";
 
@@ -62,6 +63,10 @@ export async function createCompanionOrder(
   action: ReturnType<typeof buildCreateOrderAction>,
   token: string,
 ): Promise<CreatedOrder> {
+  if (await isUserBlacklisted(action.serviceUserId)) {
+    throw new Error("该用户已在黑名单中，无法下单");
+  }
+
   const response = await apiClient<ApiEnvelope<CreatedOrder>>("/client/v1/order/create", {
     method: "POST",
     token,
