@@ -1,8 +1,22 @@
-import { isSystemConversationId } from "./system-conversations";
+import {
+  isOrderAssistantConversationId,
+  isSystemConversationId,
+} from "./system-conversations";
 
-const ORDER_ASSISTANT_TITLE = "订单助手";
+export const ORDER_ASSISTANT_AVATAR = require("../../../assets/message/order-assistant.svg");
 
-export function resolveConversationAvatar(title: string, avatar: string | undefined, defaultAvatar: number, conversationId?: string) {
+export function resolveConversationAvatar(
+  avatar: string | undefined,
+  defaultAvatar: number,
+  conversationId?: string,
+) {
+  if (isOrderAssistantConversationId(conversationId)) return ORDER_ASSISTANT_AVATAR;
   if (conversationId && isSystemConversationId(conversationId)) return defaultAvatar;
-  return title.trim() === ORDER_ASSISTANT_TITLE ? defaultAvatar : avatar || defaultAvatar;
+  return avatar || defaultAvatar;
+}
+
+export function getConversationAvatarUri(source: unknown): string | undefined {
+  if (typeof source === "string") return source;
+  if (!source || typeof source !== "object" || !("uri" in source)) return undefined;
+  return typeof source.uri === "string" ? source.uri : undefined;
 }

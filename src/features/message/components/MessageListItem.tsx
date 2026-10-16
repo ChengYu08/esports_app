@@ -19,6 +19,8 @@ export const MessageListItem = memo(function MessageListItem({
   isLast,
   onPress,
 }: MessageListItemProps) {
+  const unreadCount = formatUnreadCount(item.unreadCount || 0);
+
   return (
     <Pressable
       accessibilityLabel={`${item.title}${item.isOnline ? "，在线" : ""}，${item.preview}`}
@@ -42,7 +44,11 @@ export const MessageListItem = memo(function MessageListItem({
         </Text>
       </View>
       {!isLast && <View style={styles.divider} />}
-      {formatUnreadCount(item.unreadCount || 0) ? <View style={styles.badge}><Text style={styles.badgeText}>{formatUnreadCount(item.unreadCount || 0)}</Text></View> : null}
+      {unreadCount ? (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{unreadCount}</Text>
+        </View>
+      ) : null}
     </Pressable>
   );
 });
@@ -61,14 +67,14 @@ const styles = StyleSheet.create({
   avatar: { width: 40, height: 40, borderRadius: 20 },
   onlineDot: {
     position: "absolute",
-    right: -1,
-    bottom: -1,
-    width: 12,
-    height: 12,
+    right: 0,
+    bottom: 0,
+    width: 11,
+    height: 11,
     borderRadius: 6,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: "#FFFFFF",
-    backgroundColor: "#20C46B",
+    backgroundColor: "#2FC273",
   },
   content: { flex: 1, gap: 4 },
   heading: { flexDirection: "row", alignItems: "center", gap: 16 },
@@ -101,6 +107,24 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     backgroundColor: "#EBEBEB",
   },
-  badge: { position: "absolute", right: 16, bottom: 14, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 5, alignItems: "center", justifyContent: "center", backgroundColor: "#FE1F4C" },
-  badgeText: { color: "#FFFFFF", fontFamily: DOUYIN_SANS, fontSize: 10, lineHeight: 14, fontWeight: "600" },
+  badge: {
+    position: "absolute",
+    left: 44,
+    top: 14,
+    minWidth: 18,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#FFFFFF",
+    borderRadius: 999,
+    backgroundColor: "#FF4754",
+  },
+  badgeText: {
+    color: "#FFFFFF",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 11,
+    lineHeight: 16,
+  },
 });

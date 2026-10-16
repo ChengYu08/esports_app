@@ -1,6 +1,7 @@
 import { useStore } from 'zustand';
 import { createStore, type StoreApi } from 'zustand/vanilla';
 
+import { logger } from '@/core/logging/logger';
 import {
   disconnectRongCloud,
   getRongConversations,
@@ -8,11 +9,13 @@ import {
   initializeRongCloud,
   isRongCloudAvailable,
   markRongConversationRead,
+  subscribeRongConnectionStatus,
   sendRongImage,
   sendRongText,
   sendRongAfterSaleCard,
   subscribeRongMessageEvents,
   subscribeRongMessages,
+  type RongCloudConnectionSignal,
 } from './rongcloud-im';
 import {
   markMessageFailed,
@@ -48,6 +51,7 @@ export type MessageAdapter = {
   sendImage: (peerId: string, path: string) => Promise<ManagedMessage>;
   sendAfterSaleCard?: (peerId: string, payload: AfterSaleCardPayload) => Promise<ManagedMessage>;
   markRead: (peerId: string) => Promise<boolean>;
+  subscribeConnectionStatus?: (listener: (signal: RongCloudConnectionSignal) => void) => () => void;
   subscribeConversations: (listener: (conversation: MessageConversation) => void) => () => void;
   subscribeMessages: (listener: (peerId: string, message: ManagedMessage, conversation: MessageConversation) => void) => () => void;
   disconnect: () => Promise<void>;
@@ -127,6 +131,7 @@ function createAdapter(): MessageAdapter {
     sendImage: sendRongImage,
     sendAfterSaleCard: sendRongAfterSaleCard,
     markRead: markRongConversationRead,
+    subscribeConnectionStatus: subscribeRongConnectionStatus,
     subscribeConversations: subscribeRongMessages,
     subscribeMessages: subscribeRongMessageEvents,
     disconnect: disconnectRongCloud,
@@ -136,8 +141,15 @@ function createAdapter(): MessageAdapter {
 export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageStoreState> {
   let stopMessageSubscription: (() => void) | undefined;
   let stopBlacklistSubscription: (() => void) | undefined;
+  let stopConnectionStatusSubscription: (() => void) | undefined;
   let blacklistRevision = 0;
   let onlineStatusRequestId = 0;
+  let onlineStatusToken: string | null = null;
+  let hasInitialized = false;
+  let initializeInProgress = false;
+  let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  let reconnectAttempts = 0;
+  let lifecycleRevision = 0;
 
   const store = createStore<MessageStoreState>((set, get) => {
     const applyBlacklist = (entries: BlacklistEntry[]) => {
@@ -170,6 +182,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         return;
       }
       const normalizedConversation = { ...conversation, id: normalizedPeerId, title: getSystemConversationTitle(normalizedPeerId, conversation.title) };
+      const isNewConversation = !get().conversations.some((item) => item.id === normalizedPeerId);
       const isActive = get().activePeerId === normalizedPeerId;
       set((state) => {
         const existing = state.conversations.find((item) => item.id === normalizedPeerId);
@@ -187,6 +200,9 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           conversations: mergeConversations(state.conversations, nextConversation),
         };
       });
+      if (isNewConversation && onlineStatusToken) {
+        void get().refreshOnlineStatuses(onlineStatusToken);
+      }
       if (isActive) void adapter.markRead(normalizedPeerId).catch((error) => set({ lastError: error instanceof Error ? error.message : '清除未读失败' }));
     };
 
@@ -213,6 +229,78 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       });
     };
 
+    const syncConversations = async (expectedLifecycleRevision = lifecycleRevision) => {
+      const conversations = await adapter.getConversations();
+      if (expectedLifecycleRevision !== lifecycleRevision) return;
+      const blockedUserIds = new Set(get().blacklistedUserIds);
+      const blockedConversationIds = conversations
+        .filter((conversation) =>
+          !isSystemConversationId(conversation.id)
+          && blockedUserIds.has(conversation.id),
+        )
+        .map((conversation) => conversation.id);
+      set((state) => ({
+        conversations: conversations
+          .map((conversation) =>
+            !isSystemConversationId(conversation.id) && blockedUserIds.has(conversation.id)
+              ? { ...conversation, unreadCount: 0 }
+              : conversation,
+          )
+          .reduce(mergeConversations, state.conversations),
+      }));
+      if (onlineStatusToken) void get().refreshOnlineStatuses(onlineStatusToken);
+      await Promise.allSettled(blockedConversationIds.map((peerId) => adapter.markRead(peerId)));
+    };
+
+    const scheduleReconnect = () => {
+      if (reconnectTimer || !onlineStatusToken) return;
+      const delayMs = Math.min(1_000 * 2 ** Math.min(reconnectAttempts, 5), 30_000);
+      reconnectAttempts += 1;
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = undefined;
+        const token = onlineStatusToken;
+        if (token) void get().initialize(token);
+      }, delayMs);
+    };
+
+    const watchConnectionStatus = () => {
+      if (stopConnectionStatusSubscription) return;
+      const stopListening = adapter.subscribeConnectionStatus?.((signal) => {
+        if (signal === 'connected') {
+          if (reconnectTimer) clearTimeout(reconnectTimer);
+          reconnectTimer = undefined;
+          reconnectAttempts = 0;
+          if (!hasInitialized || initializeInProgress) return;
+          set({ connectionState: 'ready', lastError: null });
+          void syncConversations(lifecycleRevision).catch((error) => {
+            logger.warn('RongCloud conversation sync after reconnect failed', {
+              stage: 'reconnect-sync',
+              errorName: error instanceof Error ? error.name : typeof error,
+            });
+          });
+          return;
+        }
+        if (signal === 'connecting') {
+          if (hasInitialized || get().connectionState === 'ready') {
+            set({ connectionState: 'connecting', lastError: null });
+          }
+          return;
+        }
+        if (signal === 'timeout') {
+          if (get().connectionState === 'idle' || get().connectionState === 'unavailable') return;
+          set({ connectionState: 'error', lastError: '即时消息连接超时，正在自动重连' });
+          scheduleReconnect();
+          return;
+        }
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        reconnectTimer = undefined;
+        if (get().connectionState !== 'idle' && get().connectionState !== 'unavailable') {
+          set({ connectionState: 'error', lastError: '即时消息连接失败，请检查登录状态后重试' });
+        }
+      });
+      if (stopListening) stopConnectionStatusSubscription = stopListening;
+    };
+
     return {
       connectionState: 'idle',
       conversations: [],
@@ -232,10 +320,11 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
             .map((conversation) => normalizeSystemConversationId(conversation.id))
             .filter(Boolean),
         ));
-        if (userIds.length === 0) return;
 
         try {
-          const statuses = await clientAuthApi.getUserOnlineStatus(token, userIds);
+          const statuses: Record<string, number> = userIds.length > 0
+            ? await clientAuthApi.getUserOnlineStatus(token, userIds)
+            : {};
           if (requestId !== onlineStatusRequestId) return;
           const requestedIds = new Set(userIds);
           set((state) => ({
@@ -253,6 +342,8 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       },
 
       initialize: async (token) => {
+        const initializationRevision = lifecycleRevision;
+        onlineStatusToken = token || null;
         if (!stopBlacklistSubscription) {
           stopBlacklistSubscription = subscribeBlacklist((entries) => {
             blacklistRevision += 1;
@@ -261,6 +352,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         }
         const revision = blacklistRevision;
         const entries = await readBlacklist();
+        if (initializationRevision !== lifecycleRevision) return;
         if (revision === blacklistRevision) applyBlacklist(entries);
         if (!token) return;
         if (get().connectionState === 'connecting' || get().connectionState === 'ready') return;
@@ -268,41 +360,40 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           set({ connectionState: 'unavailable', lastError: unavailableMessage });
           return;
         }
+        watchConnectionStatus();
         set({ connectionState: 'connecting', lastError: null });
+        initializeInProgress = true;
         try {
           const ready = await adapter.initialize(token);
+          if (initializationRevision !== lifecycleRevision) return;
           if (!ready) {
+            initializeInProgress = false;
+            logger.warn('Instant messaging adapter initialization returned false', {
+              stage: 'adapter-initialize',
+            });
             set({ connectionState: 'error', lastError: '即时消息连接失败，请稍后重试' });
             return;
           }
-          set({ connectionState: 'ready', lastError: null });
-          const conversations = await adapter.getConversations();
-          const blockedUserIds = new Set(get().blacklistedUserIds);
-          const blockedConversationIds = conversations
-            .filter((conversation) =>
-              !isSystemConversationId(conversation.id)
-              && blockedUserIds.has(conversation.id),
-            )
-            .map((conversation) => conversation.id);
-          set((state) => ({
-            conversations: conversations
-              .map((conversation) =>
-                !isSystemConversationId(conversation.id) && blockedUserIds.has(conversation.id)
-                  ? { ...conversation, unreadCount: 0 }
-                  : conversation,
-              )
-              .reduce(mergeConversations, state.conversations),
-          }));
-          void get().refreshOnlineStatuses(token);
-          await Promise.allSettled(blockedConversationIds.map((peerId) => adapter.markRead(peerId)));
+          await syncConversations(initializationRevision);
+          if (initializationRevision !== lifecycleRevision) return;
           stopMessageSubscription?.();
           stopMessageSubscription = adapter.subscribeMessages(receiveMessage);
+          hasInitialized = true;
+          initializeInProgress = false;
+          set({ connectionState: 'ready', lastError: null });
         } catch (error) {
+          if (initializationRevision !== lifecycleRevision) return;
+          initializeInProgress = false;
+          logger.warn('Instant messaging initialization threw an error', {
+            stage: 'message-store-initialize',
+            errorName: error instanceof Error ? error.name : typeof error,
+          });
           set({ connectionState: 'error', lastError: error instanceof Error ? error.message : '即时消息连接失败，请稍后重试' });
         }
       },
 
       openConversation: async (conversation) => {
+        const isNewConversation = !get().conversations.some((item) => item.id === conversation.id);
         set((state) => {
           const current = state.conversations.find((item) => item.id === conversation.id);
           return {
@@ -311,6 +402,12 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
             conversations: mergeConversations(state.conversations, { ...(current || toConversationShell(conversation)), ...conversation }),
           };
         });
+        if (isNewConversation && onlineStatusToken) {
+          void get().refreshOnlineStatuses(onlineStatusToken);
+        }
+        // Update the local unread state immediately, even if IM is offline or
+        // history loading takes time. markRead forwards to the adapter when ready.
+        void get().markRead(conversation.id);
         if (get().connectionState !== 'ready') return;
         const previous = get().historyByPeerId[conversation.id];
         if (!previous) {
@@ -325,7 +422,6 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
             });
           }
         }
-        await get().markRead(conversation.id);
       },
 
       closeConversation: (peerId) => {
@@ -448,11 +544,20 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       },
 
       reset: async () => {
+        lifecycleRevision += 1;
         onlineStatusRequestId += 1;
+        onlineStatusToken = null;
+        hasInitialized = false;
+        initializeInProgress = false;
+        reconnectAttempts = 0;
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        reconnectTimer = undefined;
         stopMessageSubscription?.();
         stopBlacklistSubscription?.();
+        stopConnectionStatusSubscription?.();
         stopMessageSubscription = undefined;
         stopBlacklistSubscription = undefined;
+        stopConnectionStatusSubscription = undefined;
         await adapter.disconnect();
         set({ connectionState: 'idle', conversations: [], blacklistedUserIds: [], messagesByPeerId: {}, historyByPeerId: {}, openPeerIds: [], activePeerId: null, lastError: null });
       },

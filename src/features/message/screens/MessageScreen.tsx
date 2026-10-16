@@ -8,7 +8,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Toast from "react-native-root-toast";
 import { MessageHeader } from "../components/MessageHeader";
 import { MessageListItem } from "../components/MessageListItem";
-import { resolveConversationAvatar } from "../message-avatar";
+import {
+  getConversationAvatarUri,
+  resolveConversationAvatar,
+} from "../message-avatar";
 import { useMessageStore } from "../message-store";
 import { getConversationDisplayTitle } from "../message-title";
 import type { MessageListItemModel } from "../message.types";
@@ -19,6 +22,7 @@ import {
 } from "../system-conversations";
 
 const defaultConversationAvatar = require("../../../../assets/coms/avatar_default.webp");
+const systemNotificationAvatar = require("../../../../assets/message/message-system-notice.svg");
 
 export default function MessageScreen() {
   const insets = useSafeAreaInsets();
@@ -67,9 +71,10 @@ export default function MessageScreen() {
           const id = normalizeSystemConversationId(item.id);
           const title = getConversationDisplayTitle(id, item.title, item.note);
           const avatar = resolveConversationAvatar(
-            title,
             item.avatar,
-            defaultConversationAvatar,
+            isSystemConversationId(id)
+              ? systemNotificationAvatar
+              : defaultConversationAvatar,
             id,
           );
           return {
@@ -85,12 +90,14 @@ export default function MessageScreen() {
   const handleMessagePress = (item: MessageListItemModel) => {
     if (item.kind !== "conversation" || isSelfConversationId(item.id, userId))
       return;
+    const avatarUri = getConversationAvatarUri(item.avatar);
     router.push({
       pathname: "/chat/[id]",
       params: {
         id: normalizeSystemConversationId(item.id),
         title: item.title,
         clubId: item.clubId || "",
+        ...(avatarUri ? { avatar: avatarUri } : {}),
       },
     });
   };

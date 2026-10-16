@@ -30,6 +30,7 @@ export type OrderNotifyCardMessage = {
   id: string;
   kind: "orderNotify";
   title: string;
+  orderId?: string;
   orderNo?: string;
   gameName?: string;
   serviceDesc?: string;
@@ -115,6 +116,7 @@ export function mapRongMessage(message: RongSdkMessage, enums: { image: number; 
       id,
       kind: "orderNotify",
       title: String(payload.title || "订单状态通知"),
+      orderId: payload.orderId == null ? undefined : String(payload.orderId),
       orderNo: payload.orderNo == null ? undefined : String(payload.orderNo),
       gameName: payload.gameName == null ? undefined : String(payload.gameName),
       serviceDesc: payload.serviceDesc == null ? undefined : String(payload.serviceDesc),

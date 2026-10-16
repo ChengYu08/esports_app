@@ -44,7 +44,11 @@ import type {
   ProfileReview,
   ProfileSkillCard,
 } from "@/features/mine/api/profile.types";
-import { addToBlacklist, isUserBlacklisted } from "@/features/mine/blacklist";
+import {
+  addToBlacklist,
+  isUserBlacklisted,
+  subscribeBlacklist,
+} from "@/features/mine/blacklist";
 import {
   ProfileGameSkeleton,
   ProfileSkeleton,
@@ -110,10 +114,15 @@ export default function ProfileScreen() {
   const [paymentSheetVisible, setPaymentSheetVisible] = useState(false);
   const [profileActionsVisible, setProfileActionsVisible] = useState(false);
   const [blacklistPromptVisible, setBlacklistPromptVisible] = useState(false);
+  const [blacklistStatus, setBlacklistStatus] = useState({
+    userId: "",
+    isBlacklisted: false,
+  });
   const [paymentCancelError, setPaymentCancelError] = useState<string | null>(
     null,
   );
   const paymentCancelingRef = useRef(false);
+  const chatCheckPendingRef = useRef(false);
   const detailQuery = useProfileDetail(routeParams);
   const detail = detailQuery.data;
   const followStateQuery = useUserFollowState(
@@ -143,6 +152,39 @@ export default function ProfileScreen() {
   );
   const localProfile = useMemo(() => toLocalProfile(user), [user]);
   const profile = detail ?? localProfile;
+
+  useEffect(() => {
+    if (isMine || profile.userId <= 0) return;
+
+    let active = true;
+    const refreshBlacklistStatus = () => {
+      void isUserBlacklisted(profile.userId)
+        .then((isBlacklisted) => {
+          if (active) {
+            setBlacklistStatus({
+              userId: String(profile.userId),
+              isBlacklisted,
+            });
+          }
+        })
+        .catch(() => {
+          if (active) {
+            setBlacklistStatus({
+              userId: String(profile.userId),
+              isBlacklisted: false,
+            });
+          }
+        });
+    };
+
+    refreshBlacklistStatus();
+    const unsubscribe = subscribeBlacklist(refreshBlacklistStatus);
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [isMine, profile.userId]);
+
   const gameDetail = gameDetailQuery.data;
   const games = detail?.games ?? [];
   const coverImageUrl = gameDetail?.backgroundUrl?.trim();
@@ -189,6 +231,36 @@ export default function ProfileScreen() {
       Toast.show(error instanceof Error ? error.message : "操作失败", {
         duration: Toast.durations.SHORT,
       });
+    }
+  };
+
+  const handleChatPress = async () => {
+    if (!requireLogin() || chatCheckPendingRef.current) return;
+    chatCheckPendingRef.current = true;
+
+    try {
+      if (await isUserBlacklisted(profile.userId)) {
+        Toast.show("该用户已在黑名单中，无法发起聊天", {
+          duration: Toast.durations.SHORT,
+        });
+        return;
+      }
+
+      router.push({
+        pathname: "/chat/[id]",
+        params: createProfileChatParams({
+          userId: profile.userId,
+          nickname: profile.nickname,
+          headImage: profile.headImage,
+          clubId: profile.clubId,
+        }),
+      });
+    } catch {
+      Toast.show("黑名单状态读取失败，请稍后重试", {
+        duration: Toast.durations.SHORT,
+      });
+    } finally {
+      chatCheckPendingRef.current = false;
     }
   };
 
@@ -467,7 +539,14 @@ export default function ProfileScreen() {
             <View style={styles.navButton} />
           )}
         </View>
-        <ProfileIdentity profile={profile} />
+        <ProfileIdentity
+          profile={profile}
+          isBlacklisted={
+            !isMine &&
+            blacklistStatus.userId === String(profile.userId) &&
+            blacklistStatus.isBlacklisted
+          }
+        />
       </View>
 
       <FlatList
@@ -515,18 +594,7 @@ export default function ProfileScreen() {
           </Pressable>
           <Pressable
             style={styles.chatButton}
-            onPress={() => {
-              if (!requireLogin()) return;
-              router.push({
-                pathname: "/chat/[id]",
-                params: createProfileChatParams({
-                  userId: profile.userId,
-                  nickname: profile.nickname,
-                  headImage: profile.headImage,
-                  clubId: profile.clubId,
-                }),
-              });
-            }}
+            onPress={() => void handleChatPress()}
           >
             <Text style={styles.chatText}>聊一聊</Text>
           </Pressable>
@@ -805,7 +873,13 @@ function ProfileActionsSheet({
   );
 }
 
-function ProfileIdentity({ profile }: { profile: ProfileDetail }) {
+function ProfileIdentity({
+  profile,
+  isBlacklisted,
+}: {
+  profile: ProfileDetail;
+  isBlacklisted: boolean;
+}) {
   const status = getStatus(profile.onlineStatus, profile.gameStatus);
   const age = profile.birth ? calculateAge(profile.birth) : "";
   const avatarPreviewParams = createProfileAvatarPreviewParams(
@@ -843,6 +917,15 @@ function ProfileIdentity({ profile }: { profile: ProfileDetail }) {
           <Text numberOfLines={1} style={styles.name}>
             {profile.nickname}
           </Text>
+
+          {isBlacklisted ? (
+            <View
+              accessibilityLabel="已加入黑名单"
+              style={styles.blacklistTag}
+            >
+              <Text style={styles.blacklistTagText}>已加入黑名单</Text>
+            </View>
+          ) : null}
 
           {profile.sex === 1 || profile.sex === 2 ? (
             <Image
@@ -1661,6 +1744,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
     fontWeight: "600",
+  },
+  blacklistTag: {
+    flexShrink: 0,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.4)",
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  blacklistTagText: {
+    color: "#FFFFFF",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: "500",
   },
   gender: { width: 15, height: 15 },
   male: {

@@ -5,6 +5,8 @@ import type {
   RCIMIWMessage,
 } from '@rongcloud/react-native-im-wrapper';
 
+import { ApiError } from '@/core/network/api-client';
+import { logger } from '@/core/logging/logger';
 import { mapRongMessage, type RongSdkMessage } from './chat-message';
 import type { ManagedMessage, MessageConversation, MessageHistoryPage } from './message-state';
 import type { AfterSaleCardPayload } from '@/features/order/after-sale-card';
@@ -16,12 +18,18 @@ export type RongTextMessage = ManagedMessage;
 type RongSdk = typeof import('@rongcloud/react-native-im-wrapper');
 type ConversationListener = (conversation: RongConversation) => void;
 type MessageListener = (peerId: string, message: ManagedMessage, conversation: RongConversation) => void;
+export type RongCloudConnectionSignal = 'connected' | 'connecting' | 'timeout' | 'terminal';
 
 let engine: RCIMIWEngine | null = null;
 let connected = false;
 let businessToken = '';
+let hasStartedConnection = false;
+let connectionAttempt: Promise<boolean> | null = null;
+let cancelConnectionAttempt: (() => void) | null = null;
+let connectionEpoch = 0;
 const conversationListeners = new Set<ConversationListener>();
 const messageListeners = new Set<MessageListener>();
+const connectionStatusListeners = new Set<(signal: RongCloudConnectionSignal) => void>();
 
 function getRuntimeConfig() {
   try {
@@ -100,12 +108,28 @@ export function isRongCloudAvailable() {
     const reactNative = require('react-native') as { NativeModules?: typeof nativeModules; Platform?: { OS?: string } };
     nativeModules = reactNative.NativeModules || {};
     platform = reactNative.Platform?.OS || platform;
-  } catch {
+  } catch (error) {
+    logger.warn('Could not inspect native module availability', {
+      stage: 'availability',
+      errorName: error instanceof Error ? error.name : typeof error,
+    });
     return false;
   }
   const turboModuleEnabled = Boolean((globalThis as typeof globalThis & { __turboModuleProxy?: unknown }).__turboModuleProxy);
   const { env } = getRuntimeConfig();
-  return platform !== 'web' && Boolean(env.rongCloudAppKey && (nativeModules.RCReactNativeIM || turboModuleEnabled));
+  const hasAppKey = Boolean(env.rongCloudAppKey);
+  const hasNativeModule = Boolean(nativeModules.RCReactNativeIM);
+  const available = platform !== 'web' && hasAppKey && (hasNativeModule || turboModuleEnabled);
+  if (!available) {
+    logger.warn('RongCloud is unavailable in this runtime', {
+      stage: 'availability',
+      platform,
+      hasAppKey,
+      hasNativeModule,
+      turboModuleEnabled,
+    });
+  }
+  return available;
 }
 
 export function toManagedMessage(message: RongSdkMessage | RCIMIWMessage, messageEnums = getSdkEnums()): ManagedMessage | null {
@@ -117,6 +141,105 @@ export function toManagedMessage(message: RongSdkMessage | RCIMIWMessage, messag
 
 function emitConversation(conversation: RongConversation) {
   conversationListeners.forEach((listener) => listener(conversation));
+}
+
+function publishConnectionStatus(status: number): RongCloudConnectionSignal {
+  const sdk = loadSdk();
+  const statuses = sdk?.RCIMIWConnectionStatus;
+  const signal: RongCloudConnectionSignal = status === statuses?.CONNECTED
+    ? 'connected'
+    : status === statuses?.TIMEOUT
+      ? 'timeout'
+      : status === statuses?.TOKEN_INCORRECT
+        || status === statuses?.CONN_USER_BLOCKED
+        || status === statuses?.KICKED_OFFLINE_BY_OTHER_CLIENT
+        || status === statuses?.SIGN_OUT
+        ? 'terminal'
+        : 'connecting';
+  connected = signal === 'connected';
+  connectionStatusListeners.forEach((listener) => listener(signal));
+  return signal;
+}
+
+function publishConnectionSignal(signal: RongCloudConnectionSignal) {
+  connected = signal === 'connected';
+  connectionStatusListeners.forEach((listener) => listener(signal));
+}
+
+export function subscribeRongConnectionStatus(
+  listener: (signal: RongCloudConnectionSignal) => void,
+) {
+  connectionStatusListeners.add(listener);
+  return () => connectionStatusListeners.delete(listener);
+}
+
+function waitForRongCloudConnection(currentEngine: RCIMIWEngine) {
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+    const finish = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      stopListening();
+      if (cancelConnectionAttempt === cancel) cancelConnectionAttempt = null;
+      resolve(value);
+    };
+    const onStatus = (signal: RongCloudConnectionSignal) => {
+      if (signal === 'connected') finish(true);
+      else if (signal === 'terminal' || signal === 'timeout') finish(false);
+    };
+    const stopListening = subscribeRongConnectionStatus(onStatus);
+    const cancel = () => finish(false);
+    cancelConnectionAttempt = cancel;
+    void currentEngine.getConnectionStatus()
+      .then((status) => publishConnectionStatus(status))
+      .catch(() => undefined);
+  });
+}
+
+function waitBeforeConnectionRetry(delayMs: number, attemptEpoch: number) {
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+    const finish = (shouldContinue: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (cancelConnectionAttempt === cancel) cancelConnectionAttempt = null;
+      resolve(shouldContinue && attemptEpoch === connectionEpoch);
+    };
+    const cancel = () => finish(false);
+    const timer = setTimeout(() => finish(true), delayMs);
+    cancelConnectionAttempt = cancel;
+  });
+}
+
+function isTransientImTokenError(error: unknown): error is ApiError {
+  if (!(error instanceof ApiError)) return false;
+  return error.status === 0
+    || error.status === 408
+    || error.status === 429
+    || error.status >= 500;
+}
+
+async function fetchImTokenWithRetry(accessToken: string, attemptEpoch: number) {
+  let retryCount = 0;
+  while (attemptEpoch === connectionEpoch) {
+    try {
+      return await getClientAuthApi().getImToken(accessToken);
+    } catch (error) {
+      if (!isTransientImTokenError(error) || attemptEpoch !== connectionEpoch) throw error;
+      const delayMs = Math.min(1_000 * 2 ** Math.min(retryCount, 5), 30_000);
+      retryCount += 1;
+      logger.warn('IM token request failed temporarily; retrying', {
+        stage: 'im-token',
+        attempt: retryCount,
+        retryInMs: delayMs,
+        status: error.status,
+      });
+      const shouldRetry = await waitBeforeConnectionRetry(delayMs, attemptEpoch);
+      if (!shouldRetry) return null;
+    }
+  }
+  return null;
 }
 
 async function emitReceived(message: RCIMIWMessage) {
@@ -139,8 +262,7 @@ function installListeners() {
   if (!engine) return;
   engine.setOnMessageReceivedListener((message) => { void emitReceived(message); });
   engine.setOnConnectionStatusChangedListener((status) => {
-    const sdk = loadSdk();
-    connected = status === sdk?.RCIMIWConnectionStatus.CONNECTED;
+    publishConnectionStatus(status);
   });
 }
 
@@ -148,13 +270,34 @@ export function isRongCloudConnected() {
   return connected;
 }
 
-export async function connectRongCloud(accessToken: string) {
-  if (!isRongCloudAvailable() || !accessToken) return false;
-  businessToken = accessToken;
-  if (!engine) {
-    const sdk = loadSdk();
-    if (!sdk) return false;
-    try {
+export function connectRongCloud(accessToken: string) {
+  if (connectionAttempt) return connectionAttempt;
+  const attemptEpoch = connectionEpoch;
+  const attempt = connectRongCloudOnce(accessToken, attemptEpoch).finally(() => {
+    if (connectionAttempt === attempt) connectionAttempt = null;
+  });
+  connectionAttempt = attempt;
+  return attempt;
+}
+
+async function connectRongCloudOnce(accessToken: string, attemptEpoch: number) {
+  let stage = 'availability';
+  try {
+    if (attemptEpoch !== connectionEpoch) return false;
+    if (!isRongCloudAvailable()) return false;
+    if (!accessToken) {
+      logger.warn('RongCloud connection skipped without an access token', { stage: 'access-token' });
+      return false;
+    }
+    businessToken = accessToken;
+    if (!engine) {
+      stage = 'sdk-load';
+      const sdk = loadSdk();
+      if (!sdk) {
+        logger.warn('RongCloud SDK could not be loaded', { stage });
+        return false;
+      }
+      stage = 'engine-init';
       const { env } = getRuntimeConfig();
       engine = sdk.RCIMIWEngine.create(env.rongCloudAppKey);
       await engine.registerNativeCustomMessage(
@@ -166,26 +309,111 @@ export async function connectRongCloud(accessToken: string) {
         sdk.RCIMIWNativeCustomMessagePersistentFlag.Counted,
       );
       installListeners();
-    } catch {
+      if (attemptEpoch !== connectionEpoch) return false;
+    }
+    const currentEngine = engine;
+    const sdk = loadSdk();
+    if (!currentEngine || !sdk) return false;
+
+    const currentStatus = await currentEngine.getConnectionStatus().catch(() => undefined);
+    if (attemptEpoch !== connectionEpoch) return false;
+    if (typeof currentStatus === 'number') {
+      const signal = publishConnectionStatus(currentStatus);
+      if (signal === 'connected') return true;
+      const statuses = sdk.RCIMIWConnectionStatus;
+      const sdkIsReconnecting = currentStatus === statuses.CONNECTING
+        || currentStatus === statuses.SUSPEND
+        || currentStatus === statuses.NETWORK_UNAVAILABLE;
+      if (hasStartedConnection && sdkIsReconnecting) {
+        logger.info('RongCloud SDK is already reconnecting', { stage: 'connection-status' });
+        return waitForRongCloudConnection(currentEngine);
+      }
+    }
+
+    stage = 'im-token';
+    const tokenResponse = await fetchImTokenWithRetry(accessToken, attemptEpoch);
+    if (attemptEpoch !== connectionEpoch) return false;
+    const token = tokenResponse?.token;
+    if (!token) {
+      logger.warn('RongCloud IM token response did not contain a token', { stage });
       return false;
     }
-  }
-  if (connected) return true;
-  try {
-    const token = (await getClientAuthApi().getImToken(accessToken)).token;
-    const sdk = loadSdk();
-    if (!sdk) return false;
-    connected = await new Promise<boolean>((resolve) => {
+    stage = 'connect';
+    hasStartedConnection = true;
+    return await new Promise<boolean>((resolve) => {
       let settled = false;
-      const finish = (value: boolean) => { if (!settled) { settled = true; resolve(value); } };
-      const timer = setTimeout(() => finish(false), 16_000);
-      void engine?.connect(token, 15, {
-        onConnected: (code) => { clearTimeout(timer); finish(code === 0); },
-      }).then((code) => { if (code !== 0) { clearTimeout(timer); finish(false); } }).catch(() => { clearTimeout(timer); finish(false); });
+      let loggedExistingConnection = false;
+      const finish = (value: boolean) => {
+        if (settled) return;
+        settled = true;
+        stopListening();
+        if (cancelConnectionAttempt === cancel) cancelConnectionAttempt = null;
+        if (value) connected = true;
+        resolve(value);
+      };
+      const onStatus = (signal: RongCloudConnectionSignal) => {
+        if (signal === 'connected') finish(true);
+        else if (signal === 'terminal' || signal === 'timeout') finish(false);
+      };
+      const stopListening = subscribeRongConnectionStatus(onStatus);
+      const cancel = () => finish(false);
+      cancelConnectionAttempt = cancel;
+      const inspectStatus = () => {
+        void currentEngine.getConnectionStatus()
+          .then((status) => publishConnectionStatus(status))
+          .catch(() => undefined);
+      };
+      const handleConnectResult = (code: number, resultStage: string) => {
+        if (attemptEpoch !== connectionEpoch) return;
+        if (code === 0) {
+          finish(true);
+          return;
+        }
+        if (code === 34001) {
+          if (!loggedExistingConnection) {
+            logger.info('RongCloud connection already exists or is reconnecting', {
+              stage: resultStage,
+              errorCode: code,
+            });
+            loggedExistingConnection = true;
+          }
+          inspectStatus();
+          return;
+        }
+        if (code === 34006) {
+          logger.warn('RongCloud connection timed out; scheduling another attempt', {
+            stage: resultStage,
+            errorCode: code,
+          });
+          publishConnectionSignal('timeout');
+          finish(false);
+          return;
+        }
+        logger.warn('RongCloud connection failed', { stage: resultStage, errorCode: code });
+        finish(false);
+      };
+
+      void currentEngine.connect(token, 0, {
+        onConnected: (code) => {
+          handleConnectResult(code, 'connect-callback');
+        },
+      }).then((code) => {
+        if (code !== 0) handleConnectResult(code, 'connect-result');
+      }).catch((error: unknown) => {
+        logger.warn('RongCloud connect call rejected', {
+          stage: 'connect-rejected',
+          errorName: error instanceof Error ? error.name : typeof error,
+        });
+        finish(false);
+      });
     });
-    return connected;
-  } catch {
+  } catch (error) {
+    if (attemptEpoch !== connectionEpoch) return false;
     connected = false;
+    logger.warn('RongCloud initialization failed', {
+      stage,
+      errorName: error instanceof Error ? error.name : typeof error,
+    });
     return false;
   }
 }
@@ -319,9 +547,14 @@ export async function markRongConversationRead(targetId: string) {
 }
 
 export async function disconnectRongCloud() {
+  connectionEpoch += 1;
+  cancelConnectionAttempt?.();
+  connectionAttempt = null;
+  hasStartedConnection = false;
   if (engine) await engine.disconnect(false);
   connected = false;
   businessToken = '';
   conversationListeners.clear();
   messageListeners.clear();
+  connectionStatusListeners.clear();
 }

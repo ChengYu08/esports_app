@@ -27,16 +27,19 @@ import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import type { AfterSaleCardPayload } from "@/features/order/after-sale-card";
 import { afterSaleCardRows } from "@/features/order/after-sale-card";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { EmptyState } from "@/shared/ui/AsyncStates";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import { OrderNotifyCard } from "../components/OrderNotifyCard";
 import { resolveConversationAvatar } from "../message-avatar";
 import type { ManagedMessage } from "../message-state";
 import { useMessageStore } from "../message-store";
 import { getConversationDisplayTitle } from "../message-title";
 import {
   getSystemConversationTitle,
-  isSelfConversationId,
+  isOrderAssistantConversationId,
   isSystemConversationId,
+  isSelfConversationId,
   normalizeSystemConversationId,
 } from "../system-conversations";
 
@@ -50,7 +53,39 @@ const chatEmoji = require("../../../../assets/message/chat-emoji.svg");
 const chatPhoto = require("../../../../assets/message/chat-photo.svg");
 const chatSend = require("../../../../assets/message/chat-send.svg");
 const chatArrowRight = require("../../../../assets/mine/figma/mine-arrow-right.svg");
+const systemNotificationAvatar = require("../../../../assets/message/message-system-notice.svg");
 const EMPTY_MESSAGES: ManagedMessage[] = [];
+
+type ChatListRow =
+  | { key: string; kind: "time"; label: string }
+  | { key: string; kind: "message"; message: ManagedMessage };
+
+function formatMessageTimeSeparator(timestamp: number) {
+  const date = new Date(timestamp);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${month}-${day} ${hours}:${minutes}`;
+}
+
+function buildChatListRows(messages: ManagedMessage[]): ChatListRow[] {
+  return messages.flatMap((message, index) => {
+    const previousMessage = messages[index - 1];
+    const showTime =
+      !previousMessage || message.sentAt - previousMessage.sentAt > 5 * 60 * 1000;
+    return [
+      ...(showTime
+        ? [{
+            key: `time-${message.id}`,
+            kind: "time" as const,
+            label: formatMessageTimeSeparator(message.sentAt),
+          }]
+        : []),
+      { key: message.id, kind: "message" as const, message },
+    ];
+  });
+}
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
@@ -68,7 +103,7 @@ export default function ChatScreen() {
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [noteVisible, setNoteVisible] = useState(false);
   const [noteDraft, setNoteDraft] = useState("");
-  const listRef = useRef<FlatList<ManagedMessage>>(null);
+  const listRef = useRef<FlatList<ChatListRow>>(null);
   const initialHistoryLoaded = useRef(false);
   const shouldScrollToEnd = useRef(false);
   const isNearBottom = useRef(true);
@@ -89,6 +124,7 @@ export default function ChatScreen() {
     () => isPeerBlacklisted ? messages.filter((message) => message.isMine) : messages,
     [isPeerBlacklisted, messages],
   );
+  const chatRows = useMemo(() => buildChatListRows(visibleMessages), [visibleMessages]);
   const connectionState = useMessageStore((state) => state.connectionState);
   const lastError = useMessageStore((state) => state.lastError);
   const openConversation = useMessageStore((state) => state.openConversation);
@@ -127,16 +163,16 @@ export default function ChatScreen() {
     conversation?.note,
   );
   const conversationAvatar = resolveConversationAvatar(
-    conversationBaseTitle,
     avatar || conversation?.avatar,
-    defaultAvatar,
+    isSystemConversationId(conversationId) ? systemNotificationAvatar : defaultAvatar,
     conversationId,
   );
   const myAvatar = useMemo(
     () => myAvatarUrl ? { uri: myAvatarUrl } : defaultMyAvatar,
     [myAvatarUrl],
   );
-  const imReady = connectionState === "ready";
+  const peerOnline = conversation?.isOnline;
+  const isOrderAssistant = isOrderAssistantConversationId(conversationId);
   const isPinned = Boolean(conversation?.isPinned);
   const scrollToLatest = useCallback(
     () => requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: false })),
@@ -159,16 +195,51 @@ export default function ChatScreen() {
     },
     [conversationId, retryMessage],
   );
-  const renderMessage = useCallback(
-    ({ item }: { item: ManagedMessage }) => (
+  const openOrderDetail = useCallback((orderId: string) => {
+    router.push({ pathname: "/order/[id]", params: { id: orderId } });
+  }, []);
+  const openProfile = useCallback(() => {
+    setSettingsVisible(false);
+    if (!/^\d+$/.test(conversationId)) {
+      Alert.alert(
+        "暂无法查看主页",
+        "当前会话缺少主页信息，请从用户主页重新发起聊天。",
+      );
+      return;
+    }
+    const targetClubId =
+      clubId ||
+      conversation?.clubId ||
+      (afterSalePayload?.clubId ? String(afterSalePayload.clubId) : undefined);
+    router.push({
+      pathname: "/profile",
+      params: {
+        ...(targetClubId ? { clubId: String(targetClubId) } : {}),
+        userId: conversationId,
+      },
+    });
+  }, [
+    afterSalePayload,
+    clubId,
+    conversation?.clubId,
+    conversationId,
+  ]);
+  const renderChatRow = useCallback(
+    ({ item }: { item: ChatListRow }) => item.kind === "time" ? (
+      <View style={styles.timeSeparator}>
+        <Text style={styles.timeSeparatorText}>{item.label}</Text>
+      </View>
+    ) : (
       <ChatBubble
-        item={item}
+        item={item.message}
         peerAvatar={conversationAvatar}
         myAvatar={myAvatar}
         onRetry={handleRetryMessage}
+        onOpenProfile={canViewProfile ? openProfile : undefined}
+        onOpenOrder={isOrderAssistant ? openOrderDetail : undefined}
       />
     ),
-    [conversationAvatar, handleRetryMessage, myAvatar],
+    [canViewProfile, conversationAvatar, handleRetryMessage, isOrderAssistant, myAvatar, openOrderDetail, openProfile],
   );
 
   useEffect(() => {
@@ -250,28 +321,6 @@ export default function ChatScreen() {
     setNoteVisible(false);
   };
 
-  const openProfile = () => {
-    setSettingsVisible(false);
-    if (!/^\d+$/.test(conversationId)) {
-      Alert.alert(
-        "暂无法查看主页",
-        "当前会话缺少主页信息，请从用户主页重新发起聊天。",
-      );
-      return;
-    }
-    const targetClubId =
-      clubId ||
-      conversation?.clubId ||
-      (afterSalePayload?.clubId ? String(afterSalePayload.clubId) : undefined);
-    router.push({
-      pathname: "/profile",
-      params: {
-        ...(targetClubId ? { clubId: String(targetClubId) } : {}),
-        userId: conversationId,
-      },
-    });
-  };
-
   if (isSelfConversation) return null;
 
   return (
@@ -292,21 +341,35 @@ export default function ChatScreen() {
             <Image source={chatBack} style={styles.headerIcon} />
           </Pressable>
           <View style={styles.identity}>
-            <CachedImage
-              contentFit="cover"
-              source={conversationAvatar}
-              style={styles.headerAvatar}
-            />
+            <Pressable
+              accessibilityLabel="查看用户主页"
+              accessibilityRole="button"
+              disabled={!canViewProfile}
+              hitSlop={8}
+              onPress={openProfile}
+            >
+              <CachedImage
+                contentFit="cover"
+                source={conversationAvatar}
+                style={styles.headerAvatar}
+              />
+            </Pressable>
             <Text numberOfLines={1} style={styles.name}>
               {conversationTitle}
             </Text>
-            <Image
-              source={imReady ? chatOnline : chatOffline}
-              style={styles.onlineIcon}
-            />
-            <Text style={[styles.onlineText, !imReady && styles.offlineText]}>
-              {imReady ? "在线中" : "3天前在线"}
-            </Text>
+            {!isSystemConversationId(conversationId) && typeof peerOnline === "boolean" ? (
+              <>
+                <Image
+                  source={peerOnline ? chatOnline : chatOffline}
+                  style={styles.onlineIcon}
+                />
+                <Text
+                  style={[styles.onlineText, !peerOnline && styles.offlineText]}
+                >
+                  {peerOnline ? "在线中" : "离线"}
+                </Text>
+              </>
+            ) : null}
           </View>
           <Pressable
             accessibilityLabel="更多功能"
@@ -323,9 +386,12 @@ export default function ChatScreen() {
       <FlatList
         ref={listRef}
         contentContainerStyle={styles.messageList}
-        data={visibleMessages}
-        keyExtractor={(item) => item.id}
-        renderItem={renderMessage}
+        data={chatRows}
+        keyExtractor={(item) => item.key}
+        ListEmptyComponent={isOrderAssistant ? (
+          <EmptyState message="暂无订单消息" style={styles.orderAssistantEmpty} />
+        ) : null}
+        renderItem={renderChatRow}
         showsVerticalScrollIndicator={false}
         onContentSizeChange={handleContentSizeChange}
         maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
@@ -380,11 +446,13 @@ export default function ChatScreen() {
         <Text style={styles.errorBanner}>{lastError}</Text>
       ) : null}
 
-      <ChatComposer
-        bottomInset={insets.bottom}
-        onSendText={handleSendText}
-        onSendImage={handleSendImage}
-      />
+      {!isOrderAssistant ? (
+        <ChatComposer
+          bottomInset={insets.bottom}
+          onSendText={handleSendText}
+          onSendImage={handleSendImage}
+        />
+      ) : null}
       <BottomSheet
         visible={settingsVisible}
         onClose={() => setSettingsVisible(false)}
@@ -632,11 +700,15 @@ const ChatBubble = memo(function ChatBubble({
   peerAvatar,
   myAvatar,
   onRetry,
+  onOpenProfile,
+  onOpenOrder,
 }: {
   item: ManagedMessage;
   peerAvatar: string | number;
   myAvatar: { uri: string } | number;
   onRetry: (clientId: string) => void;
+  onOpenProfile?: () => void;
+  onOpenOrder?: (orderId: string) => void;
 }) {
   const { width: windowWidth } = useWindowDimensions();
   const [imageRatio, setImageRatio] = useState(1);
@@ -648,13 +720,27 @@ const ChatBubble = memo(function ChatBubble({
   const imageHeight = naturalImageHeight * imageScale;
 
   return (
-    <View style={[styles.bubbleRow, item.isMine && styles.mineRow]}>
+    <View
+      style={[
+        styles.bubbleRow,
+        item.isMine && styles.mineRow,
+        item.kind === "orderNotify" && !item.isMine && styles.orderNotifyMessageRow,
+      ]}
+    >
       {!item.isMine && (
-        <CachedImage
-          contentFit="cover"
-          source={peerAvatar}
-          style={styles.messageAvatar}
-        />
+        <Pressable
+          accessibilityLabel="查看用户主页"
+          accessibilityRole="button"
+          disabled={!onOpenProfile}
+          hitSlop={6}
+          onPress={onOpenProfile}
+        >
+          <CachedImage
+            contentFit="cover"
+            source={peerAvatar}
+            style={styles.messageAvatar}
+          />
+        </Pressable>
       )}
       <View
         style={[
@@ -711,33 +797,7 @@ const ChatBubble = memo(function ChatBubble({
             </View>
           </View>
         ) : item.kind === "orderNotify" ? (
-          <View style={styles.orderNotifyCard}>
-            <Text style={styles.orderNotifyTitle}>{item.title}</Text>
-            {item.orderNo ? (
-              <Text style={styles.orderNotifyRow}>订单号：{item.orderNo}</Text>
-            ) : null}
-            {item.gameName ? (
-              <Text style={styles.orderNotifyRow}>游戏：{item.gameName}</Text>
-            ) : null}
-            {item.serviceDesc ? (
-              <Text style={styles.orderNotifyRow}>
-                服务：{item.serviceDesc}
-              </Text>
-            ) : null}
-            {item.numDesc ? (
-              <Text style={styles.orderNotifyRow}>数量：{item.numDesc}</Text>
-            ) : null}
-            {item.totalPriceDesc ? (
-              <Text style={styles.orderNotifyRow}>
-                总价：{item.totalPriceDesc}
-              </Text>
-            ) : null}
-            {item.createTime ? (
-              <Text style={styles.orderNotifyRow}>
-                时间：{item.createTime.replace("T", " ").slice(0, 19)}
-              </Text>
-            ) : null}
-          </View>
+          <OrderNotifyCard item={item} onOpenOrder={onOpenOrder} />
         ) : (
           <Text style={styles.bubbleText}>{item.text}</Text>
         )}
@@ -807,6 +867,19 @@ const styles = StyleSheet.create({
   onlineText: { color: "#2FC273", fontFamily: DOUYIN_SANS, fontSize: 12 },
   offlineText: { color: "#999999" },
   messageList: { flexGrow: 1, paddingTop: 8, paddingBottom: 12 },
+  orderAssistantEmpty: { flex: 1 },
+  timeSeparator: {
+    minHeight: 32,
+    paddingVertical: 7,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  timeSeparatorText: {
+    color: "#999999",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 12,
+    lineHeight: 18,
+  },
   bubbleRow: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -814,6 +887,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
+  orderNotifyMessageRow: { paddingRight: 36 },
   mineRow: { justifyContent: "flex-end", paddingLeft: 36, paddingRight: 16 },
   messageAvatar: {
     width: 36,
@@ -965,21 +1039,6 @@ const styles = StyleSheet.create({
     maxWidth: "84%",
     paddingHorizontal: 0,
     paddingVertical: 0,
-  },
-  orderNotifyCard: { minWidth: 220, padding: 14 },
-  orderNotifyTitle: {
-    color: "#111111",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 15,
-    fontWeight: "600",
-    lineHeight: 22,
-    marginBottom: 8,
-  },
-  orderNotifyRow: {
-    color: "#666666",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 13,
-    lineHeight: 20,
   },
   sheetBackdrop: {
     flex: 1,
