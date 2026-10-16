@@ -31,7 +31,7 @@ export default function TabsLayout() {
       <Tabs
         initialRouteName="index"
         tabBar={(props) => <AppTabBar {...props} />}
-        screenOptions={{ headerShown: false }}
+        screenOptions={{ headerShown: false, animation: "fade" }}
       >
         <Tabs.Screen name="index" />
         <Tabs.Screen name="ranking" options={{ title: "排行榜" }} />

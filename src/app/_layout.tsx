@@ -181,19 +181,19 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <RootSiblingParent>
           {privacyAccepted ? (
-            <Stack screenOptions={{ headerShown: false, gestureEnabled: true }}>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                gestureEnabled: true,
+                animation: "fade",
+                animationMatchesGesture: false,
+                fullScreenGestureEnabled: false,
+              }}
+            >
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen
-                name="login"
-                options={{
-                  animation: "fade",
-                  animationMatchesGesture: false,
-                  fullScreenGestureEnabled: false,
-                }}
-              />
-              <Stack.Screen
                 name="image-preview"
-                options={{ animation: "fade", headerShown: false }}
+                options={{ headerShown: false }}
               />
               <Stack.Screen name="basic-settings" />
               <Stack.Screen name="account-settings" />
