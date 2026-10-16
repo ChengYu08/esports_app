@@ -132,6 +132,7 @@ export default function ChatScreen() {
   const closeConversation = useMessageStore((state) => state.closeConversation);
   const sendText = useMessageStore((state) => state.sendText);
   const sendImage = useMessageStore((state) => state.sendImage);
+  const resolveImagePreview = useMessageStore((state) => state.resolveImagePreview);
   const sendAfterSaleCard = useMessageStore((state) => state.sendAfterSaleCard);
   const setConversationNote = useMessageStore(
     (state) => state.setConversationNote,
@@ -204,6 +205,17 @@ export default function ChatScreen() {
   const openOrderDetail = useCallback((orderId: string) => {
     router.push({ pathname: "/order/[id]", params: { id: orderId } });
   }, []);
+  const openImagePreview = useCallback(async (message: ManagedMessage) => {
+    try {
+      const uri = await resolveImagePreview(conversationId, message);
+      router.push({ pathname: "/image-preview", params: createImagePreviewParams([uri], 0) });
+    } catch (error) {
+      Alert.alert(
+        "图片预览失败",
+        error instanceof Error ? error.message : "融云图片下载失败",
+      );
+    }
+  }, [conversationId, resolveImagePreview]);
   const openProfile = useCallback(() => {
     setSettingsVisible(false);
     if (!/^\d+$/.test(conversationId)) {
@@ -243,9 +255,10 @@ export default function ChatScreen() {
         onRetry={handleRetryMessage}
         onOpenProfile={canViewProfile ? openProfile : undefined}
         onOpenOrder={isOrderAssistant ? openOrderDetail : undefined}
+        onPreviewImage={openImagePreview}
       />
     ),
-    [canViewProfile, conversationAvatar, handleRetryMessage, isOrderAssistant, myAvatar, openOrderDetail, openProfile],
+    [canViewProfile, conversationAvatar, handleRetryMessage, isOrderAssistant, myAvatar, openImagePreview, openOrderDetail, openProfile],
   );
 
   useEffect(() => {
@@ -708,6 +721,7 @@ const ChatBubble = memo(function ChatBubble({
   onRetry,
   onOpenProfile,
   onOpenOrder,
+  onPreviewImage,
 }: {
   item: ManagedMessage;
   peerAvatar: string | number;
@@ -715,6 +729,7 @@ const ChatBubble = memo(function ChatBubble({
   onRetry: (clientId: string) => void;
   onOpenProfile?: () => void;
   onOpenOrder?: (orderId: string) => void;
+  onPreviewImage: (message: ManagedMessage) => void;
 }) {
   const { width: windowWidth } = useWindowDimensions();
   const [imageRatio, setImageRatio] = useState(1);
@@ -759,12 +774,7 @@ const ChatBubble = memo(function ChatBubble({
         {item.kind === "image" ? (
           <Pressable
             accessibilityLabel="预览聊天图片"
-            onPress={() =>
-              router.push({
-                pathname: "/image-preview",
-                params: createImagePreviewParams([item.imageUrl], 0),
-              })
-            }
+            onPress={() => onPreviewImage(item)}
           >
             <CachedImage
               contentFit="contain"

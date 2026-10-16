@@ -7,6 +7,7 @@ export type ManagedMessage = ChatMessage & {
   clientId?: string;
   sentAt: number;
   retryPayload?: { kind: "text"; text: string } | { kind: "image"; path: string };
+  mediaSource?: unknown;
 };
 
 export type MessageConversation = {

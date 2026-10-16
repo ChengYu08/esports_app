@@ -136,7 +136,62 @@ export function toManagedMessage(message: RongSdkMessage | RCIMIWMessage, messag
   if (!messageEnums) return null;
   const mapped = mapRongMessage(message as RongSdkMessage, { image: messageEnums.imageType, send: messageEnums.directionSend });
   if (!mapped) return null;
-  return { ...mapped, status: 'sent', sentAt: message.sentTime || Date.now() };
+  return {
+    ...mapped,
+    ...(mapped.kind === 'image' ? { mediaSource: message as RCIMIWMediaMessage } : {}),
+    status: 'sent',
+    sentAt: message.sentTime || Date.now(),
+  };
+}
+
+function toLocalMediaUri(path: string) {
+  if (/^(?:file|content):\/\//i.test(path)) return path;
+  return `file://${path.startsWith('/') ? '' : '/'}${path}`;
+}
+
+export async function downloadRongImageMessage(message: ManagedMessage): Promise<string> {
+  if (message.kind !== 'image') throw new Error('消息不是图片');
+  if (/^(?:file|content):\/\//i.test(message.imageUrl)) return message.imageUrl;
+  const mediaMessage = message.mediaSource as RCIMIWMediaMessage | undefined;
+  if (!mediaMessage) {
+    if (/^https?:\/\/[^/]*ronghub\.com\//i.test(message.imageUrl)) {
+      throw new Error('缺少融云媒体消息数据，无法通过 SDK 下载图片');
+    }
+    return message.imageUrl;
+  }
+  if (mediaMessage.local) return toLocalMediaUri(mediaMessage.local);
+
+  const currentEngine = requireConnected();
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (error?: Error, localPath?: string) => {
+      if (settled) return;
+      settled = true;
+      if (error) {
+        reject(error);
+        return;
+      }
+      if (!localPath) {
+        reject(new Error('融云图片下载完成，但没有返回本地文件路径'));
+        return;
+      }
+      resolve(toLocalMediaUri(localPath));
+    };
+
+    void currentEngine.downloadMediaMessage(mediaMessage, {
+      onMediaMessageDownloaded: (code, downloadedMessage) => {
+        if (code !== 0) {
+          finish(new Error(`融云图片下载失败（${code}）`));
+          return;
+        }
+        finish(undefined, downloadedMessage.local);
+      },
+    }).then((code) => {
+      if (code !== 0) finish(new Error(`融云图片下载请求失败（${code}）`));
+    }).catch((error: unknown) => {
+      finish(error instanceof Error ? error : new Error('融云图片下载请求失败'));
+    });
+  });
 }
 
 function emitConversation(conversation: RongConversation) {

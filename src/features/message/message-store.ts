@@ -4,6 +4,7 @@ import { createStore, type StoreApi } from 'zustand/vanilla';
 import { logger } from '@/core/logging/logger';
 import {
   disconnectRongCloud,
+  downloadRongImageMessage,
   getRongConversations,
   getRongMessages,
   initializeRongCloud,
@@ -50,6 +51,7 @@ export type MessageAdapter = {
   getMessages: (peerId: string, beforeSentTime?: number) => Promise<MessageHistoryPage>;
   sendText: (peerId: string, text: string) => Promise<ManagedMessage>;
   sendImage: (peerId: string, path: string) => Promise<ManagedMessage>;
+  downloadImage?: (message: ManagedMessage) => Promise<string>;
   sendAfterSaleCard?: (peerId: string, payload: AfterSaleCardPayload) => Promise<ManagedMessage>;
   markRead: (peerId: string) => Promise<boolean>;
   subscribeConnectionStatus?: (listener: (signal: RongCloudConnectionSignal) => void) => () => void;
@@ -81,6 +83,7 @@ export type MessageStoreState = {
   sendText: (peerId: string, text: string) => Promise<void>;
   sendAfterSaleCard: (peerId: string, payload: import('@/features/order/after-sale-card').AfterSaleCardPayload) => Promise<boolean>;
   sendImage: (peerId: string, path: string) => Promise<void>;
+  resolveImagePreview: (peerId: string, message: ManagedMessage) => Promise<string>;
   retryMessage: (peerId: string, clientId: string) => Promise<void>;
   markRead: (peerId: string) => Promise<void>;
   setConversationNote: (peerId: string, note: string) => void;
@@ -130,6 +133,7 @@ function createAdapter(): MessageAdapter {
     getMessages: getRongMessages,
     sendText: sendRongText,
     sendImage: sendRongImage,
+    downloadImage: downloadRongImageMessage,
     sendAfterSaleCard: sendRongAfterSaleCard,
     markRead: markRongConversationRead,
     subscribeConnectionStatus: subscribeRongConnectionStatus,
@@ -497,6 +501,24 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         } catch (error) {
           set((state) => ({ messagesByPeerId: { ...state.messagesByPeerId, [peerId]: markMessageFailed(state.messagesByPeerId[peerId] || [], pending.clientId || pending.id) }, lastError: error instanceof Error ? error.message : '发送图片失败' }));
         }
+      },
+
+      resolveImagePreview: async (peerId, message) => {
+        if (message.kind !== 'image') throw new Error('消息不是图片');
+        const imageUrl = adapter.downloadImage
+          ? await adapter.downloadImage(message)
+          : message.imageUrl;
+        set((state) => ({
+          messagesByPeerId: {
+            ...state.messagesByPeerId,
+            [peerId]: (state.messagesByPeerId[peerId] || []).map((item) =>
+              item.id === message.id && item.kind === 'image'
+                ? { ...item, imageUrl }
+                : item,
+            ),
+          },
+        }));
+        return imageUrl;
       },
 
       sendAfterSaleCard: async (peerId, payload) => {

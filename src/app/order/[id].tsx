@@ -108,9 +108,11 @@ export default function OrderDetailRoute() {
     ? "请在剩余时间内完成支付"
     : isCompleted
       ? "感谢你的支持"
-      : order.status === "inService"
-        ? "服务进行中"
-        : "陪玩确认后开始服务";
+      : isCancelled
+        ? "订单已取消"
+        : order.status === "inService"
+          ? "服务进行中"
+          : "陪玩确认后开始服务";
   const copyOrderNumber = async () => {
     try {
       await Clipboard.setStringAsync(orderNumber);
