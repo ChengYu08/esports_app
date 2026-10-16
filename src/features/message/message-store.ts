@@ -39,6 +39,7 @@ import {
   isSystemConversationId,
   normalizeSystemConversationId,
 } from './system-conversations';
+import { dispatchInAppNotification } from './notification-hub';
 
 export type MessageConnectionState = 'idle' | 'connecting' | 'ready' | 'unavailable' | 'error';
 
@@ -182,14 +183,28 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         return;
       }
       const normalizedConversation = { ...conversation, id: normalizedPeerId, title: getSystemConversationTitle(normalizedPeerId, conversation.title) };
-      const isNewConversation = !get().conversations.some((item) => item.id === normalizedPeerId);
       const isActive = get().activePeerId === normalizedPeerId;
+      if (!isActive && !message.isMine) {
+        const preview = message.kind === 'image'
+          ? '[图片]'
+          : message.kind === 'afterSale' || message.kind === 'orderNotify'
+            ? message.title
+            : message.text;
+        dispatchInAppNotification({
+          peerId: normalizedPeerId,
+          title: getSystemConversationTitle(normalizedPeerId, normalizedConversation.title),
+          preview: preview || '新消息',
+          avatar: normalizedConversation.avatar,
+          isSystem: isSystemConversationId(normalizedPeerId),
+        });
+      }
       set((state) => {
         const existing = state.conversations.find((item) => item.id === normalizedPeerId);
         const nextConversation: MessageConversation = {
           ...normalizedConversation,
           title: getSystemConversationTitle(normalizedPeerId, existing?.title || normalizedConversation.title),
           avatar: existing?.avatar || normalizedConversation.avatar,
+          isOnline: message.isMine ? existing?.isOnline : true,
           unreadCount: isActive ? 0 : (existing?.unreadCount || 0) + 1,
           updatedAt: message.sentAt,
         };
@@ -200,9 +215,6 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           conversations: mergeConversations(state.conversations, nextConversation),
         };
       });
-      if (isNewConversation && onlineStatusToken) {
-        void get().refreshOnlineStatuses(onlineStatusToken);
-      }
       if (isActive) void adapter.markRead(normalizedPeerId).catch((error) => set({ lastError: error instanceof Error ? error.message : '清除未读失败' }));
     };
 

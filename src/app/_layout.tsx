@@ -21,6 +21,7 @@ import {
   messageStore,
   useMessageStore,
 } from "@/features/message/message-store";
+import { InAppNotificationBanner } from "@/features/message/components/InAppNotificationBanner";
 import { PrivacyConsentGate } from "@/features/privacy/components/PrivacyConsentGate";
 import { readPrivacyConsent } from "@/features/privacy/privacy-consent";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
@@ -202,6 +203,7 @@ export default function RootLayout() {
           ) : (
             <PrivacyConsentGate onAccepted={() => setPrivacyAccepted(true)} />
           )}
+          <InAppNotificationBanner />
         </RootSiblingParent>
       </SafeAreaProvider>
     </QueryClientProvider>

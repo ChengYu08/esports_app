@@ -13,6 +13,7 @@ import {
   resolveConversationAvatar,
 } from "../message-avatar";
 import { useMessageStore } from "../message-store";
+import { isVisibleMessageConversation } from "../message-unread";
 import { getConversationDisplayTitle } from "../message-title";
 import type { MessageListItemModel } from "../message.types";
 import {
@@ -62,11 +63,7 @@ export default function MessageScreen() {
   const items = useMemo<MessageListItemModel[]>(
     () =>
       conversations
-        .filter((item) =>
-          !isSelfConversationId(item.id, userId)
-          && (isSystemConversationId(item.id)
-            || !blacklistedUserIds.includes(normalizeSystemConversationId(item.id))),
-        )
+        .filter((item) => isVisibleMessageConversation(item, userId, blacklistedUserIds))
         .map((item) => {
           const id = normalizeSystemConversationId(item.id);
           const title = getConversationDisplayTitle(id, item.title, item.note);

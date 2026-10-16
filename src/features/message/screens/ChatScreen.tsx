@@ -2,7 +2,7 @@ import { useAuthStore } from "@esports/auth";
 import { HeadphonesRegular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -127,6 +127,7 @@ export default function ChatScreen() {
   const chatRows = useMemo(() => buildChatListRows(visibleMessages), [visibleMessages]);
   const connectionState = useMessageStore((state) => state.connectionState);
   const lastError = useMessageStore((state) => state.lastError);
+  const refreshOnlineStatuses = useMessageStore((state) => state.refreshOnlineStatuses);
   const openConversation = useMessageStore((state) => state.openConversation);
   const closeConversation = useMessageStore((state) => state.closeConversation);
   const sendText = useMessageStore((state) => state.sendText);
@@ -172,6 +173,11 @@ export default function ChatScreen() {
     [myAvatarUrl],
   );
   const peerOnline = conversation?.isOnline;
+  useFocusEffect(
+    useCallback(() => {
+      if (accessToken) void refreshOnlineStatuses(accessToken);
+    }, [accessToken, refreshOnlineStatuses]),
+  );
   const isOrderAssistant = isOrderAssistantConversationId(conversationId);
   const isPinned = Boolean(conversation?.isPinned);
   const scrollToLatest = useCallback(

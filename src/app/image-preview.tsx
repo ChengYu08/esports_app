@@ -1,14 +1,75 @@
 import { ImageZoom } from "@likashefqet/react-native-image-zoom";
-import { Image } from "expo-image";
+import { Image, type ImageErrorEventData } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, NativeScrollEvent, NativeSyntheticEvent, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import type { ImageErrorEvent as NativeImageErrorEvent } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { logger } from "@/core/logging/logger";
 import { parseImagePreviewParams } from "@/features/mine/image-preview.params";
 import { IMAGE_PREVIEW_ZOOM } from "@/features/mine/image-preview.zoom";
 import { EmptyState } from "@/shared/ui/AsyncStates";
+
+function sanitizeImageUri(uri: string) {
+  if (uri.startsWith("data:")) return "data:<redacted>";
+  return uri.split(/[?#]/, 1)[0];
+}
+
+function sanitizeImageError(error?: string) {
+  return (error || "未提供错误详情")
+    .replace(/(?:https?|file|content):\/\/[^\s"'<>]+/gi, (value) => sanitizeImageUri(value))
+    .slice(0, 240);
+}
+
+function reportImageLoadFailure(stage: string, uri: string, error?: string) {
+  logger.warn("Image preview failed to load image", {
+    stage,
+    uri: sanitizeImageUri(uri),
+    error: sanitizeImageError(error),
+  });
+  return sanitizeImageError(error);
+}
+
+function PreviewImage({ uri, width, height }: { uri: string; width: number; height: number }) {
+  const [zoomLoadFailed, setZoomLoadFailed] = useState(false);
+  const [fallbackError, setFallbackError] = useState<string | null>(null);
+
+  if (zoomLoadFailed) {
+    return fallbackError ? (
+      <View style={styles.imageError}>
+        <Text style={styles.imageErrorText}>图片加载失败：{fallbackError}</Text>
+      </View>
+    ) : (
+      <Image
+        source={{ uri }}
+        contentFit="contain"
+        onError={(event: ImageErrorEventData) => setFallbackError(reportImageLoadFailure(
+          "expo-image-fallback",
+          uri,
+          event.error,
+        ))}
+        style={{ width, height }}
+      />
+    );
+  }
+
+  return (
+    <ImageZoom
+      uri={uri}
+      maxScale={IMAGE_PREVIEW_ZOOM.maxScale}
+      doubleTapScale={IMAGE_PREVIEW_ZOOM.doubleTapScale}
+      isDoubleTapEnabled
+      isPinchEnabled
+      onError={(event: NativeImageErrorEvent) => {
+        reportImageLoadFailure("image-zoom", uri, event.nativeEvent.error);
+        setZoomLoadFailed(true);
+      }}
+      style={{ width, height }}
+    />
+  );
+}
 
 export default function ImagePreviewScreen() {
   const { width, height } = useWindowDimensions();
@@ -73,14 +134,7 @@ export default function ImagePreviewScreen() {
         })}
         renderItem={({ item }) => (
           <View style={[styles.page, { width, height }]}>
-            <ImageZoom
-              uri={item}
-              maxScale={IMAGE_PREVIEW_ZOOM.maxScale}
-              doubleTapScale={IMAGE_PREVIEW_ZOOM.doubleTapScale}
-              isDoubleTapEnabled
-              isPinchEnabled
-              style={{ width, height }}
-            />
+            <PreviewImage uri={item} width={width} height={height} />
           </View>
         )}
       />
@@ -110,5 +164,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.45)",
   },
   closeText: { color: "#fff", fontSize: 32, fontWeight: "300", lineHeight: 36 },
+  imageError: { flex: 1, alignItems: "center", justifyContent: "center" },
+  imageErrorText: { color: "#fff", fontSize: 14 },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#000" },
 });

@@ -5,7 +5,7 @@ import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { formatUnreadCount } from "@/features/message/message-unread";
+import { formatUnreadCount, sumVisibleUnreadCount } from "@/features/message/message-unread";
 import { useMessageStore } from "@/features/message/message-store";
 import {
   getTabPressAction,
@@ -55,11 +55,9 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
   const isAuthenticated = useAuthStore((authState) =>
     Boolean(authState.accessToken && authState.user),
   );
+  const userId = useAuthStore((authState) => authState.user?.id);
   const unreadCount = useMessageStore((messageState) =>
-    messageState.conversations.reduce(
-      (total, conversation) => total + conversation.unreadCount,
-      0,
-    ),
+    sumVisibleUnreadCount(messageState.conversations, userId, messageState.blacklistedUserIds),
   );
   const unreadLabel = formatUnreadCount(unreadCount);
   const activeRoute = state.routes[state.index]?.name;

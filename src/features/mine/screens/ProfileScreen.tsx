@@ -13,7 +13,9 @@ import {
   Animated,
   Easing,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -1268,94 +1270,99 @@ function CompanionOrderSheet({
       visible
       onRequestClose={() => closeSheet()}
     >
-      <Animated.View
-        style={[styles.orderModalBackdrop, { opacity: backdropOpacity }]}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.orderKeyboardAvoiding}
       >
-        <>
-          <Pressable
-            accessibilityLabel="关闭下单弹窗"
-            onPress={() => closeSheet()}
-            style={StyleSheet.absoluteFill}
-          />
-          <Animated.View
-            style={[styles.orderModal, { transform: [{ translateY: sheetY }] }]}
-          >
-            <View style={styles.orderModalHeader}>
-              <Text style={styles.orderModalTitle}>陪玩下单</Text>
-              <Pressable onPress={() => closeSheet()}>
-                <Text style={styles.orderClose}>×</Text>
-              </Pressable>
-            </View>
-            <>
-              <Text style={styles.orderLocked}>
-                {card.modeName}-{card.levelName}
-              </Text>
-              {loading ? (
-                <Text style={styles.orderHint}>服务加载中...</Text>
-              ) : (
-                services.map((service) => (
-                  <Pressable
-                    key={service.companionServiceId}
-                    onPress={() =>
-                      setSelectedServiceId(service.companionServiceId)
-                    }
-                    style={[
-                      styles.serviceOption,
-                      selectedServiceId === service.companionServiceId &&
-                        styles.serviceOptionActive,
-                    ]}
-                  >
-                    <Text style={styles.serviceOptionName}>{service.name}</Text>
-                    <Text style={styles.serviceOptionPrice}>
-                      {service.price} 星钻
-                    </Text>
-                  </Pressable>
-                ))
-              )}
-              <View style={styles.quantityRow}>
-                <Text style={styles.orderLabel}>数量</Text>
-                <TextInput
-                  keyboardType="number-pad"
-                  value={quantity}
-                  onChangeText={setQuantity}
-                  style={styles.quantityInput}
-                />
+        <Animated.View
+          style={[styles.orderModalBackdrop, { opacity: backdropOpacity }]}
+        >
+          <>
+            <Pressable
+              accessibilityLabel="关闭下单弹窗"
+              onPress={() => closeSheet()}
+              style={StyleSheet.absoluteFill}
+            />
+            <Animated.View
+              style={[styles.orderModal, { transform: [{ translateY: sheetY }] }]}
+            >
+              <View style={styles.orderModalHeader}>
+                <Text style={styles.orderModalTitle}>陪玩下单</Text>
+                <Pressable onPress={() => closeSheet()}>
+                  <Text style={styles.orderClose}>×</Text>
+                </Pressable>
               </View>
-              <TextInput
-                placeholder="备注（选填）"
-                value={remark}
-                onChangeText={setRemark}
-                style={styles.remarkInput}
-              />
-              <Pressable
-                onPress={() => setAgreed((value) => !value)}
-                style={styles.agreementRow}
-              >
-                <Text style={styles.checkbox}>{agreed ? "✓" : ""}</Text>
-                <Text style={styles.agreementText}>我已阅读并同意服务协议</Text>
-              </Pressable>
-              <Text style={styles.orderTotal}>合计：{total} 星钻</Text>
-              <Pressable
-                style={[
-                  styles.orderSubmit,
-                  (!agreed ||
-                    submitting ||
-                    (Boolean(token) && !selectedService)) &&
-                    styles.orderSubmitDisabled,
-                ]}
-                onPress={() => void submitOrder()}
-                disabled={
-                  !agreed || submitting || (Boolean(token) && !selectedService)
-                }
-              >
-                <Text style={styles.orderSubmitText}>
-                  {submitting ? "提交中..." : "确认下单"}
+              <>
+                <Text style={styles.orderLocked}>
+                  {card.modeName}-{card.levelName}
                 </Text>
-              </Pressable>
-            </>
-          </Animated.View>
-        </>
-      </Animated.View>
+                {loading ? (
+                  <Text style={styles.orderHint}>服务加载中...</Text>
+                ) : (
+                  services.map((service) => (
+                    <Pressable
+                      key={service.companionServiceId}
+                      onPress={() =>
+                        setSelectedServiceId(service.companionServiceId)
+                      }
+                      style={[
+                        styles.serviceOption,
+                        selectedServiceId === service.companionServiceId &&
+                          styles.serviceOptionActive,
+                      ]}
+                    >
+                      <Text style={styles.serviceOptionName}>{service.name}</Text>
+                      <Text style={styles.serviceOptionPrice}>
+                        {service.price} 星钻
+                      </Text>
+                    </Pressable>
+                  ))
+                )}
+                <View style={styles.quantityRow}>
+                  <Text style={styles.orderLabel}>数量</Text>
+                  <TextInput
+                    keyboardType="number-pad"
+                    value={quantity}
+                    onChangeText={setQuantity}
+                    style={styles.quantityInput}
+                  />
+                </View>
+                <TextInput
+                  placeholder="备注（选填）"
+                  value={remark}
+                  onChangeText={setRemark}
+                  style={styles.remarkInput}
+                />
+                <Pressable
+                  onPress={() => setAgreed((value) => !value)}
+                  style={styles.agreementRow}
+                >
+                  <Text style={styles.checkbox}>{agreed ? "✓" : ""}</Text>
+                  <Text style={styles.agreementText}>我已阅读并同意服务协议</Text>
+                </Pressable>
+                <Text style={styles.orderTotal}>合计：{total} 星钻</Text>
+                <Pressable
+                  style={[
+                    styles.orderSubmit,
+                    (!agreed ||
+                      submitting ||
+                      (Boolean(token) && !selectedService)) &&
+                      styles.orderSubmitDisabled,
+                  ]}
+                  onPress={() => void submitOrder()}
+                  disabled={
+                    !agreed || submitting || (Boolean(token) && !selectedService)
+                  }
+                >
+                  <Text style={styles.orderSubmitText}>
+                    {submitting ? "提交中..." : "确认下单"}
+                  </Text>
+                </Pressable>
+              </>
+            </Animated.View>
+          </>
+        </Animated.View>
+      </KeyboardAvoidingView>
       <AppPrompt
         visible={Boolean(prompt)}
         title={prompt?.title}
@@ -1926,6 +1933,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "flex-end",
     backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  orderKeyboardAvoiding: {
+    flex: 1,
+    justifyContent: "flex-end",
   },
   orderModal: {
     backgroundColor: "#fff",

@@ -61,6 +61,7 @@ describe('message store', () => {
     receiveConversation?.(conversation);
     receiveMessage?.('42', { ...sentMessage, isMine: false }, { ...conversation, preview: 'hello', updatedAt: 10 });
     expect(store.getState().conversations[0].unreadCount).toBe(1);
+    expect(store.getState().conversations[0].isOnline).toBe(true);
     await store.getState().openConversation({ id: '42', title: 'Peer' });
     expect(store.getState().conversations[0].unreadCount).toBe(0);
   });
