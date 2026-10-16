@@ -3,7 +3,6 @@ import { Delete24Regular } from "@fluentui/react-native-icons";
 import { Paths } from "expo-file-system";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import Toast from "react-native-root-toast";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -16,6 +15,7 @@ import {
   Text,
   View,
 } from "react-native";
+import Toast from "react-native-root-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { queryClient } from "@/core/query/query-client";
@@ -40,7 +40,8 @@ function formatBytes(bytes: number | null) {
   if (bytes === null) return "暂不可用";
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024)
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
@@ -50,7 +51,9 @@ export default function BasicSettingsScreen() {
   const clearSession = useAuthStore((state) => state.clearSession);
   const [clearing, setClearing] = useState(false);
   const [cacheModalVisible, setCacheModalVisible] = useState(false);
-  const [cacheSize, setCacheSize] = useState<number | null>(() => readCacheSize());
+  const [cacheSize, setCacheSize] = useState<number | null>(() =>
+    readCacheSize(),
+  );
   const [loggingOut, setLoggingOut] = useState(false);
 
   const clearCache = () => setCacheModalVisible(true);
@@ -68,7 +71,9 @@ export default function BasicSettingsScreen() {
         }
         queryClient.clear();
         setCacheSize(readCacheSize());
-        Toast.show("清理完成，可重新下载的缓存已清除", { duration: Toast.durations.SHORT });
+        Toast.show("清理完成，可重新下载的缓存已清除", {
+          duration: Toast.durations.SHORT,
+        });
       } catch (error) {
         Toast.show(
           `清理失败，${error instanceof Error ? error.message : "请稍后重试"}`,
@@ -194,13 +199,18 @@ export default function BasicSettingsScreen() {
             </Text>
             <View style={styles.cacheSizePanel}>
               <Text style={styles.cacheSizeLabel}>可清理文件</Text>
-              <Text style={styles.cacheSizeValue}>{formatBytes(cacheSize)}</Text>
+              <Text style={styles.cacheSizeValue}>
+                {formatBytes(cacheSize)}
+              </Text>
             </View>
             <View style={styles.cacheModalActions}>
               <Pressable
                 accessibilityRole="button"
                 onPress={() => setCacheModalVisible(false)}
-                style={({ pressed }) => [styles.cacheCancelButton, pressed && styles.buttonPressed]}
+                style={({ pressed }) => [
+                  styles.cacheCancelButton,
+                  pressed && styles.buttonPressed,
+                ]}
               >
                 <Text style={styles.cacheCancelText}>取消</Text>
               </Pressable>
@@ -208,9 +218,17 @@ export default function BasicSettingsScreen() {
                 accessibilityRole="button"
                 disabled={clearing}
                 onPress={confirmClearCache}
-                style={({ pressed }) => [styles.cacheConfirmButton, pressed && styles.buttonPressed, clearing && styles.buttonDisabled]}
+                style={({ pressed }) => [
+                  styles.cacheConfirmButton,
+                  pressed && styles.buttonPressed,
+                  clearing && styles.buttonDisabled,
+                ]}
               >
-                {clearing ? <ActivityIndicator color="#FFF" /> : <Text style={styles.cacheConfirmText}>立即清理</Text>}
+                {clearing ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <Text style={styles.cacheConfirmText}>立即清理</Text>
+                )}
               </Pressable>
             </View>
           </View>
@@ -339,7 +357,6 @@ const styles = StyleSheet.create({
   cacheModalTitle: {
     marginTop: 14,
     color: "#111216",
-    fontFamily: DOUYIN_SANS,
     fontSize: 18,
     lineHeight: 25,
     fontWeight: "600",

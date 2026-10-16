@@ -17,6 +17,7 @@ export type MessageConversation = {
   avatar?: string;
   unreadCount: number;
   updatedAt: number;
+  isOnline?: boolean;
   clubId?: string;
   note?: string;
   isPinned?: boolean;

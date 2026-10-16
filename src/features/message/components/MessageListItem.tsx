@@ -21,12 +21,15 @@ export const MessageListItem = memo(function MessageListItem({
 }: MessageListItemProps) {
   return (
     <Pressable
-      accessibilityLabel={`${item.title}，${item.preview}`}
+      accessibilityLabel={`${item.title}${item.isOnline ? "，在线" : ""}，${item.preview}`}
       accessibilityRole="button"
       onPress={() => onPress(item)}
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
     >
-      <CachedImage source={item.avatar} style={styles.avatar} contentFit="cover" />
+      <View style={styles.avatarWrap}>
+        <CachedImage source={item.avatar} style={styles.avatar} contentFit="cover" />
+        {item.isOnline ? <View style={styles.onlineDot} /> : null}
+      </View>
       <View style={styles.content}>
         <View style={styles.heading}>
           <Text numberOfLines={1} style={styles.title}>
@@ -54,7 +57,19 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   rowPressed: { backgroundColor: "#FAFAFA" },
+  avatarWrap: { position: "relative", width: 40, height: 40 },
   avatar: { width: 40, height: 40, borderRadius: 20 },
+  onlineDot: {
+    position: "absolute",
+    right: -1,
+    bottom: -1,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+    backgroundColor: "#20C46B",
+  },
   content: { flex: 1, gap: 4 },
   heading: { flexDirection: "row", alignItems: "center", gap: 16 },
   title: {

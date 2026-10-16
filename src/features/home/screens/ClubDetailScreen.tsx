@@ -10,10 +10,11 @@ import {
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Easing,
+  FlatList,
   Modal,
   Pressable,
   ScrollView,
@@ -23,7 +24,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { CompanionFilters, GameKey } from "../api/home.types";
+import type { Companion, CompanionFilters, GameKey } from "../api/home.types";
 import {
   useClubCompanions,
   useClubDetail,
@@ -50,6 +51,8 @@ const filterDefinitions: { key: FilterKey; label: string }[] = [
   { key: "status", label: "状态" },
   { key: "price", label: "价格" },
 ];
+
+const memberKeyExtractor = (member: Companion) => String(member.profileId);
 
 export default function ClubDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -88,9 +91,45 @@ export default function ClubDetailScreen() {
     [club, priceSort, selectedGame, selectedMode, selectedSex, selectedStatus],
   );
   const companionsQuery = useClubCompanions(companionFilters);
-  const members =
-    companionsQuery.data?.pages.flatMap((page) => page.items) ?? [];
+  const members = useMemo(
+    () => companionsQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [companionsQuery.data],
+  );
   const voicePlayer = useVoicePlayer();
+  const clubId = club?.id ?? "";
+  const renderMember = useCallback(
+    ({ item }: { item: Companion }) => (
+      <MemberCard
+        clubId={clubId}
+        userId={item.userId}
+        image={item.headImage}
+        name={item.nickname}
+        description={item.signature}
+        gender={item.sex === 1 ? "male" : "female"}
+        price={item.price}
+        orderCount={item.orderCount}
+        voiceDuration={item.voiceDurationSeconds}
+        voiceUrl={item.voiceUrl}
+        voicePlaying={voicePlayer.playingUrl === item.voiceUrl}
+        onToggleVoice={voicePlayer.toggle}
+        status={
+          item.gameStatus === 1
+            ? "游戏中"
+            : item.onlineStatus === 1
+              ? "空闲中"
+              : undefined
+        }
+        statusColor={
+          item.gameStatus === 1
+            ? "#1e5eff"
+            : item.onlineStatus === 1
+              ? "#16c978"
+              : undefined
+        }
+      />
+    ),
+    [clubId, voicePlayer.playingUrl, voicePlayer.toggle],
+  );
   const [filterBackdropOpacity] = useState(() => new Animated.Value(0));
   const [filterSheetTranslateY] = useState(
     () => new Animated.Value(windowHeight),
@@ -478,49 +517,24 @@ export default function ClubDetailScreen() {
           </Pressable>
         </Pressable>
       </Modal>
-      <ScrollView
+      <FlatList
+        data={members}
+        keyExtractor={memberKeyExtractor}
+        renderItem={renderMember}
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={7}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 92 + insets.bottom }}
         style={styles.listScroll}
-      >
-        <View style={styles.list}>
-          {members.map((member) => (
-            <MemberCard
-              key={member.profileId}
-              clubId={club.id}
-              userId={member.userId}
-              image={member.headImage}
-              name={member.nickname}
-              description={member.signature}
-              gender={member.sex === 1 ? "male" : "female"}
-              price={member.price}
-              orderCount={member.orderCount}
-              voiceDuration={member.voiceDurationSeconds}
-              voiceUrl={member.voiceUrl}
-              playingVoiceUrl={voicePlayer.playingUrl}
-              onToggleVoice={voicePlayer.toggle}
-              status={
-                member.gameStatus === 1
-                  ? "游戏中"
-                  : member.onlineStatus === 1
-                    ? "空闲中"
-                    : undefined
-              }
-              statusColor={
-                member.gameStatus === 1
-                  ? "#1e5eff"
-                  : member.onlineStatus === 1
-                    ? "#16c978"
-                    : undefined
-              }
-            />
-          ))}
-          {companionsQuery.isLoading ? <ClubDetailMemberSkeletonList /> : null}
-          {!companionsQuery.isLoading && members.length === 0 && (
+        ListEmptyComponent={
+          companionsQuery.isLoading ? (
+            <ClubDetailMemberSkeletonList />
+          ) : (
             <EmptyState message="暂无大神" style={styles.memberEmpty} />
-          )}
-        </View>
-      </ScrollView>
+          )
+        }
+      />
       <View
         style={[
           styles.bottomBar,
@@ -641,7 +655,7 @@ function FilterOption({
   );
 }
 
-function MemberCard({
+const MemberCard = memo(function MemberCard({
   clubId,
   userId,
   image,
@@ -652,7 +666,7 @@ function MemberCard({
   orderCount,
   voiceDuration,
   voiceUrl,
-  playingVoiceUrl,
+  voicePlaying,
   onToggleVoice,
   status,
   statusColor,
@@ -667,13 +681,12 @@ function MemberCard({
   orderCount: number;
   voiceDuration?: number;
   voiceUrl?: string;
-  playingVoiceUrl: string | null;
+  voicePlaying: boolean;
   onToggleVoice: (voiceUrl: string) => void;
   status?: string;
   statusColor?: string;
 }) {
   const isPlaying = status === "游戏中";
-  const voicePlaying = Boolean(voiceUrl && playingVoiceUrl === voiceUrl);
   return (
     <Pressable
       style={styles.memberCard}
@@ -739,7 +752,7 @@ function MemberCard({
       </View>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   state: {

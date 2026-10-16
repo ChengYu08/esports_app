@@ -1,13 +1,14 @@
 import { useAuthStore } from "@esports/auth";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useFonts } from "expo-font";
-import { Stack } from "expo-router";
+import { router, Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { RootSiblingParent } from "react-native-root-siblings";
+import Toast from "react-native-root-toast";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { ApiError } from "@/core/network/api-client";
+import { setAuthExpiredHandler } from "@/core/network/api-client";
 import { queryClient } from "@/core/query/query-client";
 import { toAuthUser } from "@/features/auth/client-auth-flow";
 import { clientAuthApi } from "@/features/auth/client-auth.api";
@@ -56,11 +57,49 @@ export default function RootLayout() {
   const [sessionReady, setSessionReady] = useState(false);
   const [privacyReady, setPrivacyReady] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const authExpiryTask = useRef<Promise<void> | null>(null);
+  const needsLoginRedirect = useRef(false);
   const setSession = useAuthStore((state) => state.setSession);
   const clearSession = useAuthStore((state) => state.clearSession);
   const accessToken = useAuthStore((state) => state.accessToken);
   const initializeMessages = useMessageStore((state) => state.initialize);
   const resetMessages = useMessageStore((state) => state.reset);
+
+  useEffect(() => {
+    return setAuthExpiredHandler(async (_error, requestToken) => {
+      if (useAuthStore.getState().accessToken !== requestToken) return;
+      if (authExpiryTask.current) {
+        await authExpiryTask.current;
+        return;
+      }
+
+      needsLoginRedirect.current = true;
+      const task = (async () => {
+        await clearAuthSession().catch(() => undefined);
+        if (useAuthStore.getState().accessToken !== requestToken) {
+          needsLoginRedirect.current = false;
+          return;
+        }
+        clearSession();
+        queryClient.clear();
+      })();
+      authExpiryTask.current = task;
+      try {
+        await task;
+      } finally {
+        if (authExpiryTask.current === task) authExpiryTask.current = null;
+      }
+    });
+  }, [clearSession]);
+
+  useEffect(() => {
+    if (!needsLoginRedirect.current || !sessionReady || accessToken) return;
+    needsLoginRedirect.current = false;
+    router.replace("/login");
+    Toast.show("登录状态已失效，请重新登录", {
+      duration: Toast.durations.SHORT,
+    });
+  }, [accessToken, sessionReady]);
 
   useEffect(() => {
     if (accessToken && privacyAccepted) void initializeMessages(accessToken);
@@ -115,11 +154,8 @@ export default function RootLayout() {
         };
         await saveAuthSession(refreshedSession);
         if (active) setSession(refreshedSession);
-      } catch (requestError) {
-        if (requestError instanceof ApiError && requestError.status === 401) {
-          await clearAuthSession();
-          if (active) clearSession();
-        }
+      } catch {
+        // Profile refresh is best-effort at startup; auth expiry is handled centrally by apiClient.
       } finally {
         if (active) setSessionReady(true);
       }
@@ -147,7 +183,14 @@ export default function RootLayout() {
           {privacyAccepted ? (
             <Stack screenOptions={{ headerShown: false, gestureEnabled: true }}>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="login" options={{ animation: "none" }} />
+              <Stack.Screen
+                name="login"
+                options={{
+                  animation: "fade",
+                  animationMatchesGesture: false,
+                  fullScreenGestureEnabled: false,
+                }}
+              />
               <Stack.Screen
                 name="image-preview"
                 options={{ animation: "fade", headerShown: false }}

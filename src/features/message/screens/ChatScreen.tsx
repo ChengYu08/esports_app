@@ -3,7 +3,7 @@ import { HeadphonesRegular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -64,9 +64,6 @@ export default function ChatScreen() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const userId = useAuthStore((state) => state.user?.id);
   const myAvatarUrl = useAuthStore((state) => state.user?.headImage);
-  const [draft, setDraft] = useState("");
-  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
-  const [imageSending, setImageSending] = useState(false);
   const [afterSaleSending, setAfterSaleSending] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [noteVisible, setNoteVisible] = useState(false);
@@ -135,13 +132,44 @@ export default function ChatScreen() {
     defaultAvatar,
     conversationId,
   );
-  const myAvatar = myAvatarUrl ? { uri: myAvatarUrl } : defaultMyAvatar;
+  const myAvatar = useMemo(
+    () => myAvatarUrl ? { uri: myAvatarUrl } : defaultMyAvatar,
+    [myAvatarUrl],
+  );
   const imReady = connectionState === "ready";
   const isPinned = Boolean(conversation?.isPinned);
-  const scrollToLatest = () =>
+  const scrollToLatest = useCallback(
+    () => requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: false })),
+    [],
+  );
+  const handleSendText = useCallback(async (text: string) => {
+    if (isSelfConversation) return;
     requestAnimationFrame(() =>
-      listRef.current?.scrollToEnd({ animated: false }),
+      listRef.current?.scrollToEnd({ animated: true }),
     );
+    await sendText(conversationId, text);
+  }, [conversationId, isSelfConversation, sendText]);
+  const handleSendImage = useCallback(
+    (imageUri: string) => sendImage(conversationId, imageUri),
+    [conversationId, sendImage],
+  );
+  const handleRetryMessage = useCallback(
+    (clientId: string) => {
+      void retryMessage(conversationId, clientId);
+    },
+    [conversationId, retryMessage],
+  );
+  const renderMessage = useCallback(
+    ({ item }: { item: ManagedMessage }) => (
+      <ChatBubble
+        item={item}
+        peerAvatar={conversationAvatar}
+        myAvatar={myAvatar}
+        onRetry={handleRetryMessage}
+      />
+    ),
+    [conversationAvatar, handleRetryMessage, myAvatar],
+  );
 
   useEffect(() => {
     initialHistoryLoaded.current = false;
@@ -195,59 +223,21 @@ export default function ChatScreen() {
       scrollToLatest();
     }
     previousMessageCount.current = visibleMessages.length;
-  }, [historyState, visibleMessages.length]);
+  }, [historyState, scrollToLatest, visibleMessages.length]);
 
-  const sendMessage = async () => {
-    if (isSelfConversation) return;
-    const text = draft.trim();
-    if (!text) return;
-    setDraft("");
-    requestAnimationFrame(() =>
-      listRef.current?.scrollToEnd({ animated: true }),
-    );
-    await sendText(conversationId, text);
-  };
-
-  const selectEmoji = (emoji: EmojiType) => {
-    setDraft((current) => `${current}${emoji.emoji}`);
-  };
-
-  const pickImage = async () => {
-    if (imageSending || isSelfConversation) return;
-    setEmojiPickerOpen(false);
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert(
-        "需要访问相册",
-        "请在系统设置中允许访问照片，用于发送聊天图片。",
-      );
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      quality: 0.85,
-    });
-    if (result.canceled || !result.assets[0]) return;
-
-    const image = result.assets[0];
-    setImageSending(true);
-    await sendImage(conversationId, image.uri);
-    setImageSending(false);
-  };
-
-  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
     const distanceFromBottom =
       contentSize.height - layoutMeasurement.height - contentOffset.y;
     isNearBottom.current = distanceFromBottom <= 48;
     if (contentOffset.y < 24 && !historyLoading) void loadOlder(conversationId);
-  };
+  }, [conversationId, historyLoading, loadOlder]);
 
-  const handleContentSizeChange = () => {
+  const handleContentSizeChange = useCallback(() => {
     if (!shouldScrollToEnd.current) return;
     shouldScrollToEnd.current = false;
     scrollToLatest();
-  };
+  }, [scrollToLatest]);
 
   const openNoteEditor = () => {
     setNoteDraft(conversation?.note || "");
@@ -335,16 +325,7 @@ export default function ChatScreen() {
         contentContainerStyle={styles.messageList}
         data={visibleMessages}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <ChatBubble
-            item={item}
-            peerAvatar={conversationAvatar}
-            myAvatar={myAvatar}
-            onRetry={() =>
-              void retryMessage(conversationId, item.clientId || "")
-            }
-          />
-        )}
+        renderItem={renderMessage}
         showsVerticalScrollIndicator={false}
         onContentSizeChange={handleContentSizeChange}
         maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
@@ -399,78 +380,10 @@ export default function ChatScreen() {
         <Text style={styles.errorBanner}>{lastError}</Text>
       ) : null}
 
-      <View
-        style={[
-          styles.composer,
-          { paddingBottom: Math.max(insets.bottom, 16) },
-        ]}
-      >
-        <TextInput
-          accessibilityLabel="输入消息"
-          multiline
-          onChangeText={setDraft}
-          onFocus={() => setEmojiPickerOpen(false)}
-          placeholder="输入消息"
-          placeholderTextColor="#CCCCCC"
-          style={styles.input}
-          value={draft}
-        />
-        <View style={styles.composerActions}>
-          <View style={styles.toolButtons}>
-            <Pressable
-              accessibilityLabel="表情"
-              accessibilityRole="button"
-              hitSlop={8}
-              onPress={() => {
-                Keyboard.dismiss();
-                setEmojiPickerOpen(true);
-              }}
-              style={styles.toolButton}
-            >
-              <Image source={chatEmoji} style={styles.toolIcon} />
-            </Pressable>
-            <Pressable
-              accessibilityLabel="图片"
-              accessibilityRole="button"
-              disabled={imageSending}
-              hitSlop={8}
-              onPress={() => void pickImage()}
-              style={[
-                styles.toolButton,
-                imageSending && styles.toolButtonDisabled,
-              ]}
-            >
-              <Image source={chatPhoto} style={styles.toolIcon} />
-            </Pressable>
-          </View>
-          <Pressable
-            accessibilityLabel="发送消息"
-            accessibilityRole="button"
-            disabled={!draft.trim()}
-            onPress={() => void sendMessage()}
-            style={[
-              styles.sendButton,
-              !draft.trim() && styles.sendButtonDisabled,
-            ]}
-          >
-            <Text style={styles.sendText}>发送</Text>
-            <Image source={chatSend} style={styles.sendIcon} />
-          </Pressable>
-        </View>
-      </View>
-      <EmojiPicker
-        defaultHeight={340}
-        enableRecentlyUsed
-        onClose={() => setEmojiPickerOpen(false)}
-        onEmojiSelected={selectEmoji}
-        open={emojiPickerOpen}
-        theme={{
-          backdrop: "rgba(0, 0, 0, 0.18)",
-          knob: "#CCCCCC",
-          container: "#FFFFFF",
-          header: "#333333",
-          category: { icon: "#999999", iconActive: "#FE1F4C" },
-        }}
+      <ChatComposer
+        bottomInset={insets.bottom}
+        onSendText={handleSendText}
+        onSendImage={handleSendImage}
       />
       <BottomSheet
         visible={settingsVisible}
@@ -586,7 +499,135 @@ export default function ChatScreen() {
   );
 }
 
-function ChatBubble({
+const ChatComposer = memo(function ChatComposer({
+  bottomInset,
+  onSendText,
+  onSendImage,
+}: {
+  bottomInset: number;
+  onSendText: (text: string) => Promise<void>;
+  onSendImage: (imageUri: string) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState("");
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [imageSending, setImageSending] = useState(false);
+
+  const selectEmoji = useCallback((emoji: EmojiType) => {
+    setDraft((current) => `${current}${emoji.emoji}`);
+  }, []);
+
+  const sendMessage = async () => {
+    const text = draft.trim();
+    if (!text) return;
+    setDraft("");
+    await onSendText(text);
+  };
+
+  const pickImage = async () => {
+    if (imageSending) return;
+    setEmojiPickerOpen(false);
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        "需要访问相册",
+        "请在系统设置中允许访问照片，用于发送聊天图片。",
+      );
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.85,
+    });
+    if (result.canceled || !result.assets[0]) return;
+
+    setImageSending(true);
+    try {
+      await onSendImage(result.assets[0].uri);
+    } finally {
+      setImageSending(false);
+    }
+  };
+
+  return (
+    <>
+      <View
+        style={[
+          styles.composer,
+          { paddingBottom: Math.max(bottomInset, 16) },
+        ]}
+      >
+        <TextInput
+          accessibilityLabel="输入消息"
+          multiline
+          onChangeText={setDraft}
+          onFocus={() => setEmojiPickerOpen(false)}
+          placeholder="输入消息"
+          placeholderTextColor="#CCCCCC"
+          style={styles.input}
+          value={draft}
+        />
+        <View style={styles.composerActions}>
+          <View style={styles.toolButtons}>
+            <Pressable
+              accessibilityLabel="表情"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() => {
+                Keyboard.dismiss();
+                setEmojiPickerOpen(true);
+              }}
+              style={styles.toolButton}
+            >
+              <Image source={chatEmoji} style={styles.toolIcon} />
+            </Pressable>
+            <Pressable
+              accessibilityLabel="图片"
+              accessibilityRole="button"
+              disabled={imageSending}
+              hitSlop={8}
+              onPress={() => void pickImage()}
+              style={[
+                styles.toolButton,
+                imageSending && styles.toolButtonDisabled,
+              ]}
+            >
+              <Image source={chatPhoto} style={styles.toolIcon} />
+            </Pressable>
+          </View>
+          <Pressable
+            accessibilityLabel="发送消息"
+            accessibilityRole="button"
+            disabled={!draft.trim()}
+            onPress={() => void sendMessage()}
+            style={[
+              styles.sendButton,
+              !draft.trim() && styles.sendButtonDisabled,
+            ]}
+          >
+            <Text style={styles.sendText}>发送</Text>
+            <Image source={chatSend} style={styles.sendIcon} />
+          </Pressable>
+        </View>
+      </View>
+      <EmojiPicker
+        defaultHeight={340}
+        enableRecentlyUsed
+        onClose={() => setEmojiPickerOpen(false)}
+        onEmojiSelected={selectEmoji}
+        open={emojiPickerOpen}
+        theme={{
+          backdrop: "rgba(0, 0, 0, 0.18)",
+          knob: "#CCCCCC",
+          container: "#FFFFFF",
+          header: "#333333",
+          category: { icon: "#999999", iconActive: "#FE1F4C" },
+        }}
+      />
+    </>
+  );
+});
+
+const ChatBubble = memo(function ChatBubble({
   item,
   peerAvatar,
   myAvatar,
@@ -595,7 +636,7 @@ function ChatBubble({
   item: ManagedMessage;
   peerAvatar: string | number;
   myAvatar: { uri: string } | number;
-  onRetry: () => void;
+  onRetry: (clientId: string) => void;
 }) {
   const { width: windowWidth } = useWindowDimensions();
   const [imageRatio, setImageRatio] = useState(1);
@@ -709,13 +750,16 @@ function ChatBubble({
         />
       )}
       {item.status === "failed" ? (
-        <Pressable accessibilityRole="button" onPress={onRetry}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => onRetry(item.clientId || "")}
+        >
           <Text style={styles.retryLabel}>重试</Text>
         </Pressable>
       ) : null}
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F7F7" },

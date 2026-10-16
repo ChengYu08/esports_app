@@ -1,8 +1,8 @@
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { useAuthStore } from "@esports/auth";
-import { router } from "expo-router";
-import { useEffect, useMemo } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useMemo } from "react";
+import { AppState, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Toast from "react-native-root-toast";
@@ -29,6 +29,7 @@ export default function MessageScreen() {
   const lastError = useMessageStore((state) => state.lastError);
   const conversations = useMessageStore((state) => state.conversations);
   const blacklistedUserIds = useMessageStore((state) => state.blacklistedUserIds);
+  const refreshOnlineStatuses = useMessageStore((state) => state.refreshOnlineStatuses);
   const clearAllUnread = useMessageStore((state) => state.clearAllUnread);
 
   const handleClear = async () => {
@@ -39,6 +40,20 @@ export default function MessageScreen() {
   useEffect(() => {
     if (accessToken) void initialize(accessToken);
   }, [accessToken, initialize]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (accessToken) void refreshOnlineStatuses(accessToken);
+    }, [accessToken, refreshOnlineStatuses]),
+  );
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active" && accessToken)
+        void refreshOnlineStatuses(accessToken);
+    });
+    return () => subscription.remove();
+  }, [accessToken, refreshOnlineStatuses]);
 
   const items = useMemo<MessageListItemModel[]>(
     () =>

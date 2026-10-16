@@ -119,5 +119,10 @@ export function createClientAuthContract(requester: AuthRequester) {
         method: 'POST', token,
       }));
     },
+    async getUserOnlineStatus(token: string, userIds: string[]) {
+      return unwrap(await requester<Record<string, number>>('/client/v1/user/profile/online-status', {
+        method: 'POST', token, body: userIds,
+      }));
+    },
   };
 }

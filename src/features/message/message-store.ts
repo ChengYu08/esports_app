@@ -25,6 +25,7 @@ import {
   type MessageHistoryPage,
 } from './message-state';
 import type { AfterSaleCardPayload } from '@/features/order/after-sale-card';
+import { clientAuthApi } from '@/features/auth/client-auth.api';
 import {
   readBlacklist,
   subscribeBlacklist,
@@ -67,6 +68,7 @@ export type MessageStoreState = {
   openPeerIds: string[];
   activePeerId: string | null;
   lastError: string | null;
+  refreshOnlineStatuses: (token: string) => Promise<void>;
   initialize: (token: string) => Promise<void>;
   openConversation: (conversation: Pick<MessageConversation, 'id' | 'title' | 'avatar' | 'clubId'>) => Promise<void>;
   closeConversation: (peerId?: string) => void;
@@ -135,6 +137,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
   let stopMessageSubscription: (() => void) | undefined;
   let stopBlacklistSubscription: (() => void) | undefined;
   let blacklistRevision = 0;
+  let onlineStatusRequestId = 0;
 
   const store = createStore<MessageStoreState>((set, get) => {
     const applyBlacklist = (entries: BlacklistEntry[]) => {
@@ -220,6 +223,35 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       activePeerId: null,
       lastError: null,
 
+      refreshOnlineStatuses: async (token) => {
+        const requestId = ++onlineStatusRequestId;
+        if (!token) return;
+        const userIds = Array.from(new Set(
+          get().conversations
+            .filter((conversation) => !isSystemConversationId(conversation.id))
+            .map((conversation) => normalizeSystemConversationId(conversation.id))
+            .filter(Boolean),
+        ));
+        if (userIds.length === 0) return;
+
+        try {
+          const statuses = await clientAuthApi.getUserOnlineStatus(token, userIds);
+          if (requestId !== onlineStatusRequestId) return;
+          const requestedIds = new Set(userIds);
+          set((state) => ({
+            conversations: state.conversations.map((conversation) => {
+              if (isSystemConversationId(conversation.id)) {
+                return conversation.isOnline ? { ...conversation, isOnline: false } : conversation;
+              }
+              if (!requestedIds.has(conversation.id)) return conversation;
+              return { ...conversation, isOnline: Number(statuses[conversation.id]) === 1 };
+            }),
+          }));
+        } catch {
+          // Keep the previous snapshot if the request fails.
+        }
+      },
+
       initialize: async (token) => {
         if (!stopBlacklistSubscription) {
           stopBlacklistSubscription = subscribeBlacklist((entries) => {
@@ -261,6 +293,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
               )
               .reduce(mergeConversations, state.conversations),
           }));
+          void get().refreshOnlineStatuses(token);
           await Promise.allSettled(blockedConversationIds.map((peerId) => adapter.markRead(peerId)));
           stopMessageSubscription?.();
           stopMessageSubscription = adapter.subscribeMessages(receiveMessage);
@@ -415,6 +448,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       },
 
       reset: async () => {
+        onlineStatusRequestId += 1;
         stopMessageSubscription?.();
         stopBlacklistSubscription?.();
         stopMessageSubscription = undefined;

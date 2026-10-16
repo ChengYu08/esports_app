@@ -12,6 +12,30 @@ export class ApiError extends Error {
   }
 }
 
+type AuthExpiredHandler = (error: ApiError, requestToken: string) => void | Promise<void>;
+
+let authExpiredHandler: AuthExpiredHandler | null = null;
+
+const AUTH_EXPIRED_CODES = new Set([
+  '401',
+  'UNAUTHORIZED',
+  'NOT_LOGIN',
+  'NOT_LOGGED_IN',
+]);
+
+const AUTH_EXPIRY_IGNORED_PATHS = ['/client/v1/user/logout'];
+
+export function setAuthExpiredHandler(handler: AuthExpiredHandler | null) {
+  authExpiredHandler = handler;
+  return () => {
+    if (authExpiredHandler === handler) authExpiredHandler = null;
+  };
+}
+
+function isAuthExpiredResponse(status: number, code?: string): boolean {
+  return status === 401 || AUTH_EXPIRED_CODES.has(String(code ?? '').toUpperCase());
+}
+
 export type RequestOptions = Omit<RequestInit, 'body'> & {
   body?: unknown;
   timeoutMs?: number;
@@ -37,13 +61,31 @@ export async function apiClient<T>(path: string, options: RequestOptions = {}): 
       },
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
     });
-    const payload = (await response.json().catch(() => null)) as { message?: string; code?: string } | T | null;
+    const payload = (await response.json().catch(() => null)) as { info?: string; message?: string; code?: string } | T | null;
     logger.debug('api.request', { path, status: response.status, durationMs: Date.now() - startedAt });
 
-    if (!response.ok) {
-      const errorPayload = payload as { message?: string; code?: string } | null;
-      throw new ApiError(errorPayload?.message ?? '请求失败，请稍后重试', response.status, errorPayload?.code);
+    const errorPayload = payload as { info?: string; message?: string; code?: string } | null;
+    const requestError = new ApiError(
+      errorPayload?.info ?? errorPayload?.message ?? `请求失败，请稍后重试`,
+      response.status,
+      errorPayload?.code,
+    );
+    const authExpired = isAuthExpiredResponse(response.status, errorPayload?.code);
+
+    if (authExpired) {
+      const shouldHandleAuthExpiry = Boolean(token)
+        && !AUTH_EXPIRY_IGNORED_PATHS.some((ignoredPath) => path.includes(ignoredPath));
+      if (shouldHandleAuthExpiry) {
+        try {
+          await authExpiredHandler?.(requestError, token!);
+        } catch {
+          logger.warn('api.auth_expiry_handler_error', { path });
+        }
+      }
+      throw requestError;
     }
+
+    if (!response.ok) throw requestError;
     return payload as T;
   } catch (error) {
     if (error instanceof ApiError) throw error;
