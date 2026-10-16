@@ -10,7 +10,7 @@ import type { ProfileGameRouteParams, ProfileRouteParams } from "@/features/mine
 export function useProfileDetail(params: ProfileRouteParams | null) {
   return useQuery({
     queryKey: ["profile-detail", params?.clubId, params?.userId],
-    queryFn: () => fetchProfileDetail(params as ProfileRouteParams),
+    queryFn: ({ signal }) => fetchProfileDetail(params as ProfileRouteParams, signal),
     enabled: Boolean(params),
   });
 }
@@ -18,7 +18,7 @@ export function useProfileDetail(params: ProfileRouteParams | null) {
 export function useProfileGameDetail(params: ProfileGameRouteParams | null) {
   return useQuery({
     queryKey: ["profile-game-detail", params?.clubId, params?.userId, params?.gameId],
-    queryFn: () => fetchProfileGameDetail(params as ProfileGameRouteParams),
+    queryFn: ({ signal }) => fetchProfileGameDetail(params as ProfileGameRouteParams, signal),
     enabled: Boolean(params),
   });
 }
@@ -26,7 +26,7 @@ export function useProfileGameDetail(params: ProfileGameRouteParams | null) {
 export function useProfileReviews(params: { gameId: string; companionUserId: string } | null) {
   return useQuery({
     queryKey: ["profile-reviews", params?.gameId, params?.companionUserId],
-    queryFn: () => fetchProfileReviews(params as { gameId: string; companionUserId: string }),
+    queryFn: ({ signal }) => fetchProfileReviews(params as { gameId: string; companionUserId: string; signal?: AbortSignal }),
     enabled: Boolean(params),
   });
 }

@@ -30,7 +30,7 @@ export function useUserFollowCount(userId?: string) {
 
   return useQuery({
     queryKey: userFollowCountQueryKey(userId),
-    queryFn: () => fetchUserFollowCount(userId as string, token ?? undefined),
+    queryFn: ({ signal }) => fetchUserFollowCount(userId as string, token ?? undefined, signal),
     enabled: Boolean(userId),
   });
 }
@@ -41,7 +41,7 @@ export function useUserFollowState(followUserId?: string) {
 
   return useQuery({
     queryKey: userFollowStateQueryKey(followUserId, viewerUserId),
-    queryFn: () => fetchUserFollowState(followUserId as string, token as string),
+    queryFn: ({ signal }) => fetchUserFollowState(followUserId as string, token as string, signal),
     enabled: Boolean(followUserId && token),
   });
 }
@@ -58,13 +58,14 @@ export function useUserFollowPage(userId: string | undefined, type: UserFollowTy
       viewerUserId,
       Boolean(token),
     ] as const,
-    queryFn: ({ pageParam }) =>
+    queryFn: ({ pageParam, signal }) =>
       fetchUserFollowPage({
         userId: userId as string,
         type,
         page: pageParam,
         pageSize: PAGE_SIZE,
         token: token ?? undefined,
+        signal,
       }),
     initialPageParam: 1,
     getNextPageParam: (lastPage) =>

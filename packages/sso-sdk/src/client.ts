@@ -1,3 +1,5 @@
+import axios, { isAxiosError } from "axios";
+
 import {
   createForgetPasswordRequest,
   createPasswordLoginRequest,
@@ -15,7 +17,7 @@ import { SsoError } from "./types";
 
 export class SsoClient {
   private readonly config: SsoClientConfig;
-  private readonly fetcher: typeof globalThis.fetch;
+  private readonly axiosInstance: ReturnType<typeof axios.create>;
 
   constructor(config: SsoClientConfig) {
     this.config = {
@@ -25,7 +27,10 @@ export class SsoClient {
         config.sourceType ??
         (config.os === "iOS" ? "dianjing-ios" : "dianjing-android"),
     };
-    this.fetcher = config.fetch ?? globalThis.fetch.bind(globalThis);
+    this.axiosInstance = axios.create({
+      baseURL: this.config.baseUrl,
+      timeout: this.config.timeoutMs ?? 15_000,
+    });
   }
 
   async request<T = unknown>(
@@ -53,47 +58,85 @@ export class SsoClient {
       () => controller.abort(),
       this.config.timeoutMs ?? 15_000,
     );
+
+    const parseBody = (raw: unknown): Record<string, unknown> | null | undefined => {
+      if (raw === undefined || raw === null || raw === "") return {};
+      if (typeof raw === "string") {
+        try {
+          return JSON.parse(raw);
+        } catch {
+          return null;
+        }
+      }
+      if (typeof raw === "object") return raw as Record<string, unknown>;
+      return null;
+    };
+    const readString = (value: unknown): string | undefined =>
+      typeof value === "string" ? value : undefined;
+
     try {
       const headers = {
         ...createSignature(data, method, this.config),
         AUTHORIZATION: `basic ${this.config.clientSecret}`,
         ...(options.headers ?? {}),
       };
+
+      const queryParams = new URLSearchParams(
+        Object.entries(data).map(([key, value]) => [key, String(value)]),
+      );
       const requestUrl =
         method === "GET"
-          ? `${this.config.baseUrl}${path}${path.includes("?") ? "&" : "?"}${new URLSearchParams(Object.entries(data).map(([key, value]) => [key, String(value)]))}`
-          : `${this.config.baseUrl}${path}`;
-      const response = await this.fetcher(requestUrl, {
-        method,
-        headers,
-        signal: controller.signal,
-        body: method === "GET" ? undefined : JSON.stringify(data),
-      });
-      const body = await response.json().catch(() => ({}));
+          ? `${path}${path.includes("?") ? "&" : "?"}${queryParams.toString()}`
+          : path;
+
+      let status = 0;
+      let rawBody: unknown;
+      try {
+        const response = await this.axiosInstance.request<string>({
+          url: requestUrl,
+          method,
+          headers,
+          signal: controller.signal,
+          data: method === "GET" ? undefined : JSON.stringify(data),
+          responseType: "text",
+          transformResponse: [(res) => res],
+        });
+        status = response.status;
+        rawBody = response.data;
+      } catch (error) {
+        if (isAxiosError(error) && error.response) {
+          status = error.response.status;
+          rawBody = error.response.data;
+        } else {
+          throw error;
+        }
+      }
+
+      const body = parseBody(rawBody);
       log({
-        status: response.status,
+        status,
         code: typeof body?.code === "string" ? body.code : undefined,
       });
-      if (!response.ok)
+      if (status < 200 || status >= 300)
         throw new SsoError(
-          body?.info ?? body?.message ?? `请求失败: ${response.status}`,
-          response.status,
-          body?.code,
+          readString(body?.info) ?? readString(body?.message) ?? `请求失败: ${status}`,
+          status,
+          readString(body?.code),
         );
       if (path.includes("/oauth2/token")) {
         if (!body?.access_token)
           throw new SsoError(
-            body?.info ?? body?.message ?? "获取 token 失败",
-            response.status,
-            body?.code,
+            readString(body?.info) ?? readString(body?.message) ?? "获取 token 失败",
+            status,
+            readString(body?.code),
           );
         return body as T;
       }
       if (options.skipCodeCheck || body?.code === "SUCCESS") return body as T;
       throw new SsoError(
-        body?.info ?? body?.message ?? "请求失败",
-        response.status,
-        body?.code,
+        readString(body?.info) ?? readString(body?.message) ?? "请求失败",
+        status,
+        readString(body?.code),
       );
     } catch (error) {
       if (!(error instanceof SsoError)) {

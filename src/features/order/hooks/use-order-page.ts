@@ -8,7 +8,7 @@ export function useOrderPage(filter: OrderFilter) {
   const buyerUserId = useAuthStore((state) => state.user?.id);
   return useQuery({
     queryKey: ["orders", filter, buyerUserId],
-    queryFn: () => fetchOrderPage(filter, token as string, buyerUserId as string),
+    queryFn: ({ signal }) => fetchOrderPage(filter, token as string, buyerUserId as string, 1, 10, signal),
     enabled: Boolean(token && buyerUserId),
   });
 }

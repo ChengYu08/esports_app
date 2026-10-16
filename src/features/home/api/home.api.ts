@@ -33,8 +33,8 @@ function requireSuccess<T>(response: ApiResponse<T>, fallback: string): T {
   return response.data;
 }
 
-export async function fetchClubDetail(id: string): Promise<ClubDetail> {
-  const response = await apiClient<ApiResponse<ApiClubDetail>>(`/client/v1/club/public/detail?id=${encodeURIComponent(id)}`);
+export async function fetchClubDetail(id: string, signal?: AbortSignal): Promise<ClubDetail> {
+  const response = await apiClient<ApiResponse<ApiClubDetail>>(`/client/v1/club/public/detail?id=${encodeURIComponent(id)}`, { signal });
   const data = requireSuccess(response, "俱乐部详情加载失败");
   return {
     id: String(data.id), name: data.clubName || "未命名俱乐部", logoUrl: data.logoUrl,
@@ -47,13 +47,13 @@ export async function fetchClubDetail(id: string): Promise<ClubDetail> {
   };
 }
 
-export async function fetchClubGameModes(gameId: string): Promise<ClubGameMode[]> {
-  const response = await apiClient<ApiResponse<ApiMode[]>>(`/client/v1/club/public/getGameModeList?id=${encodeURIComponent(gameId)}`);
+export async function fetchClubGameModes(gameId: string, signal?: AbortSignal): Promise<ClubGameMode[]> {
+  const response = await apiClient<ApiResponse<ApiMode[]>>(`/client/v1/club/public/getGameModeList?id=${encodeURIComponent(gameId)}`, { signal });
   return requireSuccess(response, "游戏模式加载失败").filter((item) => item.status !== 0).map((item) => ({ id: item.id, gameId: item.gameId ?? Number(gameId), modeName: item.modeName || `模式${item.id}` }));
 }
 
-export async function fetchPriceList(groupId: string): Promise<PriceListTab[]> {
-  const response = await apiClient<ApiResponse<ApiPriceConfig>>(`/client/v1/clubPageConfig/public/detail?groupId=${encodeURIComponent(groupId)}`);
+export async function fetchPriceList(groupId: string, signal?: AbortSignal): Promise<PriceListTab[]> {
+  const response = await apiClient<ApiResponse<ApiPriceConfig>>(`/client/v1/clubPageConfig/public/detail?groupId=${encodeURIComponent(groupId)}`, { signal });
   const data = requireSuccess(response, "价目表加载失败");
   return (data.tabs ?? [])
     .filter((tab) => Boolean(tab.imageUrl))
@@ -61,16 +61,16 @@ export async function fetchPriceList(groupId: string): Promise<PriceListTab[]> {
     .map((tab, index) => ({ menuTitle: tab.menuTitle || `分类${index + 1}`, imageUrl: tab.imageUrl as string, sortNo: tab.sortNo ?? index }));
 }
 
-export async function fetchCompanionPage(filters: CompanionFilters, page = 1, pageSize = 50): Promise<CompanionPage> {
+export async function fetchCompanionPage(filters: CompanionFilters, page = 1, pageSize = 50, signal?: AbortSignal): Promise<CompanionPage> {
   const response = await apiClient<ApiResponse<ApiCompanionPage>>("/client/v1/companion/public/page", {
-    method: "POST", body: { page, pageSize, action: { ...filters, clubId: Number(filters.clubId), gameId: Number(filters.gameId) } },
+    method: "POST", body: { page, pageSize, action: { ...filters, clubId: Number(filters.clubId), gameId: Number(filters.gameId) } }, signal,
   });
   const data = requireSuccess(response, "陪玩列表加载失败");
   return { items: (data.records ?? []).map((item) => ({ profileId: item.profileId, userId: item.userId ?? item.profileId, nickname: item.nickname || "未命名陪玩", headImage: item.headImage, sex: item.sex, signature: item.signature, voiceUrl: item.voiceUrl, voiceDurationSeconds: item.voiceDurationSeconds, orderCount: item.orderCount ?? 0, onlineStatus: item.onlineStatus ?? 0, gameStatus: item.gameStatus ?? 0, price: item.price ?? 0 })), hasMore: (data.page ?? page) < (data.totalPages ?? page), nextPage: page + 1 };
 }
 
-export async function fetchGames(): Promise<Game[]> {
-  const response = await apiClient<ApiEnvelope<ApiGame[]>>('/client/v1/game/public/games');
+export async function fetchGames(signal?: AbortSignal): Promise<Game[]> {
+  const response = await apiClient<ApiEnvelope<ApiGame[]>>('/client/v1/game/public/games', { signal });
   if (response.code !== 'SUCCESS' || !Array.isArray(response.data)) return [];
   return response.data.map((game) => ({
     id: Number(game.id),
@@ -81,10 +81,11 @@ export async function fetchGames(): Promise<Game[]> {
   }));
 }
 
-export async function fetchClubPage(game: GameKey, page: number, pageSize = 10): Promise<ClubPage> {
+export async function fetchClubPage(game: GameKey, page: number, pageSize = 10, signal?: AbortSignal): Promise<ClubPage> {
   const response = await apiClient<ApiEnvelope<ApiClubPage>>('/client/v1/club/public/recommend', {
     method: 'POST',
     body: { page, pageSize, action: { gameId: Number(game) } },
+    signal,
   });
   const data = response.data;
   const records = data?.records ?? [];

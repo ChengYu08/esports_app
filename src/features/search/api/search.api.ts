@@ -7,9 +7,10 @@ type ApiClub = { id: number | string; clubName?: string; logoUrl?: string; intro
 export type SearchUser = { profileId: number; clubId: number; userId: number; clubName?: string; nickname: string; headImage?: string; signature?: string; sex?: number };
 type ApiUser = Partial<SearchUser> & { profileId: number; userId?: number; nickname?: string };
 
-export async function searchClubs(keyword: string, page = 1, pageSize = 20): Promise<ClubPage> {
+export async function searchClubs(keyword: string, page = 1, pageSize = 20, signal?: AbortSignal): Promise<ClubPage> {
   const response = await apiClient<ApiEnvelope<ApiClubPage>>(
     `/client/v1/club/public/search?keyword=${encodeURIComponent(keyword)}&page=${page}&pageSize=${pageSize}`,
+    { signal },
   );
   if (response.code !== "SUCCESS" || !response.data) throw new Error(response.info || "俱乐部搜索失败");
   return {
@@ -28,9 +29,10 @@ export async function searchClubs(keyword: string, page = 1, pageSize = 20): Pro
   };
 }
 
-export async function searchUsers(keyword: string, page = 1, pageSize = 20) {
+export async function searchUsers(keyword: string, page = 1, pageSize = 20, signal?: AbortSignal) {
   const response = await apiClient<ApiEnvelope<{ page?: number; totalPages?: number; records?: ApiUser[] }>>(
     `/client/v1/companion/public/search?keyword=${encodeURIComponent(keyword)}&page=${page}&pageSize=${pageSize}`,
+    { signal },
   );
   if (response.code !== "SUCCESS" || !response.data) throw new Error(response.info || "用户搜索失败");
   return {

@@ -120,10 +120,11 @@ function mapFollowUser(data: ApiFollowUser): UserFollowUser | null {
 export async function fetchUserFollowState(
   followUserId: string,
   token: string,
+  signal?: AbortSignal,
 ): Promise<UserFollowState> {
   const data = await request<ApiFollowState>(
     `/client/v1/userFollow/state?followUserId=${encodeURIComponent(followUserId)}`,
-    { method: "GET", token },
+    { method: "GET", token, signal },
   );
   return mapFollowState(data);
 }
@@ -131,13 +132,14 @@ export async function fetchUserFollowState(
 export async function fetchUserFollowCount(
   userId: string,
   token?: string,
+  signal?: AbortSignal,
 ): Promise<UserFollowCount> {
   const path = token
     ? "/client/v1/userFollow/count"
     : "/client/v1/userFollow/public/count";
   const data = await request<ApiFollowCount>(
     `${path}?userId=${encodeURIComponent(userId)}`,
-    { method: "GET", ...(token ? { token } : {}) },
+    { method: "GET", signal, ...(token ? { token } : {}) },
   );
   return mapFollowCount(data);
 }
@@ -148,6 +150,7 @@ export async function fetchUserFollowPage(params: {
   page: number;
   pageSize: number;
   token?: string;
+  signal?: AbortSignal;
 }): Promise<UserFollowPage> {
   const path = params.token
     ? "/client/v1/userFollow/page"
@@ -162,6 +165,7 @@ export async function fetchUserFollowPage(params: {
     .join("&");
   const data = await request<ApiFollowPage>(`${path}?${query}`, {
     method: "GET",
+    signal: params.signal,
     ...(params.token ? { token: params.token } : {}),
   });
   const items = (data.records ?? data.list ?? [])

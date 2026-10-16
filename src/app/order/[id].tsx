@@ -51,7 +51,7 @@ export default function OrderDetailRoute() {
   } | null>(null);
   const detail = useQuery({
     queryKey: orderDetailQueryKey(id),
-    queryFn: async () => mapOrder(await fetchOrderDetail(id, token as string)),
+    queryFn: async ({ signal }) => mapOrder(await fetchOrderDetail(id, token as string, signal)),
     enabled: Boolean(id && token),
   });
   if (detail.isLoading)

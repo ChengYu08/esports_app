@@ -2,7 +2,7 @@ import type { Game } from "../../home/api/home.types";
 import type { MyRanking, RankingFilters, RankingItem } from "./ranking.types";
 
 type Envelope<T> = { code?: string; info?: string; data?: T };
-type Requester = <T>(path: string, options?: { token?: string }) => Promise<Envelope<T>>;
+type Requester = <T>(path: string, options?: { token?: string; signal?: AbortSignal }) => Promise<Envelope<T>>;
 type ApiItem = Omit<RankingItem, "userId" | "clubId" | "metricValue" | "distanceToPrev"> & {
   userId: number | string;
   clubId: number | string | null;
@@ -36,9 +36,9 @@ export function getRankingProfileParams(item: RankingItem) {
 
 export function createRankingContract(request: Requester) {
   return {
-    async fetchTop(filters: RankingFilters): Promise<RankingItem[]> {
+    async fetchTop(filters: RankingFilters, signal?: AbortSignal): Promise<RankingItem[]> {
       const data = requireSuccess(
-        await request<ApiItem[] | null>(`/client/v1/rank/top?${queryString(filters)}`),
+        await request<ApiItem[] | null>(`/client/v1/rank/top?${queryString(filters)}`, signal ? { signal } : undefined),
         "榜单加载失败，请重试",
       );
       return (data ?? []).map((item) => ({
@@ -51,10 +51,10 @@ export function createRankingContract(request: Requester) {
         distanceToPrev: item.distanceToPrev == null ? null : Number(item.distanceToPrev),
       }));
     },
-    async fetchMyRank(filters: RankingFilters, token: string): Promise<MyRanking> {
+    async fetchMyRank(filters: RankingFilters, token: string, signal?: AbortSignal): Promise<MyRanking> {
       if (!token) throw new Error("请先登录");
       const data = requireSuccess(
-        await request<ApiMyRanking | null>(`/client/v1/rank/myRank?${queryString(filters)}`, { token }),
+        await request<ApiMyRanking | null>(`/client/v1/rank/myRank?${queryString(filters)}`, { token, ...(signal ? { signal } : {}) }),
         "我的排名加载失败，请重试",
       );
       return {
@@ -63,9 +63,9 @@ export function createRankingContract(request: Requester) {
         metricValue: Number(data?.metricValue ?? 0),
       };
     },
-    async fetchGames(): Promise<Game[]> {
+    async fetchGames(signal?: AbortSignal): Promise<Game[]> {
       const data = requireSuccess(
-        await request<ApiGame[] | null>("/client/v1/game/public/games"),
+        await request<ApiGame[] | null>("/client/v1/game/public/games", { ...(signal ? { signal } : {}) }),
         "游戏筛选加载失败，请重试",
       );
       return (data ?? []).map((game) => ({

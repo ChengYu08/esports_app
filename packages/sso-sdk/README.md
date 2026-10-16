@@ -1,6 +1,6 @@
 # @esports/sso-sdk
 
-React Native 统一认证客户端，按 Web SSO 的 OAuth2 接口和签名协议实现。
+React Native 统一认证客户端，按 Web SSO 的 OAuth2 接口和签名协议实现。HTTP 传输基于 Axios；如需自定义传输（如拦截器、mock、代理），可在 `SsoClientConfig` 中传入可选的 `adapter`（Axios `AxiosAdapter`）。
 
 支持：
 

@@ -13,16 +13,16 @@ export function useRankingData(filters: RankingFilters) {
   // Share the same game shape/cache with Home, while surfacing business errors here.
   const games = useQuery({
     queryKey: ["home-games"],
-    queryFn: rankingApi.fetchGames,
+    queryFn: ({ signal }) => rankingApi.fetchGames(signal),
     enabled: filters.boardCode !== "GOD",
   });
   const top = useQuery({
     queryKey: ["ranking", "top", params],
-    queryFn: () => rankingApi.fetchTop(params),
+    queryFn: ({ signal }) => rankingApi.fetchTop(params, signal),
   });
   const myRank = useQuery({
     queryKey: ["ranking", "my", user?.id, token, params],
-    queryFn: () => rankingApi.fetchMyRank(params, token!),
+    queryFn: ({ signal }) => rankingApi.fetchMyRank(params, token!, signal),
     enabled: isAuthenticated,
     // Private data must not remain in an inactive account's cache.
     gcTime: 0,

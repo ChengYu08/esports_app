@@ -15,7 +15,7 @@ type ApiEnvelope<T> = {
 
 type ProfileRequester = <T>(
   path: string,
-  options: { method: "POST"; body: unknown },
+  options: { method: "POST"; body: unknown; signal?: AbortSignal },
 ) => Promise<ApiEnvelope<T>>;
 
 type ApiProfileGame = {
@@ -215,18 +215,19 @@ export function getFirstProfileGameId(games: { gameId: number }[]): string {
 
 export function createProfileContract(requester: ProfileRequester) {
   return {
-    async fetchProfileDetail(params: ProfileRouteParams) {
+    async fetchProfileDetail(params: ProfileRouteParams, signal?: AbortSignal) {
       const data = requireSuccess(
         await requester<ApiProfileDetail>("/client/v1/companion/public/detail", {
           method: "POST",
           body: { userId: toId(params.userId, "用户ID") },
+          ...(signal ? { signal } : {}),
         }),
         "个人主页加载失败",
       );
       return mapProfileDetail(data);
     },
 
-    async fetchProfileGameDetail(params: ProfileGameRouteParams) {
+    async fetchProfileGameDetail(params: ProfileGameRouteParams, signal?: AbortSignal) {
       const data = requireSuccess(
         await requester<ApiProfileGameDetail>("/client/v1/companion/public/game/detail", {
           method: "POST",
@@ -235,13 +236,14 @@ export function createProfileContract(requester: ProfileRequester) {
             userId: toId(params.userId, "用户ID"),
             gameId: toId(params.gameId, "游戏ID"),
           },
+          ...(signal ? { signal } : {}),
         }),
         "游戏技能加载失败",
       );
       return mapGameDetail(data);
     },
 
-    async fetchProfileReviews(params: { gameId: string; companionUserId: string; page?: number; pageSize?: number }) {
+    async fetchProfileReviews(params: { gameId: string; companionUserId: string; page?: number; pageSize?: number; signal?: AbortSignal }) {
       const page = params.page ?? 1;
       const pageSize = params.pageSize ?? 20;
       const data = requireSuccess(
@@ -255,6 +257,7 @@ export function createProfileContract(requester: ProfileRequester) {
               companionUserId: toId(params.companionUserId, "用户ID"),
             },
           },
+          ...(params.signal ? { signal: params.signal } : {}),
         }),
         "评价加载失败",
       );

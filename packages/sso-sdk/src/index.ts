@@ -7,4 +7,5 @@ export {
   createPasswordLoginRequest,
 } from "./password-requests";
 export type { PasswordRequest } from "./password-requests";
+export type { AxiosAdapter } from "axios";
 export type { HttpMethod, QuickLoginAuthToken, QuickLoginProvider, SsoClientConfig, SsoRequestLog, SsoRequestOptions, SsoSourceType, SsoToken } from "./types";

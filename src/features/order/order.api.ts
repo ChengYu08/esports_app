@@ -115,10 +115,11 @@ export async function fetchOrderReview(reviewId: number, token: string): Promise
   return response.data;
 }
 
-export async function fetchOrderDetail(orderId: string, token: string): Promise<ApiOrder> {
+export async function fetchOrderDetail(orderId: string, token: string, signal?: AbortSignal): Promise<ApiOrder> {
   const response = await apiClient<ApiEnvelope<ApiOrder>>(`/client/v1/order/getDetail?orderId=${encodeURIComponent(orderId)}`, {
     method: "GET",
     token,
+    signal,
     // The detail endpoint expects orderId as a query parameter.
     headers: { "Content-Type": "application/json" },
   });
@@ -127,12 +128,13 @@ export async function fetchOrderDetail(orderId: string, token: string): Promise<
   return nested && typeof nested === "object" ? { ...response.data, ...(nested as ApiOrder) } : response.data;
 }
 
-export async function fetchOrderPage(filter: OrderFilter, token: string, buyerUserId: string, page = 1, pageSize = 10) {
+export async function fetchOrderPage(filter: OrderFilter, token: string, buyerUserId: string, page = 1, pageSize = 10, signal?: AbortSignal) {
   const orderQryStatus = statusByFilter[filter];
   const response = await apiClient<ApiEnvelope<ApiPage<ApiOrder>>>("/client/v1/order/getPageList", {
     method: "POST",
     token,
     body: { page, pageSize, action: { buyerUserId: Number(buyerUserId), ...(orderQryStatus ? { orderQryStatus } : {}) } },
+    signal,
   });
   if (response.code !== "SUCCESS" || response.data === undefined) throw new Error(response.info || "订单加载失败");
   const data = response.data;

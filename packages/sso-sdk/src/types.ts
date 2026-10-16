@@ -1,3 +1,5 @@
+import type { AxiosAdapter } from "axios";
+
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
 
 export type SsoToken = {
@@ -31,7 +33,8 @@ export type SsoClientConfig = {
   sourceType?: SsoSourceType;
   /** Optional diagnostic hook. It never receives request bodies or credentials. */
   onRequestLog?: (log: SsoRequestLog) => void;
-  fetch?: typeof globalThis.fetch;
+  /** Optional Axios transport override for host apps and deterministic callers. */
+  adapter?: AxiosAdapter;
   timeoutMs?: number;
 };
 

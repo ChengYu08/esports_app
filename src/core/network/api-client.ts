@@ -1,5 +1,8 @@
-import { env } from '@/core/config/env';
-import { logger } from '@/core/logging/logger';
+import { isAxiosError, isCancel, type Method } from "axios";
+
+import { logger } from "@/core/logging/logger";
+
+import { apiAxios } from "./axios-instance";
 
 export class ApiError extends Error {
   constructor(
@@ -36,6 +39,43 @@ function isAuthExpiredResponse(status: number, code?: string): boolean {
   return status === 401 || AUTH_EXPIRED_CODES.has(String(code ?? '').toUpperCase());
 }
 
+type ResponseErrorPayload = { info?: string; message?: string; code?: string } | null;
+
+function readErrorPayload(payload: unknown): ResponseErrorPayload {
+  if (!payload || typeof payload !== 'object') return null;
+  return payload as ResponseErrorPayload;
+}
+
+async function processResponse<T>(
+  path: string,
+  status: number,
+  payload: unknown,
+  token?: string,
+): Promise<T> {
+  const errorPayload = readErrorPayload(payload);
+  const requestError = new ApiError(
+    errorPayload?.info ?? errorPayload?.message ?? `请求失败，请稍后重试`,
+    status,
+    errorPayload?.code,
+  );
+
+  if (isAuthExpiredResponse(status, errorPayload?.code)) {
+    const shouldHandleAuthExpiry = Boolean(token)
+      && !AUTH_EXPIRY_IGNORED_PATHS.some((ignoredPath) => path.includes(ignoredPath));
+    if (shouldHandleAuthExpiry) {
+      try {
+        await authExpiredHandler?.(requestError, token!);
+      } catch {
+        logger.warn('api.auth_expiry_handler_error', { path });
+      }
+    }
+    throw requestError;
+  }
+
+  if (status < 200 || status >= 300) throw requestError;
+  return payload as T;
+}
+
 export type RequestOptions = Omit<RequestInit, 'body'> & {
   body?: unknown;
   timeoutMs?: number;
@@ -44,54 +84,34 @@ export type RequestOptions = Omit<RequestInit, 'body'> & {
 };
 
 export async function apiClient<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 15_000);
+  const { token, timeoutMs, body, method } = options;
   const startedAt = Date.now();
 
   try {
-    const { token, timeoutMs: _timeoutMs, ...requestOptions } = options;
-    const response = await fetch(`${env.apiBaseUrl}${path}`, {
-      ...requestOptions,
-      signal: controller.signal,
+    const response = await apiAxios.request<T>({
+      url: path,
+      method: (method as Method | undefined) ?? 'GET',
+      data: body === undefined ? undefined : JSON.stringify(body),
       headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
         ...(token ? { token } : {}),
-        ...options.headers,
+        ...(options.headers as Record<string, string> | undefined),
       },
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      timeout: timeoutMs,
+      signal: options.signal ?? undefined,
     });
-    const payload = (await response.json().catch(() => null)) as { info?: string; message?: string; code?: string } | T | null;
     logger.debug('api.request', { path, status: response.status, durationMs: Date.now() - startedAt });
+    return await processResponse<T>(path, response.status, response.data, token);
+  } catch (error) {
+    // React Query 取消请求时原样抛出，不当作网络失败。
+    if (isCancel(error)) throw error;
+    if (error instanceof ApiError) throw error;
 
-    const errorPayload = payload as { info?: string; message?: string; code?: string } | null;
-    const requestError = new ApiError(
-      errorPayload?.info ?? errorPayload?.message ?? `请求失败，请稍后重试`,
-      response.status,
-      errorPayload?.code,
-    );
-    const authExpired = isAuthExpiredResponse(response.status, errorPayload?.code);
-
-    if (authExpired) {
-      const shouldHandleAuthExpiry = Boolean(token)
-        && !AUTH_EXPIRY_IGNORED_PATHS.some((ignoredPath) => path.includes(ignoredPath));
-      if (shouldHandleAuthExpiry) {
-        try {
-          await authExpiredHandler?.(requestError, token!);
-        } catch {
-          logger.warn('api.auth_expiry_handler_error', { path });
-        }
-      }
-      throw requestError;
+    if (isAxiosError(error) && error.response) {
+      logger.debug('api.request', { path, status: error.response.status, durationMs: Date.now() - startedAt });
+      return await processResponse<T>(path, error.response.status, error.response.data, token);
     }
 
-    if (!response.ok) throw requestError;
-    return payload as T;
-  } catch (error) {
-    if (error instanceof ApiError) throw error;
     logger.warn('api.network_error', { path, durationMs: Date.now() - startedAt });
     throw new ApiError('网络连接失败，请检查网络后重试', 0);
-  } finally {
-    clearTimeout(timeout);
   }
 }
