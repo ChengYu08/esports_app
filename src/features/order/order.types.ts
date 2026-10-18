@@ -37,7 +37,10 @@ export type OrderItemModel = {
   status: OrderStatus;
   statusLabel: string;
   sellerName: string;
+  buyerUserId?: string;
   receiverUserId?: string;
+  receiverName?: string;
+  receiverAvatar?: ImageSource;
   clubId?: number;
   reviewId?: number;
   reviewExists?: boolean;
@@ -56,6 +59,8 @@ export type OrderItemModel = {
   createTime?: string;
   paidTime?: string;
   acceptedTime?: string;
+  dispatchTime?: string;
+  dispatchDeadline?: string;
   serviceStartTime?: string;
   serviceEndTime?: string;
   completedTime?: string;

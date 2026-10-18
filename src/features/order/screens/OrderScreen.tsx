@@ -9,6 +9,7 @@ import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
 import { OrderCard } from "../components/OrderCard";
 import { OrderAfterSaleSheet } from "../components/OrderAfterSaleSheet";
+import { OrderCompleteConfirmSheet } from "../components/OrderCompleteConfirmSheet";
 import { buildAfterSalePayload } from "../after-sale-card";
 import { OrderReviewSheet } from "../components/OrderReviewSheet";
 import { OrderHeader } from "../components/OrderHeader";
@@ -36,8 +37,11 @@ export default function OrderScreen() {
     : filter === "grabbing" || filter === "history" ? "all" : filter;
   const orders = useOrderPage(scope, visibleFilter);
   const token = useAuthStore((state) => state.accessToken);
+  const currentUser = useAuthStore((state) => state.user);
   const [cancelTarget, setCancelTarget] = useState<OrderItemModel | null>(null);
   const [completeTarget, setCompleteTarget] = useState<OrderItemModel | null>(null);
+  const [completePromptVisible, setCompletePromptVisible] = useState(false);
+  const [completing, setCompleting] = useState(false);
   const [afterSaleTarget, setAfterSaleTarget] = useState<OrderItemModel | null>(null);
   const [afterSaleMembers, setAfterSaleMembers] = useState<AfterSaleMember[]>([]);
   const [afterSaleLoading, setAfterSaleLoading] = useState(false);
@@ -59,7 +63,10 @@ export default function OrderScreen() {
       return;
     }
     if (action === "cancel") setCancelTarget(item);
-    if (action === "complete") setCompleteTarget(item);
+    if (action === "complete") {
+      setCompleteTarget(item);
+      setCompletePromptVisible(true);
+    }
     if (action === "free") setFreeTarget(item);
     if (action === "grab" && item.requestNo && token) {
       try {
@@ -113,15 +120,19 @@ export default function OrderScreen() {
   };
 
   const confirmComplete = async () => {
-    if (!completeTarget || !token) return;
+    if (!completeTarget || !token || completing) return;
     const target = completeTarget;
-    setCompleteTarget(null);
+    if (scope !== "accept") setCompletePromptVisible(false);
+    setCompleting(true);
     try {
       await completeOrderRequest(target.id, token);
+      setCompletePromptVisible(false);
       await invalidateOrderQueries(target.id);
       await orders.refetch();
     } catch (error) {
       setPrompt({ title: "完成订单失败", message: error instanceof Error ? error.message : "请稍后重试" });
+    } finally {
+      setCompleting(false);
     }
   };
 
@@ -151,7 +162,14 @@ export default function OrderScreen() {
         onEndReached={() => { if (orders.hasNextPage && !orders.isFetchingNextPage) void orders.fetchNextPage(); }}
         onEndReachedThreshold={0.35}
         renderItem={({ item }) => (
-          <OrderCard item={item} onAction={handleOrderAction} onPress={item.requestNo ? undefined : (order) => router.push(`/order/${order.id}`)} />
+          <OrderCard
+            item={item}
+            onAction={handleOrderAction}
+            onPress={(order) => {
+              if (order.requestNo) router.push(`/order/dispatch/${encodeURIComponent(order.requestNo)}`);
+              else router.push(`/order/${order.id}?scope=${scope}`);
+            }}
+          />
         )}
         refreshControl={<RefreshControl refreshing={orders.isRefetching} onRefresh={() => void orders.refetch()} tintColor="#ff214b" />}
         showsVerticalScrollIndicator={false}
@@ -174,14 +192,28 @@ export default function OrderScreen() {
       }} />
       <OrderReviewSheet visible={Boolean(reviewTarget)} readonly={Boolean(reviewTarget?.reviewExists)} detail={reviewDetail} onClose={() => setReviewTarget(null)} onSubmit={async (rating, content) => { if (!reviewTarget || !token) return; await submitOrderReview(reviewTarget.orderNo || reviewTarget.id, rating, content, token); setReviewTarget((current) => current ? { ...current, reviewExists: true } : current); setReviewDetail({ rating, content }); await orders.refetch(); }} />
       <AppPrompt
-        visible={Boolean(completeTarget)}
+        visible={completePromptVisible && scope !== "accept"}
         title="提示"
         message={`确定完成订单吗，订单号：${completeTarget?.orderNo ?? completeTarget?.id ?? ""}`}
         cancelText="取消"
         confirmText="确认"
-        onCancel={() => setCompleteTarget(null)}
+        onCancel={() => setCompletePromptVisible(false)}
         onConfirm={() => void confirmComplete()}
       />
+      {completeTarget ? (
+        <OrderCompleteConfirmSheet
+          visible={completePromptVisible && scope === "accept"}
+          order={completeTarget}
+          companionName={completeTarget.receiverName || currentUser?.nickname || "陪玩师"}
+          companionAvatar={completeTarget.receiverAvatar ?? (currentUser?.headImage ? { uri: currentUser.headImage } : undefined)}
+          serviceTime={(completeTarget.serviceStartTime || completeTarget.serviceEndTime || completeTarget.createTime || "-").replace("T", " ").slice(0, 19)}
+          loading={completing}
+          onClose={() => {
+            if (!completing) setCompletePromptVisible(false);
+          }}
+          onConfirm={() => void confirmComplete()}
+        />
+      ) : null}
       <AppPrompt
         visible={Boolean(freeTarget)}
         title="确认免单"

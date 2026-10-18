@@ -4,11 +4,14 @@ import type { OrderItemModel } from "./order.types";
 type ApiEnvelope<T> = { code?: string; info?: string; data?: T };
 type ApiPage<T> = { records?: T[]; list?: T[]; total?: number };
 
-type DispatchRequest = {
+export type DispatchRequest = {
   requestNo: string;
   publishType?: string;
+  buyerUserId?: number | string;
   buyerNickname?: string;
   buyerHeadImage?: string;
+  clubId?: number | string;
+  clubName?: string;
   gameName?: string;
   gameIconUrl?: string;
   modeName?: string;
@@ -16,13 +19,22 @@ type DispatchRequest = {
   serviceName?: string;
   billingUnitName?: string;
   quantity?: number;
+  needVoice?: boolean;
+  genderRequirement?: number;
   maleUnitPrice?: number | string;
   femaleUnitPrice?: number | string;
-  needVoice?: boolean;
+  unitDurationMinutes?: number;
   remark?: string;
   status?: string;
   grabbed?: boolean;
   currentGrabStatus?: string;
+  grabCount?: number;
+  orderId?: number | string | null;
+  selectedGrabId?: number | string | null;
+  roomId?: number | string | null;
+  roomVersion?: number | string | null;
+  expireTime?: string;
+  endTime?: string;
   createTime?: string;
 };
 
@@ -109,6 +121,15 @@ export async function fetchDispatchPage(
     total: result.total,
     hasMore: result.records.length >= pageSize && page * pageSize < result.total,
   };
+}
+
+export async function fetchDispatchDetail(requestNo: string, token: string, signal?: AbortSignal): Promise<DispatchRequest> {
+  const response = await apiClient<ApiEnvelope<DispatchRequest>>(
+    `/client/v1/quickMatch/detail?requestNo=${encodeURIComponent(requestNo)}`,
+    { method: "GET", token, signal },
+  );
+  if (response.code !== "SUCCESS" || !response.data) throw new Error(response.info || "派单详情加载失败");
+  return response.data;
 }
 
 export async function grabDispatchRequest(requestNo: string, token: string) {

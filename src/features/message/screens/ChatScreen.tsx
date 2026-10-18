@@ -940,8 +940,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
   },
-  imageBubble: { padding: 0, overflow: "hidden" },
-  messageImage: { backgroundColor: "#F2F2F2" },
+  imageBubble: {
+    padding: 0,
+    overflow: "hidden",
+    backgroundColor: "transparent",
+    borderWidth: 0,
+  },
+  messageImage: { backgroundColor: "transparent" },
   composer: {
     backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 12,

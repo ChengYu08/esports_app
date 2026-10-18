@@ -76,6 +76,7 @@ export type MessageStoreState = {
   activePeerId: string | null;
   lastError: string | null;
   refreshOnlineStatuses: (token: string) => Promise<void>;
+  refreshConversations: (token: string) => Promise<void>;
   initialize: (token: string) => Promise<void>;
   openConversation: (conversation: Pick<MessageConversation, 'id' | 'title' | 'avatar' | 'clubId'>) => Promise<void>;
   closeConversation: (peerId?: string) => void;
@@ -179,6 +180,24 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
 
     const receiveMessage = (peerId: string, message: ManagedMessage, conversation: MessageConversation) => {
       const normalizedPeerId = normalizeSystemConversationId(peerId);
+      const normalizedConversationTitle = getSystemConversationTitle(normalizedPeerId, conversation.title);
+      const isActive = get().activePeerId === normalizedPeerId;
+      const preview = message.kind === 'image'
+        ? '[图片]'
+        : message.kind === 'afterSale' || message.kind === 'orderNotify'
+          ? message.title
+          : message.text;
+      logger.info('message.new', {
+        peerId: normalizedPeerId,
+        conversationTitle: normalizedConversationTitle,
+        messageId: message.id,
+        messageKind: message.kind,
+        preview: preview || '新消息',
+        isSystemConversation: isSystemConversationId(normalizedPeerId),
+        isMine: message.isMine,
+        isActive,
+        sentAt: message.sentAt,
+      });
       if (
         !isSystemConversationId(normalizedPeerId)
         && get().blacklistedUserIds.includes(normalizedPeerId)
@@ -186,14 +205,8 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         void adapter.markRead(normalizedPeerId).catch(() => undefined);
         return;
       }
-      const normalizedConversation = { ...conversation, id: normalizedPeerId, title: getSystemConversationTitle(normalizedPeerId, conversation.title) };
-      const isActive = get().activePeerId === normalizedPeerId;
+      const normalizedConversation = { ...conversation, id: normalizedPeerId, title: normalizedConversationTitle };
       if (!isActive && !message.isMine) {
-        const preview = message.kind === 'image'
-          ? '[图片]'
-          : message.kind === 'afterSale' || message.kind === 'orderNotify'
-            ? message.title
-            : message.text;
         dispatchInAppNotification({
           peerId: normalizedPeerId,
           title: getSystemConversationTitle(normalizedPeerId, normalizedConversation.title),
@@ -355,6 +368,23 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         } catch {
           // Keep the previous snapshot if the request fails.
         }
+      },
+
+      refreshConversations: async (token) => {
+        if (!token) return;
+        onlineStatusToken = token;
+        if (get().connectionState === 'ready') {
+          try {
+            await syncConversations(lifecycleRevision);
+          } catch (error) {
+            logger.warn('Message conversation refresh failed', {
+              stage: 'message-conversation-refresh',
+              errorName: error instanceof Error ? error.name : typeof error,
+            });
+          }
+          return;
+        }
+        await get().initialize(token);
       },
 
       initialize: async (token) => {

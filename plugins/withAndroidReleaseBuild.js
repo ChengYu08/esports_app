@@ -13,6 +13,7 @@ function withAndroidReleaseBuild(config) {
     set('reactNativeArchitectures', 'arm64-v8a');
     set('android.enableMinifyInReleaseBuilds', 'true');
     set('android.enableShrinkResourcesInReleaseBuilds', 'true');
+    set('android.enablePngCrunchInReleaseBuilds', 'false');
     return mod;
   });
 
@@ -57,4 +58,4 @@ tasks.matching { it.name == 'validateSigningRelease' }.configureEach {
   });
 }
 
-module.exports = createRunOncePlugin(withAndroidReleaseBuild, TAG, '2.0.0');
+module.exports = createRunOncePlugin(withAndroidReleaseBuild, TAG, '2.1.0');

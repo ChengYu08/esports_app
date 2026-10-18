@@ -34,6 +34,7 @@ export default function MessageScreen() {
   const lastError = useMessageStore((state) => state.lastError);
   const conversations = useMessageStore((state) => state.conversations);
   const blacklistedUserIds = useMessageStore((state) => state.blacklistedUserIds);
+  const refreshConversations = useMessageStore((state) => state.refreshConversations);
   const refreshOnlineStatuses = useMessageStore((state) => state.refreshOnlineStatuses);
   const clearAllUnread = useMessageStore((state) => state.clearAllUnread);
 
@@ -42,14 +43,11 @@ export default function MessageScreen() {
     Toast.show("清理完成", { duration: Toast.durations.SHORT });
   };
 
-  useEffect(() => {
-    if (accessToken) void initialize(accessToken);
-  }, [accessToken, initialize]);
-
   useFocusEffect(
     useCallback(() => {
-      if (accessToken) void refreshOnlineStatuses(accessToken);
-    }, [accessToken, refreshOnlineStatuses]),
+      if (!accessToken) return;
+      void refreshConversations(accessToken);
+    }, [accessToken, refreshConversations]),
   );
 
   useEffect(() => {

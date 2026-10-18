@@ -13,6 +13,11 @@ const statusByFilter: Partial<Record<OrderFilter, OrderQueryStatus>> = {
   completed: "FINISHED",
   cancelled: "CANCELED",
 };
+const acceptStatusLabelByFilter: Partial<Record<OrderFilter, string>> = {
+  inProgress: "服务中",
+  completed: "已结束",
+  cancelled: "已退款",
+};
 
 function stringValue(item: ApiOrder, ...keys: string[]) {
   const value = keys.map((key) => item[key]).find((candidate) => candidate !== undefined && candidate !== null && candidate !== "");
@@ -30,8 +35,14 @@ function recordsFrom(data: ApiPage<ApiOrder> | undefined) {
   return data?.records ?? data?.list ?? [];
 }
 
-export function mapOrder(item: ApiOrder, index = 0, scope: OrderScope = "place"): OrderItemModel {
+export function mapOrder(
+  item: ApiOrder,
+  index = 0,
+  scope: OrderScope = "place",
+  filter?: OrderFilter,
+): OrderItemModel {
   const gameIcon = stringValue(item, "gameIconUrl");
+  const receiverAvatar = stringValue(item, "receiverHeadImage", "companionHeadImage");
   const rawStatus = stringValue(item, "orderStatus", "status", "orderQryStatus")?.toUpperCase();
   const status: OrderItemModel["status"] = rawStatus === "PENDING_PAY" ? "pendingPayment"
     : rawStatus === "PAID" ? "paid"
@@ -44,13 +55,15 @@ export function mapOrder(item: ApiOrder, index = 0, scope: OrderScope = "place")
     : "pendingPayment";
   const id = stringValue(item, "id", "orderId", "orderNo") ?? `order-${index}`;
   const total = stringValue(item, "realPayAmount", "totalPrice", "payAmount", "amount") ?? "0";
-  const statusLabel = scope === "accept" ? {
-    pendingPayment: "待支付", paid: "用户已支付", waitingService: "待服务",
-    inService: "服务中", completed: "已结束", cancelled: "已取消", refunded: "已退款",
-  }[status] : {
-    pendingPayment: "待支付", paid: "已支付", waitingService: "待服务",
-    inService: "服务中", completed: "已完成", cancelled: "已取消", refunded: "已退款",
-  }[status];
+  const statusLabel = scope === "accept"
+    ? acceptStatusLabelByFilter[filter ?? "all"] ?? {
+        pendingPayment: "待支付", paid: "用户已支付", waitingService: "待服务",
+        inService: "服务中", completed: "已结束", cancelled: "已取消", refunded: "已退款",
+      }[status]
+    : {
+        pendingPayment: "待支付", paid: "已支付", waitingService: "待服务",
+        inService: "服务中", completed: "已完成", cancelled: "已取消", refunded: "已退款",
+      }[status];
   const reviewId = numberValue(item, "reviewId", "orderReviewId");
   const reviewExists = item.reviewExists === true || reviewId !== undefined;
   const placeActions: OrderItemModel["actions"] = status === "pendingPayment"
@@ -69,7 +82,9 @@ export function mapOrder(item: ApiOrder, index = 0, scope: OrderScope = "place")
     ? Date.now() >= serviceEnd
     : Number.isFinite(serviceStart) && Date.now() >= serviceStart + Math.max(1, numberValue(item, "quantity", "count", "num") ?? 1) * 3_600_000;
   const settled = item.isSettle === true;
-  const acceptActions: OrderItemModel["actions"] = settled
+  const acceptActions: OrderItemModel["actions"] = status === "completed"
+    ? []
+    : settled
     ? status === "inService" && serviceEnded ? [{ key: "complete", label: "完成服务", variant: "primary" }] : []
     : status === "paid"
     ? [{ key: "reject", label: "拒绝", variant: "secondary" }, { key: "accept", label: "同意接单", variant: "primary" }]
@@ -79,13 +94,16 @@ export function mapOrder(item: ApiOrder, index = 0, scope: OrderScope = "place")
         ? serviceEnded
           ? [{ key: "free", label: "免单", variant: "secondary" }, { key: "complete", label: "完成服务", variant: "primary" }]
           : [{ key: "free", label: "免单", variant: "secondary" }]
-        : status === "completed" ? [{ key: "free", label: "免单", variant: "secondary" }] : [];
+        : [];
   return {
     id,
     orderNo: stringValue(item, "orderNo", "orderNumber") ?? id,
     status,
     statusLabel,
+    buyerUserId: stringValue(item, "buyerUserId"),
     receiverUserId: stringValue(item, "receiverUserId"),
+    receiverName: stringValue(item, "receiverNickname", "companionName"),
+    receiverAvatar: receiverAvatar ? { uri: receiverAvatar } : undefined,
     clubId: numberValue(item, "companionClubId", "clubId", "receiverClubId"),
     reviewId,
     reviewExists,
@@ -104,6 +122,8 @@ export function mapOrder(item: ApiOrder, index = 0, scope: OrderScope = "place")
     totalPrice: total,
     remark: stringValue(item, "remark", "buyerRemark"),
     ...times,
+    dispatchTime: stringValue(item, "dispatchTime", "assignedTime", "acceptedTime"),
+    dispatchDeadline: stringValue(item, "stopGrabTime", "grabEndTime", "quickMatchEndTime", "quickMatchExpireTime", "dispatchExpireTime", "expireTime"),
     sourceLabel: scope === "dispatch"
       ? stringValue(item, "publishType") === "RECEPTION" ? "客服派单" : "用户派单"
       : undefined,
@@ -205,5 +225,5 @@ export async function fetchOrderPage(filter: OrderFilter, token: string, userId:
     : total !== undefined
       ? page * pageSize < total
       : records.length >= pageSize;
-  return { items: records.map((item, index) => mapOrder(item, index, scope)), hasMore };
+  return { items: records.map((item, index) => mapOrder(item, index, scope, filter)), hasMore };
 }
