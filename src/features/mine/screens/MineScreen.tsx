@@ -5,6 +5,7 @@ import {
   BuildingPeople24Regular,
   Dismiss24Regular,
   Password24Regular,
+  PeopleCommunity24Regular,
   PersonDelete24Regular,
   PersonProhibited24Regular,
   PersonStar24Regular,
@@ -28,6 +29,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { clearAuthSession } from "@/features/auth/session-persistence";
 import { messageStore } from "@/features/message/message-store";
+import { resolveVoiceRoomId, voiceRoomApi } from "@/features/voice-room/voice-room.api";
 import { useUserFollowCount } from "@/features/mine/hooks/use-user-follow";
 import { requireLogin } from "@/shared/navigation/require-login";
 
@@ -57,6 +59,7 @@ export default function MineScreen() {
   const followCountQuery = useUserFollowCount(user?.id);
   const [logoutVisible, setLogoutVisible] = useState(false);
   const [qrCodeModal, setQrCodeModal] = useState<QrCodeModalType | null>(null);
+  const [openingVoiceRoom, setOpeningVoiceRoom] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -123,7 +126,29 @@ export default function MineScreen() {
     if (!requireLogin()) return;
     router.push("/star-recharge");
   };
+  const openMyRoom = async () => {
+    if (!requireLogin() || !accessToken || openingVoiceRoom) return;
+    setOpeningVoiceRoom(true);
+    try {
+      let room = await voiceRoomApi.getJoinedRoom(accessToken).catch(() => null);
+      if (!resolveVoiceRoomId(room)) room = await voiceRoomApi.createRoom("我的语聊房", accessToken);
+      const roomId = resolveVoiceRoomId(room);
+      if (!roomId) throw new Error("房间信息不完整，请稍后重试");
+      router.push({ pathname: "/voice-room/[id]", params: { id: roomId } });
+    } catch (error) {
+      Toast.show(error instanceof Error ? error.message : "进入语聊房失败，请稍后重试", {
+        duration: Toast.durations.SHORT,
+      });
+    } finally {
+      setOpeningVoiceRoom(false);
+    }
+  };
   const menuItems = [
+    {
+      title: openingVoiceRoom ? "正在进入房间" : "我的房间",
+      icon: PeopleCommunity24Regular,
+      onPress: () => void openMyRoom(),
+    },
     {
       title: "基础设置",
       icon: Settings24Regular,

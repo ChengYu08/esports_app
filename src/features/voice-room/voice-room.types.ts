@@ -20,7 +20,13 @@ export type VoiceRoomMessage = {
 };
 
 export type VoiceRoomDetail = {
-  roomId: string;
+  id?: string | number;
+  roomId?: string;
+  voiceRoomId?: string | number;
+  roomInfo?: VoiceRoomDetail;
+  room?: VoiceRoomDetail;
+  result?: VoiceRoomDetail;
+  data?: VoiceRoomDetail | null;
   roomVersion: string | number;
   roomName?: string;
   roomStatus?: number;

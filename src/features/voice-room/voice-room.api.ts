@@ -17,7 +17,31 @@ async function post<T>(path: string, token: string, body?: unknown) {
   return unwrap(response);
 }
 
+export function resolveVoiceRoomId(value: unknown): string | null {
+  if (!value || typeof value !== 'object') return null;
+  const room = value as Record<string, unknown>;
+  for (const key of ['id', 'roomId', 'voiceRoomId']) {
+    const candidate = room[key];
+    if ((typeof candidate === 'string' && candidate.trim()) || (typeof candidate === 'number' && Number.isFinite(candidate))) {
+      return String(candidate);
+    }
+  }
+  for (const key of ['data', 'result', 'roomInfo', 'room']) {
+    const nestedId = resolveVoiceRoomId(room[key]);
+    if (nestedId) return nestedId;
+  }
+  return null;
+}
+
 export const voiceRoomApi = {
+  getJoinedRoom(token: string) {
+    return post<VoiceRoomDetail | null>('/client/v1/voiceRoom/joined/current', token, {});
+  },
+  createRoom(roomName: string, token: string, clubId?: string | number) {
+    return post<VoiceRoomDetail>('/client/v1/voiceRoom/create', token, {
+      action: { roomName, ...(clubId ? { clubId } : {}) },
+    });
+  },
   getDetail(roomId: string, token: string) {
     return post<VoiceRoomDetail>(`/client/v1/voiceRoom/${encodeURIComponent(roomId)}/detail`, token);
   },

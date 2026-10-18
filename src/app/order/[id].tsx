@@ -37,7 +37,7 @@ import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { CachedImage } from "@/shared/ui/CachedImage";
 
 const copyIcon = require("../../../assets/coms/copy.svg");
-const backIcon = require("../../../assets/home/club-detail/icon-back.svg");
+const backIcon = require("../../../assets/message/chat-back.svg");
 const orderStepCheck = require("../../../assets/order/order-step-check.svg");
 const orderStepActive = require("../../../assets/order/order-step-active.svg");
 const orderStepPending = require("../../../assets/order/order-step-pending.svg");

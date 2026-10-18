@@ -1,7 +1,9 @@
 import { useAuthStore } from '@esports/auth';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, router } from 'expo-router';
+import * as Clipboard from 'expo-clipboard';
 import { useEffect, useState } from 'react';
+import Toast from 'react-native-root-toast';
 import {
   ActivityIndicator,
   Alert,
@@ -35,9 +37,6 @@ const audioIcon = require('../../../../assets/voice-room/audio.svg');
 const messageIcon = require('../../../../assets/voice-room/message.svg');
 const micIcon = require('../../../../assets/voice-room/mic.svg');
 const defaultAvatar = require('../../../../assets/voice-room/avatar-default.png');
-const ownerAvatar = require('../../../../assets/voice-room/avatar-owner.png');
-const playerAvatar = require('../../../../assets/voice-room/avatar-user.png');
-const proAvatar = require('../../../../assets/voice-room/avatar-pro.png');
 const ringOwner = require('../../../../assets/voice-room/ring-owner.svg');
 const ringInvite = require('../../../../assets/voice-room/ring-invite.svg');
 
@@ -47,27 +46,21 @@ const inviteMember: VoiceRoomMember = {
   role: 'guest',
 };
 
-const demoMembers: VoiceRoomMember[] = [
-  { userId: 'owner', nickname: '陪玩小助手', role: 'owner', avatar: 'owner' },
-  { userId: 'pro', nickname: '电竞大神', role: 'service', avatar: 'pro' },
-  { userId: 'player', nickname: '正在匹配', role: 'player', avatar: 'player' },
-  inviteMember,
-  inviteMember,
-];
-
 function avatarSource(member: VoiceRoomMember) {
   if (member.avatar?.startsWith('http')) return { uri: member.avatar };
-  if (member.avatar === 'owner') return ownerAvatar;
-  if (member.avatar === 'pro') return proAvatar;
-  if (member.avatar === 'player') return playerAvatar;
   return defaultAvatar;
 }
 
-function normalizeMembers(detail?: VoiceRoomDetail, currentUserId?: string) {
-  const source = detail?.members?.length ? detail.members : demoMembers;
-  const members = source.filter((member) => member.userId !== currentUserId);
-  const people = members.filter((member) => member.userId !== 'invite');
-  return [...people.slice(0, 6), inviteMember, inviteMember];
+function normalizeMembers(detail: VoiceRoomDetail | undefined, currentUser?: { id: string; nickname?: string; headImage?: string }) {
+  const currentUserId = currentUser?.id;
+  const self = currentUser ? [{
+    userId: currentUser.id,
+    nickname: currentUser.nickname || '我',
+    avatar: currentUser.headImage,
+    role: String(detail?.creatorUserId ?? '') === currentUser.id ? 'owner' as const : undefined,
+  }] : [];
+  const people = (detail?.members || []).filter((member) => member.userId !== currentUserId && member.userId !== 'invite');
+  return [...self, ...people].slice(0, 7).concat(inviteMember);
 }
 
 function displayMessage(message: VoiceRoomMessage) {
@@ -87,7 +80,7 @@ export default function VoiceRoomScreen() {
   const currentUser = useAuthStore((state) => state.user);
   const roomId = typeof id === 'string' ? id : id?.[0];
   const [room, setRoom] = useState<VoiceRoomDetail | null>(null);
-  const [members, setMembers] = useState<VoiceRoomMember[]>(demoMembers);
+  const [members, setMembers] = useState<VoiceRoomMember[]>(() => normalizeMembers(undefined, currentUser || undefined));
   const [messages, setMessages] = useState<VoiceRoomMessage[]>([
     { id: 'welcome', kind: 'notice', text: '欢迎来到语聊房，和大家一起开黑吧', sentAt: 1 },
     { id: 'tips', kind: 'system', text: '房间内请文明交流，友善互动', sentAt: 2 },
@@ -116,7 +109,7 @@ export default function VoiceRoomScreen() {
         const prepared = await voiceRoomApi.prepareJoin(roomId, detail.roomVersion ?? '1', accessToken);
         if (!active) return;
         setRoom({ ...detail, ...prepared, roomId });
-        setMembers(normalizeMembers({ ...detail, ...prepared }, currentUser?.id));
+        setMembers(normalizeMembers({ ...detail, ...prepared }, currentUser || undefined));
         joinedChatroom = prepared.rongChatroomId;
         await joinVoiceChatRoom(accessToken, prepared.rongChatroomId);
         const rtc = await voiceRoomApi.getRtcToken(roomId, prepared.roomVersion, accessToken);
@@ -149,7 +142,7 @@ export default function VoiceRoomScreen() {
       void leaveVoiceRtc();
       if (joinedChatroom) void leaveVoiceChatRoom(joinedChatroom);
     };
-  }, [accessToken, currentUser?.id, roomId]);
+  }, [accessToken, currentUser, roomId]);
 
   useEffect(() => {
     if (!chatroomId) return;
@@ -159,17 +152,25 @@ export default function VoiceRoomScreen() {
     });
     const stopMembers = subscribeVoiceChatMembers((targetId, actions) => {
       if (targetId !== chatroomId) return;
-      setMembers((items) => items.map((item) => {
-        const action = actions.find((entry) => entry.userId === item.userId);
-        if (!action) return item;
-        return action.actionType === 2 ? { ...item, userId: `${item.userId}-left` } : item;
-      }));
+      setMembers((items) => actions.reduce<VoiceRoomMember[]>((next, action) => {
+        const userId = action.userId;
+        if (!userId || userId === 'invite' || userId === currentUser?.id) return next;
+        if (action.actionType === 2) return next.filter((member) => member.userId !== userId);
+        if (action.actionType === 1 && !next.some((member) => member.userId === userId)) {
+          return [...next.filter((member) => member.userId !== 'invite'), {
+            userId,
+            nickname: `用户${userId}`,
+            role: String(room?.creatorUserId ?? '') === userId ? 'owner' as const : undefined,
+          }, inviteMember].slice(0, 8);
+        }
+        return next;
+      }, items));
     });
     return () => {
       stopMessages();
       stopMembers();
     };
-  }, [chatroomId]);
+  }, [chatroomId, currentUser?.id, room?.creatorUserId]);
 
   const leave = async () => {
     if (roomId && accessToken) await voiceRoomApi.leave(roomId, roomVersion, accessToken).catch(() => undefined);
@@ -209,8 +210,26 @@ export default function VoiceRoomScreen() {
     }
   };
 
+  const copyInviteLink = async () => {
+    if (!roomId || !room) {
+      Toast.show('房间信息加载中，请稍后再试', { duration: Toast.durations.SHORT });
+      return;
+    }
+    const inviteLink = `https://djpc.jlgkj.top/chat?type=chat-room&id=${encodeURIComponent(roomId)}&v=${encodeURIComponent(String(room.roomVersion ?? '1'))}`;
+    try {
+      await Clipboard.setStringAsync(inviteLink);
+      Toast.show('邀请链接已复制，去发给好友吧', { duration: Toast.durations.SHORT });
+    } catch {
+      Toast.show('复制失败，请手动复制', { duration: Toast.durations.SHORT });
+    }
+  };
+
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView
+      style={styles.screen}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={0}
+    >
       <Image source={background} contentFit="cover" style={StyleSheet.absoluteFill} />
       <View style={[styles.safe, { paddingTop: insets.top }]}> 
         <View style={styles.header}>
@@ -233,7 +252,7 @@ export default function VoiceRoomScreen() {
             const invite = member.userId === 'invite';
             const ring = invite ? ringInvite : member.role === 'owner' ? ringOwner : undefined;
             return (
-              <Pressable key={`${member.userId}-${index}`} style={styles.memberSlot} onPress={invite ? () => Alert.alert('邀请用户', '邀请链接已准备，可从分享面板发送给好友。') : undefined}>
+              <Pressable key={`${member.userId}-${index}`} style={styles.memberSlot} onPress={invite ? () => void copyInviteLink() : undefined}>
                 <View style={[styles.avatarWrap, member.speaking && styles.avatarSpeaking]}>
                   {ring ? <Image source={ring} style={styles.ring} /> : null}
                   {invite ? <Image source={ringInvite} style={styles.inviteRing} /> : <Image source={avatarSource(member)} style={styles.avatar} />}
@@ -276,7 +295,7 @@ export default function VoiceRoomScreen() {
             <Pressable accessibilityLabel="发送消息" onPress={() => void sendMessage()} style={styles.toolButton}>
               <Image source={messageIcon} style={styles.toolIcon} />
             </Pressable>
-            <Pressable accessibilityLabel="邀请用户" onPress={() => Alert.alert('邀请用户', '邀请链接已准备，可从分享面板发送给好友。')} style={styles.toolButton}>
+            <Pressable accessibilityLabel="复制邀请链接" onPress={() => void copyInviteLink()} style={styles.toolButton}>
               <Image source={inviteIcon} style={styles.toolIcon} />
             </Pressable>
           </View>
