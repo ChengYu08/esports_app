@@ -12,8 +12,8 @@ import {
 } from "@fluentui/react-native-icons";
 import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
-import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import { useFocusEffect, router } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -57,6 +57,23 @@ export default function MineScreen() {
   const followCountQuery = useUserFollowCount(user?.id);
   const [logoutVisible, setLogoutVisible] = useState(false);
   const [qrCodeModal, setQrCodeModal] = useState<QrCodeModalType | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      void followCountQuery.refetch();
+      if (accessToken && user?.id)
+        void clientAuthApi
+          .fetchCurrentUser(accessToken)
+          .then((profile) => {
+            useAuthStore.setState((state) =>
+              state.user?.id === String(profile.id)
+                ? { user: { ...state.user, starBalance: profile.starBalance } }
+                : state,
+            );
+          })
+          .catch(() => undefined);
+    }, [followCountQuery, accessToken, user?.id]),
+  );
   const displayName = useMemo(
     () =>
       user?.nickname ||
