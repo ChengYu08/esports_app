@@ -1,6 +1,7 @@
 import type { ImageSource } from "expo-image";
 
-export type OrderFilter = "all" | "inProgress" | "completed" | "cancelled";
+export type OrderScope = "dispatch" | "accept" | "place";
+export type OrderFilter = "all" | "inProgress" | "completed" | "cancelled" | "grabbing" | "history";
 
 export type OrderStatus =
   | "pendingPayment"
@@ -17,7 +18,12 @@ export type OrderActionKey =
   | "afterSales"
   | "review"
   | "reorder"
-  | "complete";
+  | "complete"
+  | "accept"
+  | "reject"
+  | "start"
+  | "free"
+  | "grab";
 
 export type OrderAction = {
   key: OrderActionKey;
@@ -36,8 +42,13 @@ export type OrderItemModel = {
   reviewId?: number;
   reviewExists?: boolean;
   sellerAvatar: ImageSource | number;
+  gameIcon?: ImageSource;
   serviceName: string;
   gameName: string;
+  billingUnitName?: string;
+  requestNo?: string;
+  voiceTag?: string;
+  sourceLabel?: string;
   unitPrice: string;
   quantity: number;
   totalPrice: string;

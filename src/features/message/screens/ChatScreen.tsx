@@ -733,12 +733,9 @@ const ChatBubble = memo(function ChatBubble({
 }) {
   const { width: windowWidth } = useWindowDimensions();
   const [imageRatio, setImageRatio] = useState(1);
-  const maxImageWidth = Math.min(168, Math.max(120, windowWidth * 0.58));
-  const maxImageHeight = 240;
-  const naturalImageHeight = maxImageWidth / imageRatio;
-  const imageScale = Math.min(1, maxImageHeight / naturalImageHeight);
-  const imageWidth = maxImageWidth * imageScale;
-  const imageHeight = naturalImageHeight * imageScale;
+  const targetImageWidth = item.isMine ? 120 : 160;
+  const imageWidth = Math.min(targetImageWidth, windowWidth * 0.58);
+  const imageHeight = imageWidth / imageRatio;
 
   return (
     <View

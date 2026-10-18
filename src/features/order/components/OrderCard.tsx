@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { memo } from "react";
+import { memo, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { DOUYIN_SANS } from "@/shared/theme/typography";
@@ -51,30 +51,44 @@ export const OrderCard = memo(function OrderCard({
           <Text numberOfLines={1} style={styles.sellerName}>
             {item.sellerName}
           </Text>
+          {item.voiceTag ? (
+            <Text style={[styles.voiceTag, item.voiceTag === "需试音" && styles.voiceTagRequired]}>{item.voiceTag}</Text>
+          ) : null}
         </View>
-        <Text style={[styles.status, { color: STATUS_COLORS[item.status] }]}>
-          {item.statusLabel}
+        <Text style={[styles.status, { color: item.sourceLabel ? (item.sourceLabel === "客服派单" ? "#1B84E0" : "#FF943D") : STATUS_COLORS[item.status] }]}>
+          {item.sourceLabel ?? item.statusLabel}
         </Text>
       </View>
 
       <View style={styles.orderBody}>
-        <View style={styles.productRow}>
-          <View style={styles.productCopy}>
-            <Text numberOfLines={1} style={styles.serviceName}>
-              {item.serviceName}
-            </Text>
-            <Text numberOfLines={1} style={styles.gameName}>
-              {item.gameName}
-            </Text>
-          </View>
-          <View style={styles.priceBlock}>
-            <Text style={styles.unitPrice}>{item.unitPrice}</Text>
-            <Text style={styles.quantity}>x {item.quantity}</Text>
-          </View>
+        <Text numberOfLines={1} style={styles.serviceName}>{item.serviceName}</Text>
+        <View style={styles.detailPanel}>
+          <OrderDetailRow label="游戏">
+            <View style={styles.gameValue}>
+              <CachedImage source={item.gameIcon ?? require("../../../../assets/voice-room/game.svg")} contentFit="contain" style={styles.gameIcon} />
+              <Text numberOfLines={1} style={styles.detailValue}>{item.gameName}</Text>
+            </View>
+          </OrderDetailRow>
+          <OrderDetailRow label="单价">
+            <Text style={styles.detailValue}>{item.unitPrice}星钻/{item.billingUnitName ?? "小时"}</Text>
+          </OrderDetailRow>
+          {item.remark ? (
+            <OrderDetailRow label="备注">
+              <Text numberOfLines={2} style={styles.detailValue}>{item.remark}</Text>
+            </OrderDetailRow>
+          ) : null}
         </View>
         <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>共</Text>
-          <Text style={styles.totalPrice}>{item.totalPrice}</Text>
+          <View style={styles.quantitySummary}>
+            <Text style={styles.totalLabel}>{item.unitPrice}星钻</Text>
+            <Text style={styles.totalLabel}>x</Text>
+            <Text style={styles.quantity}>{item.quantity}{item.billingUnitName ?? "小时"}</Text>
+          </View>
+          <View style={styles.totalValue}>
+            <Text style={styles.totalLabel}>合计</Text>
+            <Text style={styles.totalPrice}>{item.totalPrice}</Text>
+            <CachedImage source={require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png")} contentFit="contain" style={styles.diamondIcon} />
+          </View>
         </View>
       </View>
       </Pressable>
@@ -87,6 +101,15 @@ export const OrderCard = memo(function OrderCard({
     </View>
   );
 });
+
+function OrderDetailRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>{label}</Text>
+      <View style={styles.detailContent}>{children}</View>
+    </View>
+  );
+}
 
 function ActionButton({
   action,
@@ -136,7 +159,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: "#FFFFFF",
-    gap: 12,
+    gap: 8,
   },
   sellerRow: {
     flexDirection: "row",
@@ -165,33 +188,50 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: "500",
   },
-  orderBody: { gap: 4 },
-  productRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 16,
+  voiceTag: {
+    overflow: "hidden",
+    borderRadius: 3,
+    backgroundColor: "#F2F2F2",
+    paddingHorizontal: 4,
+    color: "#808080",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 11,
+    lineHeight: 18,
   },
-  productCopy: { flex: 1, gap: 4 },
+  voiceTagRequired: { color: "#581CE5", backgroundColor: "#F1EBFF" },
+  orderBody: { gap: 8 },
   serviceName: {
     fontFamily: DOUYIN_SANS,
     color: "#0A0A0A",
     fontSize: 14,
     lineHeight: 22,
   },
-  gameName: {
-    fontFamily: DOUYIN_SANS,
+  detailPanel: {
+    backgroundColor: "#F7F7F7",
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  detailRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  detailLabel: {
+    width: 36,
     color: "#999999",
+    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
-  priceBlock: { width: 80, alignItems: "flex-end", gap: 4 },
-  unitPrice: {
-    fontFamily: DOUYIN_SANS,
+  detailContent: { flex: 1 },
+  detailValue: {
     color: "#0A0A0A",
-    fontSize: 14,
-    lineHeight: 22,
-    fontWeight: "500",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 12,
+    lineHeight: 18,
   },
+  gameValue: { flexDirection: "row", alignItems: "center", gap: 6 },
+  gameIcon: { width: 14, height: 14 },
+  quantitySummary: { flexDirection: "row", alignItems: "center", gap: 4 },
+  totalValue: { flexDirection: "row", alignItems: "center", gap: 4 },
   quantity: {
     fontFamily: DOUYIN_SANS,
     color: "#999999",
@@ -201,7 +241,7 @@ const styles = StyleSheet.create({
   totalRow: {
     flexDirection: "row",
     justifyContent: "flex-end",
-    alignItems: "flex-end",
+    alignItems: "center",
     gap: 4,
   },
   totalLabel: {
@@ -217,6 +257,7 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontWeight: "500",
   },
+  diamondIcon: { width: 14, height: 14 },
   actions: {
     minHeight: 26,
     flexDirection: "row",

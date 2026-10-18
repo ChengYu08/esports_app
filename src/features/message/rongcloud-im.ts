@@ -18,6 +18,8 @@ export type RongTextMessage = ManagedMessage;
 type RongSdk = typeof import('@rongcloud/react-native-im-wrapper');
 type ConversationListener = (conversation: RongConversation) => void;
 type MessageListener = (peerId: string, message: ManagedMessage, conversation: RongConversation) => void;
+type ChatRoomMessageListener = (roomId: string, message: RCIMIWMessage) => void;
+type ChatRoomMemberListener = (roomId: string, actions: { userId?: string; actionType?: number }[]) => void;
 export type RongCloudConnectionSignal = 'connected' | 'connecting' | 'timeout' | 'terminal';
 
 let engine: RCIMIWEngine | null = null;
@@ -30,6 +32,8 @@ let connectionEpoch = 0;
 const conversationListeners = new Set<ConversationListener>();
 const messageListeners = new Set<MessageListener>();
 const connectionStatusListeners = new Set<(signal: RongCloudConnectionSignal) => void>();
+const chatRoomMessageListeners = new Set<ChatRoomMessageListener>();
+const chatRoomMemberListeners = new Set<ChatRoomMemberListener>();
 
 function getRuntimeConfig() {
   try {
@@ -315,10 +319,35 @@ async function emitReceived(message: RCIMIWMessage) {
 
 function installListeners() {
   if (!engine) return;
-  engine.setOnMessageReceivedListener((message) => { void emitReceived(message); });
+  engine.setOnMessageReceivedListener((message) => {
+    const sdk = loadSdk();
+    if (sdk && message.conversationType === sdk.RCIMIWConversationType.CHATROOM) {
+      const roomId = String(message.targetId || '');
+      chatRoomMessageListeners.forEach((listener) => listener(roomId, message));
+      return;
+    }
+    void emitReceived(message);
+  });
+  engine.setOnChatRoomMemberChangedListener((roomId, actions) => {
+    chatRoomMemberListeners.forEach((listener) => listener(roomId, actions));
+  });
   engine.setOnConnectionStatusChangedListener((status) => {
     publishConnectionStatus(status);
   });
+}
+
+export function getRongCloudEngine() {
+  return engine;
+}
+
+export function subscribeRongChatRoomMessages(listener: ChatRoomMessageListener) {
+  chatRoomMessageListeners.add(listener);
+  return () => chatRoomMessageListeners.delete(listener);
+}
+
+export function subscribeRongChatRoomMembers(listener: ChatRoomMemberListener) {
+  chatRoomMemberListeners.add(listener);
+  return () => chatRoomMemberListeners.delete(listener);
 }
 
 export function isRongCloudConnected() {

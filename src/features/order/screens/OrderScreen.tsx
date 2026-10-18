@@ -12,10 +12,12 @@ import { OrderAfterSaleSheet } from "../components/OrderAfterSaleSheet";
 import { buildAfterSalePayload } from "../after-sale-card";
 import { OrderReviewSheet } from "../components/OrderReviewSheet";
 import { OrderHeader } from "../components/OrderHeader";
+import { OrderScopeTabs } from "../components/OrderScopeTabs";
 import { OrderTabs } from "../components/OrderTabs";
 import { useOrderPage } from "../hooks/use-order-page";
 import { invalidateOrderQueries } from "../order-query";
-import { cancelOrder as cancelOrderRequest, completeOrder as completeOrderRequest, fetchAfterSaleMembers, fetchOrderReview, submitOrderReview, type AfterSaleMember, type OrderReview } from "../order.api";
+import { acceptOrder, cancelOrder as cancelOrderRequest, completeOrder as completeOrderRequest, fetchAfterSaleMembers, fetchOrderReview, freeOrderService, rejectOrder, startOrderService, submitOrderReview, type AfterSaleMember, type OrderReview } from "../order.api";
+import { grabDispatchRequest } from "../dispatch.api";
 import { fetchStarBalance, payCompanionOrder } from "@/features/mine/api/companion-order.api";
 import type {
   OrderActionKey,
@@ -25,8 +27,14 @@ import type {
 
 export default function OrderScreen() {
   const insets = useSafeAreaInsets();
-  const [filter, setFilter] = useState<OrderFilter>("all");
-  const orders = useOrderPage(filter);
+  const isCompanion = useAuthStore((state) => state.isCompanion);
+  const [selectedScope, setSelectedScope] = useState<"dispatch" | "accept" | "place">(() => isCompanion ? "dispatch" : "place");
+  const [filter, setFilter] = useState<OrderFilter>(() => isCompanion ? "grabbing" : "all");
+  const scope = isCompanion ? selectedScope : "place";
+  const visibleFilter = scope === "dispatch"
+    ? filter === "history" ? "history" : "grabbing"
+    : filter === "grabbing" || filter === "history" ? "all" : filter;
+  const orders = useOrderPage(scope, visibleFilter);
   const token = useAuthStore((state) => state.accessToken);
   const [cancelTarget, setCancelTarget] = useState<OrderItemModel | null>(null);
   const [completeTarget, setCompleteTarget] = useState<OrderItemModel | null>(null);
@@ -36,9 +44,14 @@ export default function OrderScreen() {
   const [reviewTarget, setReviewTarget] = useState<OrderItemModel | null>(null);
   const [reviewDetail, setReviewDetail] = useState<OrderReview | null>(null);
   const [payTarget, setPayTarget] = useState<OrderItemModel | null>(null);
+  const [freeTarget, setFreeTarget] = useState<OrderItemModel | null>(null);
   const [prompt, setPrompt] = useState<{ title: string; message: string; confirmText?: string } | null>(null);
   const cancelingPaymentRef = useRef(false);
-  const items = orders.data?.items ?? [];
+  const items = orders.data?.pages.flatMap((page) => page.items) ?? [];
+  const emptyMessage = scope === "dispatch"
+    ? visibleFilter === "history" ? "暂无抢单记录" : "暂无可抢需求"
+    : visibleFilter === "all" ? "暂无订单"
+      : `暂无${visibleFilter === "inProgress" ? "进行中" : visibleFilter === "completed" ? "已完成" : "已取消"}订单`;
 
   const handleOrderAction = async (item: OrderItemModel, action: OrderActionKey) => {
     if (action === "pay") {
@@ -47,6 +60,26 @@ export default function OrderScreen() {
     }
     if (action === "cancel") setCancelTarget(item);
     if (action === "complete") setCompleteTarget(item);
+    if (action === "free") setFreeTarget(item);
+    if (action === "grab" && item.requestNo && token) {
+      try {
+        await grabDispatchRequest(item.requestNo, token);
+        await orders.refetch();
+      } catch (error) {
+        setPrompt({ title: "抢单失败", message: error instanceof Error ? error.message : "请稍后重试" });
+      }
+    }
+    if ((action === "accept" || action === "reject" || action === "start") && token) {
+      try {
+        if (action === "accept") await acceptOrder(item.id, token);
+        if (action === "reject") await rejectOrder(item.id, token);
+        if (action === "start") await startOrderService(item.id, token);
+        await invalidateOrderQueries(item.id);
+        await orders.refetch();
+      } catch (error) {
+        setPrompt({ title: "订单操作失败", message: error instanceof Error ? error.message : "请稍后重试" });
+      }
+    }
     if (action === "afterSales") {
       if (item.clubId == null) {
         Alert.alert("暂无法申请售后", "缺少俱乐部信息，无法申请售后");
@@ -94,8 +127,17 @@ export default function OrderScreen() {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <OrderHeader />
-      <OrderTabs onChange={setFilter} value={filter} />
+      <OrderHeader title={isCompanion ? "派单中心" : "订单"} />
+      {isCompanion ? (
+        <OrderScopeTabs
+          value={scope}
+          onChange={(nextScope) => {
+            setSelectedScope(nextScope);
+            setFilter(nextScope === "dispatch" ? "grabbing" : "all");
+          }}
+        />
+      ) : null}
+      <OrderTabs scope={scope} onChange={setFilter} value={visibleFilter} />
       <FlatList
         contentContainerStyle={[
           styles.content,
@@ -104,9 +146,12 @@ export default function OrderScreen() {
         data={items}
         ItemSeparatorComponent={OrderSeparator}
         keyExtractor={(item) => item.id}
-        ListEmptyComponent={orders.isLoading ? <LoadingState /> : orders.isError ? <ErrorState onRetry={() => void orders.refetch()} /> : <View style={styles.empty}><EmptyState message={filter === "all" ? "暂无订单" : `暂无${filter === "inProgress" ? "进行中" : filter === "completed" ? "已完成" : "已取消"}订单`} /></View>}
+        ListEmptyComponent={orders.isLoading ? <LoadingState /> : orders.isError ? <ErrorState onRetry={() => void orders.refetch()} /> : <View style={styles.empty}><EmptyState message={emptyMessage} /></View>}
+        ListFooterComponent={orders.isFetchingNextPage ? <Text style={styles.listFooter}>加载中...</Text> : null}
+        onEndReached={() => { if (orders.hasNextPage && !orders.isFetchingNextPage) void orders.fetchNextPage(); }}
+        onEndReachedThreshold={0.35}
         renderItem={({ item }) => (
-          <OrderCard item={item} onAction={handleOrderAction} onPress={(order) => router.push(`/order/${order.id}`)} />
+          <OrderCard item={item} onAction={handleOrderAction} onPress={item.requestNo ? undefined : (order) => router.push(`/order/${order.id}`)} />
         )}
         refreshControl={<RefreshControl refreshing={orders.isRefetching} onRefresh={() => void orders.refetch()} tintColor="#ff214b" />}
         showsVerticalScrollIndicator={false}
@@ -136,6 +181,25 @@ export default function OrderScreen() {
         confirmText="确认"
         onCancel={() => setCompleteTarget(null)}
         onConfirm={() => void confirmComplete()}
+      />
+      <AppPrompt
+        visible={Boolean(freeTarget)}
+        title="确认免单"
+        message={`确认免单 ${freeTarget?.totalPrice ?? "0"} 星钻吗？`}
+        cancelText="取消"
+        confirmText="确认"
+        onCancel={() => setFreeTarget(null)}
+        onConfirm={() => {
+          const target = freeTarget;
+          setFreeTarget(null);
+          if (!target || !token) return;
+          void freeOrderService(target.id, Number(target.totalPrice) || 0, token)
+            .then(async () => {
+              await invalidateOrderQueries(target.id);
+              await orders.refetch();
+            })
+            .catch((error) => setPrompt({ title: "免单失败", message: error instanceof Error ? error.message : "请稍后重试" }));
+        }}
       />
       <StarPaymentPrompt
         key={payTarget?.id ?? "none"}
@@ -240,6 +304,7 @@ const styles = StyleSheet.create({
   content: { flexGrow: 1, paddingTop: 8 },
   separator: { height: 8 },
   empty: { flex: 1, minHeight: 320, alignItems: "center", justifyContent: "center" },
+  listFooter: { paddingVertical: 16, color: "#999", fontSize: 12, textAlign: "center" },
   paymentSheet: { padding: 24, borderTopLeftRadius: 20, borderTopRightRadius: 20, backgroundColor: "#fff" },
   paymentTitle: { color: "#111", fontSize: 18, fontWeight: "600", textAlign: "center" },
   paymentAmount: { marginTop: 24, color: "#111", fontSize: 22, fontWeight: "700", textAlign: "center" },

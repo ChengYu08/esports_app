@@ -47,7 +47,7 @@ export async function completeClientLogin(
   if (setCompanionStatus) {
     try {
       const userDetail = await fetchUserDetail(String(profile.id), login.token);
-      const isCompanion = !!userDetail.companionProfile;
+      const isCompanion = profile.positions?.some((position) => position.code === 'COMPANION') ?? false;
       setCompanionStatus(isCompanion, userDetail.companionProfile ?? null);
       logger.debug('companion.status_checked', { userId: profile.id, isCompanion });
     } catch (error) {

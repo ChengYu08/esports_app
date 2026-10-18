@@ -32,7 +32,11 @@ export const useAuthStore = create<AuthState>((set) => ({
   accessToken: null,
   isCompanion: false,
   companionProfile: null,
-  setSession: (session) => set(session),
+  setSession: (session) => set({
+    ...session,
+    isCompanion: session.user.positions?.some((position) => position.code === "COMPANION") ?? false,
+    companionProfile: null,
+  }),
   setCompanionStatus: (isCompanion, profile) => set({ isCompanion, companionProfile: profile }),
   clearSession: () => set({ user: null, accessToken: null, isCompanion: false, companionProfile: null }),
 }));

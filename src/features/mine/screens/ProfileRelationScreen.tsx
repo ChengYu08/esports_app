@@ -1,4 +1,5 @@
 import { useAuthStore } from "@esports/auth";
+import { Person24Regular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { useLocalSearchParams, router } from "expo-router";
 import { useState } from "react";
@@ -26,8 +27,12 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { EmptyState, ErrorState } from "@/shared/ui/AsyncStates";
 
-const fallbackAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
+const fallbackAvatar = require("../../../../assets/coms/avatar_default.webp");
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
+
+function isUnavailableUser(user: UserFollowUser) {
+  return user.nickname === "账号被封禁" || user.nickname === "账号已注销";
+}
 
 export default function ProfileRelationScreen() {
   const insets = useSafeAreaInsets();
@@ -39,7 +44,9 @@ export default function ProfileRelationScreen() {
   const viewerUserId = useAuthStore((state) => state.user?.id);
   const userId = typeof route.userId === "string" ? route.userId : undefined;
   const clubId = typeof route.clubId === "string" ? route.clubId : undefined;
-  const type: UserFollowType = route.type === "fans" ? "fans" : "following";
+  const requestedType =
+    typeof route.type === "string" ? route.type : route.type?.[0];
+  const type: UserFollowType = requestedType === "fans" ? "fans" : "following";
   const query = useUserFollowPage(userId, type);
   const followMutation = useToggleUserFollow();
   const [followedBackIds, setFollowedBackIds] = useState<Set<string>>(
@@ -95,7 +102,17 @@ export default function ProfileRelationScreen() {
     }
   };
 
-  const title = type === "fans" ? "粉丝" : "关注";
+  const switchType = (nextType: UserFollowType) => {
+    if (nextType === type || !userId) return;
+    router.replace({
+      pathname: "/profile-relations",
+      params: {
+        userId,
+        type: nextType,
+        ...(clubId ? { clubId } : {}),
+      },
+    });
+  };
 
   return (
     <View style={styles.screen}>
@@ -105,17 +122,49 @@ export default function ProfileRelationScreen() {
           { height: 44 + insets.top, paddingTop: insets.top },
         ]}
       >
-        <Pressable
-          accessibilityLabel="返回"
-          accessibilityRole="button"
-          hitSlop={12}
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Image source={backIcon} style={styles.backIcon} />
-        </Pressable>
-        <Text style={styles.headerTitle}>{title}</Text>
-        <View style={styles.headerSpace} />
+        <View style={styles.nav}>
+          <Pressable
+            accessibilityLabel="返回"
+            accessibilityRole="button"
+            hitSlop={12}
+            onPress={() => router.back()}
+            style={styles.backButton}
+          >
+            <Image source={backIcon} style={styles.backIcon} />
+          </Pressable>
+          <View style={styles.tabBar}>
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityState={{ selected: type === "following" }}
+              onPress={() => switchType("following")}
+              style={styles.tab}
+            >
+              <Text
+                style={[
+                  styles.tabText,
+                  type === "following" && styles.tabTextActive,
+                ]}
+              >
+                关注
+              </Text>
+              {type === "following" ? <View style={styles.tabIndicator} /> : null}
+            </Pressable>
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityState={{ selected: type === "fans" }}
+              onPress={() => switchType("fans")}
+              style={styles.tab}
+            >
+              <Text
+                style={[styles.tabText, type === "fans" && styles.tabTextActive]}
+              >
+                粉丝
+              </Text>
+              {type === "fans" ? <View style={styles.tabIndicator} /> : null}
+            </Pressable>
+          </View>
+          <View style={styles.headerSpace} />
+        </View>
       </View>
 
       <FlatList
@@ -127,6 +176,7 @@ export default function ProfileRelationScreen() {
         ]}
         renderItem={({ item }) => {
           const isSelf = Boolean(viewerUserId && item.userId === viewerUserId);
+          const unavailable = isUnavailableUser(item);
           const followedBack =
             item.followedBack || followedBackIds.has(item.userId);
           const followPending =
@@ -136,97 +186,78 @@ export default function ProfileRelationScreen() {
           return (
             <View style={styles.row}>
               <Pressable
+                disabled={unavailable}
                 accessibilityRole="button"
                 accessibilityLabel={`查看${item.nickname}的主页`}
-                onPress={() => openUserProfile(item)}
+                onPress={unavailable ? undefined : () => openUserProfile(item)}
                 style={({ pressed }) => [
                   styles.userInfo,
-                  pressed && styles.pressed,
+                  pressed && !unavailable && styles.pressed,
                 ]}
               >
-                <CachedImage
-                  source={item.avatar ? { uri: item.avatar } : fallbackAvatar}
-                  contentFit="cover"
-                  style={styles.avatar}
-                />
+                <View style={styles.avatarFrame}>
+                  {unavailable ? (
+                    <View style={styles.unavailableAvatar}>
+                      <Person24Regular color="#D9D9D9" height={24} width={24} />
+                    </View>
+                  ) : (
+                    <CachedImage
+                      source={item.avatar ? { uri: item.avatar } : fallbackAvatar}
+                      contentFit="cover"
+                      style={styles.avatar}
+                    />
+                  )}
+                </View>
                 <View style={styles.userCopy}>
-                  <View style={styles.nameLine}>
-                    <Text numberOfLines={1} style={styles.nickname}>
-                      {item.nickname}
+                  <Text numberOfLines={1} style={styles.nickname}>
+                    {item.nickname}
+                  </Text>
+                  {item.signature ? (
+                    <Text numberOfLines={1} style={styles.signature}>
+                      {item.signature}
                     </Text>
-                    {item.gender === 1 || item.gender === 2 ? (
-                      <Text
-                        style={[
-                          styles.gender,
-                          item.gender === 2 && styles.femaleGender,
-                        ]}
-                      >
-                        {item.gender === 1 ? "男" : "女"}
-                      </Text>
-                    ) : null}
-                    {item.age != null ? (
-                      <Text style={styles.age}>{item.age}</Text>
-                    ) : null}
-                  </View>
-                  <Text numberOfLines={1} style={styles.signature}>
-                    {item.signature || "暂无个性签名"}
-                  </Text>
-                  <Text numberOfLines={1} style={styles.userId}>
-                    ID：{item.userId}
-                  </Text>
+                  ) : null}
                 </View>
               </Pressable>
 
-              <View style={styles.actions}>
-                {type === "fans" && !isSelf ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={followedBack ? "已回关" : "回关"}
-                    accessibilityState={{
-                      disabled: followedBack || followPending,
-                      busy: followPending,
-                    }}
-                    disabled={followedBack || followPending}
-                    onPress={() => void followBack(item)}
-                    style={[
-                      styles.actionButton,
-                      followedBack && styles.actionButtonDone,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.actionText,
-                        followedBack && styles.actionTextDone,
-                      ]}
-                    >
-                      {followedBack
-                        ? "已回关"
-                        : followPending
-                          ? "处理中…"
-                          : "回关"}
-                    </Text>
-                  </Pressable>
-                ) : (
-                  <>
+              {!unavailable && !isSelf ? (
+                <View style={styles.actions}>
+                  {type === "fans" ? (
                     <Pressable
                       accessibilityRole="button"
-                      onPress={() => openUserProfile(item)}
-                      style={styles.profileButton}
+                      accessibilityLabel={followedBack ? "已回关" : "回关"}
+                      accessibilityState={{
+                        disabled: followedBack || followPending,
+                        busy: followPending,
+                      }}
+                      disabled={followedBack || followPending}
+                      onPress={() => void followBack(item)}
+                      style={[
+                        styles.actionButton,
+                        followedBack && styles.actionButtonDone,
+                      ]}
                     >
-                      <Text style={styles.profileButtonText}>主页</Text>
-                    </Pressable>
-                    {!isSelf ? (
-                      <Pressable
-                        accessibilityRole="button"
-                        onPress={() => openChat(item)}
-                        style={styles.chatButton}
+                      <Text
+                        style={[
+                          styles.actionText,
+                          followedBack && styles.actionTextDone,
+                        ]}
                       >
-                        <Text style={styles.chatButtonText}>聊一聊</Text>
-                      </Pressable>
-                    ) : null}
-                  </>
-                )}
-              </View>
+                        {followedBack ? "已回关" : "回关"}
+                      </Text>
+                    </Pressable>
+                  ) : (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="聊一聊"
+                      onPress={() => openChat(item)}
+                      style={styles.actionButton}
+                    >
+                      <Text style={styles.actionText}>聊一聊</Text>
+                    </Pressable>
+                  )}
+                </View>
+              ) : null}
             </View>
           );
         }}
@@ -275,13 +306,11 @@ export default function ProfileRelationScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#FFFFFF" },
-  header: {
+  header: { backgroundColor: "#FFFFFF" },
+  nav: {
+    height: 44,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#F0F0F0",
-    backgroundColor: "#FFFFFF",
   },
   backButton: {
     width: 48,
@@ -290,99 +319,102 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
-  headerTitle: {
-    color: "#111111",
+  tabBar: {
+    flex: 1,
+    height: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 36,
+  },
+  tab: {
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  tabText: {
+    color: "#999999",
     fontFamily: DOUYIN_SANS,
-    fontSize: 17,
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: "400",
+  },
+  tabTextActive: {
+    color: "#1A1A1A",
     fontWeight: "600",
+  },
+  tabIndicator: {
+    position: "absolute",
+    bottom: 4,
+    width: 16,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: "#E62336",
   },
   headerSpace: { width: 48, height: 44 },
   listContent: { paddingHorizontal: 16 },
   emptyContent: { flexGrow: 1 },
   row: {
-    minHeight: 88,
+    height: 76,
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#EEEEEE",
+    paddingVertical: 16,
   },
   userInfo: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center" },
   pressed: { opacity: 0.75 },
-  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: "#F2F2F2" },
-  userCopy: { flex: 1, minWidth: 0, marginLeft: 12 },
-  nameLine: { flexDirection: "row", alignItems: "center", gap: 6 },
+  avatarFrame: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    overflow: "hidden",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "#EBEBEB",
+    backgroundColor: "#FFFFFF",
+  },
+  avatar: { width: 44, height: 44 },
+  unavailableAvatar: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F2F2F2",
+  },
+  userCopy: { flex: 1, minWidth: 0, marginLeft: 8 },
   nickname: {
     flexShrink: 1,
-    color: "#222222",
+    color: "#333333",
     fontFamily: DOUYIN_SANS,
-    fontSize: 15,
+    fontSize: 14,
+    lineHeight: 22,
     fontWeight: "600",
   },
-  gender: {
-    overflow: "hidden",
-    borderRadius: 4,
-    paddingHorizontal: 4,
-    color: "#2878FF",
-    backgroundColor: "#E9F2FF",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 10,
-    lineHeight: 16,
-  },
-  femaleGender: { color: "#F04E85", backgroundColor: "#FFF0F5" },
-  age: {
-    color: "#555555",
-    backgroundColor: "#F1F1F1",
-    overflow: "hidden",
-    borderRadius: 4,
-    paddingHorizontal: 4,
-    fontFamily: DOUYIN_SANS,
-    fontSize: 10,
-    lineHeight: 16,
-  },
   signature: {
-    marginTop: 4,
-    color: "#888888",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 12,
-  },
-  userId: {
-    marginTop: 2,
-    color: "#AAAAAA",
+    marginTop: 0,
+    color: "#666666",
     fontFamily: DOUYIN_SANS,
     fontSize: 11,
+    lineHeight: 16,
   },
-  actions: { flexDirection: "row", alignItems: "center", gap: 8, marginLeft: 10 },
+  actions: { alignItems: "center", justifyContent: "center", marginLeft: 16 },
   actionButton: {
-    minWidth: 62,
-    height: 32,
-    borderRadius: 16,
+    minWidth: 60,
+    height: 24,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 10,
-    backgroundColor: "#E62336",
+    paddingHorizontal: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "#EBEBEB",
+    backgroundColor: "#FFFFFF",
   },
-  actionButtonDone: { backgroundColor: "#F3F3F3" },
-  actionText: { color: "#FFFFFF", fontFamily: DOUYIN_SANS, fontSize: 12 },
-  actionTextDone: { color: "#888888" },
-  profileButton: {
-    height: 30,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 10,
-    backgroundColor: "#F3F3F3",
+  actionButtonDone: { backgroundColor: "#F7F7F7" },
+  actionText: {
+    color: "#333333",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 12,
+    lineHeight: 18,
   },
-  profileButtonText: { color: "#555555", fontFamily: DOUYIN_SANS, fontSize: 12 },
-  chatButton: {
-    height: 30,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 10,
-    backgroundColor: "#E62336",
-  },
-  chatButtonText: { color: "#FFFFFF", fontFamily: DOUYIN_SANS, fontSize: 12 },
+  actionTextDone: { color: "#999999" },
   emptyState: { flex: 1 },
   emptyLoading: { flex: 1, alignSelf: "center" },
   retryText: { color: "#E62336", fontFamily: DOUYIN_SANS, fontSize: 13 },
