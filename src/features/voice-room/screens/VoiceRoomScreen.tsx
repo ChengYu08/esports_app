@@ -169,6 +169,7 @@ export default function VoiceRoomScreen() {
   } | null>(null);
   const [micChanging, setMicChanging] = useState(false);
   const [serviceCalling, setServiceCalling] = useState(false);
+  const [distanceEnabled, setDistanceEnabled] = useState(false);
   const [loading, setLoading] = useState(() => Boolean(roomId && accessToken));
   const [error, setError] = useState<string | null>(() =>
     !roomId ? "语聊房不存在" : !accessToken ? "请先登录后进入语聊房" : null,
@@ -772,6 +773,8 @@ export default function VoiceRoomScreen() {
           micChanging={micChanging}
           leaving={leaving}
           serviceCalling={serviceCalling}
+          distanceEnabled={distanceEnabled}
+          onToggleDistance={() => setDistanceEnabled(prev => !prev)}
           onChangeText={setInput}
           onSend={() => void sendMessage()}
           onToggleMute={() => void toggleMute()}

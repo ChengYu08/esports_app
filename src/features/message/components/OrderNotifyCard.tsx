@@ -46,25 +46,18 @@ export const OrderNotifyCard = memo(function OrderNotifyCard({
       <View style={styles.details}>
         <View style={styles.copy}>
           {item.serviceDesc ? (
-            <Text numberOfLines={1} style={styles.service}>
+            <Text style={styles.service}>
               {item.serviceDesc}
             </Text>
           ) : null}
-          <View style={styles.metadata}>
-            {metadata.map((value, index) => (
-              <View key={`${value}-${index}`} style={styles.metadataItem}>
-                {index > 0 ? <View style={styles.divider} /> : null}
-                <Text numberOfLines={1} style={styles.metadataText}>
-                  {value}
-                </Text>
-              </View>
-            ))}
-          </View>
+          {metadata.length > 0 ? (
+            <Text style={styles.metadataText}>{metadata.join(" | ")}</Text>
+          ) : null}
         </View>
         <View style={styles.price}>
           {item.totalPriceDesc ? (
             <>
-              <Text numberOfLines={1} style={styles.amount}>
+              <Text style={styles.amount}>
                 {item.totalPriceDesc}
               </Text>
               <Image source={orderAssistantCoin} style={styles.coin} />
@@ -79,7 +72,8 @@ export const OrderNotifyCard = memo(function OrderNotifyCard({
 
 const styles = StyleSheet.create({
   card: {
-    minWidth: 220,
+    width: "100%",
+    minWidth: 0,
     maxWidth: "100%",
     padding: 12,
     borderRadius: 8,
@@ -100,12 +94,9 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 8,
     backgroundColor: "#F7F7F7",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     gap: 8,
   },
-  copy: { flex: 1, minWidth: 0, gap: 2 },
+  copy: { minWidth: 0, gap: 4 },
   service: {
     color: "#0A0A0A",
     fontFamily: DOUYIN_SANS,
@@ -113,39 +104,27 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     lineHeight: 18,
   },
-  metadata: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    minWidth: 0,
-  },
-  metadataItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    minWidth: 0,
-  },
-  divider: { width: 1, height: 6, backgroundColor: "#999999" },
   metadataText: {
-    flexShrink: 1,
     color: "#999999",
     fontFamily: DOUYIN_SANS,
     fontSize: 10,
     lineHeight: 14,
   },
   price: {
-    flexShrink: 0,
+    alignSelf: "flex-end",
+    maxWidth: "100%",
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
   },
   amount: {
+    flexShrink: 1,
     color: "#FE1F4C",
     fontFamily: DOUYIN_SANS,
     fontSize: 12,
     fontWeight: "500",
     lineHeight: 18,
   },
-  coin: { width: 14, height: 12 },
-  arrow: { width: 16, height: 16 },
+  coin: { width: 14, height: 12, flexShrink: 0 },
+  arrow: { width: 16, height: 16, flexShrink: 0 },
 });

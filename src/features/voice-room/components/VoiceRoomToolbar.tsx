@@ -1,12 +1,10 @@
 import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import {
   Pressable,
   StyleSheet,
-  Text,
   TextInput,
   useWindowDimensions,
-  View,
+  View
 } from "react-native";
 
 import { VoiceRoomMicControl } from "./VoiceRoomMicrophone";
@@ -15,6 +13,7 @@ const sendIcon = require("../../../../assets/voice-room/toolbar-send.svg");
 const messageIcon = require("../../../../assets/voice-room/toolbar-message.svg");
 const inviteIcon = require("../../../../assets/voice-room/toolbar-invite.svg");
 const serviceIcon = require("../../../../assets/voice-room/toolbar-service.svg");
+const distanceIcon = require("../../../../assets/voice-room/toolbar-distance.svg");
 
 type VoiceRoomToolbarProps = {
   bottomInset: number;
@@ -25,6 +24,8 @@ type VoiceRoomToolbarProps = {
   micChanging: boolean;
   leaving: boolean;
   serviceCalling: boolean;
+  distanceEnabled: boolean;
+  onToggleDistance: () => void;
   onChangeText: (text: string) => void;
   onSend: () => void;
   onToggleMute: () => void;
@@ -42,6 +43,8 @@ export function VoiceRoomToolbar({
   micChanging,
   leaving,
   serviceCalling,
+  distanceEnabled,
+  onToggleDistance,
   onChangeText,
   onSend,
   onToggleMute,
@@ -119,7 +122,7 @@ export function VoiceRoomToolbar({
           <Image source={inviteIcon} style={styles.icon} contentFit="contain" />
         </Pressable>
       </View>
-      <Pressable
+      {/* <Pressable
         accessibilityRole="button"
         accessibilityLabel="客服派单"
         accessibilityState={{ disabled: serviceCalling, busy: serviceCalling }}
@@ -154,7 +157,7 @@ export function VoiceRoomToolbar({
             {serviceCalling ? "呼叫中…" : "客服派单"}
           </Text>
         </LinearGradient>
-      </Pressable>
+      </Pressable> */}
     </View>
   );
 }
@@ -166,6 +169,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 16,
     paddingTop: 12,
+    marginBottom: 40,
   },
   containerCompact: { gap: 8, paddingHorizontal: 12 },
   composer: {
@@ -186,7 +190,7 @@ const styles = StyleSheet.create({
     height: 36,
     padding: 0,
     color: "#FFFFFF",
-    fontSize: 14,
+    fontSize: 12,
   },
   sendButton: {
     flexShrink: 0,
@@ -194,7 +198,12 @@ const styles = StyleSheet.create({
     height: 36,
     justifyContent: "center",
   },
-  tools: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 0 },
+  tools: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexShrink: 0,
+  },
   toolsCompact: { gap: 6 },
   toolButton: {
     width: 36,
@@ -203,6 +212,14 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.08)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  distanceActive: {
+    backgroundColor: "rgba(255,165,0,0.2)",
+    borderColor: "#FFA500",
+    borderWidth: 1,
+  },
+  distanceIcon: {
+    tintColor: "#FFA500",
   },
   icon: { width: 20, height: 20 },
   serviceButton: { flexShrink: 0, borderRadius: 18 },

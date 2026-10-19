@@ -392,6 +392,11 @@ async function connectRongCloudOnce(accessToken: string, attemptEpoch: number) {
       stage = 'engine-init';
       const { env } = getRuntimeConfig();
       engine = sdk.RCIMIWEngine.create(env.rongCloudAppKey);
+      // Server notifications use this envelope; ORDER_NOTIFY is its name field.
+      await engine.registerNativeCustomMessage(
+        'RC:CustomMsg',
+        sdk.RCIMIWNativeCustomMessagePersistentFlag.Counted,
+      );
       await engine.registerNativeCustomMessage(
         'ORDER_NOTIFY',
         sdk.RCIMIWNativeCustomMessagePersistentFlag.Counted,

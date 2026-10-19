@@ -1149,7 +1149,9 @@ const styles = StyleSheet.create({
   },
   afterSaleCardValue: { flex: 1, color: "#555", fontSize: 11, lineHeight: 16 },
   orderNotifyBubble: {
-    maxWidth: "84%",
+    flex: 1,
+    minWidth: 0,
+    maxWidth: "100%",
     paddingHorizontal: 0,
     paddingVertical: 0,
   },

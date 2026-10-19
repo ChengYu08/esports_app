@@ -66,6 +66,8 @@ export type RongSdkMessage = {
   mediaUrl?: string;
   identifier?: string;
   messageIdentifier?: string;
+  objectName?: string;
+  rawData?: string;
   name?: string;
   data?: string | Record<string, unknown>;
   fields?: Record<string, string | Record<string, unknown>>;
@@ -106,18 +108,22 @@ export function mapRongMessage(message: RongSdkMessage, enums: { image: number; 
     return imageUrl ? { id, kind: "image", imageUrl, time, isMine } : null;
   }
 
-  const fields = asRecord(message.fields);
+  // Older native sessions return unregistered custom messages as rawData.
+  const fields = { ...parsePayload(message.rawData), ...asRecord(message.fields) };
   // Server-persisted RC:CustomMsg uses fields.name + fields.data. Native
   // messages use identifier/messageIdentifier, so accept both SDK shapes.
   const customIdentifier = String(
     message.identifier
       || message.messageIdentifier
+      || message.objectName
       || message.name
       || fields.identifier
       || fields.name
       || "",
   );
-  const customName = customIdentifier === "RC:CustomMsg" ? String(fields.name || "") : customIdentifier;
+  // Commands are transient signals, not persisted chat content.
+  if (customIdentifier === "RC:CmdMsg") return null;
+  const customName = customIdentifier === "RC:CustomMsg" ? String(message.name || fields.name || "") : customIdentifier;
   const customPayload = parsePayload(message.data ?? fields.data);
 
   if (customName === "PZAfterSaleApply") {
@@ -143,7 +149,10 @@ export function mapRongMessage(message: RongSdkMessage, enums: { image: number; 
     };
   }
 
-  const text = message.text || message.content;
+  const notificationText = customIdentifier === "RC:CustomMsg" || customName === "TEXT_NOTIFY_MSG"
+    ? customPayload.content
+    : undefined;
+  const text = message.text || message.content || (typeof notificationText === "string" ? notificationText : undefined);
   const roomInvite = text ? parseRoomInviteLink(text) : null;
   if (roomInvite) return { id, kind: "roomInvite", ...roomInvite, time, isMine };
   return text ? { id, kind: "text", text, time, isMine } : null;

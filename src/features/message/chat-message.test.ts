@@ -1,7 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { mapRongMessage } from "./chat-message";
 import { toManagedMessage } from "./rongcloud-im";
+
+vi.mock("@/core/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn() } }));
+vi.mock("@/core/config/env", () => ({ env: { apiBaseUrl: "https://example.com" } }));
 
 describe("mapRongMessage", () => {
   it("maps a RongCloud image message to a renderable chat image", () => {
