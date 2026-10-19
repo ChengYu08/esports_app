@@ -5,6 +5,16 @@ import { mapRongMessage, type RongSdkMessage } from "./chat-message";
 const enums = { image: 4, send: 0 };
 
 describe("server system notifications", () => {
+  it.each<RongSdkMessage>([
+    { identifier: "TEXT_NOTIFY_MSG", fields: { commandName: "TEXT_NOTIFY_MSG", content: "您的实名认证已通过" } },
+    { messageIdentifier: "TEXT_NOTIFY_MSG", fields: { content: "您的实名认证已通过" } },
+    { objectName: "TEXT_NOTIFY_MSG", rawData: JSON.stringify({ commandName: "TEXT_NOTIFY_MSG", content: "您的实名认证已通过" }) },
+  ])("renders platform notifications with business fields decoded by the SDK: %j", (body) => {
+    expect(mapRongMessage({ ...body, messageUId: "platform-decoded-1", direction: 1 }, enums)).toMatchObject({
+      id: "platform-decoded-1", kind: "text", text: "您的实名认证已通过", isMine: false,
+    });
+  });
+
   it.each([
     { messageIdentifier: "RC:CustomMsg", fields: { name: "TEXT_NOTIFY_MSG", data: JSON.stringify({ content: "您的实名认证已通过" }) } },
     { objectName: "RC:CustomMsg", rawData: JSON.stringify({ name: "TEXT_NOTIFY_MSG", data: JSON.stringify({ content: "您的实名认证已通过" }) }) },
@@ -42,6 +52,24 @@ describe("server system notifications", () => {
   it("ignores malformed custom payloads without throwing", () => {
     const message = { objectName: "RC:CustomMsg", rawData: "{broken" };
     expect(mapRongMessage(message, enums)).toBeNull();
+  });
+
+  it("prefers the notification body over a flat fallback when both are present", () => {
+    expect(mapRongMessage({
+      messageIdentifier: "RC:CustomMsg",
+      fields: {
+        name: "TEXT_NOTIFY_MSG",
+        content: "通知摘要",
+        data: JSON.stringify({ content: "您的实名认证已通过" }),
+      },
+    }, enums)).toMatchObject({ kind: "text", text: "您的实名认证已通过" });
+  });
+
+  it("ignores non-text notification content", () => {
+    expect(mapRongMessage({
+      identifier: "TEXT_NOTIFY_MSG",
+      fields: { content: { invalid: true } },
+    }, enums)).toBeNull();
   });
 });
 

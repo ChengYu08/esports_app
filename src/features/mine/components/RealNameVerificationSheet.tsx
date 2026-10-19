@@ -96,6 +96,7 @@ export function RealNameVerificationSheet({
     <>
       <BottomSheet
         keyboardAvoiding
+        scrollable
         visible={visible}
         onClose={close}
         contentStyle={styles.frame}

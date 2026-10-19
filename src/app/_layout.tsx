@@ -24,6 +24,7 @@ import {
 } from "@/features/message/message-store";
 import { InAppNotificationBanner } from "@/features/message/components/InAppNotificationBanner";
 import { VoiceRoomMiniPlayer } from "@/features/voice-room/components/VoiceRoomMiniPlayer";
+import { VoiceRoomKickListener } from "@/features/voice-room/components/VoiceRoomKickListener";
 import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
 import { leaveVoiceChatRoom } from "@/features/voice-room/voice-room-rongcloud";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
@@ -121,11 +122,14 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (accessToken) return;
-    const activeRoom = useVoiceRoomSessionStore.getState().activeRoom;
-    if (!activeRoom) return;
+    const { activeRoom, joiningRoom, clearActiveRoom } = useVoiceRoomSessionStore.getState();
+    clearActiveRoom();
+    if (!activeRoom && !joiningRoom) return;
     void leaveVoiceRtc();
-    void leaveVoiceChatRoom(activeRoom.rongChatroomId);
-    useVoiceRoomSessionStore.getState().clearActiveRoom(activeRoom.roomId);
+    const chatroomIds = new Set([activeRoom?.rongChatroomId, joiningRoom?.rongChatroomId]);
+    chatroomIds.forEach((chatroomId) => {
+      if (chatroomId) void leaveVoiceChatRoom(chatroomId).catch(() => undefined);
+    });
   }, [accessToken]);
 
   useEffect(() => {
@@ -221,6 +225,7 @@ export default function RootLayout() {
             )}
             <InAppNotificationBanner visible={!pathname.startsWith("/voice-room/")} />
             <VoiceRoomMiniPlayer />
+            <VoiceRoomKickListener />
           </RootSiblingParent>
         </GestureHandlerRootView>
       </SafeAreaProvider>

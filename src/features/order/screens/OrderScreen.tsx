@@ -292,6 +292,7 @@ function StarPaymentPrompt({
   onPaid: () => void;
   onPaymentFailed: (message: string) => void;
 }) {
+  const insets = useSafeAreaInsets();
   const [balance, setBalance] = useState<number | null>(null);
   const [paying, setPaying] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -326,7 +327,7 @@ function StarPaymentPrompt({
   };
 
   return <>
-    <BottomSheet visible={Boolean(item)} onClose={() => void onClose()} contentStyle={styles.paymentSheet}>
+    <BottomSheet scrollable visible={Boolean(item)} onClose={() => void onClose()} contentStyle={[styles.paymentSheet, { paddingBottom: 24 + insets.bottom }]}>
           <Text style={styles.paymentTitle}>星钻支付</Text>
           <Text style={styles.paymentAmount}>支付 {item?.totalPrice ?? 0} 星钻</Text>
           <Text style={styles.paymentBalance}>当前余额：{balance === null ? "加载中..." : `${balance} 星钻`}</Text>

@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import type { AfterSaleMember } from "../order.api";
@@ -6,7 +7,8 @@ import type { AfterSaleMember } from "../order.api";
 export function OrderAfterSaleSheet({ visible, loading, members, onClose, onContact }: {
   visible: boolean; loading: boolean; members: AfterSaleMember[]; onClose: () => void; onContact: (member: AfterSaleMember) => void;
 }) {
-  return <BottomSheet visible={visible} onClose={onClose} contentStyle={styles.sheet}>
+  const insets = useSafeAreaInsets();
+  return <BottomSheet scrollable visible={visible} onClose={onClose} contentStyle={[styles.sheet, { paddingBottom: 20 + insets.bottom }]}>
       <View style={styles.header}><Text style={styles.title}>申请售后</Text><Pressable onPress={onClose}><Text style={styles.close}>×</Text></Pressable></View>
       {loading ? <Text style={styles.tip}>加载中...</Text> : members.length === 0 ? <Text style={styles.tip}>暂无售后客服</Text> : members.map((member) => <View style={styles.row} key={member.userId}>
         <CachedImage contentFit="cover" source={member.headImage} style={styles.avatar} /><View style={styles.copy}><Text style={styles.name}>{member.nickname || "售后客服"}</Text><Text style={styles.status}>{Number(member.onlineStatus) === 1 ? "在线中" : "离线"}</Text></View><Pressable style={styles.contact} onPress={() => onContact(member)}><Text style={styles.contactText}>联系</Text></Pressable>

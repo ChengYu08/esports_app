@@ -102,6 +102,7 @@ export function OrderReviewSheet({
 
   return (
     <BottomSheet
+      fullScreen
       visible={visible}
       onClose={onClose}
       dismissOnBackdropPress={!submitting}

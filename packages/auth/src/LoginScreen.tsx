@@ -3,13 +3,18 @@ import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   canSendSmsCode,
   getSmsCodeActionLabel,
@@ -57,6 +62,10 @@ export function LoginScreen({
   onUserAgreementPress,
   onPrivacyPolicyPress,
 }: LoginScreenProps) {
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const compact = windowHeight - insets.top - insets.bottom < 700;
+  const credentialInputRef = useRef<TextInput>(null);
   const [mode, setMode] = useState<"sms" | "password">(initialMode ?? "sms");
   const [phone, setPhone] = useState(() => sanitizePhone(initialPhone ?? ""));
   const [code, setCode] = useState("");
@@ -112,6 +121,7 @@ export function LoginScreen({
 
   const handleSubmit = () => {
     if (!isSubmitReady || isSubmittingRef.current) return;
+    Keyboard.dismiss();
     if (!agreementAccepted) {
       setAgreementModalVisible(true);
       return;
@@ -141,218 +151,261 @@ export function LoginScreen({
   };
 
   return (
-    <View onTouchStart={Keyboard.dismiss} style={styles.screen}>
-      <View style={styles.canvas}>
-        <View style={styles.top}>
-          <Image source={topArt} style={styles.topArt} contentFit="fill" />
-          <Pressable
-            accessibilityLabel="返回"
-            disabled={isSubmitting}
-            onPress={onBack}
-            style={styles.back}
-          >
-            <Image
-              source={backIcon}
-              style={styles.backImage}
-              contentFit="contain"
-            />
-          </Pressable>
-        </View>
-        <View style={styles.content}>
-          <View style={styles.fields}>
-            <View style={styles.field}>
-              <Text style={styles.prefix}>+86</Text>
-              <TextInput
-                value={phone}
-                onChangeText={handlePhoneChange}
-                editable={!isSubmitting}
-                autoCapitalize="none"
-                keyboardType="phone-pad"
-                maxLength={11}
-                placeholder="请输入手机号"
-                placeholderTextColor="#ccc"
-                selectionColor="#e01b28"
-                style={styles.input}
-              />
-            </View>
-            <View style={styles.field}>
-              <TextInput
-                value={isPasswordMode ? password : code}
-                editable={!isSubmitting}
-                onChangeText={
-                  isPasswordMode
-                    ? setPassword
-                    : (value) => setCode(sanitizeCode(value))
-                }
-                keyboardType={isPasswordMode ? "default" : "number-pad"}
-                maxLength={isPasswordMode ? 16 : 6}
-                placeholder={isPasswordMode ? "请输入密码" : "请输入验证码"}
-                placeholderTextColor="#ccc"
-                selectionColor="#e01b28"
-                secureTextEntry={isPasswordMode && !passwordVisible}
-                style={styles.input}
-              />
-              {isPasswordMode ? (
-                <View style={styles.passwordActions}>
-                  <Pressable
-                    accessibilityLabel={
-                      passwordVisible ? "隐藏密码" : "显示密码"
-                    }
-                    accessibilityRole="button"
-                    disabled={isSubmitting}
-                    hitSlop={8}
-                    onPress={() => setPasswordVisible((visible) => !visible)}
-                    style={styles.eyeButton}
-                  >
-                    <Image
-                      accessible={false}
-                      source={passwordVisible ? eyeOpenIcon : eyeClosedIcon}
-                      style={styles.eyeIcon}
-                      contentFit="contain"
-                    />
-                  </Pressable>
-                  <View style={styles.divider} />
-                  <Pressable
-                    accessibilityLabel="忘记密码"
-                    accessibilityRole="button"
-                    disabled={isSubmitting}
-                    onPress={() => onForgotPassword?.(phone)}
-                  >
-                    <Text style={styles.forgotPassword}>忘记密码</Text>
-                  </Pressable>
-                </View>
-              ) : (
-                <>
-                  <View style={styles.divider} />
-                  <Pressable
-                    accessibilityLabel="获取验证码"
-                    accessibilityRole="button"
-                    disabled={!canSendCode || isSubmitting}
-                    onPress={() => void handleSendCode()}
-                  >
-                    <Text
-                      style={[styles.send, !canSendCode && styles.sendDisabled]}
-                    >
-                      {getSmsCodeActionLabel(isSendingCode, codeCountdown)}
-                    </Text>
-                  </Pressable>
-                </>
-              )}
-            </View>
-          </View>
-          <View style={styles.actions}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={isSubmitting ? "登录中" : undefined}
-              accessibilityState={{
-                disabled: !isSubmitReady || isSubmitting,
-                busy: isSubmitting,
-              }}
-              disabled={!isSubmitReady || isSubmitting}
-              style={[
-                styles.submit,
-                isSubmitReady && styles.submitActive,
-                isSubmitting && styles.submitLoading,
-              ]}
-              onPress={handleSubmit}
-            >
-              {isSubmitting ? (
-                <View style={styles.submitContent}>
-                  <ActivityIndicator color="#fff" size="small" />
-                  <Text style={styles.submitText}>登录中…</Text>
-                </View>
-              ) : (
-                <Text style={styles.submitText}>
-                  {isPasswordMode ? "登录" : "登录/注册"}
-                </Text>
-              )}
-            </Pressable>
-            <Pressable disabled={isSubmitting} onPress={onSkip}>
-              <Text style={styles.browse}>暂不登录，先去逛逛</Text>
-            </Pressable>
-          </View>
-        </View>
-        <View style={styles.other}>
-          {/* <LoginMethod
-            icon={phoneIcon}
-            label="一键登录"
-            onPress={onQuickLogin}
-          /> */}
-          <LoginMethod
-            icon={lockIcon}
-            label={isPasswordMode ? "验证码登录" : "密码登录"}
-            disabled={isSubmitting}
-            onPress={() =>
-              setMode((current) => (current === "sms" ? "password" : "sms"))
-            }
-          />
-          {/* <LoginMethod icon={wechatIcon} label="微信" /> */}
-        </View>
-        <Pressable
-          accessibilityLabel="已阅读并同意用户协议和隐私政策"
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: agreementAccepted }}
-          disabled={isSubmitting}
-          hitSlop={8}
-          onPress={() => setAgreementAccepted((accepted) => !accepted)}
-          style={styles.agreement}
+    <View style={styles.screen}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.keyboardAvoiding}
+      >
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={[
+            styles.canvas,
+            {
+              paddingBottom: Math.max(insets.bottom, 24),
+              paddingLeft: insets.left,
+              paddingRight: insets.right,
+            },
+          ]}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+          showsVerticalScrollIndicator={false}
         >
-          <View
-            style={[
-              styles.checkbox,
-              agreementAccepted && styles.checkboxChecked,
-            ]}
-          >
-            {agreementAccepted ? <Text style={styles.checkmark}>✓</Text> : null}
+          <View style={[styles.top, compact && styles.compactTop]}>
+            <Image source={topArt} style={styles.topArt} contentFit="fill" />
+            <Pressable
+              accessibilityLabel="返回"
+              disabled={isSubmitting}
+              onPress={onBack}
+              style={[styles.back, { top: insets.top + 8 }]}
+            >
+              <Image
+                source={backIcon}
+                style={styles.backImage}
+                contentFit="contain"
+              />
+            </Pressable>
           </View>
-          <Text style={styles.agreementText}>
-            已阅读并同意{" "}
-            <Text
-              accessibilityRole="link"
-              onPress={onUserAgreementPress}
-              style={styles.link}
+          <View style={[styles.content, compact && styles.compactContent]}>
+            <View style={styles.fields}>
+              <View style={styles.field}>
+                <Text style={styles.prefix}>+86</Text>
+                <TextInput
+                  accessibilityLabel="手机号"
+                  value={phone}
+                  onChangeText={handlePhoneChange}
+                  editable={!isSubmitting}
+                  autoCapitalize="none"
+                  keyboardType="phone-pad"
+                  maxLength={11}
+                  placeholder="请输入手机号"
+                  placeholderTextColor="#ccc"
+                  selectionColor="#e01b28"
+                  onSubmitEditing={() => credentialInputRef.current?.focus()}
+                  returnKeyType="next"
+                  style={styles.input}
+                />
+              </View>
+              <View style={styles.field}>
+                <TextInput
+                  ref={credentialInputRef}
+                  accessibilityLabel={isPasswordMode ? "密码" : "验证码"}
+                  value={isPasswordMode ? password : code}
+                  editable={!isSubmitting}
+                  onChangeText={
+                    isPasswordMode
+                      ? setPassword
+                      : (value) => setCode(sanitizeCode(value))
+                  }
+                  keyboardType={isPasswordMode ? "default" : "number-pad"}
+                  maxLength={isPasswordMode ? 16 : 6}
+                  placeholder={isPasswordMode ? "请输入密码" : "请输入验证码"}
+                  placeholderTextColor="#ccc"
+                  selectionColor="#e01b28"
+                  secureTextEntry={isPasswordMode && !passwordVisible}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onSubmitEditing={handleSubmit}
+                  returnKeyType="done"
+                  style={styles.input}
+                />
+                {isPasswordMode ? (
+                  <View style={styles.passwordActions}>
+                    <Pressable
+                      accessibilityLabel={
+                        passwordVisible ? "隐藏密码" : "显示密码"
+                      }
+                      accessibilityRole="button"
+                      disabled={isSubmitting}
+                      hitSlop={8}
+                      onPress={() => setPasswordVisible((visible) => !visible)}
+                      style={styles.eyeButton}
+                    >
+                      <Image
+                        accessible={false}
+                        source={passwordVisible ? eyeOpenIcon : eyeClosedIcon}
+                        style={styles.eyeIcon}
+                        contentFit="contain"
+                      />
+                    </Pressable>
+                    <View style={styles.divider} />
+                    <Pressable
+                      accessibilityLabel="忘记密码"
+                      accessibilityRole="button"
+                      disabled={isSubmitting}
+                      onPress={() => onForgotPassword?.(phone)}
+                    >
+                      <Text style={styles.forgotPassword}>忘记密码</Text>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <>
+                    <View style={styles.divider} />
+                    <Pressable
+                      accessibilityLabel="获取验证码"
+                      accessibilityRole="button"
+                      disabled={!canSendCode || isSubmitting}
+                      onPress={() => void handleSendCode()}
+                    >
+                      <Text
+                        style={[styles.send, !canSendCode && styles.sendDisabled]}
+                      >
+                        {getSmsCodeActionLabel(isSendingCode, codeCountdown)}
+                      </Text>
+                    </Pressable>
+                  </>
+                )}
+              </View>
+            </View>
+            <View style={[styles.actions, compact && styles.compactActions]}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={isSubmitting ? "登录中" : undefined}
+                accessibilityState={{
+                  disabled: !isSubmitReady || isSubmitting,
+                  busy: isSubmitting,
+                }}
+                disabled={!isSubmitReady || isSubmitting}
+                style={[
+                  styles.submit,
+                  isSubmitReady && styles.submitActive,
+                  isSubmitting && styles.submitLoading,
+                ]}
+                onPress={handleSubmit}
+              >
+                {isSubmitting ? (
+                  <View style={styles.submitContent}>
+                    <ActivityIndicator color="#fff" size="small" />
+                    <Text style={styles.submitText}>登录中…</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.submitText}>
+                    {isPasswordMode ? "登录" : "登录/注册"}
+                  </Text>
+                )}
+              </Pressable>
+              <Pressable disabled={isSubmitting} onPress={onSkip}>
+                <Text style={styles.browse}>暂不登录，先去逛逛</Text>
+              </Pressable>
+            </View>
+          </View>
+          <View style={[styles.footer, compact && styles.compactFooter]}>
+            <View style={styles.other}>
+              {/* <LoginMethod
+                icon={phoneIcon}
+                label="一键登录"
+                onPress={onQuickLogin}
+              /> */}
+              <LoginMethod
+                icon={lockIcon}
+                label={isPasswordMode ? "验证码登录" : "密码登录"}
+                disabled={isSubmitting}
+                onPress={() =>
+                  setMode((current) => (current === "sms" ? "password" : "sms"))
+                }
+              />
+              {/* <LoginMethod icon={wechatIcon} label="微信" /> */}
+            </View>
+            <Pressable
+              accessibilityLabel="已阅读并同意用户协议和隐私政策"
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: agreementAccepted }}
+              disabled={isSubmitting}
+              hitSlop={8}
+              onPress={() => setAgreementAccepted((accepted) => !accepted)}
+              style={[styles.agreement, compact && styles.compactAgreement]}
             >
-              《用户协议》
-            </Text>{" "}
-            <Text
-              accessibilityRole="link"
-              onPress={onPrivacyPolicyPress}
-              style={styles.link}
-            >
-              《隐私政策》
-            </Text>
-            ，未注册用户 在登录成功后自动创建账号
-          </Text>
-        </Pressable>
-        <View style={styles.homeIndicator} />
-      </View>
+              <View
+                style={[
+                  styles.checkbox,
+                  agreementAccepted && styles.checkboxChecked,
+                ]}
+              >
+                {agreementAccepted ? <Text style={styles.checkmark}>✓</Text> : null}
+              </View>
+              <Text style={styles.agreementText}>
+                已阅读并同意{" "}
+                <Text
+                  accessibilityRole="link"
+                  onPress={onUserAgreementPress}
+                  style={styles.link}
+                >
+                  《用户协议》
+                </Text>{" "}
+                <Text
+                  accessibilityRole="link"
+                  onPress={onPrivacyPolicyPress}
+                  style={styles.link}
+                >
+                  《隐私政策》
+                </Text>
+                ，未注册用户 在登录成功后自动创建账号
+              </Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
       <Modal
         animationType="fade"
         onRequestClose={() => setAgreementModalVisible(false)}
         transparent
         visible={agreementModalVisible}
       >
-        <View style={styles.modalOverlay}>
+        <View
+          style={[
+            styles.modalOverlay,
+            {
+              paddingTop: insets.top + 24,
+              paddingBottom: insets.bottom + 24,
+              paddingLeft: insets.left + 24,
+              paddingRight: insets.right + 24,
+            },
+          ]}
+        >
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>阅读并同意以下协议</Text>
-            <Text style={styles.modalText}>
-              已阅读并同意{" "}
-              <Text
-                accessibilityRole="link"
-                onPress={onUserAgreementPress}
-                style={styles.link}
-              >
-                《用户协议》
-              </Text>{" "}
-              <Text
-                accessibilityRole="link"
-                onPress={onPrivacyPolicyPress}
-                style={styles.link}
-              >
-                《隐私政策》
+            <ScrollView
+              style={styles.modalCopy}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Text style={styles.modalTitle}>阅读并同意以下协议</Text>
+              <Text style={styles.modalText}>
+                已阅读并同意{" "}
+                <Text
+                  accessibilityRole="link"
+                  onPress={onUserAgreementPress}
+                  style={styles.link}
+                >
+                  《用户协议》
+                </Text>{" "}
+                <Text
+                  accessibilityRole="link"
+                  onPress={onPrivacyPolicyPress}
+                  style={styles.link}
+                >
+                  《隐私政策》
+                </Text>
+                ，未注册用户在登录成功后自动创建账号
               </Text>
-              ，未注册用户在登录成功后自动创建账号
-            </Text>
+            </ScrollView>
             <View style={styles.modalActions}>
               <Pressable
                 accessibilityRole="button"
@@ -405,25 +458,27 @@ function LoginMethod({
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#fff", overflow: "hidden" },
-  canvas: { flex: 1, width: "100%", minHeight: 812 },
+  screen: { flex: 1, backgroundColor: "#fff" },
+  keyboardAvoiding: { flex: 1 },
+  scroll: { flex: 1 },
+  canvas: { flexGrow: 1 },
   top: { height: 208, overflow: "hidden", backgroundColor: "#ffe5e7" },
-  topArt: { position: "absolute", left: 0, top: 0, width: "100%", height: 208 },
+  compactTop: { height: 176 },
+  topArt: { position: "absolute", left: 0, top: 0, width: "100%", height: "100%" },
   back: {
     position: "absolute",
-    top: 57,
-    left: 20,
-    width: 20,
-    height: 24,
+    left: 8,
+    width: 44,
+    height: 44,
+    alignItems: "center",
     justifyContent: "center",
   },
   backImage: { width: 24, height: 24 },
   content: {
-    position: "absolute",
-    top: 196,
-    left: 0,
-    right: 0,
-    minHeight: 616,
+    marginTop: -12,
+    width: "100%",
+    maxWidth: 480,
+    alignSelf: "center",
     paddingTop: 64,
     paddingHorizontal: 32,
     backgroundColor: "#fff",
@@ -431,8 +486,9 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 12,
   },
   fields: { gap: 12 },
+  compactContent: { paddingTop: 32 },
   field: {
-    height: 46,
+    minHeight: 46,
     borderRadius: 8,
     backgroundColor: "#f7f7f7",
     padding: 12,
@@ -450,7 +506,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    height: 22,
+    minHeight: 22,
     padding: 0,
     color: "#333",
     fontSize: 14,
@@ -467,8 +523,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   actions: { marginTop: 56, alignItems: "center" },
+  compactActions: { marginTop: 32 },
   submit: {
-    height: 42,
+    minHeight: 42,
+    paddingVertical: 10,
     width: "100%",
     borderRadius: 8,
     backgroundColor: "#ff99a0",
@@ -490,15 +548,20 @@ const styles = StyleSheet.create({
     fontFamily: DOUYIN_SANS,
     fontSize: 12,
   },
+  footer: {
+    flexGrow: 1,
+    justifyContent: "flex-end",
+    paddingTop: 72,
+    width: "100%",
+    maxWidth: 480,
+    alignSelf: "center",
+  },
   other: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 614,
     flexDirection: "row",
     justifyContent: "center",
     gap: 24,
   },
+  compactFooter: { paddingTop: 32 },
   method: { width: 64, alignItems: "center" },
   circle: {
     width: 40,
@@ -512,13 +575,12 @@ const styles = StyleSheet.create({
   methodIcon: { width: 22, height: 22 },
   methodLabel: { color: "#808080", fontFamily: DOUYIN_SANS, fontSize: 12 },
   agreement: {
-    position: "absolute",
-    left: 32,
-    right: 32,
-    top: 722,
+    marginTop: 40,
+    marginHorizontal: 32,
     flexDirection: "row",
     alignItems: "flex-start",
   },
+  compactAgreement: { marginTop: 24 },
   checkbox: {
     width: 16,
     height: 16,
@@ -550,12 +612,15 @@ const styles = StyleSheet.create({
   modalCard: {
     width: "100%",
     maxWidth: 340,
+    maxHeight: "100%",
+    flexShrink: 1,
     paddingTop: 24,
     paddingHorizontal: 20,
     paddingBottom: 20,
     borderRadius: 16,
     backgroundColor: "#fff",
   },
+  modalCopy: { flexGrow: 0, flexShrink: 1 },
   modalTitle: {
     color: "#222",
     fontFamily: DOUYIN_SANS,
@@ -571,6 +636,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   modalActions: {
+    flexShrink: 0,
     marginTop: 24,
     flexDirection: "row",
     alignItems: "center",
@@ -578,14 +644,16 @@ const styles = StyleSheet.create({
   },
   disagreeButton: {
     flex: 1,
-    height: 42,
+    minHeight: 44,
+    paddingVertical: 10,
     alignItems: "center",
     justifyContent: "center",
   },
   disagreeText: { color: "#999", fontFamily: DOUYIN_SANS, fontSize: 14 },
   agreeButton: {
     flex: 2,
-    height: 42,
+    minHeight: 44,
+    paddingVertical: 10,
     borderRadius: 8,
     backgroundColor: "#e01b28",
     alignItems: "center",
@@ -596,14 +664,5 @@ const styles = StyleSheet.create({
     fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "600",
-  },
-  homeIndicator: {
-    position: "absolute",
-    bottom: 10,
-    alignSelf: "center",
-    width: 133,
-    height: 5,
-    borderRadius: 5,
-    backgroundColor: "#000",
   },
 });

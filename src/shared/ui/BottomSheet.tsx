@@ -6,12 +6,14 @@ import {
   Modal,
   Pressable,
   Platform,
+  ScrollView,
   StyleSheet,
   useWindowDimensions,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
 import type { ReactNode } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type BottomSheetProps = {
   visible: boolean;
@@ -21,6 +23,9 @@ type BottomSheetProps = {
   backdropStyle?: StyleProp<ViewStyle>;
   dismissOnBackdropPress?: boolean;
   keyboardAvoiding?: boolean;
+  /** Enable for forms and static content; lists keep their own scroll container. */
+  scrollable?: boolean;
+  fullScreen?: boolean;
 };
 
 /** Bottom sheets use the same timing as the club detail filter sheet. */
@@ -32,7 +37,10 @@ export function BottomSheet({
   backdropStyle,
   dismissOnBackdropPress = true,
   keyboardAvoiding = false,
+  scrollable = false,
+  fullScreen = false,
 }: BottomSheetProps) {
+  const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const [mounted, setMounted] = useState(visible);
   const [backdropOpacity] = useState(() => new Animated.Value(0));
@@ -89,7 +97,16 @@ export function BottomSheet({
 
   const backdrop = (
     <Animated.View
-      style={[styles.backdrop, backdropStyle, { opacity: backdropOpacity }]}
+      style={[
+        styles.backdrop,
+        backdropStyle,
+        {
+          opacity: backdropOpacity,
+          paddingTop: fullScreen ? 0 : insets.top + 12,
+          paddingLeft: fullScreen ? 0 : insets.left,
+          paddingRight: fullScreen ? 0 : insets.right,
+        },
+      ]}
     >
       <Pressable
         accessibilityLabel="关闭弹窗"
@@ -98,9 +115,24 @@ export function BottomSheet({
         style={StyleSheet.absoluteFill}
       />
       <Animated.View
-        style={[contentStyle, { transform: [{ translateY: sheetTranslateY }] }]}
+        style={[
+          styles.sheet,
+          contentStyle,
+          { transform: [{ translateY: sheetTranslateY }] },
+        ]}
       >
-        {children}
+        {scrollable ? (
+          <ScrollView
+            style={styles.scroll}
+            bounces={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+          >
+            {children}
+          </ScrollView>
+        ) : (
+          children
+        )}
       </Animated.View>
     </Animated.View>
   );
@@ -132,4 +164,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,.35)",
   },
   keyboardAvoiding: { flex: 1 },
+  sheet: { maxHeight: "100%", flexShrink: 1 },
+  scroll: { flexGrow: 0, flexShrink: 1 },
 });

@@ -1,12 +1,12 @@
 import { clientAuthApi } from "@/features/auth/client-auth.api";
+import { messageStore } from "@/features/message/message-store";
 import { useAuthStore } from "@esports/auth";
 import {
   getRecordingPermissionsAsync,
   requestRecordingPermissionsAsync,
 } from "expo-audio";
-import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -24,6 +24,7 @@ import {
 import Toast from "react-native-root-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { VoiceRoomConversationsSheet } from "../components/VoiceRoomConversationsSheet";
 import { VoiceRoomExitDialog } from "../components/VoiceRoomExitDialog";
 import { VoiceRoomMemberSheet } from "../components/VoiceRoomMemberSheet";
 import { VoiceRoomMicBadge } from "../components/VoiceRoomMicrophone";
@@ -32,6 +33,7 @@ import { exitVoiceRoom } from "../exit-voice-room";
 import {
   getVoiceChatHistory,
   joinVoiceChatRoom,
+  leaveVoiceChatRoom,
   sendVoiceChatMessage,
   subscribeVoiceChatMembers,
   subscribeVoiceChatMessages,
@@ -41,9 +43,10 @@ import {
   getVoiceRtcMuted,
   getVoiceRtcRemoteUserIds,
   joinVoiceRtc,
+  leaveVoiceRtc,
   muteVoiceRtc,
 } from "../voice-room-rtc";
-import { useVoiceRoomSessionStore } from "../voice-room-session";
+import { useVoiceRoomSessionStore, type ActiveVoiceRoom } from "../voice-room-session";
 import { voiceRoomApi } from "../voice-room.api";
 import type {
   VoiceRoomDetail,
@@ -107,7 +110,15 @@ function normalizeMembers(
             : member.role;
       return { ...member, userId, role };
     });
-  const normalizedMembers: VoiceRoomMember[] = [...self, ...people];
+  // 房主固定排在第一个麦位，其余成员按加入顺序排列
+  const isSelfOwner = Boolean(creatorUserId) && creatorUserId === currentUserId;
+  const owner = people.filter((member) => member.role === "owner");
+  const others = people.filter((member) => member.role !== "owner");
+  const normalizedMembers: VoiceRoomMember[] = [
+    ...owner,
+    ...(isSelfOwner ? self : self.filter((member) => member.role !== "owner")),
+    ...others,
+  ];
   return [...normalizedMembers.slice(0, 7), inviteMember];
 }
 
@@ -130,9 +141,6 @@ export default function VoiceRoomScreen() {
   }>();
   const accessToken = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.user);
-  const setActiveRoom = useVoiceRoomSessionStore(
-    (state) => state.setActiveRoom,
-  );
   const roomId = typeof id === "string" ? id : id?.[0];
   const invitedRoomVersion = typeof v === "string" ? v : v?.[0];
   const [room, setRoom] = useState<VoiceRoomDetail | null>(null);
@@ -158,10 +166,17 @@ export default function VoiceRoomScreen() {
     null,
   );
   const [memberSheetVisible, setMemberSheetVisible] = useState(false);
+  const [conversationsSheetVisible, setConversationsSheetVisible] =
+    useState(false);
+  const [conversationsSheetMode, setConversationsSheetMode] = useState<
+    "chat" | "invite"
+  >("chat");
   const [exitDialogVisible, setExitDialogVisible] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [exitError, setExitError] = useState<string | null>(null);
   const exitInFlight = useRef(false);
+  const kickedRef = useRef(false);
+  const focusedRef = useRef(false);
   const [rtcReadyRoomId, setRtcReadyRoomId] = useState<string | null>(null);
   const [micState, setMicState] = useState<{
     roomId: string;
@@ -189,6 +204,35 @@ export default function VoiceRoomScreen() {
   useEffect(() => {
     roomRef.current = room;
   }, [room]);
+  const minimize = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace("/(tabs)");
+  }, []);
+
+  useFocusEffect(useCallback(() => {
+    focusedRef.current = true;
+    // A private chat can cover this screen while the global listener exits it.
+    if (kickedRef.current) minimize();
+    return () => { focusedRef.current = false; };
+  }, [minimize]));
+
+  useEffect(() => {
+    kickedRef.current = false;
+    return useVoiceRoomSessionStore.subscribe((state, previous) => {
+      const kicked = state.lastKickedRoom;
+      if (!kicked || kicked === previous.lastKickedRoom || kicked.roomId !== roomId) return;
+      const version = roomRef.current?.roomVersion ?? invitedRoomVersion;
+      if (version != null && String(version) !== kicked.roomVersion) return;
+      kickedRef.current = true;
+      setExitDialogVisible(false);
+      setMemberSheetVisible(false);
+      setConversationsSheetVisible(false);
+      setRtcReadyRoomId(null);
+      setMicState(null);
+      Keyboard.dismiss();
+      if (focusedRef.current) minimize();
+    });
+  }, [invitedRoomVersion, minimize, roomId]);
   const hydrateMemberProfile = useCallback(
     (userId: string, token: string) => {
       if (
@@ -255,11 +299,27 @@ export default function VoiceRoomScreen() {
     if (!roomId || !accessToken) {
       return;
     }
+    if (kickedRef.current) return;
     let active = true;
+    let joining: ActiveVoiceRoom | null = null;
+    const isCurrentJoin = () => active && !kickedRef.current
+      && (!joining || useVoiceRoomSessionStore.getState().joiningRoom === joining);
+    const cleanupCancelledJoin = async () => {
+      if (!joining) return;
+      const state = useVoiceRoomSessionStore.getState();
+      // Never tear down a newer room that took over while an old request waited.
+      const currentRoom = state.joiningRoom && state.joiningRoom !== joining
+        ? state.joiningRoom : state.activeRoom;
+      if (currentRoom?.rongChatroomId === joining.rongChatroomId) return;
+      await Promise.allSettled([
+        ...(currentRoom ? [] : [leaveVoiceRtc()]),
+        leaveVoiceChatRoom(joining.rongChatroomId),
+      ]);
+    };
     void (async () => {
       try {
         const detail = await voiceRoomApi.getDetail(roomId, accessToken);
-        if (!active) return;
+        if (!isCurrentJoin()) return;
         if (
           invitedRoomVersion &&
           String(detail.roomVersion ?? "1") !== invitedRoomVersion
@@ -271,7 +331,19 @@ export default function VoiceRoomScreen() {
           detail.roomVersion ?? "1",
           accessToken,
         );
-        if (!active) return;
+        if (!isCurrentJoin()) return;
+        joining = {
+          roomId,
+          roomVersion: String(prepared.roomVersion ?? detail.roomVersion ?? "1"),
+          rongChatroomId: prepared.rongChatroomId,
+          roomName: prepared.roomName || detail.roomName || "语聊房",
+          creatorUserId: String(detail.creatorUserId ?? ""),
+          ownerName: String(detail.creatorUserId ?? "") === String(currentUser?.id ?? "")
+            ? currentUser?.nickname || "我" : "房间成员",
+          ownerAvatar: String(detail.creatorUserId ?? "") === String(currentUser?.id ?? "")
+            ? currentUser?.headImage : undefined,
+        };
+        useVoiceRoomSessionStore.getState().beginRoomJoin(joining);
         setRoom({ ...detail, ...prepared, roomId });
         const preparedMembers = normalizeMembers(
           { ...detail, ...prepared },
@@ -282,6 +354,7 @@ export default function VoiceRoomScreen() {
           hydrateMemberProfile(member.userId, accessToken),
         );
         await joinVoiceChatRoom(accessToken, prepared.rongChatroomId);
+        if (!isCurrentJoin()) { await cleanupCancelledJoin(); return; }
         void getVoiceChatHistory(prepared.rongChatroomId)
           .then((history) => {
             if (!active || history.length === 0) return;
@@ -310,6 +383,7 @@ export default function VoiceRoomScreen() {
           prepared.roomVersion,
           accessToken,
         );
+        if (!isCurrentJoin()) { await cleanupCancelledJoin(); return; }
         if (rtc.accessStatus && rtc.accessStatus !== "READY")
           throw new Error("语聊房当前不可加入");
         const token = rtc.token || rtc.rtcToken;
@@ -351,37 +425,25 @@ export default function VoiceRoomScreen() {
             },
           },
         });
+        if (!isCurrentJoin()) { await cleanupCancelledJoin(); return; }
         if (!rtcJoined) throw new Error("当前设备的语音服务不可用");
+        if (!useVoiceRoomSessionStore.getState().completeRoomJoin(joining)) return;
         getVoiceRtcRemoteUserIds().forEach(ensureRtcMember);
         setRtcReadyRoomId(roomId);
         setMicState({ roomId, muted: getVoiceRtcMuted() });
-        setActiveRoom({
-          roomId,
-          roomVersion: String(
-            prepared.roomVersion ?? detail.roomVersion ?? "1",
-          ),
-          rongChatroomId: prepared.rongChatroomId,
-          roomName: prepared.roomName || detail.roomName || "语聊房",
-          creatorUserId: String(detail.creatorUserId ?? ""),
-          ownerName:
-            String(detail.creatorUserId ?? "") === String(currentUser?.id ?? "")
-              ? currentUser?.nickname || "我"
-              : "房间成员",
-          ownerAvatar:
-            String(detail.creatorUserId ?? "") === String(currentUser?.id ?? "")
-              ? currentUser?.headImage
-              : undefined,
-        });
         setError(null);
       } catch (cause) {
-        if (active)
+        await cleanupCancelledJoin();
+        if (active && !kickedRef.current)
           setError(cause instanceof Error ? cause.message : "进入语聊房失败");
       } finally {
+        if (joining) useVoiceRoomSessionStore.getState().cancelRoomJoin(joining);
         if (active) setLoading(false);
       }
     })();
     return () => {
       active = false;
+      if (joining) useVoiceRoomSessionStore.getState().cancelRoomJoin(joining);
     };
   }, [
     accessToken,
@@ -390,7 +452,6 @@ export default function VoiceRoomScreen() {
     hydrateMemberProfile,
     invitedRoomVersion,
     roomId,
-    setActiveRoom,
   ]);
 
   useEffect(() => {
@@ -450,11 +511,6 @@ export default function VoiceRoomScreen() {
     room?.creatorUserId,
     room?.serviceUserId,
   ]);
-
-  const minimize = () => {
-    if (router.canGoBack()) router.back();
-    else router.replace("/(tabs)");
-  };
 
   const confirmExit = async () => {
     if (exitInFlight.current || !roomId || !room) return;
@@ -582,7 +638,9 @@ export default function VoiceRoomScreen() {
           item.userId === currentUser?.id ? { ...item, micOpen: !next } : item,
         ),
       );
-      Toast.show(next ? "已闭麦" : "已开麦", { duration: Toast.durations.SHORT });
+      Toast.show(next ? "已闭麦" : "已开麦", {
+        duration: Toast.durations.SHORT,
+      });
     } catch {
       Toast.show("麦克风不可用，当前可以听到房间语音，请检查设备或权限", {
         duration: Toast.durations.SHORT,
@@ -617,22 +675,23 @@ export default function VoiceRoomScreen() {
     }
   };
 
-  const copyInviteLink = async () => {
+  const getInviteLink = () => {
     if (!roomId || !room) {
       Toast.show("房间信息加载中，请稍后再试", {
         duration: Toast.durations.SHORT,
       });
-      return;
+      return null;
     }
-    const inviteLink = `https://djpc.jlgkj.top/chat?type=chat-room&id=${encodeURIComponent(roomId)}&v=${encodeURIComponent(String(room.roomVersion ?? "1"))}`;
-    try {
-      await Clipboard.setStringAsync(inviteLink);
-      Toast.show("邀请链接已复制，去发给好友吧", {
-        duration: Toast.durations.SHORT,
-      });
-    } catch {
-      Toast.show("复制失败，请手动复制", { duration: Toast.durations.SHORT });
-    }
+    return `https://djpc.jlgkj.top/chat?type=chat-room&id=${encodeURIComponent(roomId)}&v=${encodeURIComponent(String(room.roomVersion ?? "1"))}`;
+  };
+
+  const sendInviteLink = async (peerId: string) => {
+    const inviteLink = getInviteLink();
+    if (!inviteLink) return;
+    const sendText = messageStore.getState().sendText;
+    // await sendText(peerId, `来和我一起连麦吧：${inviteLink}`);
+    await sendText(peerId, `${inviteLink}`);
+    Toast.show("邀请已发送", { duration: Toast.durations.SHORT });
   };
 
   return (
@@ -709,7 +768,11 @@ export default function VoiceRoomScreen() {
                 ]}
                 onPress={
                   invite
-                    ? () => void copyInviteLink()
+                    ? () => {
+                        Keyboard.dismiss();
+                        setConversationsSheetMode("invite");
+                        setConversationsSheetVisible(true);
+                      }
                     : () => {
                         Keyboard.dismiss();
                         setSelectedMember(member);
@@ -774,15 +837,20 @@ export default function VoiceRoomScreen() {
           leaving={leaving}
           serviceCalling={serviceCalling}
           distanceEnabled={distanceEnabled}
-          onToggleDistance={() => setDistanceEnabled(prev => !prev)}
+          onToggleDistance={() => setDistanceEnabled((prev) => !prev)}
           onChangeText={setInput}
           onSend={() => void sendMessage()}
           onToggleMute={() => void toggleMute()}
           onOpenMessages={() => {
             Keyboard.dismiss();
-            router.navigate("/(tabs)/message");
+            setConversationsSheetMode("chat");
+            setConversationsSheetVisible(true);
           }}
-          onInvite={() => void copyInviteLink()}
+          onInvite={() => {
+            Keyboard.dismiss();
+            setConversationsSheetMode("invite");
+            setConversationsSheetVisible(true);
+          }}
           onCallService={() => void callService()}
         />
       </View>
@@ -795,6 +863,13 @@ export default function VoiceRoomScreen() {
           if (!exitInFlight.current) setExitDialogVisible(false);
         }}
         onConfirm={() => void confirmExit()}
+      />
+      <VoiceRoomConversationsSheet
+        visible={conversationsSheetVisible}
+        onClose={() => setConversationsSheetVisible(false)}
+        sendTextTo={
+          conversationsSheetMode === "invite" ? sendInviteLink : undefined
+        }
       />
       <VoiceRoomMemberSheet
         visible={memberSheetVisible}

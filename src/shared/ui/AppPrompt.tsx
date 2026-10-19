@@ -1,5 +1,6 @@
 import { DOUYIN_SANS } from "@/shared/theme/typography";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export function AppPrompt({
   visible,
@@ -18,6 +19,7 @@ export function AppPrompt({
   onCancel?: () => void;
   onConfirm: () => void;
 }) {
+  const insets = useSafeAreaInsets();
   return (
     <Modal
       animationType="fade"
@@ -25,13 +27,29 @@ export function AppPrompt({
       visible={visible}
       onRequestClose={onCancel ?? onConfirm}
     >
-      <View style={styles.backdrop}>
+      <View
+        style={[
+          styles.backdrop,
+          {
+            paddingTop: insets.top + 24,
+            paddingBottom: insets.bottom + 24,
+            paddingLeft: insets.left + 36,
+            paddingRight: insets.right + 36,
+          },
+        ]}
+      >
         <View style={styles.dialog}>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.message}>{message}</Text>
+          <ScrollView
+            style={styles.copy}
+            contentContainerStyle={styles.copyContent}
+          >
+            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.message}>{message}</Text>
+          </ScrollView>
           <View style={styles.actions}>
             {cancelText && onCancel && (
               <Pressable
+                accessibilityRole="button"
                 style={[styles.button, styles.cancelButton]}
                 onPress={onCancel}
               >
@@ -39,6 +57,7 @@ export function AppPrompt({
               </Pressable>
             )}
             <Pressable
+              accessibilityRole="button"
               style={[
                 styles.button,
                 cancelText ? styles.confirmButton : styles.singleButton,
@@ -64,11 +83,16 @@ const styles = StyleSheet.create({
   },
   dialog: {
     width: "100%",
+    maxWidth: 360,
+    maxHeight: "100%",
+    flexShrink: 1,
     borderRadius: 20,
     alignItems: "center",
     padding: 24,
     backgroundColor: "#fff",
   },
+  copy: { alignSelf: "stretch", flexGrow: 0, flexShrink: 1 },
+  copyContent: { alignItems: "center" },
   iconText: { color: "#FF3158", fontSize: 28, fontWeight: "700" },
   title: {
     marginTop: 14,
@@ -87,7 +111,9 @@ const styles = StyleSheet.create({
   },
   button: {
     alignSelf: "stretch",
-    height: 44,
+    minHeight: 44,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
     marginTop: 20,
     borderRadius: 22,
     alignItems: "center",
@@ -95,6 +121,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FF3158",
   },
   actions: {
+    flexShrink: 0,
     alignSelf: "stretch",
     flexDirection: "row",
     gap: 12,
@@ -115,6 +142,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   buttonText: {
+    textAlign: "center",
     color: "#fff",
     fontFamily: DOUYIN_SANS,
     fontSize: 15,

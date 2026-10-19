@@ -1,4 +1,5 @@
 import type {
+  RCIMIWChatRoomMemberBlockEvent,
   RCIMIWConversation,
   RCIMIWEngine,
   RCIMIWMediaMessage,
@@ -12,6 +13,7 @@ import type { ManagedMessage, MessageConversation, MessageHistoryPage } from './
 import type { AfterSaleCardPayload } from '@/features/order/after-sale-card';
 import { getRongConversationTargetId, getSystemConversationTitle, isSystemConversationId, normalizeSystemConversationId } from './system-conversations';
 import { loadConversationSnapshot } from './conversation-loader';
+import { parseRongCommand, type RongCommand } from './rongcloud-command';
 
 export type RongConversation = MessageConversation;
 export type RongTextMessage = ManagedMessage;
@@ -36,6 +38,8 @@ const messageListeners = new Set<MessageListener>();
 const connectionStatusListeners = new Set<(signal: RongCloudConnectionSignal) => void>();
 const chatRoomMessageListeners = new Set<ChatRoomMessageListener>();
 const chatRoomMemberListeners = new Set<ChatRoomMemberListener>();
+const commandListeners = new Set<(command: RongCommand) => void>();
+const chatRoomBlockedListeners = new Set<(event: RCIMIWChatRoomMemberBlockEvent) => void>();
 
 function getRuntimeConfig() {
   try {
@@ -329,6 +333,14 @@ function installListeners() {
   });
   engine.setOnMessageReceivedListener((message) => {
     const sdk = loadSdk();
+    if (sdk && message.messageType === sdk.RCIMIWMessageType.COMMAND) {
+      const command = parseRongCommand(message, {
+        private: sdk.RCIMIWConversationType.PRIVATE,
+        command: sdk.RCIMIWMessageType.COMMAND,
+      });
+      if (command) commandListeners.forEach((listener) => listener(command));
+      return;
+    }
     if (sdk && message.conversationType === sdk.RCIMIWConversationType.CHATROOM) {
       const roomId = String(message.targetId || '');
       chatRoomMessageListeners.forEach((listener) => listener(roomId, message));
@@ -339,6 +351,12 @@ function installListeners() {
   engine.setOnChatRoomMemberChangedListener((roomId, actions) => {
     chatRoomMemberListeners.forEach((listener) => listener(roomId, actions));
   });
+  engine.setOnChatRoomNotifyBlockListener((event) => {
+    const sdk = loadSdk();
+    if (sdk && event.operateType === sdk.RCIMIWChatRoomMemberOperateType.Blocked) {
+      chatRoomBlockedListeners.forEach((listener) => listener(event));
+    }
+  });
   engine.setOnConnectionStatusChangedListener((status) => {
     publishConnectionStatus(status);
   });
@@ -346,6 +364,16 @@ function installListeners() {
 
 export function getRongCloudEngine() {
   return engine;
+}
+
+export function subscribeRongCommands(listener: (command: RongCommand) => void) {
+  commandListeners.add(listener);
+  return () => { commandListeners.delete(listener); };
+}
+
+export function subscribeRongChatRoomBlocked(listener: (event: RCIMIWChatRoomMemberBlockEvent) => void) {
+  chatRoomBlockedListeners.add(listener);
+  return () => { chatRoomBlockedListeners.delete(listener); };
 }
 
 export function subscribeRongChatRoomMessages(listener: ChatRoomMessageListener) {

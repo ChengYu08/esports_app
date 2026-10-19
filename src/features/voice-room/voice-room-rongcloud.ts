@@ -73,8 +73,10 @@ export async function joinVoiceChatRoom(accessToken: string, chatroomId: string)
 
 export async function leaveVoiceChatRoom(chatroomId: string) {
   const engine = getRongCloudEngine();
-  if (engine) await engine.leaveChatRoom(chatroomId);
+  // A kicked user may already be absent on the server; always discard the
+  // local joined marker so a later permitted join actually reaches the SDK.
   joinedChatroomIds.delete(chatroomId);
+  if (engine) await engine.leaveChatRoom(chatroomId);
 }
 
 export async function getVoiceChatHistory(chatroomId: string) {

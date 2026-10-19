@@ -687,12 +687,14 @@ export default function ProfileScreen() {
       ) : null}
       <AppPrompt
         visible={paymentSuccess}
-        title="操作成功"
-        message="订单已支付，可在订单页面查看进度"
+        title="支付成功"
+        message="订单已支付，前往聊天与对方沟通服务安排。订单进度可在订单页面查看。"
+        confirmText="去聊天"
+        cancelText="稍后联系"
+        onCancel={() => setPaymentSuccess(false)}
         onConfirm={() => {
           setPaymentSuccess(false);
-          setPaymentSheetVisible(false);
-          setPaymentOrder(null);
+          void handleChatPress();
         }}
       />
       <AppPrompt
@@ -1455,6 +1457,7 @@ function StarPaymentSheet({
       <BottomSheet
         visible={visible}
         onClose={() => void onClose()}
+        scrollable
         contentStyle={[
           styles.paymentModal,
           { paddingBottom: Math.max(insets.bottom, 16) },
@@ -1801,7 +1804,7 @@ const styles = StyleSheet.create({
   onlineIcon: { width: 12, height: 12 },
   onlineText: {
     fontFamily: DOUYIN_SANS,
-    fontSize: 10,
+    fontSize: 12,
     lineHeight: 12,
   },
   clubLine: { flexDirection: "row", alignItems: "center", gap: 6 },
@@ -1831,7 +1834,7 @@ const styles = StyleSheet.create({
   editProfileButton: {
     height: 48,
     marginHorizontal: 12,
-    marginTop: "auto",
+    // marginTop: "auto",
     marginBottom: 8,
     borderRadius: 8,
     backgroundColor: "#FFF",
@@ -1841,6 +1844,7 @@ const styles = StyleSheet.create({
     borderColor: "#EBEBEB",
     borderWidth: 1,
     gap: 8,
+    marginTop: 30,
   },
   profileListFooter: { flexGrow: 1 },
   editProfileText: {
@@ -2202,7 +2206,7 @@ const styles = StyleSheet.create({
     fontFamily: DOUYIN_SANS,
     fontSize: 12,
   },
-  reviewList: { marginHorizontal: -16, marginTop: 8 },
+  reviewList: { marginHorizontal: 8, marginTop: 8 },
   reviewListItem: { marginHorizontal: -16 },
   reviewCard: {
     flexDirection: "row",

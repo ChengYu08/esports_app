@@ -105,10 +105,8 @@ export default function ChatScreen() {
   const [noteVisible, setNoteVisible] = useState(false);
   const [noteDraft, setNoteDraft] = useState("");
   const listRef = useRef<FlatList<ChatListRow>>(null);
-  const initialHistoryLoaded = useRef(false);
-  const shouldScrollToEnd = useRef(false);
   const isNearBottom = useRef(true);
-  const previousMessageCount = useRef(0);
+  const scrollFrame = useRef<number | null>(null);
   const conversationId = normalizeSystemConversationId(String(id || ""));
   const isSelfConversation = isSelfConversationId(conversationId, userId);
   const canViewProfile = !isSystemConversationId(conversationId);
@@ -125,7 +123,10 @@ export default function ChatScreen() {
     () => isPeerBlacklisted ? messages.filter((message) => message.isMine) : messages,
     [isPeerBlacklisted, messages],
   );
-  const chatRows = useMemo(() => buildChatListRows(visibleMessages), [visibleMessages]);
+  const chatRows = useMemo(
+    () => buildChatListRows(visibleMessages).slice().reverse(),
+    [visibleMessages],
+  );
   const connectionState = useMessageStore((state) => state.connectionState);
   const lastError = useMessageStore((state) => state.lastError);
   const refreshOnlineStatuses = useMessageStore((state) => state.refreshOnlineStatuses);
@@ -182,26 +183,34 @@ export default function ChatScreen() {
   );
   const isOrderAssistant = isOrderAssistantConversationId(conversationId);
   const isPinned = Boolean(conversation?.isPinned);
-  const scrollToLatest = useCallback(
-    () => requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: false })),
-    [],
-  );
+  const scrollToLatest = useCallback(() => {
+    isNearBottom.current = true;
+    if (scrollFrame.current !== null) cancelAnimationFrame(scrollFrame.current);
+    // In an inverted list, the newest message is at offset zero.
+    // Wait for the pending message and composer layout to be committed.
+    scrollFrame.current = requestAnimationFrame(() => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      scrollFrame.current = null;
+    });
+  }, []);
   const handleSendText = useCallback(async (text: string) => {
     if (isSelfConversation) return;
-    requestAnimationFrame(() =>
-      listRef.current?.scrollToEnd({ animated: true }),
-    );
+    scrollToLatest();
     await sendText(conversationId, text);
-  }, [conversationId, isSelfConversation, sendText]);
+  }, [conversationId, isSelfConversation, scrollToLatest, sendText]);
   const handleSendImage = useCallback(
-    (imageUri: string) => sendImage(conversationId, imageUri),
-    [conversationId, sendImage],
+    (imageUri: string) => {
+      scrollToLatest();
+      return sendImage(conversationId, imageUri);
+    },
+    [conversationId, scrollToLatest, sendImage],
   );
   const handleRetryMessage = useCallback(
     (clientId: string) => {
+      scrollToLatest();
       void retryMessage(conversationId, clientId);
     },
-    [conversationId, retryMessage],
+    [conversationId, retryMessage, scrollToLatest],
   );
   const openOrderDetail = useCallback((orderId: string) => {
     router.push({ pathname: "/order/[id]", params: { id: orderId } });
@@ -269,10 +278,14 @@ export default function ChatScreen() {
   );
 
   useEffect(() => {
-    initialHistoryLoaded.current = false;
-    shouldScrollToEnd.current = false;
     isNearBottom.current = true;
-    previousMessageCount.current = 0;
+    return () => {
+      if (scrollFrame.current !== null) cancelAnimationFrame(scrollFrame.current);
+      scrollFrame.current = null;
+    };
+  }, [conversationId]);
+
+  useEffect(() => {
     if (isSelfConversation) {
       router.back();
       return () => closeConversation(conversationId);
@@ -301,39 +314,24 @@ export default function ChatScreen() {
     openConversation,
   ]);
 
-  useEffect(() => {
-    if (!historyState || historyState.loading) return;
-
-    if (!initialHistoryLoaded.current) {
-      initialHistoryLoaded.current = true;
-      previousMessageCount.current = visibleMessages.length;
-      shouldScrollToEnd.current = true;
-      scrollToLatest();
-      return;
-    }
-
-    if (
-      visibleMessages.length > previousMessageCount.current &&
-      isNearBottom.current
-    ) {
-      shouldScrollToEnd.current = true;
-      scrollToLatest();
-    }
-    previousMessageCount.current = visibleMessages.length;
-  }, [historyState, scrollToLatest, visibleMessages.length]);
-
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-    const distanceFromBottom =
-      contentSize.height - layoutMeasurement.height - contentOffset.y;
-    isNearBottom.current = distanceFromBottom <= 48;
-    if (contentOffset.y < 24 && !historyLoading) void loadOlder(conversationId);
+    // Native content anchoring can emit a scroll before our requested scroll runs.
+    if (scrollFrame.current !== null) return;
+    isNearBottom.current = event.nativeEvent.contentOffset.y <= 48;
+  }, []);
+
+  const handleLoadOlder = useCallback(() => {
+    if (!historyLoading) void loadOlder(conversationId);
   }, [conversationId, historyLoading, loadOlder]);
 
-  const handleContentSizeChange = useCallback(() => {
-    if (!shouldScrollToEnd.current) return;
-    shouldScrollToEnd.current = false;
-    scrollToLatest();
+  const handleScrollBeginDrag = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (scrollFrame.current !== null) cancelAnimationFrame(scrollFrame.current);
+    scrollFrame.current = null;
+    isNearBottom.current = event.nativeEvent.contentOffset.y <= 48;
+  }, []);
+
+  const keepLatestVisible = useCallback(() => {
+    if (isNearBottom.current) scrollToLatest();
   }, [scrollToLatest]);
 
   const openNoteEditor = () => {
@@ -410,7 +408,9 @@ export default function ChatScreen() {
       </View>
 
       <FlatList
+        key={conversationId}
         ref={listRef}
+        inverted
         contentContainerStyle={styles.messageList}
         data={chatRows}
         keyExtractor={(item) => item.key}
@@ -419,10 +419,14 @@ export default function ChatScreen() {
         ) : null}
         renderItem={renderChatRow}
         showsVerticalScrollIndicator={false}
-        onContentSizeChange={handleContentSizeChange}
-        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+        onContentSizeChange={keepLatestVisible}
+        onLayout={keepLatestVisible}
+        maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 48 }}
+        onEndReached={handleLoadOlder}
+        onEndReachedThreshold={0.2}
         onScroll={handleScroll}
-        scrollEventThrottle={150}
+        onScrollBeginDrag={handleScrollBeginDrag}
+        scrollEventThrottle={16}
       />
       {afterSalePayload ? (
         <View style={styles.afterSaleGuide}>
@@ -445,7 +449,10 @@ export default function ChatScreen() {
                 afterSalePayload,
               );
               setAfterSaleSending(false);
-              if (sent) setAfterSalePayload(null);
+              if (sent) {
+                scrollToLatest();
+                setAfterSalePayload(null);
+              }
             }}
           >
             <Text
@@ -482,6 +489,7 @@ export default function ChatScreen() {
       <BottomSheet
         visible={settingsVisible}
         onClose={() => setSettingsVisible(false)}
+        scrollable
         contentStyle={[
           styles.settingsSheet,
           { paddingBottom: Math.max(insets.bottom, 20) },
@@ -552,42 +560,50 @@ export default function ChatScreen() {
         visible={noteVisible}
         onRequestClose={() => setNoteVisible(false)}
       >
-        <Pressable
-          style={styles.noteBackdrop}
-          onPress={() => setNoteVisible(false)}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalKeyboard}
         >
-          <View
-            onStartShouldSetResponder={() => true}
-            style={styles.noteDialog}
+          <Pressable
+            style={[
+              styles.noteBackdrop,
+              { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 },
+            ]}
+            onPress={() => setNoteVisible(false)}
           >
-            <Text style={styles.noteTitle}>备注</Text>
-            <TextInput
-              autoFocus
-              maxLength={30}
-              onChangeText={setNoteDraft}
-              placeholder="请输入备注"
-              placeholderTextColor="#CCCCCC"
-              style={styles.noteInput}
-              value={noteDraft}
-            />
-            <View style={styles.noteActions}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setNoteVisible(false)}
-                style={styles.noteCancel}
-              >
-                <Text style={styles.noteCancelText}>取消</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                onPress={saveNote}
-                style={styles.noteConfirm}
-              >
-                <Text style={styles.noteConfirmText}>保存</Text>
-              </Pressable>
+            <View
+              onStartShouldSetResponder={() => true}
+              style={styles.noteDialog}
+            >
+              <Text style={styles.noteTitle}>备注</Text>
+              <TextInput
+                autoFocus
+                maxLength={30}
+                onChangeText={setNoteDraft}
+                placeholder="请输入备注"
+                placeholderTextColor="#CCCCCC"
+                style={styles.noteInput}
+                value={noteDraft}
+              />
+              <View style={styles.noteActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setNoteVisible(false)}
+                  style={styles.noteCancel}
+                >
+                  <Text style={styles.noteCancelText}>取消</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={saveNote}
+                  style={styles.noteConfirm}
+                >
+                  <Text style={styles.noteConfirmText}>保存</Text>
+                </Pressable>
+              </View>
             </View>
-          </View>
-        </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
     </KeyboardAvoidingView>
   );
@@ -916,7 +932,11 @@ const styles = StyleSheet.create({
   onlineIcon: { width: 6, height: 6 },
   onlineText: { color: "#2FC273", fontFamily: DOUYIN_SANS, fontSize: 12 },
   offlineText: { color: "#999999" },
-  messageList: { flexGrow: 1, paddingTop: 8, paddingBottom: 12 },
+  messageList: {
+    flexGrow: 1,
+    paddingTop: 8,
+    paddingBottom: 12,
+  },
   orderAssistantEmpty: { flex: 1 },
   timeSeparator: {
     minHeight: 32,
@@ -1161,11 +1181,11 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.7)",
   },
   settingsSheet: {
-    minHeight: 312,
     backgroundColor: "#F7F7F7",
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
   },
+  modalKeyboard: { flex: 1 },
   sheetTitleRow: {
     height: 56,
     paddingHorizontal: 16,

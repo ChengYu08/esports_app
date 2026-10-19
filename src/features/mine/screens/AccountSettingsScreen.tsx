@@ -333,9 +333,10 @@ export default function AccountSettingsScreen() {
 
       <BottomSheet
         keyboardAvoiding
+        scrollable
         visible={editing !== null}
         onClose={() => setEditing(null)}
-        contentStyle={styles.modalCard}
+        contentStyle={[styles.modalCard, { paddingBottom: 20 + insets.bottom }]}
       >
         <View>
           <Text style={styles.modalTitle}>{editTitle(editing)}</Text>

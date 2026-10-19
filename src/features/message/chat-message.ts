@@ -149,8 +149,9 @@ export function mapRongMessage(message: RongSdkMessage, enums: { image: number; 
     };
   }
 
+  // The SDK can unwrap RC:CustomMsg.data into fields instead of fields.data.
   const notificationText = customIdentifier === "RC:CustomMsg" || customName === "TEXT_NOTIFY_MSG"
-    ? customPayload.content
+    ? mergeCustomPayload(fields, customPayload).content
     : undefined;
   const text = message.text || message.content || (typeof notificationText === "string" ? notificationText : undefined);
   const roomInvite = text ? parseRoomInviteLink(text) : null;

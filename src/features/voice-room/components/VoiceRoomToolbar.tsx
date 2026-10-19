@@ -4,7 +4,7 @@ import {
   StyleSheet,
   TextInput,
   useWindowDimensions,
-  View
+  View,
 } from "react-native";
 
 import { VoiceRoomMicControl } from "./VoiceRoomMicrophone";
@@ -12,8 +12,6 @@ import { VoiceRoomMicControl } from "./VoiceRoomMicrophone";
 const sendIcon = require("../../../../assets/voice-room/toolbar-send.svg");
 const messageIcon = require("../../../../assets/voice-room/toolbar-message.svg");
 const inviteIcon = require("../../../../assets/voice-room/toolbar-invite.svg");
-const serviceIcon = require("../../../../assets/voice-room/toolbar-service.svg");
-const distanceIcon = require("../../../../assets/voice-room/toolbar-distance.svg");
 
 type VoiceRoomToolbarProps = {
   bottomInset: number;
@@ -111,7 +109,7 @@ export function VoiceRoomToolbar({
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="复制邀请链接"
+          accessibilityLabel="邀请用户"
           onPress={onInvite}
           hitSlop={4}
           style={({ pressed }) => [
