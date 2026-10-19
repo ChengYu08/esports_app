@@ -50,6 +50,32 @@
 5. **Hermes 引擎**: 保留 Podfile 中的项目配置，不通过文本替换强制切换引擎。
 6. **发布打包**: 统一执行 Release 的 `xcodebuild archive` 和 `xcodebuild -exportArchive`，由工程中的 React Native bundle build phase 生成 JS bundle。Archive 失败时控制台只显示关键诊断，完整日志可从 `ios-archive-log` artifact 下载。
 
+### 构建缓存与耗时
+
+- npm 使用 `setup-node` 的下载缓存，安装时执行 `npm ci --prefer-offline --no-audit --no-fund`，仍按 `package-lock.json` 安装完整依赖并运行安装脚本。
+- 根目录 `Gemfile` / `Gemfile.lock` 固定 CocoaPods 为现有工程使用的 `1.16.2`，由 `ruby/setup-ruby` 缓存 Ruby 依赖；本地执行预检前需要在可用的 Ruby 环境中运行 `bundle install`。
+- CocoaPods 下载和索引缓存按 CPU 架构、JS 依赖锁文件、Ruby 锁文件及生成后的 Podfile 等输入区分。Expo 生成工程时尚无 `ios/Podfile.lock`，因此缓存键不会仅依赖这个缺失的文件。
+- React Native 默认先运行 `pod install`；仅当日志表明 specs 缺失或过期时，重试一次 `--repo-update`。其它错误保留原始失败状态。
+- Metro 缓存路径从 Node 的 `os.tmpdir()` 读取，与 SDK 57 的 `metro-cache` 目录一致。缓存按依赖、Node 版本、架构和 commit 保存，并可从相同依赖的前一次构建恢复。
+- `ccache` 默认启用，原生编译缓存限制为 1 GiB，按 Xcode 版本、CPU 架构和原生依赖输入隔离。手动触发 workflow 时可将 `ccache` 设为 `false`，使用常规编译排查问题。
+- Archive 成功后输出 `Build Timing Summary`，并输出 ccache 命中统计；IPA 已经过压缩，上传 artifact 时使用 `compression-level: 0`。
+- 第一次构建用于建立缓存；后续构建的实际收益应通过 Actions 步骤耗时、编译耗时和 ccache 命中率比较。Release、Hermes、JS bundle、签名和最终 IPA 校验仍按原流程执行。
+
+### 优化前备份与回滚
+
+2026-10-19 优化前的原文件保存在 `ci/github-actions/ios-build/backups/2026-10-19-before-speedup/`，复制后已核对 SHA-256：
+
+- `ios-build.yml`：原 `.github/workflows/ios-build.yml`，SHA-256 为 `777de0301250243fbbaf32f8b220c0f8fcff02de6e6d9c5a55582207fecf952a`。
+- `README.md`：原说明文档，SHA-256 为 `3e9b1c42e6330080457b2cb21261c539691f16265557d57cc0b41341daa37990`。
+
+需要恢复本次优化前的配置时，在项目根目录执行以下命令；最后一条仅删除本次新增的 Ruby 依赖配置：
+
+```bash
+cp ci/github-actions/ios-build/backups/2026-10-19-before-speedup/ios-build.yml .github/workflows/ios-build.yml
+cp ci/github-actions/ios-build/backups/2026-10-19-before-speedup/README.md ci/github-actions/ios-build/README.md
+rm Gemfile Gemfile.lock
+```
+
 ### React Native 发布预检
 
 - 先安装 CocoaPods，再清理和检查工程；有根目录 Gemfile 时统一使用 Bundler 环境。
@@ -90,7 +116,7 @@ workflow 会按以下优先级检测包管理器：
 - 非 Flutter / Xcode 归档分支会把 `app_version` 写入 Expo 生成的 `CFBundleShortVersionString`，把 `app_build_number` 写入 `CFBundleVersion`，并同步 Release 的 `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION`
 - iOS 预检清理会把 Xcode 工程的 `TARGETED_DEVICE_FAMILY` 规范为 `1`，即只保留 iPhone，去掉 iPad 等其它设备族。
 - CI 上默认禁用 Swift Package Manager（`flutter config --no-enable-swift-package-manager`），统一走 CocoaPods，规避 xcodebuild 静默解析远程 SPM 包导致卡死。手动触发 workflow 时可把 `disable_swift_package_manager` 切到 `false` 以启用 SPM（仅当项目存在 SPM-only 插件时才需要）
-- CocoaPods 缓存以 `ios/Podfile.lock` 为 key 命中 `~/Library/Caches/CocoaPods` 与 `~/.cocoapods/repos`，加速重复构建
+- CocoaPods 缓存以依赖锁文件和生成后的原生配置为 key，缓存 `~/Library/Caches/CocoaPods` 与 `~/.cocoapods/repos`，加速重复构建
 - `flutter-build-ipa` 模式下会在构建前显式执行 `cd ios && pod install --repo-update`，把依赖解析从 `flutter build ipa` 内部剥离出来，便于排错
 - Flutter 项目默认走 `flutter build ipa --release --verbose --export-options-plist="$EXPORT_OPTIONS_PLIST"`，并开启 `set -x` 打印每条命令，方便 CI 日志排查
 - 如果 `flutter build ipa` 在某个项目上不适配，手动触发 workflow 时把 `flutter_build_mode` 切到 `xcodebuild-archive`，会改走 `flutter build ios --release --no-codesign` + `xcodebuild archive` / `xcodebuild -exportArchive`

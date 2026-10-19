@@ -1,0 +1,589 @@
+name: Build iOS IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      flutter_version:
+        description: Flutter version. Leave empty to use latest stable.
+        required: false
+        default: ""
+        type: string
+      flutter_build_name:
+        description: Deprecated. Use app_version instead. Leave empty to use pubspec.yaml.
+        required: false
+        default: ""
+        type: string
+      app_version:
+        description: IPA version, for example 1.2.3. Leave empty to use pubspec.yaml or Xcode project.
+        required: false
+        default: ""
+        type: string
+      app_build_number:
+        description: IPA build number, for example 45. Leave empty to use pubspec.yaml or Xcode project.
+        required: false
+        default: ""
+        type: string
+      ipa_file_name:
+        description: Output IPA file name. Leave empty to keep the generated name.
+        required: false
+        default: ""
+        type: string
+      ipa_overwrite:
+        description: Overwrite an existing IPA with the same output name.
+        required: false
+        default: true
+        type: boolean
+      flutter_build_mode:
+        description: Flutter build mode.
+        required: false
+        default: flutter-build-ipa
+        type: choice
+        options:
+          - flutter-build-ipa
+          - xcodebuild-archive
+      node_version:
+        description: Node.js version for React Native. Leave empty to use latest LTS.
+        required: false
+        default: ""
+        type: string
+      package_manager:
+        description: Package manager for React Native dependencies.
+        required: false
+        default: auto
+        type: choice
+        options:
+          - auto
+          - npm
+          - yarn
+          - pnpm
+      metro_cache:
+        description: Enable Metro bundler cache for React Native.
+        required: false
+        default: true
+        type: boolean
+      xcode_path:
+        description: Xcode.app path. Leave empty to use the runner default.
+        required: false
+        default: ""
+        type: string
+      disable_swift_package_manager:
+        description: Disable Swift Package Manager and use CocoaPods only. Recommended on CI to avoid xcodebuild hanging while resolving remote SPM packages.
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios:
+    name: Build iOS IPA
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    env:
+      BUNDLE_ID: com.esportsapp.apps
+      XCODE_WORKSPACE: ios/app.xcworkspace
+      XCODE_PROJECT_FILE: ios/app.xcodeproj/project.pbxproj
+      XCODE_SCHEME: app
+      IOS_BUILD_CONFIGURATION: Release
+      REACT_NATIVE_PROJECT: "true"
+
+    steps:
+      - name: Set build paths
+        run: |
+          {
+            echo "KEYCHAIN_PATH=${RUNNER_TEMP}/app-signing.keychain-db"
+            echo "ARCHIVE_PATH=${RUNNER_TEMP}/Runner.xcarchive"
+            echo "EXPORT_PATH=${RUNNER_TEMP}/ipa"
+            echo "EXPORT_OPTIONS_PLIST=${RUNNER_TEMP}/ExportOptions.plist"
+          } >> "$GITHUB_ENV"
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode
+        env:
+          XCODE_PATH_INPUT: ${{ inputs.xcode_path }}
+        run: |
+          if [ -n "$XCODE_PATH_INPUT" ]; then
+            sudo xcode-select -s "$XCODE_PATH_INPUT/Contents/Developer"
+          fi
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      # React Native: Detect package manager
+      - name: Detect package manager
+        if: ${{ env.REACT_NATIVE_PROJECT == 'true' }}
+        id: detect_pm
+        run: |
+          if [ "${{ inputs.package_manager }}" != "auto" ]; then
+            echo "PACKAGE_MANAGER=${{ inputs.package_manager }}" >> "$GITHUB_ENV"
+          elif [ -f "pnpm-lock.yaml" ]; then
+            echo "PACKAGE_MANAGER=pnpm" >> "$GITHUB_ENV"
+          elif [ -f "yarn.lock" ]; then
+            echo "PACKAGE_MANAGER=yarn" >> "$GITHUB_ENV"
+          else
+            echo "PACKAGE_MANAGER=npm" >> "$GITHUB_ENV"
+          fi
+          echo "Detected package manager: ${PACKAGE_MANAGER:-auto}"
+
+      # React Native: Set up Node.js latest LTS
+      - name: Set up Node.js latest LTS
+        if: ${{ env.REACT_NATIVE_PROJECT == 'true' && inputs.node_version == '' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      # React Native: Set up Node.js custom version
+      - name: Set up Node.js custom version
+        if: ${{ env.REACT_NATIVE_PROJECT == 'true' && inputs.node_version != '' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+
+      - name: Enable package manager
+        if: ${{ env.REACT_NATIVE_PROJECT == 'true' }}
+        run: |
+          if [ "$PACKAGE_MANAGER" != "npm" ]; then
+            command -v corepack >/dev/null 2>&1 || npm install -g corepack
+            corepack enable
+          fi
+
+      # React Native: Install dependencies
+      - name: Install React Native dependencies
+        if: ${{ env.REACT_NATIVE_PROJECT == 'true' }}
+        run: |
+          case "$PACKAGE_MANAGER" in
+            yarn)
+              echo "Installing dependencies with Yarn..."
+              yarn install --frozen-lockfile
+              ;;
+            pnpm)
+              echo "Installing dependencies with pnpm..."
+              pnpm install --frozen-lockfile
+              ;;
+            *)
+              echo "Installing dependencies with npm..."
+              npm ci
+              ;;
+          esac
+
+      - name: Resolve IPA build version
+        env:
+          APP_VERSION_INPUT: ${{ inputs.app_version }}
+          FLUTTER_BUILD_NAME_INPUT: ${{ inputs.flutter_build_name }}
+          APP_BUILD_NUMBER_INPUT: ${{ inputs.app_build_number }}
+        run: |
+          version_line=""
+          build_name=""
+          build_number=""
+          if [ -f pubspec.yaml ]; then
+            version_line="$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n 1 | tr -d '"' | tr -d "'")"
+            if [ -z "$version_line" ]; then
+              echo "pubspec.yaml does not contain a version field." >&2
+              exit 1
+            fi
+            build_name="${version_line%%+*}"
+            if [ "$version_line" != "$build_name" ]; then
+              build_number="${version_line#*+}"
+            fi
+          fi
+          if [ -n "$APP_VERSION_INPUT" ]; then
+            build_name="$APP_VERSION_INPUT"
+          elif [ -n "$FLUTTER_BUILD_NAME_INPUT" ]; then
+            build_name="$FLUTTER_BUILD_NAME_INPUT"
+          fi
+          if [ -n "$APP_BUILD_NUMBER_INPUT" ]; then
+            build_number="$APP_BUILD_NUMBER_INPUT"
+          fi
+          if [ -f pubspec.yaml ] && [ -z "$build_number" ]; then
+            build_number="1"
+          fi
+          {
+            echo "APP_VERSION=$build_name"
+            echo "APP_BUILD_NUMBER=$build_number"
+            echo "CI_FLUTTER_BUILD_NAME=$build_name"
+            echo "CI_FLUTTER_BUILD_NUMBER=$build_number"
+          } >> "$GITHUB_ENV"
+          echo "pubspec version: ${version_line:-not found}"
+          echo "IPA version: ${build_name:-use project default}"
+          echo "IPA build number: ${build_number:-use project default}"
+
+      # ios/ is generated by Expo and is intentionally not committed.
+      # Generate it after version resolution so app.config.js can write the
+      # requested values into the generated Info.plist.
+      - name: Generate iOS native project
+        if: ${{ env.REACT_NATIVE_PROJECT == 'true' }}
+        run: npx expo prebuild --platform ios --no-install
+
+      # React Native: Cache Metro bundler
+      - name: Cache Metro bundler
+        if: ${{ env.REACT_NATIVE_PROJECT == 'true' && inputs.metro_cache == true }}
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ runner.temp }}/.metro
+            node_modules/.cache
+          key: metro-${{ runner.os }}-${{ hashFiles('package-lock.json', 'yarn.lock', 'pnpm-lock.yaml') }}
+          restore-keys: metro-${{ runner.os }}-
+
+      - name: Set up Flutter latest stable
+        if: ${{ hashFiles('pubspec.yaml') != '' && inputs.flutter_version == '' }}
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Set up Flutter custom version
+        if: ${{ hashFiles('pubspec.yaml') != '' && inputs.flutter_version != '' }}
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ inputs.flutter_version }}
+          channel: stable
+          cache: true
+
+      - name: Install Flutter dependencies
+        if: ${{ hashFiles('pubspec.yaml') != '' }}
+        run: flutter pub get
+
+      # CI 上禁用 Swift Package Manager，统一走 CocoaPods：
+      # - 所有插件均支持 CocoaPods，无 SPM-only 依赖；
+      # - 规避 xcodebuild 静默解析远程 SPM 包导致的卡死；
+      # - 消除 SPM/CocoaPods 混合可能触发的非交互提示。
+      - name: Disable Swift Package Manager on CI
+        if: ${{ hashFiles('pubspec.yaml') != '' && inputs.disable_swift_package_manager == true }}
+        run: flutter config --no-enable-swift-package-manager
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/CocoaPods
+            ~/.cocoapods/repos
+          key: cocoapods-${{ runner.os }}-${{ hashFiles('ios/Podfile.lock') }}
+          restore-keys: cocoapods-${{ runner.os }}-
+
+      - name: Import iOS signing certificate and profile
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH="${RUNNER_TEMP}/ios_distribution.p12"
+          PROFILE_PATH="${RUNNER_TEMP}/app_store.mobileprovision"
+          PROFILE_PLIST="${RUNNER_TEMP}/profile.plist"
+          PROFILES_DIR="${HOME}/Library/MobileDevice/Provisioning Profiles"
+
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 -D -o "$CERTIFICATE_PATH"
+          echo -n "$PROVISION_PROFILE_BASE64" | base64 -D -o "$PROFILE_PATH"
+
+          echo "Decoded certificate size:"
+          wc -c "$CERTIFICATE_PATH"
+          echo "Decoded certificate SHA256:"
+          shasum -a 256 "$CERTIFICATE_PATH"
+          if ! openssl pkcs12 -in "$CERTIFICATE_PATH" -info -noout -passin "pass:$P12_PASSWORD" >/dev/null 2>&1; then
+            echo "Decoded certificate is not a valid PKCS#12 file, or IOS_DISTRIBUTION_CERTIFICATE_PASSWORD is incorrect." >&2
+            exit 1
+          fi
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -P "$P12_PASSWORD" -A -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          mkdir -p "$PROFILES_DIR"
+          security cms -D -i "$PROFILE_PATH" > "$PROFILE_PLIST"
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' "$PROFILE_PLIST")
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c 'Print Name' "$PROFILE_PLIST")
+          PROFILE_TEAM_ID=$(/usr/libexec/PlistBuddy -c 'Print TeamIdentifier:0' "$PROFILE_PLIST")
+          PROFILE_APP_ID=$(/usr/libexec/PlistBuddy -c 'Print Entitlements:application-identifier' "$PROFILE_PLIST")
+          PROFILE_BUNDLE_ID="${PROFILE_APP_ID#${PROFILE_TEAM_ID}.}"
+          SIGNING_IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | sed -n 's/.*"\(.*Distribution.*\)"/\1/p' | head -n 1)
+
+          if [ "$PROFILE_BUNDLE_ID" != "$BUNDLE_ID" ]; then
+            echo "Provisioning profile bundle id '$PROFILE_BUNDLE_ID' does not match '$BUNDLE_ID'." >&2
+            exit 1
+          fi
+          if /usr/libexec/PlistBuddy -c 'Print ProvisionedDevices' "$PROFILE_PLIST" >/dev/null 2>&1; then
+            echo "Provisioning profile contains ProvisionedDevices; use an App Store profile for app-store export." >&2
+            exit 1
+          fi
+          if /usr/libexec/PlistBuddy -c 'Print ProvisionsAllDevices' "$PROFILE_PLIST" >/dev/null 2>&1; then
+            echo "Provisioning profile is an enterprise profile; use an App Store profile for app-store export." >&2
+            exit 1
+          fi
+          if [ -z "$SIGNING_IDENTITY" ]; then
+            echo "No distribution signing identity found in imported certificate." >&2
+            security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+            exit 1
+          fi
+
+          cp "$PROFILE_PATH" "$PROFILES_DIR/${PROFILE_UUID}.mobileprovision"
+
+          {
+            echo "DEVELOPMENT_TEAM=${PROFILE_TEAM_ID}"
+            echo "IOS_PROVISION_PROFILE_UUID=${PROFILE_UUID}"
+            echo "IOS_PROVISION_PROFILE_NAME=${PROFILE_NAME}"
+            echo "IOS_SIGNING_IDENTITY=${SIGNING_IDENTITY}"
+            echo "PROFILE_PATH=${PROFILE_PATH}"
+            echo "PROFILE_PLIST=${PROFILE_PLIST}"
+          } >> "$GITHUB_ENV"
+
+          echo "Using profile '${PROFILE_NAME}' for '${PROFILE_BUNDLE_ID}' with team '${PROFILE_TEAM_ID}'."
+          echo "Using signing identity '${SIGNING_IDENTITY}'."
+
+      - name: Set up Ruby for React Native
+        if: ${{ env.REACT_NATIVE_PROJECT == 'true' }}
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: ${{ hashFiles('Gemfile') != '' }}
+
+      - name: Install CocoaPods pods (React Native)
+        if: ${{ env.REACT_NATIVE_PROJECT == 'true' }}
+        run: |
+          if [ ! -f ios/Podfile ]; then
+            echo "Missing ios/Podfile. Generate the native iOS project first." >&2
+            exit 1
+          fi
+          if [ -f Gemfile ]; then
+            bundle exec pod install --project-directory=ios --repo-update
+          else
+            gem install cocoapods --no-document
+            pod install --project-directory=ios --repo-update
+          fi
+
+      - name: Preflight and clean iOS build settings
+        run: ./ci/github-actions/ios-build/signing/scripts/preflight-ios-build.sh --clean
+
+      - name: Build Flutter iOS files
+        if: ${{ hashFiles('pubspec.yaml') != '' && inputs.flutter_build_mode == 'xcodebuild-archive' }}
+        run: |
+          build_args=(--release --no-codesign "--build-name=$CI_FLUTTER_BUILD_NAME" "--build-number=$CI_FLUTTER_BUILD_NUMBER")
+          flutter build ios "${build_args[@]}"
+
+      - name: Configure CI release signing
+        if: ${{ env.REACT_NATIVE_PROJECT != 'true' }}
+        run: |
+          set -o pipefail
+          # Project-level Release settings can retain Flutter's default
+          # "iPhone Developer" identity. The target Release xcconfig has higher
+          # precedence, so write the imported distribution signing values there.
+          if [ -f ios/Flutter/Release.xcconfig ]; then
+            {
+              echo
+              echo '// CI-only release signing overrides.'
+              echo "CODE_SIGN_STYLE = Manual"
+              echo "DEVELOPMENT_TEAM = ${DEVELOPMENT_TEAM}"
+              echo "CODE_SIGN_IDENTITY[sdk=iphoneos*] = ${IOS_SIGNING_IDENTITY}"
+              echo "PROVISIONING_PROFILE_SPECIFIER = ${IOS_PROVISION_PROFILE_NAME}"
+            } >> ios/Flutter/Release.xcconfig
+          fi
+
+          xcodebuild_args=(
+            -scheme "$XCODE_SCHEME"
+            -configuration "$IOS_BUILD_CONFIGURATION"
+            -sdk iphoneos
+            -showBuildSettings
+            CODE_SIGN_STYLE=Manual
+            "DEVELOPMENT_TEAM=${DEVELOPMENT_TEAM}"
+            "CODE_SIGN_IDENTITY=${IOS_SIGNING_IDENTITY}"
+            "PROVISIONING_PROFILE_SPECIFIER=${IOS_PROVISION_PROFILE_NAME}"
+          )
+          if [ -d "$XCODE_WORKSPACE" ]; then
+            xcodebuild_args=(-workspace "$XCODE_WORKSPACE" "${xcodebuild_args[@]}")
+          else
+            XCODE_PROJECT="${XCODE_PROJECT_FILE%/project.pbxproj}"
+            xcodebuild_args=(-project "$XCODE_PROJECT" "${xcodebuild_args[@]}")
+          fi
+          xcodebuild "${xcodebuild_args[@]}" | \
+            awk '/^[[:space:]]*(CODE_SIGN_STYLE|CODE_SIGN_IDENTITY|DEVELOPMENT_TEAM|PROVISIONING_PROFILE_SPECIFIER) =/ { print }'
+
+      - name: Verify React Native Release build settings
+        if: ${{ env.REACT_NATIVE_PROJECT == 'true' }}
+        run: ./ci/github-actions/ios-build/signing/scripts/preflight-ios-build.sh --check-settings
+
+      - name: Create export options
+        run: |
+          cat > "$EXPORT_OPTIONS_PLIST" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>teamID</key>
+            <string>${DEVELOPMENT_TEAM}</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>signingCertificate</key>
+            <string>${IOS_SIGNING_IDENTITY}</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${BUNDLE_ID}</key>
+              <string>${IOS_PROVISION_PROFILE_NAME}</string>
+            </dict>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>uploadSymbols</key>
+            <true/>
+          </dict>
+          </plist>
+          EOF
+
+      - name: Install CocoaPods pods
+        if: ${{ hashFiles('pubspec.yaml') != '' }}
+        run: |
+          cd ios
+          pod install --repo-update
+
+      - name: Build Flutter IPA
+        if: ${{ hashFiles('pubspec.yaml') != '' && inputs.flutter_build_mode == 'flutter-build-ipa' }}
+        run: |
+          set -x
+          build_args=(--release --verbose "--build-name=$CI_FLUTTER_BUILD_NAME" "--build-number=$CI_FLUTTER_BUILD_NUMBER" "--export-options-plist=$EXPORT_OPTIONS_PLIST")
+          flutter build ipa "${build_args[@]}"
+          mkdir -p "$EXPORT_PATH"
+          cp build/ios/ipa/*.ipa "$EXPORT_PATH"/
+
+      - name: Archive iOS app
+        id: archive
+        if: ${{ hashFiles('pubspec.yaml') == '' || inputs.flutter_build_mode == 'xcodebuild-archive' }}
+        run: |
+          signing_args=()
+          if [ "$REACT_NATIVE_PROJECT" != "true" ]; then
+            signing_args=(CODE_SIGN_STYLE=Manual "DEVELOPMENT_TEAM=$DEVELOPMENT_TEAM" "CODE_SIGN_IDENTITY=$IOS_SIGNING_IDENTITY" "PROVISIONING_PROFILE_SPECIFIER=$IOS_PROVISION_PROFILE_NAME")
+          fi
+          if [ -d "$XCODE_WORKSPACE" ]; then
+            archive_source=(-workspace "$XCODE_WORKSPACE")
+          else
+            XCODE_PROJECT="${XCODE_PROJECT_FILE%/project.pbxproj}"
+            if [ ! -d "$XCODE_PROJECT" ]; then
+              echo "Xcode workspace not found: $XCODE_WORKSPACE" >&2
+              echo "Derived Xcode project not found: $XCODE_PROJECT" >&2
+              exit 1
+            fi
+            archive_source=(-project "$XCODE_PROJECT")
+          fi
+
+          archive_log="$RUNNER_TEMP/ios-archive.log"
+          archive_args=(archive "${archive_source[@]}" -scheme "$XCODE_SCHEME" -configuration "$IOS_BUILD_CONFIGURATION" -destination generic/platform=iOS -archivePath "$ARCHIVE_PATH" "${signing_args[@]}")
+          echo "Archiving $XCODE_SCHEME ($IOS_BUILD_CONFIGURATION); full log will be saved to the workflow artifact on failure."
+          if xcodebuild "${archive_args[@]}" > "$archive_log" 2>&1; then
+            echo "Archive succeeded: $ARCHIVE_PATH"
+          else
+            echo "::error::xcodebuild archive failed. Key diagnostics from $archive_log:"
+            awk '
+              function emit(line) {
+                gsub(/\r/, "", line)
+                if (length(line) > 500) line = substr(line, 1, 500) " ..."
+                printf "%d:%s\n", NR, line
+              }
+              /The following build commands failed:/ { failure_count = 0; collecting_failure = 1; next }
+              collecting_failure && failure_count < 8 { failure[++failure_count] = $0; next }
+              /(^|[[:space:]])(fatal )?error:|^ld: |^Undefined symbols for architecture|^Error Domain=/ {
+                if (error_count < 20 && !seen[$0]++) {
+                  emit($0)
+                  error_count++
+                  context = 2
+                }
+                next
+              }
+              context > 0 {
+                if (length($0) < 240 && $0 ~ /^[[:space:]]+[^[:space:]]/) emit($0)
+                context--
+              }
+              END {
+                if (error_count > 0) exit
+                if (failure_count > 0) {
+                  print "No compiler error line found. Failed commands:"
+                  for (i = 1; i <= failure_count; i++) print failure[i]
+                } else {
+                  print "No error marker found; download the full archive log artifact."
+                }
+              }
+            ' "$archive_log"
+            echo "Full log: workflow artifact ios-archive-log"
+            exit 1
+          fi
+
+      - name: Upload archive log on failure
+        if: ${{ failure() && steps.archive.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-archive-log
+          path: ${{ runner.temp }}/ios-archive.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Export IPA
+        if: ${{ hashFiles('pubspec.yaml') == '' || inputs.flutter_build_mode == 'xcodebuild-archive' }}
+        run: |
+          xcodebuild -exportArchive             -archivePath "$ARCHIVE_PATH"             -exportPath "$EXPORT_PATH"             -exportOptionsPlist "$EXPORT_OPTIONS_PLIST"
+
+      - name: Normalize IPA artifact name
+        env:
+          IPA_FILE_NAME: ${{ inputs.ipa_file_name }}
+          IPA_OVERWRITE: ${{ inputs.ipa_overwrite }}
+        run: |
+          ipa_count=$(find "$EXPORT_PATH" -maxdepth 1 -type f -name '*.ipa' | wc -l | tr -d ' ')
+          if [ "$ipa_count" -ne 1 ]; then
+            echo "Expected exactly one IPA in $EXPORT_PATH, found $ipa_count." >&2
+            find "$EXPORT_PATH" -maxdepth 1 -type f -name '*.ipa' -print >&2
+            exit 1
+          fi
+
+          ipa_path=$(find "$EXPORT_PATH" -maxdepth 1 -type f -name '*.ipa' -print | sed -n '1p')
+          if [ -n "$IPA_FILE_NAME" ]; then
+            case "$IPA_FILE_NAME" in
+              */*|.*|*..*)
+              echo "ipa_file_name must be a simple file name without path traversal: $IPA_FILE_NAME" >&2
+              exit 1
+              ;;
+            esac
+            case "$IPA_FILE_NAME" in
+              *.ipa) ;;
+              *) IPA_FILE_NAME="$IPA_FILE_NAME.ipa" ;;
+            esac
+            target_path="$EXPORT_PATH/$IPA_FILE_NAME"
+            if [ "$ipa_path" != "$target_path" ]; then
+              if [ -e "$target_path" ] && [ "$IPA_OVERWRITE" != "true" ]; then
+                echo "IPA already exists and ipa_overwrite is false: $target_path" >&2
+                exit 1
+              fi
+              if [ "$IPA_OVERWRITE" = "true" ]; then
+                mv -f "$ipa_path" "$target_path"
+              else
+                mv "$ipa_path" "$target_path"
+              fi
+              ipa_path="$target_path"
+            fi
+          fi
+          echo "IPA artifact: $ipa_path"
+
+      - name: Validate final IPA before publishing artifact
+        env:
+          BUNDLE_ID: ${{ env.BUNDLE_ID }}
+          DEVELOPMENT_TEAM: ${{ env.DEVELOPMENT_TEAM }}
+          REACT_NATIVE_PROJECT: ${{ env.REACT_NATIVE_PROJECT }}
+        run: |
+          ipa_path=$(find "$EXPORT_PATH" -maxdepth 1 -type f -name '*.ipa' -print -quit)
+          ./ci/github-actions/ios-build/signing/scripts/validate-ipa.sh "$ipa_path"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: ${{ runner.temp }}/ipa/*.ipa
+          if-no-files-found: error
+
+      - name: Clean up keychain
+        if: always()
+        run: security delete-keychain "$KEYCHAIN_PATH" || true
+

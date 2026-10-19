@@ -61,6 +61,11 @@ on:
         required: false
         default: true
         type: boolean
+      ccache:
+        description: Reuse native compiler results for React Native. Disable to diagnose a cache issue.
+        required: false
+        default: true
+        type: boolean
       xcode_path:
         description: Xcode.app path. Leave empty to use the runner default.
         required: false
@@ -88,6 +93,8 @@ jobs:
       XCODE_SCHEME: app
       IOS_BUILD_CONFIGURATION: Release
       REACT_NATIVE_PROJECT: "true"
+      USE_CCACHE: ${{ inputs.ccache && '1' || '0' }}
+      CCACHE_COMPILERCHECK: content
 
     steps:
       - name: Set build paths
@@ -97,6 +104,7 @@ jobs:
             echo "ARCHIVE_PATH=${RUNNER_TEMP}/Runner.xcarchive"
             echo "EXPORT_PATH=${RUNNER_TEMP}/ipa"
             echo "EXPORT_OPTIONS_PLIST=${RUNNER_TEMP}/ExportOptions.plist"
+            echo "CCACHE_DIR=${RUNNER_TEMP}/ccache"
           } >> "$GITHUB_ENV"
 
       - name: Checkout repository
@@ -105,13 +113,16 @@ jobs:
           persist-credentials: false
 
       - name: Select Xcode
+        id: xcode
         env:
           XCODE_PATH_INPUT: ${{ inputs.xcode_path }}
         run: |
           if [ -n "$XCODE_PATH_INPUT" ]; then
             sudo xcode-select -s "$XCODE_PATH_INPUT/Contents/Developer"
           fi
-          xcodebuild -version
+          xcode_version="$(xcodebuild -version)"
+          echo "$xcode_version"
+          echo "cache-key=$(printf '%s' "$xcode_version" | shasum -a 256 | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
           xcrun --sdk iphoneos --show-sdk-version
 
       # React Native: Detect package manager
@@ -130,19 +141,14 @@ jobs:
           fi
           echo "Detected package manager: ${PACKAGE_MANAGER:-auto}"
 
-      # React Native: Set up Node.js latest LTS
-      - name: Set up Node.js latest LTS
-        if: ${{ env.REACT_NATIVE_PROJECT == 'true' && inputs.node_version == '' }}
+      - name: Set up Node.js
+        id: node
+        if: ${{ env.REACT_NATIVE_PROJECT == 'true' }}
         uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
-
-      # React Native: Set up Node.js custom version
-      - name: Set up Node.js custom version
-        if: ${{ env.REACT_NATIVE_PROJECT == 'true' && inputs.node_version != '' }}
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ inputs.node_version }}
+          node-version: ${{ inputs.node_version || 'lts/*' }}
+          cache: ${{ env.PACKAGE_MANAGER == 'npm' && 'npm' || '' }}
+          cache-dependency-path: package-lock.json
 
       - name: Enable package manager
         if: ${{ env.REACT_NATIVE_PROJECT == 'true' }}
@@ -167,7 +173,7 @@ jobs:
               ;;
             *)
               echo "Installing dependencies with npm..."
-              npm ci
+              npm ci --prefer-offline --no-audit --no-fund
               ;;
           esac
 
@@ -219,16 +225,23 @@ jobs:
         if: ${{ env.REACT_NATIVE_PROJECT == 'true' }}
         run: npx expo prebuild --platform ios --no-install
 
-      # React Native: Cache Metro bundler
+      - name: Locate Metro cache
+        if: ${{ env.REACT_NATIVE_PROJECT == 'true' && inputs.metro_cache == true }}
+        id: metro_path
+        run: |
+          cache_path="$(node -p 'require("node:path").join(require("node:os").tmpdir(), "metro-cache")')"
+          echo "path=$cache_path" >> "$GITHUB_OUTPUT"
+
       - name: Cache Metro bundler
         if: ${{ env.REACT_NATIVE_PROJECT == 'true' && inputs.metro_cache == true }}
         uses: actions/cache@v4
         with:
           path: |
-            ${{ runner.temp }}/.metro
+            ${{ steps.metro_path.outputs.path }}
             node_modules/.cache
-          key: metro-${{ runner.os }}-${{ hashFiles('package-lock.json', 'yarn.lock', 'pnpm-lock.yaml') }}
-          restore-keys: metro-${{ runner.os }}-
+          key: metro-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.node.outputs.node-version }}-${{ hashFiles('package-lock.json', 'yarn.lock', 'pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            metro-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.node.outputs.node-version }}-${{ hashFiles('package-lock.json', 'yarn.lock', 'pnpm-lock.yaml') }}-
 
       - name: Set up Flutter latest stable
         if: ${{ hashFiles('pubspec.yaml') != '' && inputs.flutter_version == '' }}
@@ -263,8 +276,10 @@ jobs:
           path: |
             ~/Library/Caches/CocoaPods
             ~/.cocoapods/repos
-          key: cocoapods-${{ runner.os }}-${{ hashFiles('ios/Podfile.lock') }}
-          restore-keys: cocoapods-${{ runner.os }}-
+          # Expo generates ios/ without a Podfile.lock before pod install.
+          # Hash the dependency inputs and generated Podfile instead.
+          key: cocoapods-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'pubspec.lock', 'Gemfile.lock', 'ios/Podfile', 'ios/Podfile.lock', 'ios/Podfile.properties.json', 'modules/**/*.podspec') }}
+          restore-keys: cocoapods-v2-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Import iOS signing certificate and profile
         env:
@@ -345,18 +360,54 @@ jobs:
           ruby-version: '3.3'
           bundler-cache: ${{ hashFiles('Gemfile') != '' }}
 
+      - name: Install compiler cache
+        if: ${{ env.REACT_NATIVE_PROJECT == 'true' && inputs.ccache == true }}
+        run: |
+          if ! command -v ccache >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install ccache
+          fi
+          ccache --version
+
+      - name: Cache native compiler results
+        if: ${{ env.REACT_NATIVE_PROJECT == 'true' && inputs.ccache == true }}
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.xcode.outputs.cache-key }}-${{ hashFiles('package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'Gemfile.lock', 'ios/Podfile', 'ios/Podfile.properties.json', 'modules/**/*.podspec') }}-${{ github.sha }}
+          restore-keys: |
+            ccache-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.xcode.outputs.cache-key }}-${{ hashFiles('package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'Gemfile.lock', 'ios/Podfile', 'ios/Podfile.properties.json', 'modules/**/*.podspec') }}-
+
+      - name: Configure compiler cache
+        if: ${{ env.REACT_NATIVE_PROJECT == 'true' && inputs.ccache == true }}
+        run: |
+          ccache --max-size=1G
+          ccache --zero-stats
+
       - name: Install CocoaPods pods (React Native)
         if: ${{ env.REACT_NATIVE_PROJECT == 'true' }}
         run: |
+          set -o pipefail
           if [ ! -f ios/Podfile ]; then
             echo "Missing ios/Podfile. Generate the native iOS project first." >&2
             exit 1
           fi
           if [ -f Gemfile ]; then
-            bundle exec pod install --project-directory=ios --repo-update
+            pod_command=(bundle exec pod)
           else
             gem install cocoapods --no-document
-            pod install --project-directory=ios --repo-update
+            pod_command=(pod)
+          fi
+          pod_log="$RUNNER_TEMP/pod-install.log"
+          if "${pod_command[@]}" install --project-directory=ios 2>&1 | tee "$pod_log"; then
+            exit 0
+          else
+            pod_status=$?
+          fi
+          if grep -Eq 'None of your spec sources contain a spec satisfying|Unable to find a specification for|out-of-date source repos' "$pod_log"; then
+            echo "CocoaPods specs are missing; retrying with a repository update."
+            "${pod_command[@]}" install --project-directory=ios --repo-update
+          else
+            exit "$pod_status"
           fi
 
       - name: Preflight and clean iOS build settings
@@ -473,10 +524,11 @@ jobs:
           fi
 
           archive_log="$RUNNER_TEMP/ios-archive.log"
-          archive_args=(archive "${archive_source[@]}" -scheme "$XCODE_SCHEME" -configuration "$IOS_BUILD_CONFIGURATION" -destination generic/platform=iOS -archivePath "$ARCHIVE_PATH" "${signing_args[@]}")
+          archive_args=(archive "${archive_source[@]}" -scheme "$XCODE_SCHEME" -configuration "$IOS_BUILD_CONFIGURATION" -destination generic/platform=iOS -archivePath "$ARCHIVE_PATH" -showBuildTimingSummary "${signing_args[@]}")
           echo "Archiving $XCODE_SCHEME ($IOS_BUILD_CONFIGURATION); full log will be saved to the workflow artifact on failure."
           if xcodebuild "${archive_args[@]}" > "$archive_log" 2>&1; then
             echo "Archive succeeded: $ARCHIVE_PATH"
+            awk '/^Build Timing Summary/ { summary = 1 } summary { print }' "$archive_log"
           else
             echo "::error::xcodebuild archive failed. Key diagnostics from $archive_log:"
             awk '
@@ -521,6 +573,13 @@ jobs:
           path: ${{ runner.temp }}/ios-archive.log
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Report compiler cache statistics
+        if: ${{ always() && env.REACT_NATIVE_PROJECT == 'true' && inputs.ccache == true }}
+        run: |
+          if command -v ccache >/dev/null 2>&1; then
+            ccache --show-stats
+          fi
 
       - name: Export IPA
         if: ${{ hashFiles('pubspec.yaml') == '' || inputs.flutter_build_mode == 'xcodebuild-archive' }}
@@ -582,6 +641,7 @@ jobs:
           name: ios-ipa
           path: ${{ runner.temp }}/ipa/*.ipa
           if-no-files-found: error
+          compression-level: 0
 
       - name: Clean up keychain
         if: always()
