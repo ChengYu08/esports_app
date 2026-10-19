@@ -4,9 +4,11 @@ import type { VoiceRoomDetail, VoiceRoomJoinPrepare, VoiceRoomRtcToken } from '.
 type Envelope<T> = { success?: boolean; code?: string; info?: string; data?: T };
 
 function unwrap<T>(response: Envelope<T> | T): T {
+  if (response && typeof response === 'object' && 'success' in response && response.success === false) {
+    throw new Error((response as Envelope<T>).info || '语聊房请求失败');
+  }
   if (response && typeof response === 'object' && 'data' in response && response.data !== undefined) {
     const envelope = response as Envelope<T>;
-    if (envelope.success === false) throw new Error(envelope.info || '语聊房请求失败');
     return envelope.data as T;
   }
   return response as T;
@@ -68,6 +70,15 @@ export const voiceRoomApi = {
       `/client/v1/voiceRoom/${encodeURIComponent(roomId)}/destroy?roomVersion=${encodeURIComponent(String(roomVersion))}`,
       token,
     );
+  },
+  async kickMember(roomId: string, roomVersion: string | number, userId: string, token: string) {
+    const response = await apiClient<Envelope<null>>(
+      `/client/v1/voiceRoom/${encodeURIComponent(roomId)}/kickOut`,
+      { method: 'POST', token, body: { action: { roomVersion, userId } } },
+    );
+    if (response.success === false || response.code !== 'SUCCESS') {
+      throw new Error(response.info || '踢出失败，请稍后重试');
+    }
   },
   inviteClubService(roomId: string, roomVersion: string | number, clubId: string | number, token: string) {
     return post<unknown>('/client/v1/voiceRoom/inviteClubService', token, {

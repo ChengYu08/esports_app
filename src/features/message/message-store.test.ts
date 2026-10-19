@@ -3,6 +3,28 @@ import { describe, expect, it, vi } from 'vitest';
 import { createMessageStore, type MessageAdapter } from './message-store';
 import type { ManagedMessage, MessageConversation, MessageHistoryPage } from './message-state';
 
+vi.mock('@/core/logging/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn() } }));
+vi.mock('@/features/auth/client-auth.api', () => ({
+  clientAuthApi: { getUserOnlineStatus: vi.fn(async () => ({})) },
+}));
+vi.mock('@/core/storage/storage', () => ({ storage: { get: vi.fn(async () => null) } }));
+vi.mock('./rongcloud-im', () => ({
+  isRongCloudAvailable: vi.fn(),
+  initializeRongCloud: vi.fn(),
+  getRongConversations: vi.fn(),
+  getRongMessages: vi.fn(),
+  sendRongText: vi.fn(),
+  sendRongImage: vi.fn(),
+  downloadRongImageMessage: vi.fn(),
+  sendRongAfterSaleCard: vi.fn(),
+  markRongConversationRead: vi.fn(),
+  subscribeRongConnectionStatus: vi.fn(),
+  subscribeRongConversationSync: vi.fn(),
+  subscribeRongMessages: vi.fn(),
+  subscribeRongMessageEvents: vi.fn(),
+  disconnectRongCloud: vi.fn(),
+}));
+
 const conversation: MessageConversation = { id: '42', title: 'Peer', preview: '', time: '', unreadCount: 0, updatedAt: 1 };
 const sentMessage: ManagedMessage = { id: 'server-1', kind: 'text', text: 'hello', time: '10:00', isMine: true, status: 'sent', sentAt: 10 };
 
@@ -24,6 +46,75 @@ function makeAdapter(overrides: Partial<MessageAdapter> = {}) {
 }
 
 describe('message store', () => {
+  it('keeps IM ready and receives live messages when history synchronization fails', async () => {
+    let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
+    const adapter = makeAdapter({
+      getConversations: vi.fn().mockRejectedValueOnce(new Error('历史消息同步暂不可用')).mockResolvedValue([conversation]),
+      subscribeMessages: (listener) => { receiveMessage = listener; return () => undefined; },
+    });
+    const store = createMessageStore(adapter);
+    await store.getState().initialize('token');
+    expect(store.getState().connectionState).toBe('ready');
+    expect(store.getState().conversationError).toBe('历史消息同步暂不可用');
+    receiveMessage?.('42', { ...sentMessage, isMine: false }, conversation);
+    expect(store.getState().conversations).toEqual([expect.objectContaining({ id: '42' })]);
+    await store.getState().refreshConversations('token');
+    expect(store.getState().conversationError).toBeNull();
+    expect(adapter.initialize).toHaveBeenCalledTimes(1);
+    await store.getState().reset();
+  });
+
+  it('receives messages delivered while the initial conversation snapshot is loading', async () => {
+    let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
+    let completeSnapshot!: (value: MessageConversation[]) => void;
+    const adapter = makeAdapter({
+      getConversations: vi.fn(() => new Promise<MessageConversation[]>((resolve) => { completeSnapshot = resolve; })),
+      subscribeMessages: vi.fn((listener) => { receiveMessage = listener; return () => undefined; }),
+    });
+    const store = createMessageStore(adapter);
+    const initializing = store.getState().initialize('token');
+    await vi.waitFor(() => expect(completeSnapshot).toBeDefined());
+    receiveMessage?.('42', { ...sentMessage, isMine: false }, { ...conversation, preview: 'hello' });
+    completeSnapshot([]);
+    await initializing;
+    expect(store.getState().conversations).toEqual([
+      expect.objectContaining({ id: '42', preview: 'hello', unreadCount: 1 }),
+    ]);
+    await store.getState().reset();
+  });
+
+  it('refreshes the list when SDK conversation synchronization completes', async () => {
+    let synchronized: (() => void) | undefined;
+    const adapter = makeAdapter({
+      getConversations: vi.fn().mockResolvedValueOnce([]).mockResolvedValue([conversation]),
+      subscribeConversationSync: (listener) => { synchronized = listener; return () => undefined; },
+    });
+    const store = createMessageStore(adapter);
+    await store.getState().initialize('token');
+    expect(store.getState().conversations).toEqual([]);
+    synchronized?.();
+    await vi.waitFor(() => expect(store.getState().conversations).toEqual([expect.objectContaining(conversation)]));
+    await store.getState().reset();
+  });
+
+  it('rechecks the snapshot if offline synchronization finishes during initialization', async () => {
+    let synchronized: (() => void) | undefined;
+    let completeSnapshot!: (value: MessageConversation[]) => void;
+    const store = createMessageStore(makeAdapter({
+      getConversations: vi.fn()
+        .mockImplementationOnce(() => new Promise((resolve) => { completeSnapshot = resolve; }))
+        .mockResolvedValue([conversation]),
+      subscribeConversationSync: (listener) => { synchronized = listener; return () => undefined; },
+    }));
+    const initializing = store.getState().initialize('token');
+    await vi.waitFor(() => expect(completeSnapshot).toBeDefined());
+    synchronized?.();
+    completeSnapshot([]);
+    await initializing;
+    expect(store.getState().conversations).toEqual([expect.objectContaining(conversation)]);
+    await store.getState().reset();
+  });
+
   it('does not create a local message while IM is unavailable', async () => {
     const store = createMessageStore(makeAdapter({ available: () => false }));
     await store.getState().initialize('token');

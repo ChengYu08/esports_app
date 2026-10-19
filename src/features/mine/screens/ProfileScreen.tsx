@@ -8,7 +8,7 @@ import {
 } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import { type ReactElement, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import {
   Animated,
   Easing,
@@ -921,10 +921,7 @@ function ProfileIdentity({
           </Text>
 
           {isBlacklisted ? (
-            <View
-              accessibilityLabel="已加入黑名单"
-              style={styles.blacklistTag}
-            >
+            <View accessibilityLabel="已加入黑名单" style={styles.blacklistTag}>
               <Text style={styles.blacklistTagText}>已加入黑名单</Text>
             </View>
           ) : null}
@@ -1284,7 +1281,10 @@ function CompanionOrderSheet({
               style={StyleSheet.absoluteFill}
             />
             <Animated.View
-              style={[styles.orderModal, { transform: [{ translateY: sheetY }] }]}
+              style={[
+                styles.orderModal,
+                { transform: [{ translateY: sheetY }] },
+              ]}
             >
               <View style={styles.orderModalHeader}>
                 <Text style={styles.orderModalTitle}>陪玩下单</Text>
@@ -1311,7 +1311,9 @@ function CompanionOrderSheet({
                           styles.serviceOptionActive,
                       ]}
                     >
-                      <Text style={styles.serviceOptionName}>{service.name}</Text>
+                      <Text style={styles.serviceOptionName}>
+                        {service.name}
+                      </Text>
                       <Text style={styles.serviceOptionPrice}>
                         {service.price} 星钻
                       </Text>
@@ -1338,7 +1340,9 @@ function CompanionOrderSheet({
                   style={styles.agreementRow}
                 >
                   <Text style={styles.checkbox}>{agreed ? "✓" : ""}</Text>
-                  <Text style={styles.agreementText}>我已阅读并同意服务协议</Text>
+                  <Text style={styles.agreementText}>
+                    我已阅读并同意服务协议
+                  </Text>
                 </Pressable>
                 <Text style={styles.orderTotal}>合计：{total} 星钻</Text>
                 <Pressable
@@ -1351,7 +1355,9 @@ function CompanionOrderSheet({
                   ]}
                   onPress={() => void submitOrder()}
                   disabled={
-                    !agreed || submitting || (Boolean(token) && !selectedService)
+                    !agreed ||
+                    submitting ||
+                    (Boolean(token) && !selectedService)
                   }
                 >
                   <Text style={styles.orderSubmitText}>

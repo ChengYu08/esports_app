@@ -29,8 +29,8 @@ export default function MessageScreen() {
   const insets = useSafeAreaInsets();
   const accessToken = useAuthStore((state) => state.accessToken);
   const userId = useAuthStore((state) => state.user?.id);
-  const initialize = useMessageStore((state) => state.initialize);
   const connectionState = useMessageStore((state) => state.connectionState);
+  const conversationError = useMessageStore((state) => state.conversationError);
   const lastError = useMessageStore((state) => state.lastError);
   const conversations = useMessageStore((state) => state.conversations);
   const blacklistedUserIds = useMessageStore((state) => state.blacklistedUserIds);
@@ -101,11 +101,11 @@ export default function MessageScreen() {
     ? "登录后查看消息"
     : connectionState === "unavailable"
       ? "当前版本暂不支持即时消息"
-      : connectionState === "connecting"
+      : connectionState === "idle" || connectionState === "connecting"
         ? "消息连接中..."
         : connectionState === "error"
           ? lastError || "消息连接失败"
-          : null;
+          : items.length === 0 ? conversationError : null;
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <MessageHeader
@@ -117,10 +117,10 @@ export default function MessageScreen() {
       {stateMessage ? (
         <View style={styles.state}>
           <Text style={styles.stateText}>{stateMessage}</Text>
-          {connectionState === "error" ? (
+          {accessToken && (connectionState === "error" || conversationError) ? (
             <Pressable
               accessibilityRole="button"
-              onPress={() => accessToken && void initialize(accessToken)}
+              onPress={() => accessToken && void refreshConversations(accessToken)}
               style={styles.retry}
             >
               <Text style={styles.retryText}>重试</Text>

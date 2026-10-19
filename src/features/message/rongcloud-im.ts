@@ -11,6 +11,7 @@ import { mapRongMessage, parseRoomInviteLink, type RongSdkMessage } from './chat
 import type { ManagedMessage, MessageConversation, MessageHistoryPage } from './message-state';
 import type { AfterSaleCardPayload } from '@/features/order/after-sale-card';
 import { getRongConversationTargetId, getSystemConversationTitle, isSystemConversationId, normalizeSystemConversationId } from './system-conversations';
+import { loadConversationSnapshot } from './conversation-loader';
 
 export type RongConversation = MessageConversation;
 export type RongTextMessage = ManagedMessage;
@@ -30,6 +31,7 @@ let connectionAttempt: Promise<boolean> | null = null;
 let cancelConnectionAttempt: (() => void) | null = null;
 let connectionEpoch = 0;
 const conversationListeners = new Set<ConversationListener>();
+const conversationSyncListeners = new Set<() => void>();
 const messageListeners = new Set<MessageListener>();
 const connectionStatusListeners = new Set<(signal: RongCloudConnectionSignal) => void>();
 const chatRoomMessageListeners = new Set<ChatRoomMessageListener>();
@@ -322,6 +324,9 @@ async function emitReceived(message: RCIMIWMessage) {
 
 function installListeners() {
   if (!engine) return;
+  engine.setOnOfflineMessageSyncCompletedListener(() => {
+    conversationSyncListeners.forEach((listener) => listener());
+  });
   engine.setOnMessageReceivedListener((message) => {
     const sdk = loadSdk();
     if (sdk && message.conversationType === sdk.RCIMIWConversationType.CHATROOM) {
@@ -511,15 +516,16 @@ export async function initializeRongCloud(accessToken: string) {
 
 export async function getRongConversations(): Promise<RongConversation[]> {
   const sdk = loadSdk();
-  if (!engine || !connected || !sdk) return [];
-  return new Promise((resolve) => {
-    void engine?.getConversations([sdk.RCIMIWConversationType.PRIVATE], '', 0, 50, {
-      onSuccess: (conversations) => {
-        void Promise.all((conversations || []).map(mapConversation).filter((item) => item.id).map(hydrateConversation)).then(resolve);
-      },
-      onError: () => resolve([]),
-    }).then((code) => { if (code !== 0) resolve([]); }).catch(() => resolve([]));
-  });
+  if (!engine || !connected || !sdk) throw new Error('即时消息尚未连接，请稍后重试');
+  const epoch = connectionEpoch;
+  const conversations = await loadConversationSnapshot(engine, sdk.RCIMIWConversationType.PRIVATE);
+  if (epoch !== connectionEpoch) return [];
+  return Promise.all(conversations.map(mapConversation).filter((item) => item.id).map(hydrateConversation));
+}
+
+export function subscribeRongConversationSync(listener: () => void) {
+  conversationSyncListeners.add(listener);
+  return () => conversationSyncListeners.delete(listener);
 }
 
 export function subscribeRongMessages(onMessage: ConversationListener) {
@@ -642,6 +648,7 @@ export async function disconnectRongCloud() {
   connected = false;
   businessToken = '';
   conversationListeners.clear();
+  conversationSyncListeners.clear();
   messageListeners.clear();
   connectionStatusListeners.clear();
 }

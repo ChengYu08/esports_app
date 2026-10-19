@@ -21,8 +21,10 @@ class VoiceRoomBackgroundModule : Module() {
     }.runOnQueue(expo.modules.kotlin.functions.Queues.MAIN)
 
     AsyncFunction("stop") {
-      val context = appContext.reactContext?.applicationContext ?: return@AsyncFunction
-      context.stopService(Intent(context, VoiceRoomBackgroundService::class.java))
+      val context = appContext.reactContext?.applicationContext
+      if (context != null) {
+        context.stopService(Intent(context, VoiceRoomBackgroundService::class.java))
+      }
       null
     }.runOnQueue(expo.modules.kotlin.functions.Queues.MAIN)
   }

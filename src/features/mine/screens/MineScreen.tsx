@@ -13,7 +13,7 @@ import {
 } from "@fluentui/react-native-icons";
 import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
-import { useFocusEffect, router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
   Modal,
@@ -29,8 +29,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { clearAuthSession } from "@/features/auth/session-persistence";
 import { messageStore } from "@/features/message/message-store";
-import { resolveVoiceRoomId, voiceRoomApi } from "@/features/voice-room/voice-room.api";
 import { useUserFollowCount } from "@/features/mine/hooks/use-user-follow";
+import {
+  resolveVoiceRoomId,
+  voiceRoomApi,
+} from "@/features/voice-room/voice-room.api";
 import { requireLogin } from "@/shared/navigation/require-login";
 
 const avatar = require("../../../../assets/mine/figma/mine-avatar.png");
@@ -130,15 +133,21 @@ export default function MineScreen() {
     if (!requireLogin() || !accessToken || openingVoiceRoom) return;
     setOpeningVoiceRoom(true);
     try {
-      let room = await voiceRoomApi.getJoinedRoom(accessToken).catch(() => null);
-      if (!resolveVoiceRoomId(room)) room = await voiceRoomApi.createRoom("我的语聊房", accessToken);
+      let room = await voiceRoomApi
+        .getJoinedRoom(accessToken)
+        .catch(() => null);
+      if (!resolveVoiceRoomId(room))
+        room = await voiceRoomApi.createRoom("我的语聊房", accessToken);
       const roomId = resolveVoiceRoomId(room);
       if (!roomId) throw new Error("房间信息不完整，请稍后重试");
       router.push({ pathname: "/voice-room/[id]", params: { id: roomId } });
     } catch (error) {
-      Toast.show(error instanceof Error ? error.message : "进入语聊房失败，请稍后重试", {
-        duration: Toast.durations.SHORT,
-      });
+      Toast.show(
+        error instanceof Error ? error.message : "进入语聊房失败，请稍后重试",
+        {
+          duration: Toast.durations.SHORT,
+        },
+      );
     } finally {
       setOpeningVoiceRoom(false);
     }
@@ -263,7 +272,7 @@ export default function MineScreen() {
           <Pressable
             accessibilityRole="link"
             accessibilityLabel="星钻余额，点击充值"
-            onPress={openStarRecharge}
+            // onPress={openStarRecharge}
             style={styles.stat}
           >
             <Text style={styles.statValue}>{user?.starBalance ?? "--"}</Text>

@@ -3,6 +3,7 @@ import type { IRtcEngine, IRtcEngineEventHandler } from 'react-native-agora';
 
 import { env } from '@/core/config/env';
 import { startVoiceRoomBackground, stopVoiceRoomBackground } from './voice-room-background';
+import { useVoiceRoomSessionStore } from './voice-room-session';
 
 export type VoiceRtcCallbacks = {
   onUserJoined?: (uid: string) => void;
@@ -15,7 +16,6 @@ let engine: IRtcEngine | null = null;
 let handler: IRtcEngineEventHandler | null = null;
 let activeChannelName: string | null = null;
 let activeCallbacks: VoiceRtcCallbacks | undefined;
-let localAudioMuted = true;
 const remoteUserIds = new Set<string>();
 
 function loadAgora(appId = env.agoraAppId) {
@@ -49,7 +49,7 @@ export async function joinVoiceRtc(options: {
   if (engine) await leaveVoiceRtc();
   if (!engine) engine = agora.createAgoraRtcEngine();
   activeCallbacks = options.callbacks;
-  localAudioMuted = true;
+  useVoiceRoomSessionStore.getState().setMicrophoneMuted(true);
   engine.initialize({ appId });
   engine.setChannelProfile(agora.ChannelProfileType.ChannelProfileCommunication);
   engine.enableAudio();
@@ -94,7 +94,7 @@ export function clearVoiceRtcCallbacks() {
 }
 
 export function getVoiceRtcMuted() {
-  return localAudioMuted;
+  return useVoiceRoomSessionStore.getState().microphoneMuted;
 }
 
 export function muteVoiceRtc(muted: boolean) {
@@ -106,7 +106,7 @@ export function muteVoiceRtc(muted: boolean) {
   if (result !== 0) return result;
   const muteResult = engine.muteLocalAudioStream(muted);
   if (muteResult === 0) {
-    localAudioMuted = muted;
+    useVoiceRoomSessionStore.getState().setMicrophoneMuted(muted);
     void startVoiceRoomBackground(!muted);
   }
   return muteResult;
@@ -124,7 +124,7 @@ export async function leaveVoiceRtc() {
     engine = null;
     activeChannelName = null;
     activeCallbacks = undefined;
-    localAudioMuted = true;
+    useVoiceRoomSessionStore.getState().setMicrophoneMuted(true);
     remoteUserIds.clear();
   }
 }

@@ -11,6 +11,7 @@ import {
   isRongCloudAvailable,
   markRongConversationRead,
   subscribeRongConnectionStatus,
+  subscribeRongConversationSync,
   sendRongImage,
   sendRongText,
   sendRongAfterSaleCard,
@@ -55,6 +56,7 @@ export type MessageAdapter = {
   sendAfterSaleCard?: (peerId: string, payload: AfterSaleCardPayload) => Promise<ManagedMessage>;
   markRead: (peerId: string) => Promise<boolean>;
   subscribeConnectionStatus?: (listener: (signal: RongCloudConnectionSignal) => void) => () => void;
+  subscribeConversationSync?: (listener: () => void) => () => void;
   subscribeConversations: (listener: (conversation: MessageConversation) => void) => () => void;
   subscribeMessages: (listener: (peerId: string, message: ManagedMessage, conversation: MessageConversation) => void) => () => void;
   disconnect: () => Promise<void>;
@@ -68,6 +70,7 @@ type HistoryState = {
 
 export type MessageStoreState = {
   connectionState: MessageConnectionState;
+  conversationError: string | null;
   conversations: MessageConversation[];
   blacklistedUserIds: string[];
   messagesByPeerId: Record<string, ManagedMessage[]>;
@@ -138,6 +141,7 @@ function createAdapter(): MessageAdapter {
     sendAfterSaleCard: sendRongAfterSaleCard,
     markRead: markRongConversationRead,
     subscribeConnectionStatus: subscribeRongConnectionStatus,
+    subscribeConversationSync: subscribeRongConversationSync,
     subscribeConversations: subscribeRongMessages,
     subscribeMessages: subscribeRongMessageEvents,
     disconnect: disconnectRongCloud,
@@ -148,11 +152,13 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
   let stopMessageSubscription: (() => void) | undefined;
   let stopBlacklistSubscription: (() => void) | undefined;
   let stopConnectionStatusSubscription: (() => void) | undefined;
+  let stopConversationSyncSubscription: (() => void) | undefined;
   let blacklistRevision = 0;
   let onlineStatusRequestId = 0;
   let onlineStatusToken: string | null = null;
   let hasInitialized = false;
   let initializeInProgress = false;
+  let conversationSyncPending = false;
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   let reconnectAttempts = 0;
   let lifecycleRevision = 0;
@@ -263,7 +269,15 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
     };
 
     const syncConversations = async (expectedLifecycleRevision = lifecycleRevision) => {
-      const conversations = await adapter.getConversations();
+      let conversations: MessageConversation[];
+      try {
+        conversations = await adapter.getConversations();
+      } catch (error) {
+        if (expectedLifecycleRevision === lifecycleRevision) {
+          set({ conversationError: error instanceof Error ? error.message : '消息列表加载失败，请重试' });
+        }
+        throw error;
+      }
       if (expectedLifecycleRevision !== lifecycleRevision) return;
       const blockedUserIds = new Set(get().blacklistedUserIds);
       const blockedConversationIds = conversations
@@ -273,6 +287,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         )
         .map((conversation) => conversation.id);
       set((state) => ({
+        conversationError: null,
         conversations: conversations
           .map((conversation) =>
             !isSystemConversationId(conversation.id) && blockedUserIds.has(conversation.id)
@@ -336,6 +351,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
 
     return {
       connectionState: 'idle',
+      conversationError: null,
       conversations: [],
       blacklistedUserIds: [],
       messagesByPeerId: {},
@@ -411,8 +427,24 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           return;
         }
         watchConnectionStatus();
+        if (!stopMessageSubscription) stopMessageSubscription = adapter.subscribeMessages(receiveMessage);
+        if (!stopConversationSyncSubscription) {
+          stopConversationSyncSubscription = adapter.subscribeConversationSync?.(() => {
+            if (initializeInProgress) {
+              conversationSyncPending = true;
+              return;
+            }
+            if (get().connectionState !== 'ready') return;
+            void syncConversations(lifecycleRevision).catch((error) => {
+              logger.warn('Message conversation synchronization failed', {
+                errorName: error instanceof Error ? error.name : typeof error,
+              });
+            });
+          });
+        }
         set({ connectionState: 'connecting', lastError: null });
         initializeInProgress = true;
+        conversationSyncPending = false;
         try {
           const ready = await adapter.initialize(token);
           if (initializationRevision !== lifecycleRevision) return;
@@ -424,10 +456,16 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
             set({ connectionState: 'error', lastError: '即时消息连接失败，请稍后重试' });
             return;
           }
-          await syncConversations(initializationRevision);
+          // List restoration can fail while the IM connection remains usable.
+          // Keep live messaging available and expose the list error separately.
+          await syncConversations(initializationRevision).catch(() => undefined);
           if (initializationRevision !== lifecycleRevision) return;
-          stopMessageSubscription?.();
-          stopMessageSubscription = adapter.subscribeMessages(receiveMessage);
+          if (conversationSyncPending) {
+            // Offline messages can finish syncing after the first read started.
+            conversationSyncPending = false;
+            await syncConversations(initializationRevision).catch(() => undefined);
+            if (initializationRevision !== lifecycleRevision) return;
+          }
           hasInitialized = true;
           initializeInProgress = false;
           set({ connectionState: 'ready', lastError: null });
@@ -617,17 +655,20 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         onlineStatusToken = null;
         hasInitialized = false;
         initializeInProgress = false;
+        conversationSyncPending = false;
         reconnectAttempts = 0;
         if (reconnectTimer) clearTimeout(reconnectTimer);
         reconnectTimer = undefined;
         stopMessageSubscription?.();
         stopBlacklistSubscription?.();
         stopConnectionStatusSubscription?.();
+        stopConversationSyncSubscription?.();
         stopMessageSubscription = undefined;
         stopBlacklistSubscription = undefined;
         stopConnectionStatusSubscription = undefined;
+        stopConversationSyncSubscription = undefined;
         await adapter.disconnect();
-        set({ connectionState: 'idle', conversations: [], blacklistedUserIds: [], messagesByPeerId: {}, historyByPeerId: {}, openPeerIds: [], activePeerId: null, lastError: null });
+        set({ connectionState: 'idle', conversationError: null, conversations: [], blacklistedUserIds: [], messagesByPeerId: {}, historyByPeerId: {}, openPeerIds: [], activePeerId: null, lastError: null });
       },
     };
   });

@@ -6,6 +6,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RootSiblingParent } from "react-native-root-siblings";
 import Toast from "react-native-root-toast";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { setAuthExpiredHandler } from "@/core/network/api-client";
@@ -194,32 +195,34 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
-        <RootSiblingParent>
-          {privacyAccepted ? (
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                gestureEnabled: true,
-                animation: "fade",
-                animationMatchesGesture: false,
-                fullScreenGestureEnabled: false,
-              }}
-            >
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen
-                name="image-preview"
-                options={{ headerShown: false }}
-              />
-              <Stack.Screen name="basic-settings" />
-              <Stack.Screen name="account-settings" />
-              <Stack.Screen name="about" />
-            </Stack>
-          ) : (
-            <PrivacyConsentGate onAccepted={() => setPrivacyAccepted(true)} />
-          )}
-          <InAppNotificationBanner visible={!pathname.startsWith("/voice-room/")} />
-          <VoiceRoomMiniPlayer />
-        </RootSiblingParent>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <RootSiblingParent>
+            {privacyAccepted ? (
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  gestureEnabled: true,
+                  animation: "fade",
+                  animationMatchesGesture: false,
+                  fullScreenGestureEnabled: false,
+                }}
+              >
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen
+                  name="image-preview"
+                  options={{ headerShown: false }}
+                />
+                <Stack.Screen name="basic-settings" />
+                <Stack.Screen name="account-settings" />
+                <Stack.Screen name="about" />
+              </Stack>
+            ) : (
+              <PrivacyConsentGate onAccepted={() => setPrivacyAccepted(true)} />
+            )}
+            <InAppNotificationBanner visible={!pathname.startsWith("/voice-room/")} />
+            <VoiceRoomMiniPlayer />
+          </RootSiblingParent>
+        </GestureHandlerRootView>
       </SafeAreaProvider>
     </QueryClientProvider>
   );
