@@ -18,6 +18,7 @@ import {
   readAuthSession,
   saveAuthSession,
 } from "@/features/auth/session-persistence";
+import { useNetworkRecovery } from "@/core/query/use-network-recovery";
 import {
   messageStore,
   useMessageStore,
@@ -201,6 +202,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <RootSiblingParent>
+            <NetworkRecovery />
             {privacyAccepted ? (
               <Stack
                 screenOptions={{
@@ -231,4 +233,9 @@ export default function RootLayout() {
       </SafeAreaProvider>
     </QueryClientProvider>
   );
+}
+
+function NetworkRecovery() {
+  useNetworkRecovery();
+  return null;
 }

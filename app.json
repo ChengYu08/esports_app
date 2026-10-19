@@ -10,6 +10,10 @@
       "softwareKeyboardLayoutMode": "resize",
       "predictiveBackGestureEnabled": false,
       "package": "com.esportsapp.apps",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.FOREGROUND_SERVICE"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -39,8 +43,8 @@
       [
         "expo-audio",
         {
-          "microphonePermission": false,
-          "recordAudioAndroid": false,
+          "microphonePermission": "允许盼之电竞使用麦克风，用于语聊房语音交流。",
+          "recordAudioAndroid": true,
           "enableBackgroundRecording": false,
           "enableBackgroundPlayback": false
         }
@@ -51,10 +55,10 @@
         "expo-image-picker",
         {
           "photosPermission": "允许盼之电竞访问你的照片，用于发送聊天图片。",
-          "cameraPermission": false,
-          "microphonePermission": false
+          "cameraPermission": false
         }
-      ]
+      ],
+      "./plugins/withVoiceRoomBackground"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -68,7 +72,12 @@
     },
     "owner": "chengyu08s-team",
     "ios": {
-      "bundleIdentifier": "com.esportsapp.apps"
+      "supportsTablet": false,
+      "bundleIdentifier": "com.esportsapp.apps",
+      "infoPlist": {
+        "UIBackgroundModes": ["audio"],
+        "NSMicrophoneUsageDescription": "用于在语聊房中进行语音交流。"
+      }
     },
     "icon": "./assets/images/icon.png"
   }
