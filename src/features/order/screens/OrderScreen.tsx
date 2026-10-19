@@ -252,9 +252,21 @@ export default function OrderScreen() {
             .finally(() => { cancelingPaymentRef.current = false; });
         }}
         onPaid={() => {
+          const paid = payTarget;
           setPayTarget(null);
           void orders.refetch();
-          setPrompt({ title: "支付成功", message: "订单已支付，可在订单页面查看进度" });
+          if (paid?.receiverUserId) {
+            router.push({
+              pathname: "/chat/[id]",
+              params: {
+                id: String(paid.receiverUserId),
+                title: paid.receiverName || "用户聊天",
+                avatar: paid.receiverAvatar && "uri" in paid.receiverAvatar ? String(paid.receiverAvatar.uri) : "",
+              },
+            });
+          } else {
+            setPrompt({ title: "支付成功", message: "订单已支付，可在订单页面查看进度" });
+          }
         }}
       />
       <AppPrompt
