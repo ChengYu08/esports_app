@@ -99,6 +99,7 @@ export default function ChatScreen() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const userId = useAuthStore((state) => state.user?.id);
   const myAvatarUrl = useAuthStore((state) => state.user?.headImage);
+  const myNickname = useAuthStore((state) => state.user?.nickname);
   const [afterSaleSending, setAfterSaleSending] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [noteVisible, setNoteVisible] = useState(false);
@@ -252,13 +253,19 @@ export default function ChatScreen() {
         item={item.message}
         peerAvatar={conversationAvatar}
         myAvatar={myAvatar}
+        peerName={conversation?.title || title || "用户"}
+        myName={myNickname || "我"}
+        onEnterRoomInvite={(roomId, roomVersion) => router.push({
+          pathname: "/voice-room/[id]",
+          params: { id: roomId, v: roomVersion },
+        })}
         onRetry={handleRetryMessage}
         onOpenProfile={canViewProfile ? openProfile : undefined}
         onOpenOrder={isOrderAssistant ? openOrderDetail : undefined}
         onPreviewImage={openImagePreview}
       />
     ),
-    [canViewProfile, conversationAvatar, handleRetryMessage, isOrderAssistant, myAvatar, openImagePreview, openOrderDetail, openProfile],
+    [canViewProfile, conversation?.title, conversationAvatar, handleRetryMessage, isOrderAssistant, myAvatar, myNickname, openImagePreview, openOrderDetail, openProfile, title],
   );
 
   useEffect(() => {
@@ -718,6 +725,9 @@ const ChatBubble = memo(function ChatBubble({
   item,
   peerAvatar,
   myAvatar,
+  peerName,
+  myName,
+  onEnterRoomInvite,
   onRetry,
   onOpenProfile,
   onOpenOrder,
@@ -726,6 +736,9 @@ const ChatBubble = memo(function ChatBubble({
   item: ManagedMessage;
   peerAvatar: string | number;
   myAvatar: { uri: string } | number;
+  peerName: string;
+  myName: string;
+  onEnterRoomInvite: (roomId: string, roomVersion: string) => void;
   onRetry: (clientId: string) => void;
   onOpenProfile?: () => void;
   onOpenOrder?: (orderId: string) => void;
@@ -765,6 +778,7 @@ const ChatBubble = memo(function ChatBubble({
           styles.bubble,
           item.isMine ? styles.mineBubble : styles.theirBubble,
           item.kind === "image" && styles.imageBubble,
+          item.kind === "roomInvite" && styles.roomInviteBubble,
           item.kind === "orderNotify" && styles.orderNotifyBubble,
         ]}
       >
@@ -786,6 +800,29 @@ const ChatBubble = memo(function ChatBubble({
                 }
               }}
             />
+          </Pressable>
+        ) : item.kind === "roomInvite" ? (
+          <Pressable
+            accessibilityLabel={`进入${item.isMine ? myName : peerName}分享的语聊房`}
+            accessibilityRole="button"
+            onPress={() => onEnterRoomInvite(item.roomId, item.roomVersion)}
+            style={styles.roomInviteCard}
+          >
+            <View style={styles.roomInviteIconWrap}>
+              <Image source={require("../../../../assets/message/room-invite.svg")} style={styles.roomInviteIcon} />
+            </View>
+            <View style={styles.roomInviteBody}>
+              <Text numberOfLines={1} style={styles.roomInviteTitle}>语聊房邀请</Text>
+              <View style={styles.roomInviteSender}>
+                <CachedImage
+                  contentFit="cover"
+                  source={item.isMine ? myAvatar : peerAvatar}
+                  style={styles.roomInviteAvatar}
+                />
+                <Text numberOfLines={1} style={styles.roomInviteName}>{item.isMine ? myName : peerName}</Text>
+              </View>
+            </View>
+            <View style={styles.roomInviteButton}><Text style={styles.roomInviteButtonText}>进入</Text></View>
           </Pressable>
         ) : item.kind === "afterSale" ? (
           <View style={styles.afterSaleCard}>
@@ -945,6 +982,64 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "transparent",
     borderWidth: 0,
+  },
+  roomInviteBubble: {
+    maxWidth: "84%",
+    padding: 0,
+    backgroundColor: "transparent",
+  },
+  roomInviteCard: {
+    width: 240,
+    maxWidth: "100%",
+    minHeight: 72,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: "#FFFFFF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  roomInviteIconWrap: {
+    width: 42,
+    height: 42,
+    flexShrink: 0,
+    borderRadius: 21,
+    backgroundColor: "#FFF2F5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  roomInviteIcon: { width: 21, height: 21 },
+  roomInviteBody: { flex: 1, minWidth: 0, gap: 2 },
+  roomInviteTitle: {
+    color: "#0A0A0A",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: "500",
+  },
+  roomInviteSender: { flexDirection: "row", alignItems: "center", gap: 4 },
+  roomInviteAvatar: { width: 14, height: 14, borderRadius: 7 },
+  roomInviteName: {
+    flexShrink: 1,
+    color: "#808080",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  roomInviteButton: {
+    flexShrink: 0,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    backgroundColor: "#FE1F4C",
+  },
+  roomInviteButtonText: {
+    color: "#FFFFFF",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "500",
   },
   messageImage: { backgroundColor: "transparent" },
   composer: {

@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import type { IRtcEngine, IRtcEngineEventHandler } from 'react-native-agora';
 
 import { env } from '@/core/config/env';
+import { startVoiceRoomBackground, stopVoiceRoomBackground } from './voice-room-background';
 
 export type VoiceRtcCallbacks = {
   onUserJoined?: (uid: string) => void;
@@ -12,6 +13,10 @@ export type VoiceRtcCallbacks = {
 
 let engine: IRtcEngine | null = null;
 let handler: IRtcEngineEventHandler | null = null;
+let activeChannelName: string | null = null;
+let activeCallbacks: VoiceRtcCallbacks | undefined;
+let localAudioMuted = true;
+const remoteUserIds = new Set<string>();
 
 function loadAgora(appId = env.agoraAppId) {
   if (Platform.OS === 'web' || !appId) return null;
@@ -37,16 +42,32 @@ export async function joinVoiceRtc(options: {
   const appId = options.appId || env.agoraAppId;
   const agora = loadAgora(appId);
   if (!agora) return false;
+  if (engine && activeChannelName === options.channelName) {
+    activeCallbacks = options.callbacks;
+    return true;
+  }
+  if (engine) await leaveVoiceRtc();
   if (!engine) engine = agora.createAgoraRtcEngine();
+  activeCallbacks = options.callbacks;
+  localAudioMuted = true;
   engine.initialize({ appId });
   engine.setChannelProfile(agora.ChannelProfileType.ChannelProfileCommunication);
   engine.enableAudio();
+  engine.setEnableSpeakerphone(true);
   handler = {
-    onUserJoined: (_connection, uid) => options.callbacks?.onUserJoined?.(String(uid)),
-    onUserOffline: (_connection, uid) => options.callbacks?.onUserOffline?.(String(uid)),
-    onUserMuteAudio: (_connection, uid, muted) => options.callbacks?.onUserMuted?.(String(uid), muted),
+    onUserJoined: (_connection, uid) => {
+      const userId = String(uid);
+      remoteUserIds.add(userId);
+      activeCallbacks?.onUserJoined?.(userId);
+    },
+    onUserOffline: (_connection, uid) => {
+      const userId = String(uid);
+      remoteUserIds.delete(userId);
+      activeCallbacks?.onUserOffline?.(userId);
+    },
+    onUserMuteAudio: (_connection, uid, muted) => activeCallbacks?.onUserMuted?.(String(uid), muted),
     onAudioVolumeIndication: (_connection, speakers) => {
-      options.callbacks?.onSpeakingChanged?.(
+      activeCallbacks?.onSpeakingChanged?.(
         speakers.filter((speaker) => (speaker.volume ?? 0) > 20).map((speaker) => String(speaker.uid)),
       );
     },
@@ -55,15 +76,40 @@ export async function joinVoiceRtc(options: {
   engine.enableAudioVolumeIndication(200, 3, true);
   const result = engine.joinChannel(options.token, options.channelName, options.uid, {
     autoSubscribeAudio: true,
-    publishMicrophoneTrack: true,
+    publishMicrophoneTrack: false,
     clientRoleType: agora.ClientRoleType.ClientRoleBroadcaster,
   });
   if (result !== 0) throw new Error(`声网进房失败（${result}）`);
+  activeChannelName = options.channelName;
+  void startVoiceRoomBackground(false);
   return true;
 }
 
+export function getVoiceRtcRemoteUserIds() {
+  return [...remoteUserIds];
+}
+
+export function clearVoiceRtcCallbacks() {
+  activeCallbacks = undefined;
+}
+
+export function getVoiceRtcMuted() {
+  return localAudioMuted;
+}
+
 export function muteVoiceRtc(muted: boolean) {
-  return engine?.muteLocalAudioStream(muted) ?? 0;
+  if (!engine) return -1;
+  const result = engine.updateChannelMediaOptions({
+    autoSubscribeAudio: true,
+    publishMicrophoneTrack: !muted,
+  });
+  if (result !== 0) return result;
+  const muteResult = engine.muteLocalAudioStream(muted);
+  if (muteResult === 0) {
+    localAudioMuted = muted;
+    void startVoiceRoomBackground(!muted);
+  }
+  return muteResult;
 }
 
 export async function leaveVoiceRtc() {
@@ -72,9 +118,14 @@ export async function leaveVoiceRtc() {
     if (handler) engine.unregisterEventHandler(handler);
     engine.leaveChannel();
     engine.release();
+    void stopVoiceRoomBackground();
   } finally {
     handler = null;
     engine = null;
+    activeChannelName = null;
+    activeCallbacks = undefined;
+    localAudioMuted = true;
+    remoteUserIds.clear();
   }
 }
 

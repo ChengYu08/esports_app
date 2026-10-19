@@ -17,7 +17,7 @@ const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
 const systemNotificationAvatar = require("../../../../assets/message/message-system-notice.svg");
 const AUTO_DISMISS_MS = 4000;
 
-function InAppNotificationBannerImpl() {
+function InAppNotificationBannerImpl({ visible = true }: { visible?: boolean }) {
   const insets = useSafeAreaInsets();
   const notification = useInAppNotification((state) => state.notification);
   const dismiss = useInAppNotification((state) => state.dismiss);
@@ -29,7 +29,7 @@ function InAppNotificationBannerImpl() {
     return () => clearTimeout(timer);
   }, [notification, dismiss]);
 
-  if (!notification) return null;
+  if (!notification || !visible) return null;
 
   const handlePress = () => {
     dismiss();

@@ -184,7 +184,9 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       const isActive = get().activePeerId === normalizedPeerId;
       const preview = message.kind === 'image'
         ? '[图片]'
-        : message.kind === 'afterSale' || message.kind === 'orderNotify'
+        : message.kind === 'roomInvite'
+          ? '[语聊房邀请]'
+          : message.kind === 'afterSale' || message.kind === 'orderNotify'
           ? message.title
           : message.text;
       logger.info('message.new', {
@@ -238,7 +240,9 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
     const updateLocalPreview = (peerId: string, message: ManagedMessage) => {
         const preview = message.kind === 'image'
           ? '[图片]'
-          : message.kind === 'afterSale' || message.kind === 'orderNotify'
+          : message.kind === 'roomInvite'
+            ? '[语聊房邀请]'
+            : message.kind === 'afterSale' || message.kind === 'orderNotify'
             ? message.title
             : message.text;
       set((state) => {

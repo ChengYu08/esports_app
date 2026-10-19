@@ -17,6 +17,15 @@ export type ChatImageMessage = {
   isMine: boolean;
 };
 
+export type RoomInviteMessage = {
+  id: string;
+  kind: "roomInvite";
+  roomId: string;
+  roomVersion: string;
+  time: string;
+  isMine: boolean;
+};
+
 export type AfterSaleCardMessage = {
   id: string;
   kind: "afterSale";
@@ -41,7 +50,7 @@ export type OrderNotifyCardMessage = {
   isMine: boolean;
 };
 
-export type ChatMessage = ChatTextMessage | ChatImageMessage | AfterSaleCardMessage | OrderNotifyCardMessage;
+export type ChatMessage = ChatTextMessage | ChatImageMessage | RoomInviteMessage | AfterSaleCardMessage | OrderNotifyCardMessage;
 
 export type RongSdkMessage = {
   messageType?: number;
@@ -77,6 +86,12 @@ function mergeCustomPayload(fields: Record<string, unknown>, payload: Record<str
   const metadata = new Set(["name", "data", "identifier", "messageIdentifier"]);
   const businessFields = Object.fromEntries(Object.entries(fields).filter(([key]) => !metadata.has(key)));
   return { ...businessFields, ...payload };
+}
+
+export function parseRoomInviteLink(text: string): { roomId: string; roomVersion: string } | null {
+  const match = text.trim().match(/^https?:\/\/[^/]+\/chat\?type=chat-room&id=(\d+)&v=(\d+)$/);
+  if (!match) return null;
+  return { roomId: match[1], roomVersion: match[2] };
 }
 
 export function mapRongMessage(message: RongSdkMessage, enums: { image: number; send: number }): ChatMessage | null {
@@ -129,5 +144,7 @@ export function mapRongMessage(message: RongSdkMessage, enums: { image: number; 
   }
 
   const text = message.text || message.content;
+  const roomInvite = text ? parseRoomInviteLink(text) : null;
+  if (roomInvite) return { id, kind: "roomInvite", ...roomInvite, time, isMine };
   return text ? { id, kind: "text", text, time, isMine } : null;
 }

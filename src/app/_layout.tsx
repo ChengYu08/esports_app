@@ -1,7 +1,7 @@
 import { useAuthStore } from "@esports/auth";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useFonts } from "expo-font";
-import { router, Stack } from "expo-router";
+import { router, Stack, usePathname } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RootSiblingParent } from "react-native-root-siblings";
@@ -22,6 +22,10 @@ import {
   useMessageStore,
 } from "@/features/message/message-store";
 import { InAppNotificationBanner } from "@/features/message/components/InAppNotificationBanner";
+import { VoiceRoomMiniPlayer } from "@/features/voice-room/components/VoiceRoomMiniPlayer";
+import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
+import { leaveVoiceChatRoom } from "@/features/voice-room/voice-room-rongcloud";
+import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
 import { PrivacyConsentGate } from "@/features/privacy/components/PrivacyConsentGate";
 import { readPrivacyConsent } from "@/features/privacy/privacy-consent";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
@@ -52,6 +56,7 @@ const fonts = {
 };
 
 export default function RootLayout() {
+  const pathname = usePathname();
   const [loaded, error] = useFonts(fonts);
   const [splashReady, setSplashReady] = useState(false);
   const finishSplash = useCallback(() => setSplashReady(true), []);
@@ -112,6 +117,15 @@ export default function RootLayout() {
     privacyReady,
     resetMessages,
   ]);
+
+  useEffect(() => {
+    if (accessToken) return;
+    const activeRoom = useVoiceRoomSessionStore.getState().activeRoom;
+    if (!activeRoom) return;
+    void leaveVoiceRtc();
+    void leaveVoiceChatRoom(activeRoom.rongChatroomId);
+    useVoiceRoomSessionStore.getState().clearActiveRoom(activeRoom.roomId);
+  }, [accessToken]);
 
   useEffect(() => {
     let active = true;
@@ -203,7 +217,8 @@ export default function RootLayout() {
           ) : (
             <PrivacyConsentGate onAccepted={() => setPrivacyAccepted(true)} />
           )}
-          <InAppNotificationBanner />
+          <InAppNotificationBanner visible={!pathname.startsWith("/voice-room/")} />
+          <VoiceRoomMiniPlayer />
         </RootSiblingParent>
       </SafeAreaProvider>
     </QueryClientProvider>

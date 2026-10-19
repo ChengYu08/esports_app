@@ -7,7 +7,7 @@ import type {
 
 import { ApiError } from '@/core/network/api-client';
 import { logger } from '@/core/logging/logger';
-import { mapRongMessage, type RongSdkMessage } from './chat-message';
+import { mapRongMessage, parseRoomInviteLink, type RongSdkMessage } from './chat-message';
 import type { ManagedMessage, MessageConversation, MessageHistoryPage } from './message-state';
 import type { AfterSaleCardPayload } from '@/features/order/after-sale-card';
 import { getRongConversationTargetId, getSystemConversationTitle, isSystemConversationId, normalizeSystemConversationId } from './system-conversations';
@@ -72,8 +72,11 @@ function getSdkEnums() {
 function mapPreview(message?: RCIMIWMessage) {
   const content = message as (RCIMIWMessage & { text?: string; content?: string }) | undefined;
   const enums = getSdkEnums();
+  const text = content?.text || content?.content;
   return {
-    preview: content?.text || content?.content || (message?.messageType === enums?.imageType ? '[图片]' : '新消息'),
+    preview: text && parseRoomInviteLink(text)
+      ? '[语聊房邀请]'
+      : text || (message?.messageType === enums?.imageType ? '[图片]' : '新消息'),
     time: message?.sentTime ? new Date(message.sentTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '',
   };
 }
