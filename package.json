@@ -63,7 +63,12 @@
     "ios": "expo run:ios --device",
     "web": "expo start --web",
     "lint": "expo lint",
-    "prebuild": "expo prebuild"
+    "prebuild": "expo prebuild",
+    "build:apk": "node scripts/build_apk.cjs --abi arm64",
+    "build:apk:arm64": "node scripts/build_apk.cjs --abi arm64",
+    "build:apk:universal": "node scripts/build_apk.cjs --abi universal",
+    "build:apk:all": "node scripts/build_apk.cjs --abi all",
+    "build:apk:init-signing": "node scripts/build_apk.cjs --init-signing"
   },
   "private": true,
   "workspaces": [
