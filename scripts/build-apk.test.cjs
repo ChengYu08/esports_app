@@ -2,7 +2,6 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { createHash } = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 const { test } = require('node:test');
 
@@ -17,23 +16,38 @@ function fixture(t, script) {
   return { root, run };
 }
 
-test('archive uses root config and actual APK bytes, preserves previous builds, rejects stale version', (t) => {
+test('archive uses root config, abi label, local YYYYMMDDHHmm name; overwrites same minute; rejects stale version', (t) => {
   const { root, run } = fixture(t, 'archive-apk.cjs');
   const output = path.join(root, 'android/app/build/outputs/apk/release');
   fs.mkdirSync(output, { recursive: true });
   fs.writeFileSync(path.join(root, 'app.json'), JSON.stringify({ expo: { name: '盼之电竞', version: '1.2.3' } }));
   const metadata = path.join(output, 'output-metadata.json');
   fs.writeFileSync(metadata, JSON.stringify({ elements: [{ versionName: '1.2.3', outputFile: 'app-release.apk' }] }));
-  for (const bytes of [Buffer.from('first artifact'), Buffer.from('second artifact')]) {
-    fs.writeFileSync(path.join(output, 'app-release.apk'), bytes);
-    const result = run();
-    assert.equal(result.status, 0, result.stderr);
-    const hash = createHash('md5').update(bytes).digest('hex');
-    assert.deepEqual(fs.readFileSync(path.join(root, 'apks', `盼之电竞-1.2.3-${hash}.apk`)), bytes);
-  }
-  assert.equal(fs.readdirSync(path.join(root, 'apks')).length, 2);
+  const namePattern = /^盼之电竞-1\.2\.3-arm64-\d{12}\.apk$/;
+  const first = Buffer.from('first artifact');
+  fs.writeFileSync(path.join(output, 'app-release.apk'), first);
   assert.equal(run().status, 0);
-  assert.equal(fs.readdirSync(path.join(root, 'apks')).length, 2);
+  let apks = fs.readdirSync(path.join(root, 'apks')).filter((f) => f.endsWith('.apk'));
+  assert.equal(apks.length, 1);
+  assert.match(apks[0], namePattern);
+  assert.deepEqual(fs.readFileSync(path.join(root, 'apks', apks[0])), first);
+
+  const runUniversal = () => spawnSync(process.execPath, [path.join(root, 'scripts', 'archive-apk.cjs')], {
+    cwd: os.tmpdir(), encoding: 'utf8', env: { ...process.env, APK_ABI_LABEL: 'universal' },
+  });
+  const universalBytes = Buffer.from('universal artifact');
+  fs.writeFileSync(path.join(output, 'app-release.apk'), universalBytes);
+  assert.equal(runUniversal().status, 0);
+  apks = fs.readdirSync(path.join(root, 'apks')).filter((f) => f.endsWith('.apk')).sort();
+  assert.equal(apks.length, 2, 'different abi labels keep both apks');
+  assert.match(apks.find((f) => f.includes('-universal-')), /^盼之电竞-1\.2\.3-universal-\d{12}\.apk$/);
+
+  const second = Buffer.from('second artifact');
+  fs.writeFileSync(path.join(output, 'app-release.apk'), second);
+  assert.equal(run().status, 0);
+  apks = fs.readdirSync(path.join(root, 'apks')).filter((f) => f.endsWith('.apk'));
+  assert.equal(apks.length, 2, 'same minute same abi rebuild overwrites arm64 only');
+  assert.deepEqual(fs.readFileSync(path.join(root, 'apks', apks.find((f) => f.includes('-arm64-')))), second);
   fs.writeFileSync(metadata, JSON.stringify({ elements: [{ versionName: 'old', outputFile: 'app-release.apk' }] }));
   assert.notEqual(run().status, 0);
 });

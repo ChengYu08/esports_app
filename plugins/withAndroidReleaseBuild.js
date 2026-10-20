@@ -48,7 +48,7 @@ android {
 tasks.matching { it.name == 'validateSigningRelease' }.configureEach {
     doFirst {
         if (!releaseKeyFile.exists() || !releaseCredentials.password || !releaseCredentials.keyAlias) {
-            throw new GradleException('Missing release signing. Run scripts/build_apk.sh --init-signing or restore .android-signing from backup.')
+            throw new GradleException('Missing release signing. Run npm run build:apk:init-signing or restore .android-signing from backup.')
         }
     }
 }

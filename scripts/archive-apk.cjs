@@ -21,11 +21,18 @@ async function archive() {
   const source = path.join(output, path.basename(apk.outputFile));
   const checksum = await md5(source);
   const safe = (text) => String(text).replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
-  const timestamp = new Date()
-    .toISOString()
-    .replace(/[-:]/g, '')
-    .replace(/\..+/, '');
-  const name = `${safe(expo.name)}-${safe(apk.versionName)}-${timestamp}`;
+  // 本地时间：年月日时分，例如 202610201430
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const timestamp = [
+    now.getFullYear(),
+    pad(now.getMonth() + 1),
+    pad(now.getDate()),
+    pad(now.getHours()),
+    pad(now.getMinutes()),
+  ].join('');
+  const abiLabel = safe(process.env.APK_ABI_LABEL || 'arm64');
+  const name = `${safe(expo.name)}-${safe(apk.versionName)}-${abiLabel}-${timestamp}`;
   const directory = path.join(root, 'apks');
   fs.mkdirSync(directory, { recursive: true });
   const target = path.join(directory, `${name}.apk`);
