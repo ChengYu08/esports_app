@@ -21,7 +21,11 @@ async function archive() {
   const source = path.join(output, path.basename(apk.outputFile));
   const checksum = await md5(source);
   const safe = (text) => String(text).replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
-  const name = `${safe(expo.name)}-${safe(apk.versionName)}-${checksum}`;
+  const timestamp = new Date()
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\..+/, '');
+  const name = `${safe(expo.name)}-${safe(apk.versionName)}-${timestamp}`;
   const directory = path.join(root, 'apks');
   fs.mkdirSync(directory, { recursive: true });
   const target = path.join(directory, `${name}.apk`);
