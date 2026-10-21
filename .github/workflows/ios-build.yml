@@ -82,7 +82,7 @@ permissions:
 
 jobs:
   build-ios:
-    name: Build iOS IPA
+    name: Build iOS IPA app
     runs-on: macos-latest
     timeout-minutes: 60
 
@@ -357,7 +357,7 @@ jobs:
         if: ${{ env.REACT_NATIVE_PROJECT == 'true' }}
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.3'
+          ruby-version: "3.3"
           bundler-cache: ${{ hashFiles('Gemfile') != '' }}
 
       - name: Install compiler cache
@@ -646,4 +646,3 @@ jobs:
       - name: Clean up keychain
         if: always()
         run: security delete-keychain "$KEYCHAIN_PATH" || true
-
