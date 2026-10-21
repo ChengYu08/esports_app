@@ -266,7 +266,8 @@ export default function VoiceRoomScreen() {
 
   const ensureRtcMember = useCallback(
     (userId: string) => {
-      if (!userId || userId === currentUser?.id) return;
+      // uid "0" 是 joinChannel 传 0 时 Agora 在音量回调里返回的本地占位 uid，不是真实用户
+      if (!userId || userId === "0" || userId === currentUser?.id) return;
       const creatorUserId = String(roomRef.current?.creatorUserId ?? "");
       const serviceUserId = String(roomRef.current?.serviceUserId ?? "");
       setMembers((items) => {
@@ -320,12 +321,11 @@ export default function VoiceRoomScreen() {
       try {
         const detail = await voiceRoomApi.getDetail(roomId, accessToken);
         if (!isCurrentJoin()) return;
-        if (
+        const staleInvite = Boolean(
           invitedRoomVersion &&
-          String(detail.roomVersion ?? "1") !== invitedRoomVersion
-        ) {
-          throw new Error("语聊房已重新开启，请重新获取邀请链接");
-        }
+            String(detail.roomVersion ?? "1") !== invitedRoomVersion,
+        );
+        // 邀请卡片携带的是旧实例版本：房间已重建，按当前版本进入最新实例
         const prepared = await voiceRoomApi.prepareJoin(
           roomId,
           detail.roomVersion ?? "1",
@@ -432,6 +432,11 @@ export default function VoiceRoomScreen() {
         setRtcReadyRoomId(roomId);
         setMicState({ roomId, muted: getVoiceRtcMuted() });
         setError(null);
+        if (staleInvite) {
+          Toast.show("语聊房已重新开启，已为你进入最新房间", {
+            duration: Toast.durations.SHORT,
+          });
+        }
       } catch (cause) {
         await cleanupCancelledJoin();
         if (active && !kickedRef.current)
@@ -688,10 +693,32 @@ export default function VoiceRoomScreen() {
   const sendInviteLink = async (peerId: string) => {
     const inviteLink = getInviteLink();
     if (!inviteLink) return;
-    const sendText = messageStore.getState().sendText;
-    // await sendText(peerId, `来和我一起连麦吧：${inviteLink}`);
-    await sendText(peerId, `${inviteLink}`);
-    Toast.show("邀请已发送", { duration: Toast.durations.SHORT });
+    if (!accessToken) {
+      Toast.show("请先登录", { duration: Toast.durations.SHORT });
+      return;
+    }
+    try {
+      await messageStore.getState().initialize(accessToken);
+      const state = messageStore.getState();
+      if (state.connectionState !== "ready") {
+        Toast.show("消息服务未连接，请稍后再试", {
+          duration: Toast.durations.SHORT,
+        });
+        return;
+      }
+      await state.sendText(peerId, inviteLink);
+      // sendText 内部 catch 错误后通过 set() 更新 store，必须重新 getState() 才能读到最新 lastError
+      const failed = messageStore.getState().lastError;
+      if (failed) {
+        Toast.show(failed, { duration: Toast.durations.SHORT });
+        return;
+      }
+      Toast.show("邀请已发送", { duration: Toast.durations.SHORT });
+    } catch {
+      Toast.show("邀请发送失败，请稍后再试", {
+        duration: Toast.durations.SHORT,
+      });
+    }
   };
 
   return (
@@ -720,10 +747,14 @@ export default function VoiceRoomScreen() {
           <Text style={styles.title}>{roomTitle}</Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={isOwner ? "解散语聊房" : "退出语聊房"}
-            disabled={loading || !room || leaving}
+            accessibilityLabel={room ? (isOwner ? "解散语聊房" : "退出语聊房") : "退出语聊房"}
+            disabled={leaving}
             onPress={() => {
               Keyboard.dismiss();
+              if (!room) {
+                minimize();
+                return;
+              }
               setExitError(null);
               setExitDialogVisible(true);
             }}

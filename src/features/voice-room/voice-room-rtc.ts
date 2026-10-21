@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import type { IRtcEngine, IRtcEngineEventHandler } from 'react-native-agora';
 
 import { env } from '@/core/config/env';
-import { startVoiceRoomBackground, stopVoiceRoomBackground } from './voice-room-background';
+import { startVoiceRoomBackground, stopVoiceRoomBackground, updateVoiceRoomMicrophone } from './voice-room-background';
 import { useVoiceRoomSessionStore } from './voice-room-session';
 
 export type VoiceRtcCallbacks = {
@@ -108,6 +108,7 @@ export function muteVoiceRtc(muted: boolean) {
   if (muteResult === 0) {
     useVoiceRoomSessionStore.getState().setMicrophoneMuted(muted);
     void startVoiceRoomBackground(!muted);
+    void updateVoiceRoomMicrophone(!muted);
   }
   return muteResult;
 }
