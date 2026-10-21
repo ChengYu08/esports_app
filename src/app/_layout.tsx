@@ -55,7 +55,7 @@ function withStartupTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
 }
 
 const fonts = {
-  [DOUYIN_SANS]: require("../../assets/fonts/Douyin Sans.ttf"),
+  [DOUYIN_SANS]: require("../../assets/fonts/DouyinSans.ttf"),
 };
 
 export default function RootLayout() {
