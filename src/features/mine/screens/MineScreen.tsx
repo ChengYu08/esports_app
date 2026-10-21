@@ -482,14 +482,12 @@ const styles = StyleSheet.create({
   },
   stat: { flex: 1, alignItems: "center", gap: 2 },
   statValue: {
-    fontFamily: DOUYIN_SANS,
     color: "#0A0A0A",
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "500",
   },
   statLabel: {
-    fontFamily: DOUYIN_SANS,
     color: "#999",
     fontSize: 11,
     lineHeight: 16,
