@@ -27,5 +27,16 @@ class VoiceRoomBackgroundModule : Module() {
       }
       null
     }.runOnQueue(expo.modules.kotlin.functions.Queues.MAIN)
+
+    AsyncFunction("updateMicrophone") { enabled: Boolean ->
+      val context = appContext.reactContext?.applicationContext
+        ?: throw IllegalStateException("语聊房后台服务不可用")
+      val intent = Intent(context, VoiceRoomBackgroundService::class.java)
+        .putExtra(VoiceRoomBackgroundService.EXTRA_TITLE, "语聊房进行中")
+        .putExtra(VoiceRoomBackgroundService.EXTRA_MICROPHONE_ENABLED, enabled)
+        .putExtra(VoiceRoomBackgroundService.EXTRA_UPDATE_ONLY, true)
+      context.startService(intent)
+      null
+    }.runOnQueue(expo.modules.kotlin.functions.Queues.MAIN)
   }
 }
