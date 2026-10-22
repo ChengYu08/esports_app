@@ -147,7 +147,9 @@ export function BottomSheet({
     >
       {keyboardAvoiding ? (
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          // Prefer padding over Android "height": height + adjustResize inside Modal
+          // can reflow the sheet and steal TextInput focus (keyboard flicker).
+          behavior="padding"
           style={styles.keyboardAvoiding}
         >
           {backdrop}

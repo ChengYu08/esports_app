@@ -16,8 +16,7 @@ npx expo run:ios
 npx expo run:android
 ```
 
-准备发布apk
-scripts/build_apk.sh
+准备发布 apk：`npm run build:apk`（仅 ARM64）；同时打 ARM64 + 双架构包：`npm run build:apk:all`。详见 `scripts/BUILD_APK.md`。
 
 https://djpc.jlgkj.top/privacy.html
 
