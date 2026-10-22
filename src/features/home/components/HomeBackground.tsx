@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
     left: "50%",
     top: -93.3,
     marginLeft: -315.5,
-    transform: [{ rotate: "-180deg" }],
+    transform: [{ scaleY: -1 }],
   },
   baseGradient: {
     position: "absolute",

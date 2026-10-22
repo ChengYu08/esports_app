@@ -3,11 +3,12 @@ import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { HomeBackground } from "@/features/home/components/HomeBackground";
 import { ClubCard } from "@/features/home/components/ClubCard";
-import { HomeHeader } from "@/features/home/components/HomeHeader";
+import { HomeHeader, HomeTopBar } from "@/features/home/components/HomeHeader";
 import { HomeSkeleton } from "@/features/home/components/HomeSkeleton";
 import { useHomeBanners, useHomeClubs, useHomeGames } from "@/features/home/hooks/use-home-data";
 import type { GameKey, HomeTab } from "@/features/home/api/home.types";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
+import { CourtHomeScreen } from "@/features/court/screens/CourtHomeScreen";
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -41,10 +42,11 @@ export default function HomeScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <HomeBackground />
+      <HomeTopBar tab={topTab} onTabChange={selectTopTab} />
       {isHomeLoading && topTab === "home" ? (
         <HomeSkeleton bottomPadding={100 + insets.bottom} />
       ) : topTab === "court" ? (
-        <FlatList data={[]} ListHeaderComponent={header} renderItem={null} ListEmptyComponent={<View style={styles.emptyCourt}><EmptyState message="小法庭功能即将上线" /></View>} />
+        <CourtHomeScreen bottomInset={insets.bottom} />
       ) : (
         <FlatList
           data={clubItems}

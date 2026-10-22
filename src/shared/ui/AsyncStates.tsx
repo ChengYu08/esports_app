@@ -1,11 +1,16 @@
 import { Image } from "expo-image";
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from "react-native";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { colors, radius, spacing } from "@/shared/theme/tokens";
 import { SkeletonList } from "@/shared/ui/Skeleton";
 
 type StateProps = { message?: string };
-type EmptyStateProps = StateProps & { hint?: string; style?: StyleProp<ViewStyle>; testID?: string };
+type EmptyStateProps = StateProps & {
+  hint?: string;
+  style?: StyleProp<ViewStyle>;
+  messageStyle?: StyleProp<TextStyle>;
+  testID?: string;
+};
 
 const emptyStateIllustration = require("../../../assets/coms/empty-state-illustration.svg");
 
@@ -20,11 +25,11 @@ export function LoadingState({ message = "加载中…", style }: StateProps & {
   );
 }
 
-export function EmptyState({ message = "这里空无一物～", hint, style, testID }: EmptyStateProps) {
+export function EmptyState({ message = "这里空无一物～", hint, style, messageStyle, testID }: EmptyStateProps) {
   return (
     <View testID={testID} style={[styles.emptyState, style]}>
       <Image accessibilityIgnoresInvertColors contentFit="contain" source={emptyStateIllustration} style={styles.emptyIllustration} />
-      <Text style={styles.emptyMessage}>{message}</Text>
+      <Text style={[styles.emptyMessage, messageStyle]}>{message}</Text>
       {hint ? <Text style={styles.emptyHint}>{hint}</Text> : null}
     </View>
   );
