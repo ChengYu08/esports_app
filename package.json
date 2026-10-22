@@ -58,12 +58,27 @@
     "vitest": "^5.0.3"
   },
   "scripts": {
-    "start": "expo start",
-    "android": "expo run:android --device",
-    "ios": "expo run:ios --device",
+    "start": "node scripts/with-env.cjs test expo start",
+    "start:test": "node scripts/with-env.cjs test expo start",
+    "start:prod": "node scripts/with-env.cjs prod expo start",
+    "start:prod-only": "node scripts/with-env.cjs prod expo start --localhost",
+    "android": "node scripts/with-env.cjs test expo run:android --device",
+    "android:test": "node scripts/with-env.cjs test expo run:android --device",
+    "android:prod": "node scripts/with-env.cjs prod expo run:android --device",
+    "ios": "node scripts/with-env.cjs test expo run:ios --device",
+    "ios:test": "node scripts/with-env.cjs test expo run:ios --device",
+    "ios:prod": "node scripts/with-env.cjs prod expo run:ios --device",
     "web": "expo start --web",
     "lint": "expo lint",
-    "prebuild": "expo prebuild"
+    "prebuild": "expo prebuild",
+    "build:apk": "node scripts/build_apk.cjs --env prod --abi arm64",
+    "build:apk:arm64": "node scripts/build_apk.cjs --env prod --abi arm64",
+    "build:apk:universal": "node scripts/build_apk.cjs --env prod --abi universal",
+    "build:apk:all": "node scripts/build_apk.cjs --env prod --abi all",
+    "build:apk:init-signing": "node scripts/build_apk.cjs --init-signing",
+    "build:apk:test": "node scripts/build_apk.cjs --env test --abi arm64",
+    "build:apk:test:universal": "node scripts/build_apk.cjs --env test --abi universal",
+    "build:apk:prod": "node scripts/build_apk.cjs --abi arm64"
   },
   "private": true,
   "workspaces": [
