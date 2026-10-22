@@ -206,6 +206,23 @@ function removeAndroidDirectory() {
  * bash 用 -Dorg.gradle.jvmargs="..." 传参；Windows cmd 会按空格拆开。
  * 改为写入 gradle.properties，效果等价且跨平台。
  */
+/**
+ * 国内 CI（无法直连 services.gradle.org）改用腾讯云镜像下载 Gradle 发行版。
+ * 环境变量 GRADLE_DIST_MIRROR 可覆盖；传 none 恢复官方源。
+ */
+function rewriteGradleDistUrl() {
+  const mirror = process.env.GRADLE_DIST_MIRROR ?? 'https://mirrors.cloud.tencent.com/gradle';
+  if (mirror === 'none') return;
+  const file = path.join(root, 'android', 'gradle', 'wrapper', 'gradle-wrapper.properties');
+  let text = fs.readFileSync(file, 'utf8');
+  const match = text.match(/^distributionUrl=(.*)$/m);
+  if (!match) throw new Error('distributionUrl not found in gradle-wrapper.properties');
+  const fileName = match[1].split('/').pop();
+  text = text.replace(/^distributionUrl=.*$/m, `distributionUrl=${mirror}/${fileName}`);
+  fs.writeFileSync(file, text);
+  console.log(`Gradle distribution mirror: ${mirror}/${fileName}`);
+}
+
 function ensureGradleJvmArgs() {
   const file = path.join(root, 'android', 'gradle.properties');
   const desired = 'org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m';
@@ -280,6 +297,7 @@ if (useBun) {
 }
 
 ensureGradleJvmArgs();
+rewriteGradleDistUrl();
 
 for (const target of targets) {
   assembleAndArchive(target, buildEnv);
