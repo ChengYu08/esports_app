@@ -237,6 +237,7 @@ function ensureGradleJvmArgs() {
 
 function assembleAndArchive(target, buildEnv) {
   const gradlew = isWin ? 'gradlew.bat' : './gradlew';
+  const isTest = buildEnv.APK_ENV_LABEL === 'test';
   console.log(`Building APK (${target.label}: ${target.architectures})...`);
   run(
     gradlew,
@@ -246,8 +247,9 @@ function assembleAndArchive(target, buildEnv) {
       '-Pkotlin.compiler.execution.strategy=in-process',
       '-Pkotlin.incremental=false',
       `-PreactNativeArchitectures=${target.architectures}`,
-      '-Pandroid.enableMinifyInReleaseBuilds=true',
-      '-Pandroid.enableShrinkResourcesInReleaseBuilds=true',
+      // 测试包不做 R8 混淆与资源收缩（省 2-3 分钟，崩溃堆栈也更可读）
+      '-Pandroid.enableMinifyInReleaseBuilds=' + (isTest ? 'false' : 'true'),
+      '-Pandroid.enableShrinkResourcesInReleaseBuilds=' + (isTest ? 'false' : 'true'),
     ],
     {
       cwd: path.join(root, 'android'),

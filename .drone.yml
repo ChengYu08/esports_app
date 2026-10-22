@@ -20,14 +20,13 @@ image_pull_secrets:
 
 steps:
   - name: build-android
-    image: nexus.jinliwangluo.com:8082/panzhi/android-build-box:optimized-1.0.0
+    image: nexus.jinliwangluo.com:8082/panzhi/android-build-box:optimized-1.0.1
     pull: if-not-exists
     environment:
       ANDROID_HOME: /opt/android-sdk
       JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
       npm_config_cache: /root/.npm
-      # RN 0.86 默认 NDK（prebuild 生成的 android/ 会要求该版本）
-      ANDROID_NDK_VERSION: "27.1.12297006"
+      # 镜像内已预装 NDK 27.1.12297006（RN 0.86 要求），无需构建时下载
     commands:
       - |
         set -e
@@ -76,14 +75,13 @@ steps:
           yes | sdkmanager --sdk_root="$${ANDROID_HOME}" --licenses >/dev/null || true
         fi
 
-        # untrusted 不能挂缓存卷，每次构建按需安装 NDK
-        NDK_DIR="$${ANDROID_HOME}/ndk/$${ANDROID_NDK_VERSION}"
+        # 镜像已预装 NDK 27.1.12297006（见注释），此处仅校验存在，避免 RN 构建中途才报缺 NDK
+        NDK_DIR="$${ANDROID_HOME}/ndk/27.1.12297006"
         if [ ! -d "$${NDK_DIR}" ]; then
-          echo "安装 NDK $${ANDROID_NDK_VERSION} ..."
-          sdkmanager --sdk_root="$${ANDROID_HOME}" "ndk;$${ANDROID_NDK_VERSION}"
-        else
-          echo "镜像内已有 NDK: $${NDK_DIR}"
+          echo "镜像缺少 NDK 27.1.12297006，请更新镜像 panzhi/android-build-box:optimized-1.0.1"
+          exit 1
         fi
+        echo "NDK 就绪: $${NDK_DIR}"
 
         npm ci --prefer-offline --no-audit --no-fund
         node scripts/build_apk.cjs --env "$${BUILD_ENV}" --abi "$${BUILD_ABI}"
