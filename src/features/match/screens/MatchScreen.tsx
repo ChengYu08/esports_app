@@ -1,9 +1,12 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, router } from "expo-router";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -33,6 +36,13 @@ const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond
 /** Figma dark bg：#0C0C2E → #120D2B */
 const BG_GRADIENT = ["#0C0C2E", "#120D2B"] as const;
 const PUBLISH_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
+/**
+ * Figma 按钮区 pb=56，其中 HomeIndicator=34，内容区余量=22。
+ * 安全区用 insets 承接 HomeIndicator，仅保留 22 的内容间距。
+ */
+const FOOTER_CONTENT_BOTTOM = 22;
+/** 备注输入框相对 ScrollView 可视底边的间距，避免底部被裁切 */
+const REMARK_KEYBOARD_GAP = 12;
 
 function HintText({ text }: { text: string }) {
   return <Text style={styles.hintText}>{text}</Text>;
@@ -40,12 +50,56 @@ function HintText({ text }: { text: string }) {
 
 export default function MatchScreen() {
   const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
+  const remarkFieldRef = useRef<View>(null);
+  const scrollOffsetRef = useRef(0);
+  const remarkFocusedRef = useRef(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [clubSheetVisible, setClubSheetVisible] = useState(false);
   const form = useMatchForm();
 
   const handlePublish = () => {
     Toast.show("功能开发中", { duration: Toast.durations.SHORT });
   };
+
+  const ensureRemarkAboveKeyboard = useCallback(() => {
+    const scrollView = scrollRef.current;
+    const remarkField = remarkFieldRef.current;
+    if (!scrollView || !remarkField) return;
+
+    // 以 ScrollView 可视区域底边为准，避免按窗口底边对齐时底部被裁切
+    scrollView.measureInWindow((_sx, scrollY, _sw, scrollHeight) => {
+      remarkField.measureInWindow((_x, y, _width, height) => {
+        const fieldBottom = y + height;
+        const visibleBottom = scrollY + scrollHeight;
+        const delta = fieldBottom - visibleBottom + REMARK_KEYBOARD_GAP;
+        if (delta <= 0) return;
+        scrollView.scrollTo({
+          y: Math.max(0, scrollOffsetRef.current + delta),
+          animated: true,
+        });
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  // 底部栏隐藏、键盘顶起后再测量，避免 Android 位置不准
+  useEffect(() => {
+    if (!keyboardVisible || !remarkFocusedRef.current) return;
+    const timer = setTimeout(ensureRemarkAboveKeyboard, Platform.OS === "android" ? 64 : 32);
+    return () => clearTimeout(timer);
+  }, [keyboardVisible, ensureRemarkAboveKeyboard]);
 
   return (
     <View style={styles.root}>
@@ -56,7 +110,11 @@ export default function MatchScreen() {
         end={{ x: 0.5, y: 1 }}
         style={styles.background}
       />
-      <View style={styles.content}>
+      <KeyboardAvoidingView
+        style={styles.content}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={0}
+      >
         <View style={[styles.nav, { paddingTop: insets.top }]}>
           <View style={styles.navBar}>
             <Pressable
@@ -77,10 +135,20 @@ export default function MatchScreen() {
         </View>
 
         <ScrollView
+          ref={scrollRef}
           style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            // 键盘弹出时增加底部空白，保证备注行能滚到可视区内且不被裁切
+            keyboardVisible && { paddingBottom: 48 },
+          ]}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
+          onScroll={(event) => {
+            scrollOffsetRef.current = event.nativeEvent.contentOffset.y;
+          }}
+          scrollEventThrottle={16}
         >
           <View style={styles.field}>
             <FieldLabel label="游戏" required />
@@ -244,7 +312,7 @@ export default function MatchScreen() {
             </View>
           </View>
 
-          <View style={[styles.field, styles.fieldCenter]}>
+          <View ref={remarkFieldRef} style={[styles.field, styles.fieldCenter]} collapsable={false}>
             <FieldLabel label="备注" />
             <View style={styles.remarkBox}>
               <TextInput
@@ -253,6 +321,12 @@ export default function MatchScreen() {
                 placeholder="填写要求"
                 placeholderTextColor="rgba(255,255,255,0.3)"
                 style={styles.remarkInput}
+                onFocus={() => {
+                  remarkFocusedRef.current = true;
+                }}
+                onBlur={() => {
+                  remarkFocusedRef.current = false;
+                }}
               />
             </View>
           </View>
@@ -266,29 +340,31 @@ export default function MatchScreen() {
           </View>
         </ScrollView>
 
-        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
-          <View style={styles.etaRow}>
-            <Text style={styles.etaMuted}>预计</Text>
-            <Text style={styles.etaAccent}>30s</Text>
-            <Text style={styles.etaMuted}>内匹配成功</Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="立即发布，匹配陪玩"
-            onPress={handlePublish}
-            style={({ pressed }) => [styles.publishWrap, pressed && styles.pressed]}
-          >
-            <LinearGradient
-              colors={PUBLISH_GRADIENT}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.publishButton}
+        {keyboardVisible ? null : (
+          <View style={[styles.footer, { paddingBottom: insets.bottom + FOOTER_CONTENT_BOTTOM }]}>
+            <View style={styles.etaRow}>
+              <Text style={styles.etaMuted}>预计</Text>
+              <Text style={styles.etaAccent}>30s</Text>
+              <Text style={styles.etaMuted}>内匹配成功</Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="立即发布，匹配陪玩"
+              onPress={handlePublish}
+              style={({ pressed }) => [styles.publishWrap, pressed && styles.pressed]}
             >
-              <Text style={styles.publishText}>立即发布，匹配陪玩</Text>
-            </LinearGradient>
-          </Pressable>
-        </View>
-      </View>
+              <LinearGradient
+                colors={PUBLISH_GRADIENT}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.publishButton}
+              >
+                <Text style={styles.publishText}>立即发布，匹配陪玩</Text>
+              </LinearGradient>
+            </Pressable>
+          </View>
+        )}
+      </KeyboardAvoidingView>
 
       <ClubSelectSheet
         visible={clubSheetVisible}
