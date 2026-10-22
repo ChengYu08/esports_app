@@ -49,8 +49,10 @@ import type {
 import {
   addToBlacklist,
   isUserBlacklisted,
+  removeFromBlacklist,
   subscribeBlacklist,
 } from "@/features/mine/blacklist";
+import { fetchBlacklistStatus } from "@/features/mine/api/blacklist.api";
 import {
   ProfileGameSkeleton,
   ProfileSkeleton,
@@ -186,6 +188,27 @@ export default function ProfileScreen() {
       unsubscribe();
     };
   }, [isMine, profile.userId]);
+
+  // 打开更多操作弹窗时，向后端查询与目标用户的拉黑关系，据此展示"拉黑/取消拉黑"
+  const openProfileActions = () => {
+    setProfileActionsVisible(true);
+    if (isMine || profile.userId <= 0) return;
+    const token = useAuthStore.getState().accessToken;
+    if (!token) return;
+    void fetchBlacklistStatus(String(profile.userId), token)
+      .then((isBlacklisted) => {
+        setBlacklistStatus({ userId: String(profile.userId), isBlacklisted });
+      })
+      .catch(() => {
+        // 查询失败保留本地镜像结果（useEffect 已回填），不阻断弹窗展示
+      });
+  };
+
+  // 当前查看对象是否已被自己拉黑（供更多操作弹窗与确认弹窗共用）
+  const isTargetBlacklisted =
+    !isMine &&
+    blacklistStatus.userId === String(profile.userId) &&
+    blacklistStatus.isBlacklisted;
 
   const gameDetail = gameDetailQuery.data;
   const games = detail?.games ?? [];
@@ -532,7 +555,7 @@ export default function ProfileScreen() {
               accessibilityLabel="更多操作"
               accessibilityRole="button"
               hitSlop={12}
-              onPress={() => setProfileActionsVisible(true)}
+              onPress={openProfileActions}
               style={styles.navButton}
             >
               <MoreHorizontal24Regular color="#fff" height={24} width={24} />
@@ -543,11 +566,7 @@ export default function ProfileScreen() {
         </View>
         <ProfileIdentity
           profile={profile}
-          isBlacklisted={
-            !isMine &&
-            blacklistStatus.userId === String(profile.userId) &&
-            blacklistStatus.isBlacklisted
-          }
+          isBlacklisted={isTargetBlacklisted}
         />
       </View>
 
@@ -606,6 +625,7 @@ export default function ProfileScreen() {
         <ProfileActionsSheet
           visible={profileActionsVisible}
           bottomInset={insets.bottom}
+          isBlacklisted={isTargetBlacklisted}
           onClose={() => setProfileActionsVisible(false)}
           onReportRequest={() =>
             router.push({
@@ -621,24 +641,44 @@ export default function ProfileScreen() {
       ) : null}
       <AppPrompt
         visible={blacklistPromptVisible}
-        title="拉黑提示"
-        message="拉黑后，您将无法收到对方的私信，且相互无法进行下单操作"
+        title={isTargetBlacklisted ? "取消拉黑提示" : "拉黑提示"}
+        message={
+          isTargetBlacklisted
+            ? "取消拉黑后，您可以正常接收对方私信并进行下单操作"
+            : "拉黑后，您将无法收到对方的私信，且相互无法进行下单操作"
+        }
         cancelText="取消"
         confirmText="确认"
         onCancel={() => setBlacklistPromptVisible(false)}
         onConfirm={() => {
           setBlacklistPromptVisible(false);
-          void addToBlacklist({
-            userId: String(profile.userId),
-            nickname: profile.nickname,
-            headImage: profile.headImage,
-            clubName: profile.clubName,
-            clubId: String(profile.clubId),
-          }).then(() => {
-            Toast.show("加入黑名单成功", {
+          if (!requireLogin()) return;
+          const token = useAuthStore.getState().accessToken;
+          if (!token) return;
+          const done = (message: string) =>
+            Toast.show(message, { duration: Toast.durations.SHORT });
+          const failed = (error: unknown) =>
+            Toast.show(error instanceof Error ? error.message : "操作失败", {
               duration: Toast.durations.SHORT,
             });
-          });
+          if (isTargetBlacklisted) {
+            void removeFromBlacklist(String(profile.userId), token)
+              .then(() => done("已取消拉黑"))
+              .catch(failed);
+            return;
+          }
+          void addToBlacklist(
+            {
+              userId: String(profile.userId),
+              nickname: profile.nickname,
+              headImage: profile.headImage,
+              clubName: profile.clubName,
+              clubId: String(profile.clubId),
+            },
+            token,
+          )
+            .then(() => done("加入黑名单成功"))
+            .catch(failed);
         }}
       />
       {orderCard && gameDetail ? (
@@ -757,12 +797,14 @@ export default function ProfileScreen() {
 function ProfileActionsSheet({
   visible,
   bottomInset,
+  isBlacklisted,
   onClose,
   onReportRequest,
   onBlockRequest,
 }: {
   visible: boolean;
   bottomInset: number;
+  isBlacklisted: boolean;
   onClose: () => void;
   onReportRequest: () => void;
   onBlockRequest: () => void;
@@ -860,7 +902,7 @@ function ProfileActionsSheet({
           </Pressable>
           <View style={styles.profileActionsDivider} />
           <Pressable
-            accessibilityLabel="拉黑"
+            accessibilityLabel={isBlacklisted ? "取消拉黑" : "拉黑"}
             accessibilityRole="button"
             onPress={() => closeSheet(onBlockRequest)}
             style={({ pressed }) => [
@@ -869,7 +911,9 @@ function ProfileActionsSheet({
             ]}
           >
             <PersonProhibited24Regular color="#333" height={24} width={24} />
-            <Text style={styles.profileActionLabel}>拉黑</Text>
+            <Text style={styles.profileActionLabel}>
+              {isBlacklisted ? "取消拉黑" : "拉黑"}
+            </Text>
           </Pressable>
         </Animated.View>
       </Animated.View>
