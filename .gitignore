@@ -48,4 +48,8 @@ example
 /android
 /apks
 
+# Expo module Android build outputs
+modules/*/android/build/
+modules/*/android/.gradle/
+
 # /.android-signing/
