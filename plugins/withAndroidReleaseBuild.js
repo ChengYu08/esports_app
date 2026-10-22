@@ -20,7 +20,8 @@ function withAndroidReleaseBuild(config) {
   return withAppBuildGradle(config, (mod) => {
     if (mod.modResults.language !== 'groovy') throw new Error(`${TAG} requires Groovy app/build.gradle.`);
     if (mod.modResults.contents.includes(TAG)) return mod;
-    // Apply after the generated android block so debug keeps its own key.
+    // Apply after the generated android block.
+    // Debug and release share the same keystore so local installs can overwrite each other.
     // Signing files live outside android/, which clean prebuild deletes.
     mod.modResults.contents += `
 // @generated begin ${TAG}
@@ -39,16 +40,19 @@ android {
         }
     }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.release
+        }
         release {
             signingConfig signingConfigs.release
             proguardFile rootProject.file('../plugins/android-release.pro')
         }
     }
 }
-tasks.matching { it.name == 'validateSigningRelease' }.configureEach {
+tasks.matching { it.name ==~ /validateSigning(Debug|Release)/ }.configureEach {
     doFirst {
         if (!releaseKeyFile.exists() || !releaseCredentials.password || !releaseCredentials.keyAlias) {
-            throw new GradleException('Missing release signing. Run scripts/build_apk.sh --init-signing or restore .android-signing from backup.')
+            throw new GradleException('Missing release signing. Run npm run build:apk:init-signing or restore .android-signing from backup.')
         }
     }
 }
@@ -58,4 +62,4 @@ tasks.matching { it.name == 'validateSigningRelease' }.configureEach {
   });
 }
 
-module.exports = createRunOncePlugin(withAndroidReleaseBuild, TAG, '2.1.0');
+module.exports = createRunOncePlugin(withAndroidReleaseBuild, TAG, '2.2.0');

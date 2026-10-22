@@ -99,80 +99,84 @@ export function RealNameVerificationSheet({
         scrollable
         visible={visible}
         onClose={close}
-        contentStyle={styles.frame}
+        contentStyle={[styles.card, { paddingBottom: 20 + insets.bottom }]}
       >
-        <View style={[styles.card, { paddingBottom: 20 + insets.bottom }]}>
-          <Text style={styles.title}>实名认证</Text>
-          <Text style={styles.notice}>
-            根据国家规定，本平台禁止未成年人交易
-          </Text>
-          <Text style={styles.fieldLabel}>真实姓名</Text>
-          <View
-            style={[
-              styles.inputShell,
-              focusedField === "name" && styles.inputShellFocused,
-            ]}
+        <Text style={styles.title}>实名认证</Text>
+        <Text style={styles.notice}>
+          根据国家规定，本平台禁止未成年人交易
+        </Text>
+        <Text style={styles.fieldLabel}>真实姓名</Text>
+        <View
+          style={[
+            styles.inputShell,
+            focusedField === "name" && styles.inputShellFocused,
+          ]}
+        >
+          <View style={styles.inputIconWrap}>
+            <Image source={nameIcon} style={styles.inputIcon} />
+          </View>
+          <TextInput
+            accessibilityLabel="真实姓名"
+            value={name}
+            onChangeText={setName}
+            onFocus={() => setFocusedField("name")}
+            onBlur={() =>
+              setFocusedField((current) => (current === "name" ? null : current))
+            }
+            onSubmitEditing={() => idCardInputRef.current?.focus()}
+            blurOnSubmit={false}
+            returnKeyType="next"
+            placeholder="请输入真实姓名"
+            placeholderTextColor="#B4B7BE"
+            style={styles.input}
+          />
+        </View>
+        <Text style={styles.fieldLabel}>身份证号</Text>
+        <View
+          style={[
+            styles.inputShell,
+            focusedField === "idCard" && styles.inputShellFocused,
+          ]}
+        >
+          <View style={styles.inputIconWrap}>
+            <Image source={idCardIcon} style={styles.inputIcon} />
+          </View>
+          <TextInput
+            ref={idCardInputRef}
+            accessibilityLabel="身份证号"
+            value={idCard}
+            onChangeText={(value) => setIdCard(value.toUpperCase())}
+            onFocus={() => setFocusedField("idCard")}
+            onBlur={() =>
+              setFocusedField((current) =>
+                current === "idCard" ? null : current,
+              )
+            }
+            onSubmitEditing={() => Keyboard.dismiss()}
+            placeholder="请输入18位身份证号"
+            placeholderTextColor="#B4B7BE"
+            keyboardType="default"
+            maxLength={18}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            returnKeyType="done"
+            style={styles.input}
+          />
+          <Text style={styles.inputCount}>{idCard.length}/18</Text>
+        </View>
+        <View style={styles.actions}>
+          <Pressable onPress={close} style={styles.cancelButton}>
+            <Text style={styles.cancelText}>取消</Text>
+          </Pressable>
+          <Pressable
+            disabled={submitting}
+            onPress={() => void submit()}
+            style={styles.confirmButton}
           >
-            <View style={styles.inputIconWrap}>
-              <Image source={nameIcon} style={styles.inputIcon} />
-            </View>
-            <TextInput
-              accessibilityLabel="真实姓名"
-              value={name}
-              onChangeText={setName}
-              onFocus={() => setFocusedField("name")}
-              onBlur={() => setFocusedField(null)}
-              onSubmitEditing={() => idCardInputRef.current?.focus()}
-              blurOnSubmit={false}
-              returnKeyType="next"
-              placeholder="请输入真实姓名"
-              placeholderTextColor="#B4B7BE"
-              style={styles.input}
-            />
-          </View>
-          <Text style={styles.fieldLabel}>身份证号</Text>
-          <View
-            style={[
-              styles.inputShell,
-              focusedField === "idCard" && styles.inputShellFocused,
-            ]}
-          >
-            <View style={styles.inputIconWrap}>
-              <Image source={idCardIcon} style={styles.inputIcon} />
-            </View>
-            <TextInput
-              ref={idCardInputRef}
-              accessibilityLabel="身份证号"
-              value={idCard}
-              onChangeText={(value) => setIdCard(value.toUpperCase())}
-              onFocus={() => setFocusedField("idCard")}
-              onBlur={() => setFocusedField(null)}
-              onSubmitEditing={() => Keyboard.dismiss()}
-              placeholder="请输入18位身份证号"
-              placeholderTextColor="#B4B7BE"
-              keyboardType="default"
-              maxLength={18}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              returnKeyType="done"
-              style={styles.input}
-            />
-            <Text style={styles.inputCount}>{idCard.length}/18</Text>
-          </View>
-          <View style={styles.actions}>
-            <Pressable onPress={close} style={styles.cancelButton}>
-              <Text style={styles.cancelText}>取消</Text>
-            </Pressable>
-            <Pressable
-              disabled={submitting}
-              onPress={() => void submit()}
-              style={styles.confirmButton}
-            >
-              <Text style={styles.confirmText}>
-                {submitting ? "提交中" : "提交认证"}
-              </Text>
-            </Pressable>
-          </View>
+            <Text style={styles.confirmText}>
+              {submitting ? "提交中" : "提交认证"}
+            </Text>
+          </Pressable>
         </View>
       </BottomSheet>
       <AppPrompt
@@ -201,10 +205,6 @@ function isValidIdCard(value: string) {
 }
 
 const styles = StyleSheet.create({
-  frame: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
   card: {
     paddingHorizontal: 20,
     paddingTop: 22,
@@ -247,11 +247,6 @@ const styles = StyleSheet.create({
   inputShellFocused: {
     borderColor: "#FF1F4C",
     backgroundColor: "#FFF7F8",
-    shadowColor: "#FF1F4C",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 5,
-    elevation: 1,
   },
   inputIconWrap: {
     width: 28,
