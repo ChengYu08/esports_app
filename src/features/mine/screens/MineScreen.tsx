@@ -59,26 +59,33 @@ export default function MineScreen() {
   const user = useAuthStore((state) => state.user);
   const accessToken = useAuthStore((state) => state.accessToken);
   const clearSession = useAuthStore((state) => state.clearSession);
-  const followCountQuery = useUserFollowCount(user?.id);
+  // 只解构 refetch 函数作为 focus effect 的稳定依赖；整个 query result
+  // 每次渲染都会生成新引用，导致接口被重复触发。
+  const {
+    data: followCount,
+    refetch: refetchFollowCount,
+  } = useUserFollowCount(user?.id);
   const [logoutVisible, setLogoutVisible] = useState(false);
   const [qrCodeModal, setQrCodeModal] = useState<QrCodeModalType | null>(null);
   const [openingVoiceRoom, setOpeningVoiceRoom] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
-      void followCountQuery.refetch();
+      void refetchFollowCount();
       if (accessToken && user?.id)
         void clientAuthApi
           .fetchCurrentUser(accessToken)
           .then((profile) => {
+            // 余额未变化时保留原 user 对象，避免触发额外渲染和 focus 循环。
             useAuthStore.setState((state) =>
-              state.user?.id === String(profile.id)
-                ? { user: { ...state.user, starBalance: profile.starBalance } }
-                : state,
+              state.user?.id !== String(profile.id) ||
+              state.user.starBalance === profile.starBalance
+                ? state
+                : { user: { ...state.user, starBalance: profile.starBalance } },
             );
           })
           .catch(() => undefined);
-    }, [followCountQuery, accessToken, user?.id]),
+    }, [refetchFollowCount, accessToken, user?.id]),
   );
   const displayName = useMemo(
     () =>
@@ -288,7 +295,7 @@ export default function MineScreen() {
             style={styles.stat}
           >
             <Text style={styles.statValue}>
-              {followCountQuery.data?.followCount ?? "--"}
+              {followCount?.followCount ?? "--"}
             </Text>
             <Text style={styles.statLabel}>关注</Text>
           </Pressable>
@@ -299,7 +306,7 @@ export default function MineScreen() {
             style={styles.stat}
           >
             <Text style={styles.statValue}>
-              {followCountQuery.data?.fansCount ?? "--"}
+              {followCount?.fansCount ?? "--"}
             </Text>
             <Text style={styles.statLabel}>粉丝</Text>
           </Pressable>
