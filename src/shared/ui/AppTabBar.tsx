@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { formatUnreadCount, sumVisibleUnreadCount } from "@/features/message/message-unread";
 import { useMessageStore } from "@/features/message/message-store";
 import {
+  getProtectedNavigationAction,
   getTabPressAction,
   type AppTab,
 } from "@/shared/navigation/tab-access";
@@ -17,18 +18,18 @@ type AppTabBarProps = {
   navigation: { navigate: (name: string) => void };
 };
 
+const TAB_CONTENT_HEIGHT = 58;
+const TAB_ITEM_HEIGHT = 46;
+const MATCH_WIDTH = 68;
+const MATCH_HEIGHT = 58;
+const BAR_TOP_OFFSET = 12;
+
 const items = [
   {
     route: "index",
     label: "首页",
     icon: require("../../../assets/coms/tab-home.svg"),
     selectedIcon: require("../../../assets/coms/tab-home-selected.svg"),
-  },
-  {
-    route: "ranking",
-    label: "排行榜",
-    icon: require("../../../assets/coms/tab-ranking.svg"),
-    selectedIcon: require("../../../assets/coms/tab-ranking-selected.svg"),
   },
   {
     route: "order",
@@ -49,6 +50,8 @@ const items = [
     selectedIcon: require("../../../assets/coms/tab-mine-selected.svg"),
   },
 ] as const;
+
+const matchIcon = require("../../../assets/coms/tab-match.svg");
 
 export function AppTabBar({ state, navigation }: AppTabBarProps) {
   const insets = useSafeAreaInsets();
@@ -71,46 +74,76 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
     navigation.navigate(action.tab);
   };
 
-  return (
-    <View
-      style={[
-        styles.bottom,
-        { height: 60 + insets.bottom, paddingBottom: insets.bottom },
-      ]}
-    >
-      {items.map((item) => {
-        const selected = activeRoute === item.route;
+  const handleMatchPress = () => {
+    const action = getProtectedNavigationAction("match", isAuthenticated);
+    if (action.type === "login") {
+      router.replace("/login");
+      return;
+    }
+    router.push("/match");
+  };
 
-        return (
-          <Pressable
-            key={item.route}
-            accessibilityRole="tab"
-            accessibilityLabel={
-              item.route === "message" && unreadLabel
-                ? `${item.label}，${unreadLabel}条未读`
-                : item.label
-            }
-            accessibilityState={{ selected }}
-            style={styles.bottomItem}
-            onPress={() => handleTabPress(item.route)}
-          >
-            <View style={styles.iconContainer}>
-              <Image
-                source={selected ? item.selectedIcon : item.icon}
-                style={styles.bottomIcon}
-              />
-              {item.route === "message" && unreadLabel ? (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{unreadLabel}</Text>
-                </View>
-              ) : null}
-            </View>
-            <Text style={[styles.bottomLabel, selected && styles.bottomActive]}>
-              {item.label}
-            </Text>
-          </Pressable>
-        );
-      })}
+  const renderTabItem = (item: (typeof items)[number]) => {
+    const selected = activeRoute === item.route;
+
+    return (
+      <Pressable
+        key={item.route}
+        accessibilityRole="tab"
+        accessibilityLabel={
+          item.route === "message" && unreadLabel
+            ? `${item.label}，${unreadLabel}条未读`
+            : item.label
+        }
+        accessibilityState={{ selected }}
+        style={styles.tabSlot}
+        onPress={() => handleTabPress(item.route)}
+      >
+        <View style={styles.bottomItem}>
+          <View style={styles.iconContainer}>
+            <Image
+              source={selected ? item.selectedIcon : item.icon}
+              style={styles.bottomIcon}
+            />
+            {item.route === "message" && unreadLabel ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{unreadLabel}</Text>
+              </View>
+            ) : null}
+          </View>
+          <Text style={[styles.bottomLabel, selected && styles.bottomActive]}>
+            {item.label}
+          </Text>
+        </View>
+      </Pressable>
+    );
+  };
+
+  return (
+    <View style={[styles.bottom, { height: TAB_CONTENT_HEIGHT + insets.bottom }]}>
+      <View
+        style={[
+          styles.barFill,
+          {
+            bottom: 0,
+            height: TAB_CONTENT_HEIGHT - BAR_TOP_OFFSET + insets.bottom,
+          },
+        ]}
+      />
+      <View style={styles.iconArea}>
+        {renderTabItem(items[0])}
+        {renderTabItem(items[1])}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="快速匹配"
+          style={styles.matchButton}
+          onPress={handleMatchPress}
+        >
+          <Image source={matchIcon} style={styles.matchIcon} />
+        </Pressable>
+        {renderTabItem(items[2])}
+        {renderTabItem(items[3])}
+      </View>
     </View>
   );
 }
@@ -123,45 +156,82 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    minHeight: 60,
-    backgroundColor: "#fff",
+    backgroundColor: "transparent",
+  },
+  barFill: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    backgroundColor: "#FFFFFF",
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#EBEBEB",
+    borderTopColor: "#F5F5F5",
+  },
+  iconArea: {
+    height: TAB_CONTENT_HEIGHT,
     flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-around",
-    paddingTop: 1,
+    alignItems: "flex-end",
+    justifyContent: "center",
+  },
+  tabSlot: {
+    flex: 1,
+    height: TAB_ITEM_HEIGHT,
+    alignItems: "center",
+    justifyContent: "center",
   },
   bottomItem: {
-    flex: 1,
-    height: 48,
+    width: 46,
+    height: TAB_ITEM_HEIGHT,
     alignItems: "center",
-    paddingTop: 1,
-    gap: 1,
+    justifyContent: "center",
+    gap: 2,
   },
-  iconContainer: { width: 30, height: 30, position: "relative" },
-  bottomIcon: { width: 30, height: 30 },
+  iconContainer: {
+    width: 24,
+    height: 24,
+    position: "relative",
+  },
+  bottomIcon: { width: 24, height: 24 },
+  matchButton: {
+    width: MATCH_WIDTH,
+    height: MATCH_HEIGHT,
+    alignItems: "center",
+    justifyContent: "flex-end",
+  },
+  matchIcon: {
+    width: MATCH_WIDTH,
+    height: MATCH_HEIGHT,
+  },
   badge: {
     position: "absolute",
-    top: -3,
-    right: -7,
-    minWidth: 17,
-    height: 17,
+    top: 1,
+    left: 16,
+    minWidth: 16,
+    minHeight: 16,
     paddingHorizontal: 4,
-    borderRadius: 9,
-    borderWidth: 1,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FE1F4C",
+    backgroundColor: "#FE4267",
   },
   badgeText: {
     color: "#FFFFFF",
     fontFamily: DOUYIN_SANS,
-    fontSize: 9,
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: "400",
+  },
+  bottomLabel: {
+    fontFamily: DOUYIN_SANS,
+    color: "#979799",
+    fontSize: 10,
     lineHeight: 12,
+    fontWeight: "400",
+    textAlign: "center",
+  },
+  bottomActive: {
+    color: "#0D0D0F",
     fontWeight: "600",
   },
-  bottomLabel: { fontFamily: DOUYIN_SANS, color: "#c8c8cc", fontSize: 11 },
-  bottomActive: { fontFamily: DOUYIN_SANS, color: "#333" },
 });
