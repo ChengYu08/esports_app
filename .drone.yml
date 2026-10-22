@@ -1,0 +1,170 @@
+# =============================================================================
+# Drone CI - 盼之电竞 Android APK 构建
+# 配套镜像：panzhi/android-build-box（JDK17 / Android SDK 预置，含 node）
+#
+# 分支规则（自动选择构建环境）：
+#   - main / prod，或分支名包含 prod、main  -> 正式包（.env.production）
+#   - 分支名包含 test、dev，或其它分支      -> 测试包（.env.development）
+#   - 可用自定义事件变量覆盖：DRONE_ENV=prod|test、DRONE_ABI=arm64|universal|all
+# =============================================================================
+
+kind: pipeline
+type: docker
+name: android-deployment
+
+image_pull_secrets:
+  - dockerconfig
+
+# 持久化缓存：必须用 host.path（仅写 name 不会跨构建复用）
+# 不要把卷挂到整个 /opt/android-sdk（会盖掉镜像内 platforms/build-tools）
+volumes:
+  - name: android-gradle-cache
+    host:
+      path: /var/lib/drone/cache/android-gradle
+  - name: android-npm-cache
+    host:
+      path: /var/lib/drone/cache/android-npm
+
+steps:
+  - name: build-android
+    image: nexus.jinliwangluo.com:8082/panzhi/android-build-box:optimized-1.0.0
+    pull: if-not-exists
+    volumes:
+      - name: android-gradle-cache
+        path: /root/.gradle
+      - name: android-npm-cache
+        path: /root/.npm
+    environment:
+      ANDROID_HOME: /opt/android-sdk
+      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+      GRADLE_USER_HOME: /root/.gradle
+      npm_config_cache: /root/.npm
+      # RN 0.86 默认 NDK（prebuild 生成的 android/ 会要求该版本）
+      ANDROID_NDK_VERSION: "27.1.12297006"
+    commands:
+      - |
+        set -e
+
+        echo "=========================================="
+        echo "构建任务配置"
+        echo "=========================================="
+        echo "分支: $DRONE_BRANCH"
+        echo "Node: $(node -v)"
+        echo "Java: $(java -version 2>&1 | head -1)"
+        echo "ANDROID_HOME: $${ANDROID_HOME}"
+
+        # ---- 按分支名自动选择构建环境 ----
+        if [ -n "$${DRONE_ENV}" ]; then
+          BUILD_ENV="$${DRONE_ENV}"
+          echo "使用手动指定 DRONE_ENV: $${BUILD_ENV}"
+        else
+          case "$DRONE_BRANCH" in
+            *prod*|*main*)
+              BUILD_ENV="prod"
+              ;;
+            *)
+              BUILD_ENV="test"
+              ;;
+          esac
+          echo "按分支自动选择构建环境: $${BUILD_ENV}"
+        fi
+
+        if [ -n "$${DRONE_ABI}" ]; then
+          BUILD_ABI="$${DRONE_ABI}"
+        else
+          BUILD_ABI="arm64"
+        fi
+        echo "构建环境: $${BUILD_ENV}  ABI: $${BUILD_ABI}"
+        echo "=========================================="
+
+        # 接受 Android SDK 许可（镜像内旧 hash 可能不全）
+        mkdir -p "$${ANDROID_HOME}/licenses"
+        printf '%s\n' \
+          '24333f8a63b6825ea9c5514f83c2829b004d1fee' \
+          > "$${ANDROID_HOME}/licenses/android-sdk-license"
+        printf '%s\n' \
+          '84831b9409646a918e30573bab4c9c91346d8abd' \
+          > "$${ANDROID_HOME}/licenses/android-sdk-preview-license"
+        if command -v sdkmanager >/dev/null 2>&1; then
+          yes | sdkmanager --sdk_root="$${ANDROID_HOME}" --licenses >/dev/null || true
+        fi
+
+        # 按需安装 NDK（挂载卷可跨构建复用；缓存卷挂的是子目录，见 volumes）
+        NDK_DIR="$${ANDROID_HOME}/ndk/$${ANDROID_NDK_VERSION}"
+        if [ ! -d "$${NDK_DIR}" ]; then
+          echo "安装 NDK $${ANDROID_NDK_VERSION} ..."
+          sdkmanager --sdk_root="$${ANDROID_HOME}" "ndk;$${ANDROID_NDK_VERSION}"
+        else
+          echo "已缓存 NDK: $${NDK_DIR}"
+        fi
+
+        echo "Gradle 缓存: $(du -sh $${GRADLE_USER_HOME} 2>/dev/null | cut -f1 || echo n/a)"
+        echo "npm 缓存: $(du -sh $${npm_config_cache} 2>/dev/null | cut -f1 || echo n/a)"
+
+        npm ci --prefer-offline --no-audit --no-fund
+        node scripts/build_apk.cjs --env "$${BUILD_ENV}" --abi "$${BUILD_ABI}"
+
+        echo "构建完成，产物:"
+        ls -lh ./apks/ 2>/dev/null || echo "未找到 APK"
+    when:
+      event:
+        - push
+        - custom
+      branch:
+        - main
+        - prod
+        - "*main*"
+        - "*prod*"
+        - "*test*"
+        - "*dev*"
+
+  - name: move-to-dev-server
+    image: nexus.jinliwangluo.com:8082/appleboy/drone-scp-with-tools:latest
+    pull: if-not-exists
+    settings:
+      host: dev.jinliwangluo.com
+      username: root
+      key:
+        from_secret: ssh_rsa
+      port: 22
+      source: ./apks/*.apk
+      strip_components: 1
+      rm: false
+    commands:
+      - |
+        set -e
+        version=$(node -p "require('./app.json').expo.version")
+        echo "使用版本: $version"
+        target="/home/apps/data/baota/wwwroot/dev.jinliwangluo.com/android/esportsapp/${DRONE_BRANCH}/$version/"
+        echo "目标路径: $target"
+        /bin/drone-scp --target "$target"
+        echo "文件上传成功"
+    environment:
+      SSH_KEY:
+        from_secret: ssh_rsa
+    depends_on:
+      - build-android
+    when:
+      event:
+        - push
+        - custom
+      branch:
+        - main
+        - prod
+        - "*main*"
+        - "*prod*"
+        - "*test*"
+        - "*dev*"
+
+trigger:
+  event:
+    include:
+      - push
+      - custom
+  branch:
+    - main
+    - prod
+    - "*main*"
+    - "*prod*"
+    - "*test*"
+    - "*dev*"
