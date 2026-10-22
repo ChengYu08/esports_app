@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Cross-platform Android release APK build (Node equivalent of build_apk.sh).
- * Usage: node scripts/build_apk.cjs [--init-signing] [--abi arm64|universal|all]
+ * Usage: node scripts/build_apk.cjs [--init-signing] [--abi arm64|universal|all] [--env prod|test]
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -15,13 +15,19 @@ const ABI_PRESETS = {
   universal: { architectures: 'armeabi-v7a,arm64-v8a', label: 'universal' },
 };
 
+const ENV_PRESETS = {
+  prod: { file: '.env.production', nodeEnv: 'production', label: 'prod' },
+  test: { file: '.env.development', nodeEnv: 'development', label: 'test' },
+};
+
 function usage() {
-  console.error('Usage: node scripts/build_apk.cjs [--init-signing] [--abi arm64|universal|all]');
+  console.error('Usage: node scripts/build_apk.cjs [--init-signing] [--abi arm64|universal|all] [--env prod|test]');
 }
 
 function parseArgs(argv) {
   let initSigning = false;
   let abi = null;
+  let envKey = 'prod';
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--init-signing') {
@@ -38,10 +44,40 @@ function parseArgs(argv) {
       i += 1;
       continue;
     }
+    if (arg === '--env') {
+      const value = argv[i + 1];
+      if (!value || value.startsWith('-') || !ENV_PRESETS[value]) {
+        usage();
+        process.exit(1);
+      }
+      envKey = value;
+      i += 1;
+      continue;
+    }
     usage();
     process.exit(1);
   }
-  return { initSigning, abi };
+  return { initSigning, abi, envPreset: ENV_PRESETS[envKey] };
+}
+
+/** Load EXPO_PUBLIC_* from the env file for the chosen environment.
+ *  Shell variables already set win, matching @expo/env precedence. */
+function loadEnvFile(file) {
+  const fullPath = path.join(root, file);
+  if (!fs.existsSync(fullPath)) {
+    console.error(`Missing ${file}. Create it from .env.example.`);
+    process.exit(1);
+  }
+  const vars = {};
+  for (const line of fs.readFileSync(fullPath, 'utf8').split(/\r?\n/)) {
+    const match = line.match(/^\s*(EXPO_PUBLIC_[A-Z0-9_]+)\s*=\s*(.*)\s*$/);
+    if (!match || line.trimStart().startsWith('#')) continue;
+    const [, key, raw] = match;
+    if (process.env[key] === undefined) {
+      vars[key] = raw;
+    }
+  }
+  return vars;
 }
 
 function resolveTargets(abiFlag) {
@@ -203,11 +239,11 @@ function assembleAndArchive(target, buildEnv) {
     },
   );
   run(process.execPath, [path.join('scripts', 'archive-apk.cjs')], {
-    env: { ...buildEnv, APK_ABI_LABEL: target.label },
+    env: { ...buildEnv, APK_ABI_LABEL: target.label, APK_ENV_LABEL: buildEnv.APK_ENV_LABEL },
   });
 }
 
-const { initSigning, abi } = parseArgs(process.argv.slice(2));
+const { initSigning, abi, envPreset } = parseArgs(process.argv.slice(2));
 process.chdir(root);
 
 run(process.execPath, [path.join('scripts', 'android-signing.cjs')]);
@@ -216,7 +252,16 @@ if (initSigning) {
 }
 
 const targets = resolveTargets(abi);
-const buildEnv = { NODE_ENV: 'production' };
+const envFileVars = loadEnvFile(envPreset.file);
+const buildEnv = {
+  NODE_ENV: envPreset.nodeEnv,
+  ...envFileVars,
+  APK_ENV_LABEL: envPreset.label,
+};
+console.log(`Building with environment: ${envPreset.label} (${envPreset.file})`);
+for (const key of Object.keys(envFileVars)) {
+  console.log(`  ${key}=${envFileVars[key]}`);
+}
 const useBun =
   fs.existsSync(path.join(root, 'bun.lock')) || fs.existsSync(path.join(root, 'bun.lockb'));
 
