@@ -51,6 +51,7 @@ function HintText({ text }: { text: string }) {
 export default function MatchScreen() {
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
+  const scrollAreaRef = useRef<View>(null);
   const remarkFieldRef = useRef<View>(null);
   const scrollOffsetRef = useRef(0);
   const remarkFocusedRef = useRef(false);
@@ -64,11 +65,12 @@ export default function MatchScreen() {
 
   const ensureRemarkAboveKeyboard = useCallback(() => {
     const scrollView = scrollRef.current;
+    const scrollArea = scrollAreaRef.current;
     const remarkField = remarkFieldRef.current;
-    if (!scrollView || !remarkField) return;
+    if (!scrollView || !scrollArea || !remarkField) return;
 
-    // 以 ScrollView 可视区域底边为准，避免按窗口底边对齐时底部被裁切
-    scrollView.measureInWindow((_sx, scrollY, _sw, scrollHeight) => {
+    // ScrollView 类型未暴露 measureInWindow，用外层 View 测量可视底边
+    scrollArea.measureInWindow((_sx, scrollY, _sw, scrollHeight) => {
       remarkField.measureInWindow((_x, y, _width, height) => {
         const fieldBottom = y + height;
         const visibleBottom = scrollY + scrollHeight;
@@ -134,9 +136,10 @@ export default function MatchScreen() {
           </View>
         </View>
 
+        <View ref={scrollAreaRef} style={styles.scroll} collapsable={false}>
         <ScrollView
           ref={scrollRef}
-          style={styles.scroll}
+          style={styles.scrollFlex}
           contentContainerStyle={[
             styles.scrollContent,
             // 键盘弹出时增加底部空白，保证备注行能滚到可视区内且不被裁切
@@ -339,6 +342,7 @@ export default function MatchScreen() {
             </View>
           </View>
         </ScrollView>
+        </View>
 
         {keyboardVisible ? null : (
           <View style={[styles.footer, { paddingBottom: insets.bottom + FOOTER_CONTENT_BOTTOM }]}>
@@ -423,6 +427,9 @@ const styles = StyleSheet.create({
     width: 56,
   },
   scroll: {
+    flex: 1,
+  },
+  scrollFlex: {
     flex: 1,
   },
   scrollContent: {
