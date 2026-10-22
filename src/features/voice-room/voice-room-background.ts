@@ -48,7 +48,8 @@ export async function startVoiceRoomBackground(microphoneEnabled: boolean) {
     await ensureAndroidNotificationPermission();
     await module.start('语聊房进行中', microphoneEnabled);
   } catch (error) {
-    console.warn('[voice-room] background service start failed', error);
+    // iOS 音频会话激活失败会直接导致听不到远端声音，必须留日志便于排查
+    console.error('[voice-room] background service start failed', error);
   }
 }
 

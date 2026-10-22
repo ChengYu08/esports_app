@@ -44,18 +44,61 @@ public class VoiceRoomBackgroundModule: Module {
   private func activateAudioSession() throws {
     guard !isSessionActive else { return }
     let session = AVAudioSession.sharedInstance()
+    // 用 .default 而非 .voiceChat：voiceChat 模式在本地未采集时会把输出压到听筒，
+    // 导致"必须先开麦才能听到声音"；回声消除由 Agora SDK 内部的软件 AEC 负责
     try session.setCategory(
       .playAndRecord,
-      mode: .voiceChat,
-      options: [.defaultToSpeaker, .allowBluetooth, .mixWithOthers]
+      mode: .default,
+      options: [.defaultToSpeaker, .allowBluetooth]
     )
     try session.setActive(true, options: [])
+    try forceSpeakerOutput()
     isSessionActive = true
+    logCurrentRoute(tag: "activate")
+    observeRouteChanges()
+  }
+
+  // 本地未采集时 iOS 会把 playAndRecord 的输出压到听筒，必须显式 override 到扬声器
+  private func forceSpeakerOutput() throws {
+    let session = AVAudioSession.sharedInstance()
+    if session.currentRoute.outputs.contains(where: { $0.portType == .builtInSpeaker }) { return }
+    try session.overrideOutputAudioPort(.speaker)
+  }
+
+  private func observeRouteChanges() {
+    NotificationCenter.default.addObserver(
+      forName: AVAudioSession.routeChangeNotification,
+      object: nil,
+      queue: .main
+    ) { note in
+      let reason = (note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt)
+        .flatMap(AVAudioSession.RouteChangeReason.init(rawValue:))
+      self.logCurrentRoute(tag: "routeChange reason=\(reason.map { String(describing: $0) } ?? "unknown")")
+      // 路由被系统或 SDK 切走后（典型：本地未采集时被压回听筒），立即切回扬声器
+      try? self.forceSpeakerOutput()
+    }
+  }
+
+  private func logCurrentRoute(tag: String) {
+    let session = AVAudioSession.sharedInstance()
+    let outputs = session.currentRoute.outputs
+      .map { "\($0.portType.rawValue):\($0.portName)" }
+      .joined(separator: ", ")
+    NSLog(
+      "[VoiceRoom][audio] %@ | category=%@ mode=%@ options=%u active=%@ | outputs=[%@]",
+      tag,
+      session.category.rawValue,
+      session.mode.rawValue,
+      session.categoryOptions.rawValue,
+      session.secondaryAudioShouldBeSilencedHint ? "muted-by-other" : "ok",
+      outputs
+    )
   }
 
   private func deactivateAudioSession() throws {
     guard isSessionActive else { return }
     let session = AVAudioSession.sharedInstance()
+    NotificationCenter.default.removeObserver(self, name: AVAudioSession.routeChangeNotification, object: nil)
     try session.setActive(false, options: [.notifyOthersOnDeactivation])
     isSessionActive = false
   }

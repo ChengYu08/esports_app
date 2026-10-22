@@ -9,6 +9,7 @@ export type VoiceRtcCallbacks = {
   onUserJoined?: (uid: string) => void;
   onUserOffline?: (uid: string) => void;
   onUserMuted?: (uid: string, muted: boolean) => void;
+  onRemoteAudioActive?: (uid: string) => void;
   onSpeakingChanged?: (uids: string[]) => void;
 };
 
@@ -52,6 +53,9 @@ export async function joinVoiceRtc(options: {
   useVoiceRoomSessionStore.getState().setMicrophoneMuted(true);
   engine.initialize({ appId });
   engine.setChannelProfile(agora.ChannelProfileType.ChannelProfileCommunication);
+  // Chatroom 场景：频繁上下麦时保持音频路由稳定在扬声器，
+  // 避免 SDK 按"纯听众"角色把输出压到听筒（iOS 上表现为必须先开麦才能听到声音）
+  engine.setAudioScenario(agora.AudioScenarioType.AudioScenarioChatroom);
   engine.enableAudio();
   engine.setEnableSpeakerphone(true);
   handler = {
@@ -66,6 +70,10 @@ export async function joinVoiceRtc(options: {
       activeCallbacks?.onUserOffline?.(userId);
     },
     onUserMuteAudio: (_connection, uid, muted) => activeCallbacks?.onUserMuted?.(String(uid), muted),
+    onRemoteAudioStateChanged: (_connection, uid, state) => {
+      // Starting/Decoding 说明对端音频流真实到达，即使漏掉 mute 广播也能据此纠正麦位状态
+      if (state === 1 || state === 2) activeCallbacks?.onRemoteAudioActive?.(String(uid));
+    },
     onAudioVolumeIndication: (_connection, speakers) => {
       activeCallbacks?.onSpeakingChanged?.(
         speakers.filter((speaker) => (speaker.volume ?? 0) > 20).map((speaker) => String(speaker.uid)),
@@ -106,6 +114,7 @@ export function muteVoiceRtc(muted: boolean) {
   if (result !== 0) return result;
   const muteResult = engine.muteLocalAudioStream(muted);
   if (muteResult === 0) {
+    if (!muted) engine.setEnableSpeakerphone(true);
     useVoiceRoomSessionStore.getState().setMicrophoneMuted(muted);
     void startVoiceRoomBackground(!muted);
     void updateVoiceRoomMicrophone(!muted);
