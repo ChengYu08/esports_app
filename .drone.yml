@@ -7,8 +7,9 @@
 #   - 分支名包含 test、dev，或其它分支      -> 测试包（.env.development）
 #   - 可用自定义事件变量覆盖：DRONE_ENV=prod|test、DRONE_ABI=arm64|universal|all
 #
-# 注意：仓库为 untrusted，不能挂载 host 卷做缓存（Gradle/npm/NDK 每次构建重新准备）。
-# 若管理员在 Drone 仓库设置勾选 Trusted，可参考 android-v3 的 host.path 卷恢复缓存。
+# 缓存：仓库已设为 Trusted，通过 host 卷挂载持久化 Gradle / npm / NDK 缓存，
+# 首次构建仍需冷启动写入，之后构建速度大幅提升。
+# 注意：并发构建共享同一卷可能冲突（Gradle 自带文件锁基本安全）。
 # =============================================================================
 
 kind: pipeline
@@ -18,10 +19,28 @@ name: android-deployment
 image_pull_secrets:
   - dockerconfig
 
+volumes:
+  - name: gradle-cache
+    host:
+      path: /var/lib/drone/cache/esportsapp/gradle
+  - name: npm-cache
+    host:
+      path: /var/lib/drone/cache/esportsapp/npm
+  - name: ndk-cache
+    host:
+      path: /var/lib/drone/cache/esportsapp/android-ndk
+
 steps:
   - name: build-android
     image: nexus.jinliwangluo.com:8082/panzhi/android-build-box:optimized-1.0.0
     pull: if-not-exists
+    volumes:
+      - name: gradle-cache
+        path: /root/.gradle
+      - name: npm-cache
+        path: /root/.npm
+      - name: ndk-cache
+        path: /opt/android-sdk/ndk
     environment:
       ANDROID_HOME: /opt/android-sdk
       JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
@@ -76,13 +95,13 @@ steps:
           yes | sdkmanager --sdk_root="$${ANDROID_HOME}" --licenses >/dev/null || true
         fi
 
-        # untrusted 不能挂缓存卷，每次构建按需安装 NDK
+        # NDK 持久化在 host 卷 /opt/android-sdk/ndk，仅首次构建需要下载安装
         NDK_DIR="$${ANDROID_HOME}/ndk/$${ANDROID_NDK_VERSION}"
         if [ ! -d "$${NDK_DIR}" ]; then
-          echo "安装 NDK $${ANDROID_NDK_VERSION} ..."
+          echo "安装 NDK $${ANDROID_NDK_VERSION}（首次会下载，之后走缓存）..."
           sdkmanager --sdk_root="$${ANDROID_HOME}" "ndk;$${ANDROID_NDK_VERSION}"
         else
-          echo "镜像内已有 NDK: $${NDK_DIR}"
+          echo "已命中 NDK 缓存: $${NDK_DIR}"
         fi
 
         npm ci --prefer-offline --no-audit --no-fund
