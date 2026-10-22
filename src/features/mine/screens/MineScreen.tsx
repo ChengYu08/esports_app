@@ -272,7 +272,7 @@ export default function MineScreen() {
           <Pressable
             accessibilityRole="link"
             accessibilityLabel="星钻余额，点击充值"
-            // onPress={openStarRecharge}
+            onPress={openStarRecharge}
             style={styles.stat}
           >
             <Text style={styles.statValue}>{user?.starBalance ?? "--"}</Text>
