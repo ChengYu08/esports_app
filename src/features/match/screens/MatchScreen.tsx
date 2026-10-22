@@ -26,11 +26,12 @@ import {
 } from "@/features/match/hooks/use-match-form";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 
-const darkBg = require("../../../../assets/match/dark-bg.svg");
 const backIcon = require("../../../../assets/match/icon-back.svg");
 const arrowDownIcon = require("../../../../assets/match/icon-arrow-down.svg");
 const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
 
+/** Figma dark bg：#0C0C2E → #120D2B */
+const BG_GRADIENT = ["#0C0C2E", "#120D2B"] as const;
 const PUBLISH_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
 
 function HintText({ text }: { text: string }) {
@@ -49,7 +50,12 @@ export default function MatchScreen() {
   return (
     <View style={styles.root}>
       <Stack.Screen options={{ headerShown: false }} />
-      <Image source={darkBg} style={styles.background} contentFit="cover" />
+      <LinearGradient
+        colors={BG_GRADIENT}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={styles.background}
+      />
       <View style={styles.content}>
         <View style={[styles.nav, { paddingTop: insets.top }]}>
           <View style={styles.navBar}>
@@ -302,7 +308,7 @@ export default function MatchScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#0B1220",
+    backgroundColor: "#0C0C2E",
   },
   background: {
     ...StyleSheet.absoluteFill,
