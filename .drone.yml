@@ -117,7 +117,9 @@ steps:
     commands:
       - |
         set -e
-        version=$(node -p "require('./app.json').expo.version")
+        # 该镜像无 node，用 sed 从 app.json 提取 expo.version
+        version=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' ./app.json | head -1)
+        if [ -z "$version" ]; then echo "无法从 app.json 解析 version"; exit 1; fi
         echo "使用版本: $version"
         target="/home/apps/data/baota/wwwroot/dev.jinliwangluo.com/android/esportsapp/${DRONE_BRANCH}/$version/"
         echo "目标路径: $target"
