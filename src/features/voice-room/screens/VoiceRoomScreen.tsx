@@ -414,12 +414,29 @@ export default function VoiceRoomScreen() {
                 ),
               );
             },
+            onRemoteAudioActive: (uid) => {
+              // 进房晚于对方开麦时收不到 mute 广播，音频流到达即说明对方已开麦
+              ensureRtcMember(uid);
+              setMembers((items) =>
+                items.map((item) =>
+                  item.userId === uid && !item.micOpen
+                    ? { ...item, micOpen: true }
+                    : item,
+                ),
+              );
+            },
             onSpeakingChanged: (uids) => {
               uids.forEach(ensureRtcMember);
               setMembers((items) =>
                 items.map((item) => ({
                   ...item,
                   speaking: uids.includes(item.userId),
+                  // 正在说话的远端用户必然开着麦，兜底纠正进房前漏掉的 mute 状态
+                  micOpen:
+                    item.userId !== currentUser?.id &&
+                    uids.includes(item.userId)
+                      ? true
+                      : item.micOpen,
                 })),
               );
             },
