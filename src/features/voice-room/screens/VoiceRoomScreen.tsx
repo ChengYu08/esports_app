@@ -8,6 +8,7 @@ import {
   requestRecordingPermissionsAsync,
 } from "expo-audio";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -56,8 +57,8 @@ import type {
   VoiceRoomMessage,
 } from "../voice-room.types";
 
-const background = require("../../../../assets/voice-room/background.svg");
 const backIcon = require("../../../../assets/voice-room/back.svg");
+const BG_GRADIENT = ["#0C0C2E", "#120D2B"] as const;
 const closeIcon = require("../../../../assets/voice-room/navbar-exit.svg");
 const inviteIcon = require("../../../../assets/voice-room/invite.svg");
 const defaultAvatar = require("../../../../assets/voice-room/avatar-default.png");
@@ -938,9 +939,10 @@ export default function VoiceRoomScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={0}
     >
-      <Image
-        source={background}
-        contentFit="cover"
+      <LinearGradient
+        colors={BG_GRADIENT}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
       <View style={[styles.safe, { paddingTop: insets.top }]}>
@@ -1136,7 +1138,7 @@ export default function VoiceRoomScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#080B25" },
+  screen: { flex: 1, backgroundColor: "#0C0C2E" },
   safe: { flex: 1 },
   header: {
     height: 52,
