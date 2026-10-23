@@ -1,6 +1,7 @@
 import { CourtAvatar } from "@/features/court/components/CourtAvatar";
 import { CourtJudgmentResult } from "@/features/court/components/CourtJudgmentResult";
 import { CourtReviewerPromptModal } from "@/features/court/components/CourtReviewerPromptModal";
+import { courtVoteUnavailableReason, submitCourtVote } from "@/features/court/court-vote";
 import { CourtVoteButton } from "@/features/court/components/CourtVoteButton";
 import {
   courtApi,
@@ -14,7 +15,7 @@ import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import * as Clipboard from "expo-clipboard";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ActivityIndicator,
@@ -38,9 +39,8 @@ export default function CourtDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [pendingAction, setPendingAction] = useState<"vote" | "favorite" | null>(null);
   const busy = pendingAction !== null;
-  const [isReviewer, setIsReviewer] = useState(false);
-  const [reviewerStatusChecked, setReviewerStatusChecked] = useState(false);
   const [reviewerPromptVisible, setReviewerPromptVisible] = useState(false);
+  const voteInFlight = useRef(false);
   const isMine = mine === "1";
   const loadRequestRef = useRef(0);
 
@@ -74,6 +74,7 @@ export default function CourtDetailScreen() {
 
   useFocusEffect(useCallback(() => {
     const timer = setTimeout(() => {
+      setReviewerPromptVisible(false);
       load();
     }, 0);
     return () => {
@@ -82,35 +83,6 @@ export default function CourtDetailScreen() {
     };
   }, [load]));
 
-  useEffect(() => {
-    let active = true;
-    const timer = setTimeout(() => {
-      setIsReviewer(false);
-      setReviewerStatusChecked(false);
-      if (!accessToken) {
-        setReviewerStatusChecked(true);
-        return;
-      }
-      courtApi
-        .getReviewerStatus()
-        .then((status) => {
-          if (!active) return;
-          setIsReviewer(
-            status.pageStatus === "APPROVED" || status.status === "APPROVED",
-          );
-          setReviewerStatusChecked(true);
-        })
-        .catch(() => {
-          if (!active) return;
-          setIsReviewer(false);
-          setReviewerStatusChecked(true);
-        });
-    }, 0);
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [accessToken]);
 
   const stage = useMemo(() => (item ? mapCaseStage(item) : null), [item]);
   async function copyCaseId() {
@@ -138,43 +110,42 @@ export default function CourtDetailScreen() {
   const voting = item?.stage === "VOTING";
   const hasVoted = Boolean(item?.myVoteResult);
   const showVotes = voting || hasVoted || Boolean(item?.result);
+  const voteUnavailable = !item || courtVoteUnavailableReason(item) !== null;
 
   async function castVote(side: "PLAINTIFF_WIN" | "DEFENDANT_WIN") {
     if (!accessToken) {
       router.push("/login");
       return;
     }
-    if (!item || busy) {
+    if (!item || busy || voteInFlight.current) {
       return;
     }
-    let reviewer = isReviewer;
-    if (!reviewerStatusChecked) {
-      try {
-        const status = await courtApi.getReviewerStatus();
-        reviewer =
-          status.pageStatus === "APPROVED" || status.status === "APPROVED";
-        setIsReviewer(reviewer);
-      } catch {
-        reviewer = false;
-      }
-      setReviewerStatusChecked(true);
-    }
-    if (!reviewer) {
-      setReviewerPromptVisible(true);
-      return;
-    }
+    voteInFlight.current = true;
     setPendingAction("vote");
     try {
-      await courtApi.vote(item.caseId, item.level || "FIRST", side);
-      Toast.show(side === "PLAINTIFF_WIN" ? "已支持原告" : "已支持被告", {
+      const outcome = await submitCourtVote(item, side);
+      if (accessToken !== useAuthStore.getState().accessToken) {
+        return;
+      }
+      if (outcome.type === "reviewer-required") {
+        setReviewerPromptVisible(true);
+        return;
+      }
+      setItem((current) => current && String(current.caseId) === String(item.caseId)
+        ? { ...current, myVoteResult: side }
+        : current);
+      Toast.show("支持成功", {
         duration: Toast.durations.SHORT,
+        position: Toast.positions.CENTER,
       });
       await load();
     } catch (error) {
       Toast.show(error instanceof Error ? error.message : "投票失败", {
         duration: Toast.durations.SHORT,
+        position: Toast.positions.CENTER,
       });
     } finally {
+      voteInFlight.current = false;
       setPendingAction(null);
     }
   }
@@ -314,18 +285,18 @@ export default function CourtDetailScreen() {
               <CourtVoteButton
                 side="plaintiff"
                 selected={item.myVoteResult === "PLAINTIFF_WIN"}
-                disabled={busy || hasVoted || !voting}
+                disabled={busy}
                 onPress={() => castVote("PLAINTIFF_WIN")}
-                muted={hasVoted || !voting}
+                muted={voteUnavailable}
                 count={item.voteSummary?.plaintiff ?? 0}
                 loading={pendingAction === "vote"}
               />
               <CourtVoteButton
                 side="defendant"
                 selected={item.myVoteResult === "DEFENDANT_WIN"}
-                disabled={busy || hasVoted || !voting}
+                disabled={busy}
                 onPress={() => castVote("DEFENDANT_WIN")}
-                muted={hasVoted || !voting}
+                muted={voteUnavailable}
                 count={item.voteSummary?.defendant ?? 0}
                 loading={pendingAction === "vote"}
               />

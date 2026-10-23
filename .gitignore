@@ -49,3 +49,9 @@ modules/*/android/build/
 modules/*/android/.gradle/
 
 # /.android-signing/
+
+
+# /ai
+.workbuddy/
+.claude/
+.codex/

@@ -11,8 +11,10 @@ import {
   View,
 } from "react-native";
 import Toast from "react-native-root-toast";
-import { courtApi, formatTime, pageRecords, type CourtCase, type CourtScope, type PlatformTicket } from "@/features/court/court.api";
+import { courtApi, pageRecords, type CourtCase, type CourtScope, type PlatformTicket } from "@/features/court/court.api";
 import { CourtReviewerPromptModal } from "@/features/court/components/CourtReviewerPromptModal";
+import { isCourtReviewerApproved, submitCourtVote } from "@/features/court/court-vote";
+import { PlatformTicketCard } from "@/features/court/components/PlatformTicketCard";
 import { CourtCard } from "@/features/court/components/CourtCard";
 import { COURT_FONT_FAMILY } from "@/features/court/court.theme";
 import { LinearGradient } from "expo-linear-gradient";
@@ -24,13 +26,13 @@ const FEEDS: { key: CourtScope; label: string }[] = [
   { key: "FAVORITE", label: "收藏" }, { key: "MY", label: "我的" },
 ];
 
-type Props = { bottomInset: number };
+type Props = { bottomInset: number; initialPage?: "court" | "ticket" };
 
-export function CourtHomeScreen({ bottomInset }: Props) {
+export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
   const accessToken = useAuthStore((state) => state.accessToken);
-  const [pageType, setPageType] = useState<"court" | "ticket">("court");
+  const [pageType, setPageType] = useState<"court" | "ticket">(initialPage);
   const [scope, setScope] = useState<CourtScope>("ALL");
-  const [ticketMine, setTicketMine] = useState(false);
+  const [ticketMine, setTicketMine] = useState(initialPage === "ticket");
   const [cases, setCases] = useState<CourtCase[]>([]);
   const [tickets, setTickets] = useState<PlatformTicket[]>([]);
   const [page, setPage] = useState(1);
@@ -39,13 +41,13 @@ export function CourtHomeScreen({ bottomInset }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [isReviewer, setIsReviewer] = useState(false);
-  const [reviewerStatusChecked, setReviewerStatusChecked] = useState(false);
   const [reviewerStats, setReviewerStats] = useState<{ todayCount?: number; totalCount?: number }>({});
   const [pendingAction, setPendingAction] = useState<{
     caseId: string;
     type: "vote" | "favorite";
   } | null>(null);
   const [reviewerPromptVisible, setReviewerPromptVisible] = useState(false);
+  const voteInFlight = useRef(false);
   const loadRequestRef = useRef(0);
   const loadedFeedRef = useRef<string | null>(null);
   const feedKey = JSON.stringify([pageType, scope, ticketMine, accessToken]);
@@ -124,56 +126,69 @@ export function CourtHomeScreen({ bottomInset }: Props) {
     };
   }, [feedKey]));
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     let active = true;
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       setIsReviewer(false);
-      setReviewerStatusChecked(false);
+      setReviewerStats({});
+      setReviewerPromptVisible(false);
       if (!accessToken) {
-        setReviewerStatusChecked(true);
         return;
       }
-      void courtApi.getReviewerStatus().then(async (status) => {
-        const approved = status.pageStatus === "APPROVED" || status.status === "APPROVED";
-        if (!active) return;
+      try {
+        const status = await courtApi.getReviewerStatus();
+        if (!active) {
+          return;
+        }
+        const approved = isCourtReviewerApproved(status);
         setIsReviewer(approved);
-        setReviewerStatusChecked(true);
-        if (approved) setReviewerStats(await courtApi.getReviewerStats().catch(() => ({})));
-      }).catch(() => {
-        if (!active) return;
-        setIsReviewer(false);
-        setReviewerStatusChecked(true);
-      });
+        if (approved) {
+          const stats = await courtApi.getReviewerStats().catch(() => ({}));
+          if (active) {
+            setReviewerStats(stats);
+          }
+        }
+      } catch {
+        if (active) {
+          setIsReviewer(false);
+        }
+      }
     }, 0);
-    return () => { active = false; clearTimeout(timer); };
-  }, [accessToken]);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [accessToken]));
 
   const data = useMemo(() => pageType === "court" ? cases : tickets, [cases, pageType, tickets]);
 
   async function vote(item: CourtCase, result: "PLAINTIFF_WIN" | "DEFENDANT_WIN") {
-    if (!requireLogin() || pendingAction) {
+    if (!requireLogin() || pendingAction || voteInFlight.current) {
       return;
     }
-    let reviewer = isReviewer;
-    if (!reviewerStatusChecked) {
-      try {
-        const status = await courtApi.getReviewerStatus();
-        reviewer = status.pageStatus === "APPROVED" || status.status === "APPROVED";
-        setIsReviewer(reviewer);
-      } catch {
-        reviewer = false;
-      }
-      setReviewerStatusChecked(true);
-    }
-    if (!reviewer) { setReviewerPromptVisible(true); return; }
+    voteInFlight.current = true;
     setPendingAction({ caseId: String(item.caseId), type: "vote" });
     try {
-      await courtApi.vote(item.caseId, item.level ?? "FIRST", result);
-      Toast.show(result === "PLAINTIFF_WIN" ? "已支持原告" : "已支持被告", { duration: Toast.durations.SHORT });
+      const outcome = await submitCourtVote(item, result);
+      if (accessToken !== useAuthStore.getState().accessToken) {
+        return;
+      }
+      setIsReviewer(isCourtReviewerApproved(outcome.reviewerStatus));
+      if (outcome.type === "reviewer-required") {
+        setReviewerPromptVisible(true);
+        return;
+      }
+      setCases((current) => current.map((row) => String(row.caseId) === String(item.caseId)
+        ? { ...row, myVoteResult: result }
+        : row));
+      Toast.show("支持成功", { duration: Toast.durations.SHORT, position: Toast.positions.CENTER });
       await load();
     } catch (error) {
-      Toast.show(error instanceof Error ? error.message : "投票失败", { duration: Toast.durations.SHORT });
-    } finally { setPendingAction(null); }
+      Toast.show(error instanceof Error ? error.message : "投票失败", { duration: Toast.durations.SHORT, position: Toast.positions.CENTER });
+    } finally {
+      voteInFlight.current = false;
+      setPendingAction(null);
+    }
   }
 
   async function toggleFavorite(item: CourtCase) {
@@ -189,6 +204,12 @@ export function CourtHomeScreen({ bottomInset }: Props) {
   }
 
   const openTicketForm = () => { if (requireLogin()) router.push("/court/complaint?mode=ticket"); };
+  const openReviewForm = () => {
+    if (!requireLogin()) {
+      return;
+    }
+    router.push("/court/complaint?mode=court");
+  };
 
   const listHeader = (
     <>
@@ -201,9 +222,20 @@ export function CourtHomeScreen({ bottomInset }: Props) {
           <Text style={[styles.sectionText, pageType === "ticket" && styles.sectionSelected]}>平台工单</Text>
           {pageType === "ticket" && <CachedImage source={require("../../../../assets/court/tab-indicator.svg")} style={styles.sectionUnderline} />}
         </Pressable>
-        {pageType === "ticket" && (
-          <Pressable onPress={openTicketForm} style={styles.ticketAction}><Text style={styles.ticketActionText}>发起投诉</Text></Pressable>
-        )}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={pageType === "court" ? "发起评审" : "发起投诉"}
+          onPress={pageType === "court" ? openReviewForm : openTicketForm}
+          style={styles.reviewAction}
+        >
+          <CachedImage
+            accessible={false}
+            source={require("../../../../assets/court/edit.svg")}
+            contentFit="contain"
+            style={styles.reviewActionIcon}
+          />
+          <Text style={styles.reviewActionText}>{pageType === "court" ? "发起评审" : "发起投诉"}</Text>
+        </Pressable>
       </View>
       {pageType === "court" ? (
         <>
@@ -218,15 +250,32 @@ export function CourtHomeScreen({ bottomInset }: Props) {
           {isReviewer && scope !== "MY" && <View style={styles.statsRow}><Text style={styles.statsLabel}>今日已评审 <Text style={styles.statsValue}>{reviewerStats.todayCount ?? 0}</Text></Text><Text style={styles.statsLabel}>累计评审 <Text style={styles.statsValue}>{reviewerStats.totalCount ?? 0}</Text></Text></View>}
         </>
       ) : (
-        <View style={styles.ticketTabs}>
-          {[false, true].map((mine) => <Pressable key={String(mine)} onPress={() => { if (mine && !requireLogin()) return; setTicketMine(mine); }} style={[styles.ticketTab, ticketMine === mine && styles.ticketTabSelected]}><Text style={[styles.ticketTabText, ticketMine === mine && styles.ticketTabTextSelected]}>{mine ? "我的" : "全部"}</Text></Pressable>)}
+        <View style={styles.feedRow}>
+          <View accessibilityRole="tablist" style={styles.feedTabs}>
+            {[false, true].map((mine) => (
+              <Pressable
+                key={String(mine)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: ticketMine === mine }}
+                onPress={() => {
+                  if (mine && !requireLogin()) {
+                    return;
+                  }
+                  setTicketMine(mine);
+                }}
+                style={[styles.feedTab, ticketMine === mine && styles.feedTabSelected]}
+              >
+                <Text style={[styles.feedText, ticketMine === mine && styles.feedTextSelected]}>{mine ? "我的" : "全部"}</Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
       )}
     </>
   );
 
   const renderCase = ({ item }: { item: CourtCase }) => <CourtCard item={item} onOpen={() => router.push({ pathname: "/court/[id]", params: { id: String(item.caseId), mine: scope === "MY" ? "1" : "0" } })} onVote={vote} onFavorite={toggleFavorite} pendingAction={pendingAction?.caseId === String(item.caseId) ? pendingAction.type : null} />;
-  const renderTicket = ({ item }: { item: PlatformTicket }) => <TicketCard item={item} onOpen={() => router.push(`/court/ticket/${item.ticketId ?? item.ticketNo}?mine=${ticketMine ? "1" : "0"}`)} />;
+  const renderTicket = ({ item }: { item: PlatformTicket }) => <PlatformTicketCard item={item} mine={ticketMine} onOpen={() => router.push(`/court/ticket/${item.ticketId ?? item.ticketNo}?mine=${ticketMine ? "1" : "0"}`)} />;
 
   return (
     <View style={styles.panel}>
@@ -260,13 +309,6 @@ export function CourtHomeScreen({ bottomInset }: Props) {
   );
 }
 
-function TicketCard({ item, onOpen }: { item: PlatformTicket; onOpen: () => void }) {
-  return <Pressable onPress={onOpen} style={styles.ticketCard}><View style={styles.cardHead}><Text style={styles.ticketTitle}>平台工单</Text><Text style={styles.cardTime}>{formatTime(item.createdAt)}</Text></View><Text style={styles.ticketContent} numberOfLines={3}>{item.content || "-"}</Text><View style={styles.ticketCardFoot}><Text style={styles.statusPill}>{ticketStatus(item.status)}</Text><Text style={styles.detailText}>查看详情 ›</Text></View></Pressable>;
-}
-
-function ticketStatus(status?: string) {
-  return ({ SUBMITTED: "已提交", REJECTED: "已驳回", PROCESSING: "处理中", TO_USER_REPLY: "待补充", RESOLVED: "已解决", CLOSED: "已关闭" } as Record<string, string>)[status || ""] || "处理中";
-}
 
 const styles = StyleSheet.create({
   panel: { backgroundColor: "#fff", borderTopLeftRadius: 12, borderTopRightRadius: 12, flex: 1, marginTop: 4, overflow: "hidden" },
@@ -275,13 +317,11 @@ const styles = StyleSheet.create({
   sectionTabs: { alignItems: "center", flexDirection: "row", height: 54, marginHorizontal: -16, paddingHorizontal: 16, paddingTop: 8 },
   sectionTab: { alignSelf: "stretch", justifyContent: "center", marginRight: 24, minWidth: 48, position: "relative" },
   sectionText: { color: "#656566", fontFamily: COURT_FONT_FAMILY, fontSize: 14, fontWeight: "400", lineHeight: 22 }, sectionSelected: { color: "#0D0D0F", fontSize: 16, fontWeight: "600" }, sectionUnderline: { bottom: 8, height: 3, left: "50%", marginLeft: -6, position: "absolute", width: 12 },
-  ticketAction: { backgroundColor: "#ff3158", borderRadius: 6, marginLeft: "auto", paddingHorizontal: 12, paddingVertical: 8 }, ticketActionText: { color: "#fff", fontFamily: COURT_FONT_FAMILY, fontSize: 12, fontWeight: "600" },
-  feedRow: { flexDirection: "row", alignItems: "center", minHeight: 36, marginBottom: 8 }, feedTabs: { alignItems: "center", flexDirection: "row", gap: 12 }, feedTab: { alignItems: "center", backgroundColor: "#F0F1F2", borderRadius: 999, justifyContent: "center", paddingHorizontal: 12, paddingVertical: 4 }, feedTabSelected: { backgroundColor: "#F0F1F2", borderColor: "#FF99AD", borderWidth: 0.5 }, feedText: { color: "#656566", fontFamily: COURT_FONT_FAMILY, fontSize: 12, fontStyle: "normal", fontWeight: "400", lineHeight: 18, textAlign: "center" }, feedTextSelected: { color: "#FE1F4C", fontWeight: "500" },
+  reviewAction: { alignItems: "center", flexDirection: "row", gap: 4, marginLeft: "auto", minHeight: 44 },
+  reviewActionIcon: { height: 16, width: 16 },
+  reviewActionText: { color: "#656566", textAlign: "center", fontFamily: COURT_FONT_FAMILY, fontSize: 12, fontStyle: "normal", fontWeight: "500", lineHeight: 18 },
+  feedRow: { flexDirection: "row", alignItems: "center", minHeight: 36, marginBottom: 8 }, feedTabs: { alignItems: "center", flexDirection: "row", gap: 12 }, feedTab: { alignItems: "center", backgroundColor: "#F0F1F2", borderRadius: 999, justifyContent: "center", paddingHorizontal: 12, paddingVertical: 4 }, feedTabSelected: { backgroundColor: "#FFF5F7", borderColor: "#FF99AD", borderWidth: 0.5 }, feedText: { color: "#656566", fontFamily: COURT_FONT_FAMILY, fontSize: 12, fontStyle: "normal", fontWeight: "400", lineHeight: 18, textAlign: "center" }, feedTextSelected: { color: "#FE1F4C", fontWeight: "500" },
   statsRow: { backgroundColor: "#fff", borderRadius: 8, flexDirection: "row", justifyContent: "space-around", marginTop: 10, paddingVertical: 10 }, statsLabel: { color: "#777", fontFamily: COURT_FONT_FAMILY, fontSize: 12 }, statsValue: { color: "#111", fontWeight: "700" }, judgeEntry: { backgroundColor: "#fff7f8", borderColor: "#ffe1e6", borderRadius: 8, borderWidth: 1, marginTop: 10, padding: 12 }, judgeTitle: { color: "#171717", fontFamily: COURT_FONT_FAMILY, fontSize: 14, fontWeight: "700" }, judgeDesc: { color: "#888", fontFamily: COURT_FONT_FAMILY, fontSize: 11, marginTop: 4 }, judgeArrow: { color: "#ff3158", fontSize: 23, position: "absolute", right: 12, top: 10 },
-  cardHead: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
-  cardTime: { color: "#979799", fontFamily: COURT_FONT_FAMILY, fontSize: 12, lineHeight: 18 },
-  detailText: { color: "#656566", fontFamily: COURT_FONT_FAMILY, fontSize: 12, lineHeight: 18 },
-  ticketTabs: { flexDirection: "row", gap: 18, paddingVertical: 10 }, ticketTab: { paddingVertical: 4 }, ticketTabSelected: { borderBottomColor: "#ff3158", borderBottomWidth: 2 }, ticketTabText: { color: "#777", fontFamily: COURT_FONT_FAMILY, fontSize: 13 }, ticketTabTextSelected: { color: "#111", fontWeight: "700" }, ticketCard: { backgroundColor: "#fff", borderColor: "#eee", borderRadius: 8, borderWidth: 1, marginTop: 10, padding: 12 }, ticketTitle: { color: "#222", fontFamily: COURT_FONT_FAMILY, fontSize: 13, fontWeight: "600" }, ticketContent: { color: "#555", fontFamily: COURT_FONT_FAMILY, fontSize: 12, lineHeight: 19, marginTop: 10 }, ticketCardFoot: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", marginTop: 10 }, statusPill: { backgroundColor: "#fff2e8", borderRadius: 10, color: "#e97924", fontFamily: COURT_FONT_FAMILY, fontSize: 10, overflow: "hidden", paddingHorizontal: 8, paddingVertical: 4 },
   empty: { flex: 1, minHeight: 146, width: 247 },
   emptyMessage: { color: "#999999", fontFamily: COURT_FONT_FAMILY, fontSize: 12, fontWeight: "400", lineHeight: 18 },
   loading: { marginVertical: 24 },

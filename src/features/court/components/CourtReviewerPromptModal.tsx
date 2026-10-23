@@ -1,35 +1,18 @@
-import { courtApi } from "@/features/court/court.api";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
-import { useState } from "react";
+import { router } from "expo-router";
 import {
-  ActivityIndicator,
   Modal,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import Toast from "react-native-root-toast";
 
 type Props = { visible: boolean; onClose: () => void };
 
 export function CourtReviewerPromptModal({ visible, onClose }: Props) {
-  const [submitting, setSubmitting] = useState(false);
-
-  async function apply() {
-    if (submitting) return;
-    setSubmitting(true);
-    try {
-      await courtApi.applyReviewer();
-      Toast.show("评审员申请已提交", { duration: Toast.durations.SHORT });
-      onClose();
-    } catch (error) {
-      Toast.show(error instanceof Error ? error.message : "申请失败", {
-        duration: Toast.durations.SHORT,
-      });
-    } finally {
-      setSubmitting(false);
-    }
+  function openReviewer() {
+    onClose();
+    router.push("/court/reviewer");
   }
 
   return (
@@ -44,26 +27,20 @@ export function CourtReviewerPromptModal({ visible, onClose }: Props) {
         <View accessibilityRole="alert" style={styles.dialog}>
           <Text style={styles.title}>成为评审员</Text>
           <Text style={styles.message}>
-            当前暂无投票资格，是否申请成为评审员？
+            {"当前暂无投票资格，是否申请成为评审\n员？"}
           </Text>
           <View style={styles.actions}>
             <Pressable
-              disabled={submitting}
               onPress={onClose}
               style={[styles.button, styles.cancel]}
             >
               <Text style={styles.cancelText}>取消</Text>
             </Pressable>
             <Pressable
-              disabled={submitting}
-              onPress={apply}
+              onPress={openReviewer}
               style={[styles.button, styles.confirm]}
             >
-              {submitting ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.confirmText}>申请</Text>
-              )}
+              <Text style={styles.confirmText}>申请</Text>
             </Pressable>
           </View>
         </View>
@@ -75,54 +52,57 @@ export function CourtReviewerPromptModal({ visible, onClose }: Props) {
 const styles = StyleSheet.create({
   overlay: {
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.58)",
+    backgroundColor: "rgba(0,0,0,0.7)",
     flex: 1,
     justifyContent: "center",
-    paddingHorizontal: 36,
+    paddingHorizontal: 24,
   },
   dialog: {
     backgroundColor: "#fff",
-    borderRadius: 10,
-    maxWidth: 340,
-    paddingHorizontal: 16,
-    paddingTop: 18,
-    width: "100%",
+    borderRadius: 12,
+    maxWidth: "100%",
+    padding: 16,
+    width: 300,
   },
   title: {
-    color: "#222",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 14,
+    color: "#333",
+    fontFamily: "PingFang SC",
+    fontSize: 16,
+    fontStyle: "normal",
     fontWeight: "600",
+    lineHeight: 24,
     textAlign: "center",
   },
   message: {
     color: "#666",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 10,
-    minHeight: 36,
+    fontFamily: "PingFang SC",
+    fontSize: 14,
+    fontStyle: "normal",
+    fontWeight: "400",
+    lineHeight: 22,
+    marginTop: 14,
   },
-  actions: { flexDirection: "row", gap: 8, marginBottom: 12, marginTop: 8 },
+  actions: { flexDirection: "row", gap: 12, marginTop: 12 },
   button: {
     alignItems: "center",
-    borderRadius: 6,
+    borderRadius: 8,
     flex: 1,
-    height: 34,
+    minHeight: 36,
+    paddingVertical: 7,
     justifyContent: "center",
   },
-  cancel: { backgroundColor: "#fff", borderColor: "#ff3158", borderWidth: 1 },
+  cancel: { backgroundColor: "#fff", borderColor: "#FE1F4C", borderWidth: 1 },
   cancelText: {
-    color: "#ff3158",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 12,
+    color: "#FE1F4C",
+    fontSize: 14,
     fontWeight: "500",
+    lineHeight: 20,
   },
-  confirm: { backgroundColor: "#ff3158" },
+  confirm: { backgroundColor: "#FE1F4C" },
   confirmText: {
     color: "#fff",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 12,
-    fontWeight: "600",
+    fontSize: 14,
+    fontWeight: "500",
+    lineHeight: 20,
   },
 });

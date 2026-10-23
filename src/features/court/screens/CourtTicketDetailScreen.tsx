@@ -3,8 +3,10 @@ import {
   formatTime,
   type PlatformTicket,
 } from "@/features/court/court.api";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { COURT_FONT_FAMILY } from "@/features/court/court.theme";
+import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import * as Clipboard from "expo-clipboard";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -23,6 +25,8 @@ export default function CourtTicketDetailScreen() {
   const insets = useSafeAreaInsets();
   const { id, mine } = useLocalSearchParams<{ id: string; mine?: string }>();
   const [ticket, setTicket] = useState<PlatformTicket | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [imageWidth, setImageWidth] = useState(62);
   const [reply, setReply] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -30,9 +34,11 @@ export default function CourtTicketDetailScreen() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError("");
     try {
       setTicket(await courtApi.getTicketDetail(id, isMine));
     } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "工单加载失败");
       Toast.show(error instanceof Error ? error.message : "工单加载失败", {
         duration: Toast.durations.SHORT,
       });
@@ -48,7 +54,9 @@ export default function CourtTicketDetailScreen() {
   }, [load]);
 
   async function sendReply() {
-    if (!reply.trim() || !ticket?.ticketId || submitting) return;
+    if (!isMine || !reply.trim() || !ticket?.ticketId || submitting) {
+      return;
+    }
     setSubmitting(true);
     try {
       await courtApi.replyTicket(ticket.ticketId, reply.trim());
@@ -64,16 +72,49 @@ export default function CourtTicketDetailScreen() {
     }
   }
 
+  const images = ticket?.evidenceThumbnails?.filter(Boolean) ?? [];
+  const ticketNumber = String(ticket?.ticketNo || ticket?.ticketId || "");
+  const officialReplies = ticket?.adminReply
+    ? [ticket.adminReply]
+    : (ticket?.messageList ?? [])
+        .filter(
+          (message) =>
+            message.senderType === "ADMIN" &&
+            (isMine || message.visibility !== "HIDDEN"),
+        )
+        .map((message) => message.content)
+        .filter((content): content is string => Boolean(content));
+
+  async function copyTicketNumber() {
+    if (!ticketNumber) {
+      return;
+    }
+    try {
+      await Clipboard.setStringAsync(ticketNumber);
+      Toast.show("案件 ID 已复制", { duration: Toast.durations.SHORT });
+    } catch {
+      Toast.show("复制失败，请重试", { duration: Toast.durations.SHORT });
+    }
+  }
+
   return (
     <View style={styles.screen}>
       <View
         style={[
           styles.header,
-          { paddingTop: insets.top, height: insets.top + 48 },
+          { paddingTop: insets.top, height: insets.top + 44 },
         ]}
       >
-        <Pressable onPress={() => router.back()} style={styles.back}>
-          <Text style={styles.backText}>‹</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="返回"
+          onPress={() => router.back()}
+          style={styles.back}
+        >
+          <CachedImage
+            source={require("../../../../assets/court/ticket-back.svg")}
+            style={styles.backIcon}
+          />
         </Pressable>
         <Text style={styles.title}>工单详情</Text>
         <View style={styles.back} />
@@ -82,91 +123,161 @@ export default function CourtTicketDetailScreen() {
         <View style={styles.center}>
           <ActivityIndicator color="#ff3158" />
         </View>
+      ) : !ticket ? (
+        <View style={styles.center}>
+          <Text style={styles.replyBody}>
+            {loadError || "工单不存在或暂不可查看"}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={load}
+            style={styles.resubmit}
+          >
+            <Text style={styles.resubmitText}>重新加载</Text>
+          </Pressable>
+        </View>
       ) : (
         <>
-          <ScrollView contentContainerStyle={styles.content}>
+          <ScrollView
+            contentContainerStyle={[
+              styles.content,
+              { paddingBottom: Math.max(insets.bottom, 24) },
+            ]}
+            keyboardShouldPersistTaps="handled"
+          >
             {ticket && (
               <>
                 <View style={styles.summary}>
-                  <View style={styles.row}>
-                    <Text style={styles.ticketNo}>
-                      工单 {ticket.ticketNo || ticket.ticketId}
-                    </Text>
-                    <Text style={styles.status}>
-                      {statusText(ticket.status)}
-                    </Text>
+                  <Text style={styles.heading}>{label(ticket.reasonType)}</Text>
+                  <View style={styles.metadata}>
+                    <View style={styles.row}>
+                      <View style={styles.metadataCell}>
+                        <Text style={styles.metadataLabel}>案件ID</Text>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`复制案件 ID ${ticketNumber}`}
+                          disabled={!ticketNumber}
+                          onPress={copyTicketNumber}
+                          hitSlop={8}
+                          style={styles.copyButton}
+                        >
+                          <Text numberOfLines={1} style={styles.metadataValue}>
+                            {ticketNumber || "-"}
+                          </Text>
+                          <CachedImage
+                            source={require("../../../../assets/coms/copy.svg")}
+                            style={styles.copyIcon}
+                            tintColor="#ABABAD"
+                          />
+                        </Pressable>
+                      </View>
+                      <View style={styles.metadataCell}>
+                        <Text style={styles.metadataLabel}>
+                          {ticket.closedAt ? "办结时间" : "提交时间"}
+                        </Text>
+                        <Text style={styles.metadataValue}>
+                          {formatTime(ticket.closedAt || ticket.createdAt)}
+                        </Text>
+                      </View>
+                    </View>
+                    {!!(ticket.targetNickname || ticket.targetUid) &&
+                      ticket.reasonType !== "ORDER_DISPUTE" && (
+                        <View style={styles.target}>
+                          <Text style={styles.metadataLabel}>投诉对象</Text>
+                          <Text style={styles.metadataValue}>
+                            {ticket.targetNickname || ticket.targetUid}
+                          </Text>
+                        </View>
+                      )}
                   </View>
-                  <Text style={styles.meta}>
-                    {label(ticket.reasonType)}　·　
-                    {formatTime(ticket.createdAt)}
-                  </Text>
-                  {!!ticket.targetNickname && (
-                    <View style={styles.target}>
-                      <CachedImage
-                        source={
-                          ticket.targetAvatar
-                            ? { uri: ticket.targetAvatar }
-                            : undefined
+                  <View style={styles.evidence}>
+                    <Text style={styles.body}>{ticket.content}</Text>
+                    {images.length > 0 && (
+                      <View
+                        style={styles.images}
+                        onLayout={(event) =>
+                          setImageWidth(
+                            Math.min(
+                              62,
+                              Math.max(
+                                1,
+                                (event.nativeEvent.layout.width - 16) / 5,
+                              ),
+                            ),
+                          )
                         }
-                        style={styles.avatar}
-                      />
-                      <Text style={styles.targetText}>
-                        {ticket.targetNickname}　ID:{ticket.targetUid}
+                      >
+                        {images.map((uri, index) => (
+                          <Pressable
+                            key={`${uri}-${index}`}
+                            accessibilityRole="button"
+                            accessibilityLabel={`查看证据图片 ${index + 1}`}
+                            onPress={() =>
+                              router.push({
+                                pathname: "/image-preview",
+                                params: createImagePreviewParams(images, index),
+                              })
+                            }
+                          >
+                            <CachedImage
+                              source={{ uri }}
+                              contentFit="cover"
+                              style={[
+                                styles.image,
+                                { width: imageWidth, height: imageWidth },
+                              ]}
+                            />
+                          </Pressable>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                </View>
+                <View style={styles.officialSection}>
+                  <Text style={styles.sectionTitle}>官方回复</Text>
+                  {officialReplies.length ? (
+                    officialReplies.map((content, index) => (
+                      <Text key={index} style={styles.replyBody}>
+                        {content}
                       </Text>
-                    </View>
-                  )}
-                  <Text style={styles.sectionTitle}>投诉内容</Text>
-                  <Text style={styles.body}>{ticket.content}</Text>
-                  {!!ticket.evidenceThumbnails?.length && (
-                    <View style={styles.images}>
-                      {ticket.evidenceThumbnails.map((uri, index) => (
-                        <CachedImage
-                          key={`${uri}-${index}`}
-                          source={{ uri }}
-                          style={styles.image}
-                        />
-                      ))}
-                    </View>
+                    ))
+                  ) : (
+                    <Text style={styles.replyBody}>暂无官方回复</Text>
                   )}
                 </View>
-                <Text style={styles.threadTitle}>处理进度</Text>
-                {(ticket.messageList ?? []).map((message, index) => (
-                  <View
-                    key={`${message.createdAt}-${index}`}
-                    style={[
-                      styles.message,
-                      message.senderType === "USER" && styles.userMessage,
-                    ]}
-                  >
-                    <Text style={styles.messageSender}>
-                      {message.senderType === "ADMIN"
-                        ? "平台客服"
-                        : message.senderType === "SYSTEM"
-                          ? "系统通知"
-                          : "我"}
+                {isMine && Boolean(ticket.messageList?.length) && (
+                  <View style={styles.officialSection}>
+                    <Text style={styles.sectionTitle}>
+                      处理进度 · {statusText(ticket.status)}
                     </Text>
-                    <Text style={styles.body}>{message.content || ""}</Text>
-                    <Text style={styles.messageTime}>
-                      {formatTime(message.createdAt)}
-                    </Text>
-                  </View>
-                ))}
-                {!!ticket.adminReply && !ticket.messageList?.length && (
-                  <View style={styles.message}>
-                    <Text style={styles.messageSender}>平台客服</Text>
-                    <Text style={styles.body}>{ticket.adminReply}</Text>
-                    <Text style={styles.messageTime}>
-                      {formatTime(ticket.repliedAt)}
-                    </Text>
+                    {(ticket.messageList ?? []).map((message, index) => (
+                      <View
+                        key={`${message.createdAt}-${index}`}
+                        style={styles.message}
+                      >
+                        <Text style={styles.messageSender}>
+                          {message.senderType === "ADMIN"
+                            ? "平台客服"
+                            : message.senderType === "SYSTEM"
+                              ? "系统通知"
+                              : "我"}
+                        </Text>
+                        <Text style={styles.body}>{message.content || ""}</Text>
+                        <Text style={styles.messageTime}>
+                          {formatTime(message.createdAt)}
+                        </Text>
+                      </View>
+                    ))}
                   </View>
                 )}
-                {ticket.status === "REJECTED" && (
+                {isMine && ticket.status === "REJECTED" && (
                   <View style={styles.rejection}>
                     <Text style={styles.rejectionTitle}>驳回原因</Text>
                     <Text style={styles.body}>
                       {ticket.rejectionReason || "未填写驳回原因"}
                     </Text>
                     <Pressable
+                      accessibilityRole="button"
                       onPress={() =>
                         router.push(
                           `/court/complaint?mode=ticket&ticketId=${ticket.ticketId}`,
@@ -198,6 +309,7 @@ export default function CourtTicketDetailScreen() {
                 multiline
               />
               <Pressable
+                accessibilityRole="button"
                 disabled={!reply.trim() || submitting}
                 onPress={sendReply}
                 style={styles.send}
@@ -218,10 +330,10 @@ function label(value?: string) {
   return (
     (
       {
-        RULE_VIOLATION: "违反平台规定",
-        ORDER_DISPUTE: "订单纠纷",
-        CHAT_DISPUTE: "聊天纠纷",
-        OTHER: "其他",
+        RULE_VIOLATION: "用户投诉",
+        ORDER_DISPUTE: "订单存在纠纷",
+        CHAT_DISPUTE: "用户投诉",
+        OTHER: "用户投诉",
         PLATFORM_SUGGESTION: "平台建议",
       } as Record<string, string>
     )[value || ""] || "平台工单"
@@ -243,7 +355,7 @@ function statusText(value?: string) {
 }
 
 const styles = StyleSheet.create({
-  screen: { backgroundColor: "#f7f7f7", flex: 1 },
+  screen: { backgroundColor: "#F5F6F7", flex: 1 },
   header: {
     alignItems: "center",
     backgroundColor: "#fff",
@@ -253,119 +365,119 @@ const styles = StyleSheet.create({
   },
   back: {
     alignItems: "center",
-    height: 36,
+    height: 44,
     justifyContent: "center",
-    width: 36,
+    width: 32,
   },
-  backText: { color: "#111", fontSize: 32, lineHeight: 34 },
+  backIcon: { height: 24, width: 24 },
   title: {
-    color: "#111",
-    fontFamily: DOUYIN_SANS,
+    color: "#0D0D0F",
+    fontFamily: COURT_FONT_FAMILY,
     fontSize: 16,
     fontWeight: "600",
+    lineHeight: 24,
   },
-  content: { padding: 12, paddingBottom: 24 },
-  summary: { backgroundColor: "#fff", borderRadius: 8, padding: 12 },
-  row: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  ticketNo: {
-    color: "#222",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 14,
+  content: { paddingTop: 8, gap: 8 },
+  summary: { backgroundColor: "#fff", padding: 16, gap: 16 },
+  heading: {
+    color: "#0D0D0F",
+    fontFamily: COURT_FONT_FAMILY,
+    fontSize: 24,
     fontWeight: "600",
+    lineHeight: 30,
+    marginBottom: 8,
   },
-  status: {
-    backgroundColor: "#fff0e7",
-    borderRadius: 12,
-    color: "#e47928",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 10,
-    overflow: "hidden",
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-  },
-  meta: { color: "#999", fontFamily: DOUYIN_SANS, fontSize: 10, marginTop: 8 },
-  target: {
-    alignItems: "center",
-    backgroundColor: "#fafafa",
-    flexDirection: "row",
-    marginTop: 10,
-    padding: 8,
-  },
-  avatar: { backgroundColor: "#eee", borderRadius: 16, height: 32, width: 32 },
-  targetText: {
-    color: "#555",
-    fontFamily: DOUYIN_SANS,
+  metadata: { gap: 8 },
+  row: { alignItems: "flex-start", flexDirection: "row", gap: 8 },
+  metadataCell: { flex: 1, minWidth: 0, flexDirection: "row", gap: 2 },
+  metadataLabel: {
+    color: "#979799",
+    fontFamily: COURT_FONT_FAMILY,
     fontSize: 11,
-    marginLeft: 8,
+    lineHeight: 16,
+    width: 48,
+  },
+  metadataValue: {
+    color: "#0D0D0F",
+    fontFamily: COURT_FONT_FAMILY,
+    fontSize: 11,
+    lineHeight: 16,
+    flexShrink: 1,
+  },
+  copyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  copyIcon: { width: 12, height: 12 },
+  target: { flexDirection: "row", gap: 2 },
+  evidence: { gap: 6 },
+  body: {
+    color: "#0D0D0F",
+    fontFamily: COURT_FONT_FAMILY,
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  images: { flexDirection: "row", flexWrap: "wrap", gap: 4, maxWidth: 326 },
+  image: { borderRadius: 6, backgroundColor: "#F5F6F7" },
+  officialSection: {
+    backgroundColor: "#fff",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 6,
   },
   sectionTitle: {
-    color: "#222",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 13,
+    color: "#0D0D0F",
+    fontFamily: COURT_FONT_FAMILY,
+    fontSize: 16,
     fontWeight: "600",
-    marginTop: 14,
+    lineHeight: 22,
+    paddingVertical: 4,
   },
-  body: {
-    color: "#444",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 12,
-    lineHeight: 19,
-    marginTop: 6,
+  replyBody: {
+    color: "#656566",
+    fontFamily: COURT_FONT_FAMILY,
+    fontSize: 14,
+    lineHeight: 22,
   },
-  images: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 9 },
-  image: { borderRadius: 5, height: 58, width: 58 },
-  threadTitle: {
-    color: "#222",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 13,
-    fontWeight: "600",
-    marginBottom: 8,
-    marginTop: 16,
-  },
-  message: {
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    marginBottom: 8,
-    padding: 12,
-  },
-  userMessage: { borderColor: "#ffdae1", borderWidth: 1 },
+  message: { gap: 6, paddingVertical: 8 },
   messageSender: {
-    color: "#e77b25",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 11,
+    color: "#656566",
+    fontFamily: COURT_FONT_FAMILY,
+    fontSize: 12,
     fontWeight: "600",
+    lineHeight: 18,
   },
   messageTime: {
-    color: "#aaa",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 10,
-    marginTop: 7,
+    color: "#979799",
+    fontFamily: COURT_FONT_FAMILY,
+    fontSize: 11,
+    lineHeight: 16,
   },
-  rejection: {
-    backgroundColor: "#fff4f5",
-    borderRadius: 8,
-    marginTop: 10,
-    padding: 12,
-  },
+  rejection: { backgroundColor: "#fff", padding: 16, gap: 8 },
   rejectionTitle: {
-    color: "#e3425a",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 12,
+    color: "#FE1F4C",
+    fontFamily: COURT_FONT_FAMILY,
+    fontSize: 14,
     fontWeight: "600",
   },
   resubmit: {
     alignItems: "center",
-    borderColor: "#ff3158",
-    borderRadius: 6,
-    borderWidth: 1,
+    borderColor: "#FE1F4C",
+    borderRadius: 8,
+    borderWidth: 0.5,
     marginTop: 10,
-    paddingVertical: 9,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
   },
-  resubmitText: { color: "#ff3158", fontFamily: DOUYIN_SANS, fontSize: 12 },
+  resubmitText: {
+    color: "#FE1F4C",
+    fontFamily: COURT_FONT_FAMILY,
+    fontSize: 14,
+    lineHeight: 22,
+  },
   replyBox: {
     alignItems: "flex-end",
     backgroundColor: "#fff",
@@ -373,27 +485,33 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     gap: 8,
-    padding: 10,
+    padding: 12,
   },
   replyInput: {
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#F5F6F7",
     borderRadius: 8,
-    color: "#333",
+    color: "#0D0D0F",
     flex: 1,
-    fontFamily: DOUYIN_SANS,
-    fontSize: 12,
+    fontFamily: COURT_FONT_FAMILY,
+    fontSize: 14,
+    lineHeight: 22,
     maxHeight: 90,
     minHeight: 42,
     padding: 10,
   },
   send: {
     alignItems: "center",
-    backgroundColor: "#ff3158",
-    borderRadius: 6,
+    backgroundColor: "#FE1F4C",
+    borderRadius: 8,
     justifyContent: "center",
-    minHeight: 40,
+    minHeight: 42,
     paddingHorizontal: 14,
   },
-  sendText: { color: "#fff", fontFamily: DOUYIN_SANS, fontSize: 12 },
-  center: { alignItems: "center", flex: 1, justifyContent: "center" },
+  sendText: { color: "#fff", fontFamily: COURT_FONT_FAMILY, fontSize: 14 },
+  center: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+    padding: 16,
+  },
 });

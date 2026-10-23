@@ -1,5 +1,6 @@
 import { CourtAvatar } from "@/features/court/components/CourtAvatar";
 import { CourtVoteButton } from "@/features/court/components/CourtVoteButton";
+import { courtVoteUnavailableReason } from "@/features/court/court-vote";
 import {
   formatCount,
   formatTime,
@@ -34,9 +35,11 @@ export function CourtCard({
   const stage = mapCaseStage(item);
   const voting = item.stage === "VOTING";
   const defeated = !voting && item.result === "DEFENDANT_WIN";
-  const hasVoted = Boolean(item.myVoteResult);
-  const disabled = !voting || busy || hasVoted;
-  const muted = !voting || hasVoted;
+  // 非评委仍可点击投票进入认证引导，不能用 actions.VOTE 禁用这个入口。
+  const unavailable = courtVoteUnavailableReason(item) !== null;
+  // 已投票/过期时仍响应点击，由投票校验显示原因并拦截请求。
+  const disabled = busy;
+  const muted = unavailable;
   const stageColor = voting
     ? "#0796A3"
     : defeated
