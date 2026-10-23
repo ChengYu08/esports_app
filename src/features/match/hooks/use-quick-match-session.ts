@@ -18,6 +18,8 @@ import {
 
 const POLL_INTERVAL_MS = 4000;
 const DEFAULT_COUNTDOWN_SEC = 30 * 60;
+/** 抢单选人上限（与 PC / 后端 @Size(max = 3) 一致） */
+export const MAX_GRAB_SELECT = 3;
 
 export type MatchEndReason = "expired" | "cancelled" | "ended";
 
@@ -122,7 +124,7 @@ export function useQuickMatchSession(
 
   const [detail, setDetail] = useState<QuickMatchRequestDetail | null>(null);
   const [candidates, setCandidates] = useState<QuickMatchGrabItem[]>([]);
-  const [selectedGrabId, setSelectedGrabId] = useState<string | null>(null);
+  const [selectedGrabIds, setSelectedGrabIds] = useState<string[]>([]);
   const [countdownSec, setCountdownSec] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   /** 建单后支付中：迟到的超时/结束信令不得清会话 */
@@ -170,7 +172,7 @@ export function useQuickMatchSession(
     const sec = Math.max(0, Math.floor((expireAtRef.current - Date.now()) / 1000));
     setCountdownSec(sec);
     setCandidates([]);
-    setSelectedGrabId(null);
+    setSelectedGrabIds([]);
     setDetail(null);
     setOrderPending(false);
     if (sec <= 0) {
@@ -219,7 +221,7 @@ export function useQuickMatchSession(
         return;
       }
       setCandidates(list);
-      setSelectedGrabId((prev) => (prev && list.some((item) => item.id === prev) ? prev : null));
+      setSelectedGrabIds((prev) => prev.filter((id) => list.some((item) => item.id === id)));
     } catch {
       // 网络失败保留视图，等待下次轮询
     } finally {
@@ -268,15 +270,24 @@ export function useQuickMatchSession(
     }
   }, [finishEnded, pollGrabList, requestNo, submitting, token]);
 
-  const selectGrab = useCallback((grabId: string) => {
-    setSelectedGrabId((prev) => (prev === grabId ? null : grabId));
+  const toggleGrab = useCallback((grabId: string) => {
+    setSelectedGrabIds((prev) => {
+      if (prev.includes(grabId)) {
+        return prev.filter((id) => id !== grabId);
+      }
+      if (prev.length >= MAX_GRAB_SELECT) {
+        Toast.show("最多选择3名陪玩", { duration: Toast.durations.SHORT });
+        return prev;
+      }
+      return [...prev, grabId];
+    });
   }, []);
 
   return {
     requestNo,
     detail,
     candidates,
-    selectedGrabId,
+    selectedGrabIds,
     countdownSec,
     countdownText: formatCountdown(countdownSec),
     submitting,
@@ -284,6 +295,6 @@ export function useQuickMatchSession(
     setSubmitting,
     setOrderPending,
     cancelMatching,
-    selectGrab,
+    toggleGrab,
   };
 }

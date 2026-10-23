@@ -67,7 +67,7 @@ export default function MatchMatchingScreen({
       setPayVisible(true);
       return;
     }
-    if (!session.selectedGrabId) {
+    if (!session.selectedGrabIds.length) {
       Toast.show("请先选择陪玩", { duration: Toast.durations.SHORT });
       return;
     }
@@ -76,7 +76,7 @@ export default function MatchMatchingScreen({
     try {
       const created = await selectAndCreateOrder(
         requestNo,
-        [session.selectedGrabId],
+        session.selectedGrabIds,
         token,
       );
       session.setOrderPending(true);
@@ -142,9 +142,9 @@ export default function MatchMatchingScreen({
           <MatchingGrabListView
             countdownText={session.countdownText}
             candidates={session.candidates}
-            selectedGrabId={session.selectedGrabId}
+            selectedGrabIds={session.selectedGrabIds}
             submitting={session.submitting}
-            onSelect={session.selectGrab}
+            onSelect={session.toggleGrab}
             onConfirm={() => void handleSelectAndOrder()}
           />
         ) : (

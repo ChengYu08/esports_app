@@ -20,7 +20,7 @@ const defaultAvatar = require("../../../../assets/voice-room/avatar-default.png"
 type MatchingGrabListViewProps = {
   countdownText: string;
   candidates: QuickMatchGrabItem[];
-  selectedGrabId: string | null;
+  selectedGrabIds: string[];
   submitting: boolean;
   onSelect: (grabId: string) => void;
   onConfirm: () => void;
@@ -38,15 +38,23 @@ function GenderAge({ sex }: { sex: 0 | 1 | 2 }) {
   );
 }
 
+function formatConfirmLabel(selectedCount: number, submitting: boolean): string {
+  if (submitting) return "处理中...";
+  if (selectedCount === 0) return "选TA下单";
+  return `选TA下单（${selectedCount}）`;
+}
+
 export function MatchingGrabListView({
   countdownText,
   candidates,
-  selectedGrabId,
+  selectedGrabIds,
   submitting,
   onSelect,
   onConfirm,
 }: MatchingGrabListViewProps) {
   const insets = useSafeAreaInsets();
+  const selectedCount = selectedGrabIds.length;
+  const confirmLabel = formatConfirmLabel(selectedCount, submitting);
 
   return (
     <View style={styles.root}>
@@ -62,7 +70,7 @@ export function MatchingGrabListView({
 
         <View style={styles.list}>
           {candidates.map((item) => {
-            const selected = item.id === selectedGrabId;
+            const selected = selectedGrabIds.includes(item.id);
             return (
               <Pressable
                 key={item.id}
@@ -98,7 +106,7 @@ export function MatchingGrabListView({
       <View style={[styles.footer, { paddingBottom: insets.bottom + FOOTER_CONTENT_BOTTOM }]}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="选TA下单"
+          accessibilityLabel={confirmLabel}
           disabled={submitting}
           onPress={onConfirm}
           style={({ pressed }) => [styles.confirmWrap, pressed && styles.pressed]}
@@ -109,7 +117,7 @@ export function MatchingGrabListView({
             end={{ x: 1, y: 1 }}
             style={styles.confirmButton}
           >
-            <Text style={styles.confirmText}>{submitting ? "处理中..." : "选TA下单"}</Text>
+            <Text style={styles.confirmText}>{confirmLabel}</Text>
           </MatchLinearGradient>
         </Pressable>
       </View>
