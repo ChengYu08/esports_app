@@ -202,26 +202,29 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <RootSiblingParent>
-            <NetworkRecovery />
             {privacyAccepted ? (
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  gestureEnabled: true,
-                  animation: "fade",
-                  animationMatchesGesture: false,
-                  fullScreenGestureEnabled: false,
-                }}
-              >
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen
-                  name="image-preview"
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen name="basic-settings" />
-                <Stack.Screen name="account-settings" />
-                <Stack.Screen name="about" />
-              </Stack>
+              <>
+                {/* Network monitoring starts only after privacy consent. */}
+                <NetworkRecovery />
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    gestureEnabled: true,
+                    animation: "fade",
+                    animationMatchesGesture: false,
+                    fullScreenGestureEnabled: false,
+                  }}
+                >
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  <Stack.Screen
+                    name="image-preview"
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen name="basic-settings" />
+                  <Stack.Screen name="account-settings" />
+                  <Stack.Screen name="about" />
+                </Stack>
+              </>
             ) : (
               <PrivacyConsentGate onAccepted={() => setPrivacyAccepted(true)} />
             )}
