@@ -82,6 +82,7 @@ export type EvidenceSubmission = {
   level?: CourtLevel;
 };
 export type TimelineItem = {
+  applicantParty?: "PLAINTIFF" | "DEFENDANT";
   eventType?: string;
   level?: CourtLevel;
   reason?: string;

@@ -1,3 +1,4 @@
+import { CourtSelectedReviewCard } from "@/features/court/components/CourtSelectedReviewCard";
 import { complaintStyles } from "@/features/court/complaint.styles";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import type { CourtCaseType, CourtSource, TicketTarget } from "@/features/court/court.api";
@@ -175,7 +176,9 @@ export function CourtCaseFormSection({
           </View>
         </View>
       </Pressable>
-      {selectedSource && (
+      {selectedSource && (isDeleteReview ? (
+        <CourtSelectedReviewCard source={selectedSource} disabled={disabled} />
+      ) : (
         <View style={styles.sourceInfo}>
           <CachedImage
             source={
@@ -197,7 +200,7 @@ export function CourtCaseFormSection({
             </Text>
           </View>
         </View>
-      )}
+      ))}
       <FormField label="个人诉求" required>
         <TextInput
           value={claim}

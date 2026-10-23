@@ -107,6 +107,12 @@ export default function CourtComplaintScreen() {
         orderNo: item.orderNo,
         companionNickname: item.companionNickname,
         companionAvatar: item.companionAvatar,
+        defendantNickname: item.defendant?.nickname,
+        defendantAvatar: item.defendant?.avatar,
+        gameName: item.gameName,
+        reviewContent: item.reviewContent,
+        reviewRating: item.reviewRating,
+        reviewImageUrls: item.reviewImageUrls,
       });
     setImages(toUploadItems(item.editableEvidence));
   });

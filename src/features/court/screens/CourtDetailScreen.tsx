@@ -1,3 +1,5 @@
+import { CourtEvidenceSubmission } from "@/features/court/components/CourtEvidenceSubmission";
+import { CourtProcessTimeline } from "@/features/court/components/CourtProcessTimeline";
 import { CourtAvatar } from "@/features/court/components/CourtAvatar";
 import { CourtJudgmentResult } from "@/features/court/components/CourtJudgmentResult";
 import { CourtReviewerPromptModal } from "@/features/court/components/CourtReviewerPromptModal";
@@ -6,7 +8,6 @@ import { CourtVoteButton } from "@/features/court/components/CourtVoteButton";
 import {
   courtApi,
   formatCount,
-  formatTime,
   mapCaseStage,
   type CourtCase,
 } from "@/features/court/court.api";
@@ -171,9 +172,14 @@ export default function CourtDetailScreen() {
           favoriteCount: result.favoriteCount ?? current.favoriteCount,
         };
       });
+      Toast.show(result.favorited ? "收藏成功" : "已取消收藏", {
+        duration: Toast.durations.SHORT,
+        position: Toast.positions.CENTER,
+      });
     } catch (error) {
       Toast.show(error instanceof Error ? error.message : "收藏失败", {
         duration: Toast.durations.SHORT,
+        position: Toast.positions.CENTER,
       });
     } finally {
       setPendingAction(null);
@@ -338,74 +344,17 @@ export default function CourtDetailScreen() {
           )}
         </View>
         {tab === "判决流程" ? (
-          <View style={styles.timeline}>
-            {(item.timeline ?? []).length ? (
-              item.timeline?.map((entry, index) => (
-                <View
-                  key={`${entry.eventType}-${index}`}
-                  style={styles.timelineRow}
-                >
-                  <View style={styles.timelineMark}>
-                    <View
-                      style={[styles.dot, index === 0 && styles.dotCurrent]}
-                    />
-                    {index < (item.timeline?.length ?? 0) - 1 && (
-                      <View style={styles.timelineLine} />
-                    )}
-                  </View>
-                  <View style={styles.timelineText}>
-                    <Text style={styles.timelineTitle}>
-                      {timelineLabel(entry.eventType, entry.toStage)}
-                    </Text>
-                    {!!entry.reason && (
-                      <Text style={styles.timelineReason}>{entry.reason}</Text>
-                    )}
-                    <Text style={styles.timelineTime}>
-                      {formatTime(entry.createdAt)}
-                    </Text>
-                  </View>
-                </View>
-              ))
-            ) : (
-              <Text style={styles.muted}>暂无流程记录</Text>
-            )}
-          </View>
+          <CourtProcessTimeline key={`${item.caseId}-${item.level}`} item={item} />
         ) : (
           <View style={styles.evidenceList}>
             {evidence.length ? (
               evidence.map((submission, index) => (
-                <View
+                <CourtEvidenceSubmission
                   key={`${submission.submittedAt}-${index}`}
-                  style={styles.evidenceItem}
-                >
-                  <Text style={styles.evidenceLabel}>
-                    {tab} ·{" "}
-                    {submission.level === "SECOND"
-                      ? "二审"
-                      : submission.level === "THIRD"
-                        ? "三审"
-                        : "一审"}
-                  </Text>
-                  {!!submission.content && (
-                    <Text style={styles.body}>{submission.content}</Text>
-                  )}
-                  {!!submission.imageUrls?.length && (
-                    <View style={styles.imageRow}>
-                      {submission.imageUrls
-                        .slice(0, 9)
-                        .map((uri, imageIndex) => (
-                          <CachedImage
-                            key={`${uri}-${imageIndex}`}
-                            source={{ uri }}
-                            style={styles.imageThumb}
-                          />
-                        ))}
-                    </View>
-                  )}
-                  <Text style={styles.timelineTime}>
-                    {formatTime(submission.submittedAt)}
-                  </Text>
-                </View>
+                  submission={submission}
+                  party={tab === "原告举证" ? item.plaintiff : item.defendant}
+                  role={tab === "原告举证" ? "PLAINTIFF" : "DEFENDANT"}
+                />
               ))
             ) : (
               <Text style={styles.muted}>暂无举证</Text>
@@ -529,42 +478,6 @@ function caseTypeLabel(code?: string) {
     )[code || ""] || "投诉"
   );
 }
-function timelineLabel(type?: string, stage?: string) {
-  // 流程标题与 web 端 utils/courtProcessTimeline.ts 保持一致。
-  const eventLabels: Record<string, string> = {
-    CASE_SUBMITTED: "案件提交",
-    CASE_ACCEPTED: "案件受理",
-    EVIDENCE_STARTED: "举证阶段",
-    VOTING_STARTED: "评审投票",
-    EVIDENCE_TIMEOUT: "评审投票",
-    CASE_JUDGED: "判决结果",
-    SECOND_CASE_JUDGED: "判决结果",
-    CASE_APPEALED: "申请二审",
-    APPEAL_ACCEPTED: "二审受理",
-    CASE_THIRD_APPEALED: "确认开庭",
-    CASE_CLOSED: "案件关闭",
-  };
-  const stageLabels: Record<string, string> = {
-    DRAFT: "草稿",
-    SUBMITTED: "案件提交",
-    PENDING_RE_SUBMIT: "待重新提交",
-    ACCEPTED: "案件受理",
-    EVIDENCE: "举证阶段",
-    VOTING: "评审投票",
-    JUDGED: "判决结果",
-    APPEALING: "申诉中",
-    HEARING: "确认开庭",
-    CLOSED: "案件关闭",
-  };
-
-  return (
-    eventLabels[type || ""] ||
-    stageLabels[type || ""] ||
-    stageLabels[stage || ""] ||
-    "流程更新"
-  );
-}
-
 const styles = StyleSheet.create({
   screen: { backgroundColor: "#F5F6F7", flex: 1 },
   header: {
@@ -673,47 +586,7 @@ const styles = StyleSheet.create({
     marginLeft: -6,
     position: "absolute",
   },
-  evidenceList: { backgroundColor: "#fff", minHeight: 140, padding: 16 },
-  evidenceItem: {
-    borderBottomColor: "#eee",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    paddingBottom: 12,
-    paddingTop: 4,
-  },
-  evidenceLabel: {
-    color: "#3DA5FF",
-    fontFamily: COURT_FONT_FAMILY,
-    fontSize: 11,
-    marginBottom: 7,
-  },
-  timeline: { backgroundColor: "#fff", minHeight: 140, padding: 14 },
-  timelineRow: { flexDirection: "row", minHeight: 66 },
-  timelineMark: { alignItems: "center", width: 18 },
-  dot: {
-    backgroundColor: "#ddd",
-    borderRadius: 5,
-    height: 9,
-    marginTop: 4,
-    width: 9,
-  },
-  dotCurrent: { backgroundColor: "#ff3158" },
-  timelineLine: { backgroundColor: "#eee", flex: 1, width: 1 },
-  timelineText: { flex: 1, paddingBottom: 12, paddingLeft: 8 },
-  timelineTitle: { color: "#0D0D0F", fontFamily: COURT_FONT_FAMILY, fontSize: 12 },
-  timelineReason: {
-    color: "#777",
-    fontFamily: COURT_FONT_FAMILY,
-    fontSize: 11,
-    lineHeight: 17,
-    marginTop: 3,
-  },
-  timelineTime: {
-    color: "#979799",
-    fontFamily: COURT_FONT_FAMILY,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 5,
-  },
+  evidenceList: { backgroundColor: "#fff", paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, gap: 16 },
   footer: {
     alignItems: "center",
     backgroundColor: "#fff",
