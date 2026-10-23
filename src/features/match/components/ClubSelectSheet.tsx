@@ -1,5 +1,4 @@
 import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useMemo, useState } from "react";
 import {
   FlatList,
@@ -14,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { MatchClub } from "@/features/match/api/match.types";
 import { HighlightedText } from "@/features/match/components/HighlightedText";
+import { MatchLinearGradient } from "@/features/match/components/MatchLinearGradient";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 
@@ -173,14 +173,14 @@ export function ClubSelectSheet({
           onPress={handleConfirm}
           style={({ pressed }) => [styles.confirmWrap, pressed && styles.pressed]}
         >
-          <LinearGradient
+          <MatchLinearGradient
             colors={CONFIRM_GRADIENT}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.confirm}
           >
             <Text style={styles.confirmText}>确定</Text>
-          </LinearGradient>
+          </MatchLinearGradient>
         </Pressable>
       </View>
     </BottomSheet>

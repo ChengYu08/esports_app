@@ -32,6 +32,9 @@ export const MATCH_COMPANION_PREFERENCE_OPTIONS: {
   { value: 2, label: "双陪" },
 ];
 
+/** 备注字数上限，对齐 PC ClubQuickMatchModal */
+export const MATCH_REMARK_MAX = 200;
+
 function formatPrice(value: number): string {
   if (!Number.isFinite(value)) return "0";
   return Number(value.toFixed(2)).toString();
@@ -220,6 +223,12 @@ export function useMatchForm() {
     return formatPriceRange(maleTotal, femaleTotal);
   }, [gender, quantity, selectedService]);
 
+  const remarkOverLimit = remark.length > MATCH_REMARK_MAX;
+
+  const updateRemark = useCallback((next: string) => {
+    setRemark(next.slice(0, MATCH_REMARK_MAX + 1));
+  }, []);
+
   return {
     token,
     gameId,
@@ -232,6 +241,7 @@ export function useMatchForm() {
     quantity,
     voice,
     remark,
+    remarkOverLimit,
     games,
     clubs,
     modes,
@@ -254,6 +264,6 @@ export function useMatchForm() {
     setCompanionPreference,
     setQuantity,
     setVoice,
-    setRemark,
+    setRemark: updateRemark,
   };
 }
