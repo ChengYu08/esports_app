@@ -239,25 +239,26 @@ export function useQuickMatchSession(
   const endMatching = useCallback(
     async (reason: MatchEndReason, message?: string) => {
       if (orderPendingRef.current || endedRef.current) return;
-      if (
-        (reason === "cancelled" || reason === "expired") &&
-        token &&
-        userId
-      ) {
-        try {
-          await closeAuditionRoomIfNeeded(
-            requestNoRef.current,
-            token,
-            String(userId),
-            Boolean(detailRef.current?.needVoice),
-          );
-        } catch (error) {
-          console.warn("[match] close audition room on end failed", error);
-        }
-      }
+      // TODO(临时注释): 取消/超时关闭试音房
+      // if (
+      //   (reason === "cancelled" || reason === "expired") &&
+      //   token &&
+      //   userId
+      // ) {
+      //   try {
+      //     await closeAuditionRoomIfNeeded(
+      //       requestNoRef.current,
+      //       token,
+      //       String(userId),
+      //       Boolean(detailRef.current?.needVoice),
+      //     );
+      //   } catch (error) {
+      //     console.warn("[match] close audition room on end failed", error);
+      //   }
+      // }
       finishEnded(reason, message);
     },
-    [finishEnded, token, userId],
+    [finishEnded],
   );
 
   // 初始化倒计时

@@ -91,15 +91,17 @@ export default function MatchMatchingScreen({
     }
   }, [requestNo, session, token]);
 
-  const closeAuditionRoom = session.closeAuditionRoom;
+  // TODO(临时注释): 支付成功关闭试音房
+  // const closeAuditionRoom = session.closeAuditionRoom;
   const handlePaid = useCallback(() => {
     setPayVisible(false);
     Toast.show("支付成功", { duration: Toast.durations.SHORT });
-    void (async () => {
-      await closeAuditionRoom();
-      leaveMatchFlow();
-    })();
-  }, [closeAuditionRoom, leaveMatchFlow]);
+    // void (async () => {
+    //   await closeAuditionRoom();
+    //   leaveMatchFlow();
+    // })();
+    leaveMatchFlow();
+  }, [leaveMatchFlow]);
 
   return (
     <View style={styles.root}>
