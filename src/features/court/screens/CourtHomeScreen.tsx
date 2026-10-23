@@ -47,6 +47,8 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
     type: "vote" | "favorite";
   } | null>(null);
   const [reviewerPromptVisible, setReviewerPromptVisible] = useState(false);
+  const listRef = useRef<FlatList<CourtCase | PlatformTicket>>(null);
+  const [backToTopFeed, setBackToTopFeed] = useState<string | null>(null);
   const voteInFlight = useRef(false);
   const loadRequestRef = useRef(0);
   const loadedFeedRef = useRef<string | null>(null);
@@ -114,6 +116,7 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
     loadedFeedRef.current = feedKey;
     const timer = setTimeout(() => {
       if (!preservePages) {
+        setBackToTopFeed(null);
         setCases([]);
         setTickets([]);
         setPage(1);
@@ -281,7 +284,12 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
     <View style={styles.panel}>
     <LinearGradient colors={["#FFFFFF", "#F7F7F7"]} locations={[0, 0.2]} style={StyleSheet.absoluteFill} pointerEvents="none" />
     <FlatList
-      key={pageType}
+      key={feedKey}
+      ref={listRef}
+      onScroll={(event) => {
+        setBackToTopFeed(event.nativeEvent.contentOffset.y > 80 ? feedKey : null);
+      }}
+      scrollEventThrottle={32}
       data={data as never[]}
       keyExtractor={(item: any, index) => String(pageType === "court" ? item.caseId : item.ticketId ?? item.ticketNo ?? index)}
       renderItem={pageType === "court" ? renderCase as never : renderTicket as never}
@@ -304,6 +312,21 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
       onEndReached={() => { if (hasMore && !loading && !loadingMore) void load(true); }}
       onEndReachedThreshold={0.4}
     />
+    {data.length > 0 && backToTopFeed === feedKey && (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="回到顶部"
+        onPress={() => listRef.current?.scrollToOffset({ offset: 0, animated: true })}
+        style={({ pressed }) => [styles.backToTop, { bottom: bottomInset + 88 }, pressed && styles.backToTopPressed]}
+      >
+        <CachedImage
+          accessible={false}
+          source={require("../../../../assets/court/back-to-top.svg")}
+          contentFit="contain"
+          style={styles.backToTopIcon}
+        />
+      </Pressable>
+    )}
     <CourtReviewerPromptModal visible={reviewerPromptVisible} onClose={() => setReviewerPromptVisible(false)} />
     </View>
   );
@@ -324,5 +347,18 @@ const styles = StyleSheet.create({
   statsRow: { backgroundColor: "#fff", borderRadius: 8, flexDirection: "row", justifyContent: "space-around", marginTop: 10, paddingVertical: 10 }, statsLabel: { color: "#777", fontFamily: COURT_FONT_FAMILY, fontSize: 12 }, statsValue: { color: "#111", fontWeight: "700" }, judgeEntry: { backgroundColor: "#fff7f8", borderColor: "#ffe1e6", borderRadius: 8, borderWidth: 1, marginTop: 10, padding: 12 }, judgeTitle: { color: "#171717", fontFamily: COURT_FONT_FAMILY, fontSize: 14, fontWeight: "700" }, judgeDesc: { color: "#888", fontFamily: COURT_FONT_FAMILY, fontSize: 11, marginTop: 4 }, judgeArrow: { color: "#ff3158", fontSize: 23, position: "absolute", right: 12, top: 10 },
   empty: { flex: 1, minHeight: 146, width: 247 },
   emptyMessage: { color: "#999999", fontFamily: COURT_FONT_FAMILY, fontSize: 12, fontWeight: "400", lineHeight: 18 },
+  backToTop: {
+    position: "absolute",
+    right: 12,
+    width: 48,
+    height: 48,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.95)",
+    alignItems: "center",
+    justifyContent: "center",
+    boxShadow: "0px 2px 16px 0px rgba(0,0,0,0.05), 0px 4px 8px 0px rgba(0,0,0,0.08)",
+  },
+  backToTopPressed: { backgroundColor: "#F5F6F7" },
+  backToTopIcon: { width: 28, height: 28 },
   loading: { marginVertical: 24 },
 });
