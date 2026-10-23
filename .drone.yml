@@ -83,6 +83,12 @@ steps:
         fi
         echo "NDK 就绪: $${NDK_DIR}"
 
+        # 缓存卷跨构建持久化：上次构建若被超时强杀，会遗留守护进程锁文件，
+        # 导致本次 Gradle 启动时 "Timeout waiting to lock" 失败，先清理
+        pkill -9 -f GradleDaemon 2>/dev/null || true
+        pkill -9 -f KotlinCompileDaemon 2>/dev/null || true
+        find /root/.gradle -name '*.lock' -delete 2>/dev/null || true
+
         npm ci --prefer-offline --no-audit --no-fund
         node scripts/build_apk.cjs --env "$${BUILD_ENV}" --abi "$${BUILD_ABI}"
 
