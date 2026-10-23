@@ -235,6 +235,22 @@ function ensureGradleJvmArgs() {
   fs.writeFileSync(file, text);
 }
 
+/**
+ * CI 容器是一次性的，Gradle Daemon 跨构建无法复用，只会遗留锁文件
+ * 污染持久缓存卷（journal-1.lock 等），导致下次构建启动失败。
+ */
+function disableGradleDaemon() {
+  const file = path.join(root, 'android', 'gradle.properties');
+  const line = 'org.gradle.daemon=false';
+  let text = fs.readFileSync(file, 'utf8');
+  if (/^org\.gradle\.daemon=/m.test(text)) {
+    text = text.replace(/^org\.gradle\.daemon=.*$/m, line);
+  } else {
+    text += `\n${line}\n`;
+  }
+  fs.writeFileSync(file, text);
+}
+
 function assembleAndArchive(target, buildEnv) {
   const gradlew = isWin ? 'gradlew.bat' : './gradlew';
   const isTest = buildEnv.APK_ENV_LABEL === 'test';
@@ -299,6 +315,7 @@ if (useBun) {
 }
 
 ensureGradleJvmArgs();
+disableGradleDaemon();
 rewriteGradleDistUrl();
 
 for (const target of targets) {
