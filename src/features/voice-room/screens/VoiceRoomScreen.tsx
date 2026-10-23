@@ -1,4 +1,6 @@
 import { clientAuthApi } from "@/features/auth/client-auth.api";
+import { fetchActiveQuickMatch } from "@/features/match/api/match.api";
+import { isQuickMatchActive } from "@/features/match/api/match.types";
 import { messageStore } from "@/features/message/message-store";
 import { useAuthStore } from "@esports/auth";
 import {
@@ -56,7 +58,7 @@ import type {
 
 const background = require("../../../../assets/voice-room/background.svg");
 const backIcon = require("../../../../assets/voice-room/back.svg");
-const closeIcon = require("../../../../assets/voice-room/close.svg");
+const closeIcon = require("../../../../assets/voice-room/navbar-exit.svg");
 const inviteIcon = require("../../../../assets/voice-room/invite.svg");
 const defaultAvatar = require("../../../../assets/voice-room/avatar-default.png");
 const ringOwner = require("../../../../assets/voice-room/ring-owner.svg");
@@ -135,14 +137,29 @@ function displayMessage(message: VoiceRoomMessage) {
 
 export default function VoiceRoomScreen() {
   const insets = useSafeAreaInsets();
-  const { id, v } = useLocalSearchParams<{
+  const params = useLocalSearchParams<{
     id: string | string[];
     v?: string | string[];
+    scene?: string | string[];
+    requestNo?: string | string[];
+    expireTime?: string | string[];
+    gameId?: string | string[];
+    gameName?: string | string[];
+    gameIconUrl?: string | string[];
   }>();
   const accessToken = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.user);
-  const roomId = typeof id === "string" ? id : id?.[0];
-  const invitedRoomVersion = typeof v === "string" ? v : v?.[0];
+  const paramStr = (value?: string | string[]) =>
+    typeof value === "string" ? value : value?.[0];
+  const roomId = paramStr(params.id);
+  const invitedRoomVersion = paramStr(params.v);
+  const routeScene = paramStr(params.scene);
+  const routeRequestNo = paramStr(params.requestNo);
+  const routeExpireTime = paramStr(params.expireTime);
+  const routeGameId = paramStr(params.gameId);
+  const routeGameName = paramStr(params.gameName);
+  const routeGameIconUrl = paramStr(params.gameIconUrl);
+  const sessionActiveRoom = useVoiceRoomSessionStore((state) => state.activeRoom);
   const [room, setRoom] = useState<VoiceRoomDetail | null>(null);
   const [members, setMembers] = useState<VoiceRoomMember[]>(() =>
     normalizeMembers(undefined, currentUser || undefined),
@@ -189,6 +206,10 @@ export default function VoiceRoomScreen() {
   const [error, setError] = useState<string | null>(() =>
     !roomId ? "语聊房不存在" : !accessToken ? "请先登录后进入语聊房" : null,
   );
+  /** null=校验中不展示按钮；true 才显示「选择陪玩」 */
+  const [matchActiveForAudition, setMatchActiveForAudition] = useState<
+    boolean | null
+  >(null);
 
   const roomVersion = room?.roomVersion ?? "1";
   const chatroomId = room?.rongChatroomId;
@@ -197,6 +218,21 @@ export default function VoiceRoomScreen() {
   const isOwner =
     Boolean(currentUser?.id) &&
     String(room?.creatorUserId ?? "") === String(currentUser?.id);
+  const auditionFromSession =
+    sessionActiveRoom &&
+    sessionActiveRoom.roomId === roomId &&
+    sessionActiveRoom.scene === "audition"
+      ? sessionActiveRoom
+      : null;
+  const isAuditionScene =
+    routeScene === "audition" || Boolean(auditionFromSession);
+  const auditionRequestNo =
+    routeRequestNo || auditionFromSession?.matchRequestNo || undefined;
+  const showSelectCompanion =
+    isOwner &&
+    isAuditionScene &&
+    Boolean(auditionRequestNo) &&
+    matchActiveForAudition === true;
   const rtcReady = Boolean(roomId && rtcReadyRoomId === roomId);
   const muted = !roomId || micState?.roomId !== roomId || micState.muted;
   const profileRequests = useRef(new Set<string>());
@@ -209,12 +245,146 @@ export default function VoiceRoomScreen() {
     else router.replace("/(tabs)");
   }, []);
 
-  useFocusEffect(useCallback(() => {
-    focusedRef.current = true;
-    // A private chat can cover this screen while the global listener exits it.
-    if (kickedRef.current) minimize();
-    return () => { focusedRef.current = false; };
-  }, [minimize]));
+  const clearAuditionSessionMarkers = useCallback((targetRoomId: string) => {
+    const current = useVoiceRoomSessionStore.getState().activeRoom;
+    if (!current || current.roomId !== targetRoomId) return;
+    if (
+      current.scene == null &&
+      current.matchRequestNo == null &&
+      current.matchExpireTime == null &&
+      current.matchGameId == null &&
+      current.matchGameName == null &&
+      current.matchGameIconUrl == null
+    ) {
+      return;
+    }
+    useVoiceRoomSessionStore.getState().setActiveRoom({
+      roomId: current.roomId,
+      roomVersion: current.roomVersion,
+      rongChatroomId: current.rongChatroomId,
+      roomName: current.roomName,
+      creatorUserId: current.creatorUserId,
+      ownerName: current.ownerName,
+      ownerAvatar: current.ownerAvatar,
+    });
+  }, []);
+
+  const openSelectCompanion = useCallback(() => {
+    if (!auditionRequestNo) return;
+    const matchMeta =
+      sessionActiveRoom?.roomId === roomId ? sessionActiveRoom : null;
+    const expireTime =
+      routeExpireTime || matchMeta?.matchExpireTime || undefined;
+    const gameId = routeGameId || matchMeta?.matchGameId || undefined;
+    const gameName = routeGameName || matchMeta?.matchGameName || undefined;
+    const gameIconUrl =
+      routeGameIconUrl || matchMeta?.matchGameIconUrl || undefined;
+    // push 压在语聊房之上；勿用 navigate/singular，否则会重排栈并可能清掉首页
+    router.push({
+      pathname: "/match/matching/[requestNo]",
+      params: {
+        requestNo: auditionRequestNo,
+        ...(expireTime ? { expireTime } : {}),
+        ...(gameId && gameName
+          ? {
+              gameId,
+              gameName,
+              ...(gameIconUrl ? { gameIconUrl } : {}),
+            }
+          : {}),
+      },
+    });
+  }, [
+    auditionRequestNo,
+    roomId,
+    routeExpireTime,
+    routeGameId,
+    routeGameIconUrl,
+    routeGameName,
+    sessionActiveRoom,
+  ]);
+
+  /** 路由带试音标记时补写到 session，小窗再进仍可带上 requestNo 做校验 */
+  useEffect(() => {
+    if (!roomId || routeScene !== "audition" || !routeRequestNo) return;
+    if (matchActiveForAudition === false) return;
+    const current = useVoiceRoomSessionStore.getState().activeRoom;
+    if (!current || current.roomId !== roomId) return;
+    if (
+      current.scene === "audition" &&
+      current.matchRequestNo === routeRequestNo
+    ) {
+      return;
+    }
+    useVoiceRoomSessionStore.getState().setActiveRoom({
+      ...current,
+      scene: "audition",
+      matchRequestNo: routeRequestNo,
+      matchExpireTime: routeExpireTime || current.matchExpireTime,
+      matchGameId: routeGameId || current.matchGameId,
+      matchGameName: routeGameName || current.matchGameName,
+      matchGameIconUrl: routeGameIconUrl || current.matchGameIconUrl,
+    });
+  }, [
+    matchActiveForAudition,
+    roomId,
+    routeExpireTime,
+    routeGameId,
+    routeGameIconUrl,
+    routeGameName,
+    routeRequestNo,
+    routeScene,
+  ]);
+
+  useFocusEffect(
+    useCallback(() => {
+      focusedRef.current = true;
+      // A private chat can cover this screen while the global listener exits it.
+      if (kickedRef.current) minimize();
+
+      const needsAuditionCheck =
+        isOwner && isAuditionScene && Boolean(auditionRequestNo);
+      if (!needsAuditionCheck || !accessToken || !auditionRequestNo) {
+        setMatchActiveForAudition(needsAuditionCheck ? null : false);
+        return () => {
+          focusedRef.current = false;
+        };
+      }
+
+      let cancelled = false;
+      setMatchActiveForAudition(null);
+      void (async () => {
+        try {
+          const active = await fetchActiveQuickMatch(accessToken);
+          if (cancelled) return;
+          const ok =
+            Boolean(active) &&
+            isQuickMatchActive(active) &&
+            active!.requestNo === auditionRequestNo;
+          setMatchActiveForAudition(ok);
+          if (!ok && roomId) clearAuditionSessionMarkers(roomId);
+        } catch (error) {
+          if (cancelled) return;
+          console.warn("[voice-room] audition match check failed", error);
+          setMatchActiveForAudition(false);
+          if (roomId) clearAuditionSessionMarkers(roomId);
+        }
+      })();
+
+      return () => {
+        cancelled = true;
+        focusedRef.current = false;
+      };
+    }, [
+      accessToken,
+      auditionRequestNo,
+      clearAuditionSessionMarkers,
+      isAuditionScene,
+      isOwner,
+      minimize,
+      roomId,
+    ]),
+  );
 
   useEffect(() => {
     kickedRef.current = false;
@@ -332,6 +502,17 @@ export default function VoiceRoomScreen() {
           accessToken,
         );
         if (!isCurrentJoin()) return;
+        const prevRoom = useVoiceRoomSessionStore.getState().activeRoom;
+        const prevAudition =
+          prevRoom?.roomId === roomId && prevRoom.scene === "audition"
+            ? prevRoom
+            : null;
+        const auditionScene =
+          routeScene === "audition" || Boolean(prevAudition)
+            ? ("audition" as const)
+            : undefined;
+        const matchRequestNo =
+          routeRequestNo || prevAudition?.matchRequestNo || undefined;
         joining = {
           roomId,
           roomVersion: String(prepared.roomVersion ?? detail.roomVersion ?? "1"),
@@ -342,6 +523,19 @@ export default function VoiceRoomScreen() {
             ? currentUser?.nickname || "我" : "房间成员",
           ownerAvatar: String(detail.creatorUserId ?? "") === String(currentUser?.id ?? "")
             ? currentUser?.headImage : undefined,
+          ...(auditionScene && matchRequestNo
+            ? {
+                scene: auditionScene,
+                matchRequestNo,
+                matchExpireTime:
+                  routeExpireTime || prevAudition?.matchExpireTime || undefined,
+                matchGameId: routeGameId || prevAudition?.matchGameId || undefined,
+                matchGameName:
+                  routeGameName || prevAudition?.matchGameName || undefined,
+                matchGameIconUrl:
+                  routeGameIconUrl || prevAudition?.matchGameIconUrl || undefined,
+              }
+            : {}),
         };
         useVoiceRoomSessionStore.getState().beginRoomJoin(joining);
         setRoom({ ...detail, ...prepared, roomId });
@@ -885,6 +1079,7 @@ export default function VoiceRoomScreen() {
           leaving={leaving}
           serviceCalling={serviceCalling}
           distanceEnabled={distanceEnabled}
+          showSelectCompanion={showSelectCompanion}
           onToggleDistance={() => setDistanceEnabled((prev) => !prev)}
           onChangeText={setInput}
           onSend={() => void sendMessage()}
@@ -900,6 +1095,7 @@ export default function VoiceRoomScreen() {
             setConversationsSheetVisible(true);
           }}
           onCallService={() => void callService()}
+          onSelectCompanion={openSelectCompanion}
         />
       </View>
       <VoiceRoomExitDialog
@@ -955,7 +1151,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  headerIcon: { width: 22, height: 22 },
+  headerIcon: { width: 24, height: 24 },
   title: { color: "#F6F7FF", fontSize: 17, fontWeight: "700" },
   roomMeta: { paddingHorizontal: 20, paddingTop: 2, paddingBottom: 12 },
   roomName: { color: "#F7F8FF", fontSize: 16, fontWeight: "700" },

@@ -31,11 +31,37 @@ export function VoiceRoomMiniPlayer() {
 
   const openRoom = useCallback(() => {
     if (!room) return;
+    // 选人页压在语聊房上时用 back，避免 navigate 再叠一层语聊房
+    if (pathname.startsWith('/match/matching') && router.canGoBack()) {
+      router.back();
+      return;
+    }
     router.navigate({
       pathname: '/voice-room/[id]',
-      params: { id: room.roomId, v: room.roomVersion },
+      params: {
+        id: room.roomId,
+        v: room.roomVersion,
+        ...(room.scene === 'audition' && room.matchRequestNo
+          ? {
+              scene: 'audition',
+              requestNo: room.matchRequestNo,
+              ...(room.matchExpireTime
+                ? { expireTime: room.matchExpireTime }
+                : {}),
+              ...(room.matchGameId && room.matchGameName
+                ? {
+                    gameId: room.matchGameId,
+                    gameName: room.matchGameName,
+                    ...(room.matchGameIconUrl
+                      ? { gameIconUrl: room.matchGameIconUrl }
+                      : {}),
+                  }
+                : {}),
+            }
+          : {}),
+      },
     });
-  }, [room]);
+  }, [pathname, room]);
 
   const gesture = useMemo(() => {
     const pan = Gesture.Pan()

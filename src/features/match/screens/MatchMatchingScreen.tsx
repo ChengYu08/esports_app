@@ -91,11 +91,15 @@ export default function MatchMatchingScreen({
     }
   }, [requestNo, session, token]);
 
+  const closeAuditionRoom = session.closeAuditionRoom;
   const handlePaid = useCallback(() => {
     setPayVisible(false);
     Toast.show("支付成功", { duration: Toast.durations.SHORT });
-    leaveMatchFlow();
-  }, [leaveMatchFlow]);
+    void (async () => {
+      await closeAuditionRoom();
+      leaveMatchFlow();
+    })();
+  }, [closeAuditionRoom, leaveMatchFlow]);
 
   return (
     <View style={styles.root}>

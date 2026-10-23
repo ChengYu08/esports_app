@@ -115,13 +115,36 @@ export default function MatchPublishScreen() {
   }, []);
 
   const enterAuditionRoom = useCallback(
-    async (requestNo: string) => {
+    async (
+      requestNo: string,
+      options?: {
+        expireTime?: string;
+        game?: { id: string; name: string; iconUrl?: string } | null;
+      },
+    ) => {
       if (!form.token) return false;
       try {
         const room = await ensureAuditionRoom(requestNo, form.token);
         const roomId = resolveVoiceRoomId(room) || room.id;
         if (!roomId) throw new Error("试音房信息不存在");
-        router.push({ pathname: "/voice-room/[id]", params: { id: roomId } });
+        const game = options?.game;
+        // replace：替换发布页，避免语聊房返回又回到发布表单（与不试音 goMatching 一致）
+        router.replace({
+          pathname: "/voice-room/[id]",
+          params: {
+            id: roomId,
+            scene: "audition",
+            requestNo,
+            ...(options?.expireTime ? { expireTime: options.expireTime } : {}),
+            ...(game?.id && game.name
+              ? {
+                  gameId: game.id,
+                  gameName: game.name,
+                  ...(game.iconUrl ? { gameIconUrl: game.iconUrl } : {}),
+                }
+              : {}),
+          },
+        });
         return true;
       } catch (error) {
         Toast.show(
@@ -210,10 +233,14 @@ export default function MatchPublishScreen() {
       );
 
       const selectedGame = form.games.find((item) => item.id === form.gameId);
-      // 先落匹配中页，再进试音房，从语聊房返回仍在匹配中
-      goMatching(result.requestNo, result.expireTime, selectedGame ?? null);
       if (needVoice) {
-        await enterAuditionRoom(result.requestNo);
+        // 需试音：直接进试音房，不落匹配等待页；选人由房内「选择陪玩」再 push
+        await enterAuditionRoom(result.requestNo, {
+          expireTime: result.expireTime,
+          game: selectedGame ?? null,
+        });
+      } else {
+        goMatching(result.requestNo, result.expireTime, selectedGame ?? null);
       }
     } catch (error) {
       Toast.show(error instanceof Error ? error.message : "发布失败，请重试", {

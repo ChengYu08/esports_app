@@ -1,5 +1,8 @@
 import { create } from 'zustand';
 
+/** 试音派单进入的语聊房场景 */
+export type VoiceRoomScene = 'audition';
+
 export type ActiveVoiceRoom = {
   roomId: string;
   roomVersion: string;
@@ -8,6 +11,13 @@ export type ActiveVoiceRoom = {
   creatorUserId: string;
   ownerName: string;
   ownerAvatar?: string;
+  /** 从快速匹配「需试音」进入时标记，用于底栏「选择陪玩」 */
+  scene?: VoiceRoomScene;
+  matchRequestNo?: string;
+  matchExpireTime?: string;
+  matchGameId?: string;
+  matchGameName?: string;
+  matchGameIconUrl?: string;
 };
 
 type VoiceRoomSessionState = {
