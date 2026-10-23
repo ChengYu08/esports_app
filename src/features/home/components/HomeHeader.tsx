@@ -5,6 +5,7 @@ import type {
   HomeTab,
 } from "@/features/home/api/home.types";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { COURT_FONT_FAMILY } from "@/features/court/court.theme";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { Image } from "expo-image";
 import { router } from "expo-router";
@@ -36,29 +37,6 @@ export function HomeHeader({
 }: HomeHeaderProps) {
   return (
     <>
-      <View style={styles.topBar}>
-        <View style={styles.topTabs}>
-          <Tab
-            label="首页"
-            selected={tab === "home"}
-            onPress={() => onTabChange("home")}
-          />
-          {/* <Tab
-            label="小法庭"
-            selected={tab === "court"}
-            onPress={() => onTabChange("court")}
-          /> */}
-        </View>
-        <Pressable
-          accessibilityLabel="搜索"
-          style={styles.search}
-          onPress={() =>
-            router.push({ pathname: "/search", params: { type: "club" } })
-          }
-        >
-          <Image source={searchIcon} style={styles.searchIcon} />
-        </Pressable>
-      </View>
       {/* <View style={styles.banner}>
         <CachedImage
           source={
@@ -141,19 +119,37 @@ export function HomeHeader({
   );
 }
 
+export function HomeTopBar({ tab, onTabChange }: Pick<HomeHeaderProps, "tab" | "onTabChange">) {
+  return (
+    <View style={styles.topBar}>
+      <View style={styles.topTabs}>
+        <Tab label="首页" court={tab === "court"} selected={tab === "home"} onPress={() => onTabChange("home")} />
+        <Tab label="小法庭" court={tab === "court"} selected={tab === "court"} onPress={() => onTabChange("court")} />
+      </View>
+      <View style={styles.actions}>
+        <Pressable accessibilityLabel="搜索" style={styles.search} onPress={() => router.push({ pathname: "/search", params: { type: "club" } })}>
+          <Image source={searchIcon} style={styles.searchIcon} />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 function Tab({
   label,
   selected,
   onPress,
+  court = false,
 }: {
   label: string;
   selected: boolean;
   onPress: () => void;
+  court?: boolean;
 }) {
   return (
     <Pressable onPress={onPress} style={styles.tab}>
       {selected && <View style={styles.line} />}
-      <Text style={[styles.tabText, selected && styles.tabSelected]}>
+      <Text style={[styles.tabText, selected && styles.tabSelected, court && styles.courtTabText, court && selected && styles.courtTabSelected]}>
         {label}
       </Text>
     </Pressable>
@@ -163,7 +159,7 @@ function Tab({
 const styles = StyleSheet.create({
   topBar: {
     height: 44,
-    paddingLeft: 20,
+    paddingLeft: 16,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -182,6 +178,8 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
   },
+  courtTabText: { fontFamily: COURT_FONT_FAMILY, color: "#CACACC", fontWeight: "600", lineHeight: 26 },
+  courtTabSelected: { color: "#0D0D0F", lineHeight: 28 },
   line: {
     position: "absolute",
     bottom: 11,
@@ -191,7 +189,8 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: "#FFC2C6",
   },
-  search: { paddingRight: 12 },
+  actions: { alignItems: "center", flexDirection: "row", gap: 10, height: "100%", paddingRight: 12 },
+  search: { alignItems: "center", height: 44, justifyContent: "center", width: 40 },
   searchIcon: { width: 48, height: 48 },
   banner: {
     marginHorizontal: 12,
