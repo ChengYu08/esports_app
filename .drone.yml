@@ -16,6 +16,9 @@ kind: pipeline
 type: docker
 name: android-deployment
 
+# 冷构建（首次写缓存卷）耗时较长，默认 60 分钟会超时被杀
+timeout: 180
+
 image_pull_secrets:
   - dockerconfig
 
@@ -105,6 +108,8 @@ steps:
         fi
 
         npm ci --prefer-offline --no-audit --no-fund
+
+        # 冷构建可能远超 60 分钟（NDK + 全量 Gradle 依赖），放宽 pipeline 超时后再跑
         node scripts/build_apk.cjs --env "$${BUILD_ENV}" --abi "$${BUILD_ABI}"
 
         echo "构建完成，产物:"
