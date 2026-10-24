@@ -47,6 +47,15 @@ type ClubQuickMatchSheetProps = {
   /** 当前俱乐部启用的游戏（对齐 PC club 模式 props.games） */
   games: MatchGame[];
   initialGameId?: string;
+  /**
+   * club：俱乐部页老板自发；
+   * reception：语聊房接待代发（买家为房主，固定需试音，发布后由老板端接管）
+   */
+  mode?: "club" | "reception";
+  /** 接待代发时的老板用户 ID（mode=reception 必传） */
+  buyerUserId?: string | number;
+  /** 接待代发时展示的老板昵称 */
+  buyerNickname?: string;
 };
 
 function LightFieldLabel({
@@ -154,11 +163,15 @@ export function ClubQuickMatchSheet({
   club: lockedClub,
   games: providedGames,
   initialGameId,
+  mode = "club",
+  buyerUserId,
+  buyerNickname,
 }: ClubQuickMatchSheetProps) {
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const user = useAuthStore((state) => state.user);
   const activeRoom = useVoiceRoomSessionStore((state) => state.activeRoom);
+  const isReception = mode === "reception";
   const form = useMatchForm({
     enabled: visible,
     lockedClub: visible ? lockedClub : null,
@@ -305,19 +318,26 @@ export function ClubQuickMatchSheet({
       });
       return;
     }
+    if (isReception && !buyerUserId) {
+      Toast.show("未识别到下单老板，请重试", { duration: Toast.durations.SHORT });
+      return;
+    }
     if (submitting) return;
 
-    const needVoice = form.voice === "需试音";
+    // 接待代发固定需试音，由老板端接管进房；老板自发仍按表单选择
+    const needVoice = isReception ? true : form.voice === "需试音";
     setSubmitting(true);
     try {
-      if (needVoice && activeRoom && user?.id) {
+      // 仅老板自发试音需退出当前房；接待代发在老板房间发起，不能退散老板房间
+      if (!isReception && needVoice && activeRoom && user?.id) {
         await exitVoiceRoom(activeRoom, String(user.id), form.token);
       }
 
       const result = await publishQuickMatch(
         {
           clubId: Number(form.club.id),
-          publishType: "BUYER",
+          publishType: isReception ? "RECEPTION" : "BUYER",
+          buyerUserId: isReception ? Number(buyerUserId) : undefined,
           gameId: Number(form.gameId),
           gameModeId: Number(form.modeId),
           gameLevelId: Number(form.levelId),
@@ -332,6 +352,12 @@ export function ClubQuickMatchSheet({
         },
         form.token,
       );
+
+      if (isReception) {
+        Toast.show("已为老板发起派单", { duration: Toast.durations.SHORT });
+        onClose();
+        return;
+      }
 
       const selectedGame = form.games.find((item) => item.id === form.gameId);
       if (needVoice) {
@@ -351,21 +377,24 @@ export function ClubQuickMatchSheet({
     }
   }, [
     activeRoom,
+    buyerUserId,
     enterAuditionRoom,
     form,
     goMatching,
+    isReception,
+    onClose,
     submitting,
     user?.id,
   ]);
 
   const handlePublish = useCallback(() => {
-    if (form.voice === "需试音" && activeRoom) {
+    if (!isReception && form.voice === "需试音" && activeRoom) {
       pendingPublishRef.current = runPublish;
       setExitRoomPromptVisible(true);
       return;
     }
     void runPublish();
-  }, [activeRoom, form.voice, runPublish]);
+  }, [activeRoom, form.voice, isReception, runPublish]);
 
   const clubDisplayName = form.club?.name || lockedClub.name;
 
@@ -381,8 +410,17 @@ export function ClubQuickMatchSheet({
           { paddingBottom: Math.max(insets.bottom, 12) },
         ]}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>一键匹配</Text>
+        <View style={[styles.header, isReception && styles.headerTall]}>
+          <View style={styles.headerTitles}>
+            <Text style={styles.title}>
+              {isReception ? "客服派单" : "一键匹配"}
+            </Text>
+            {isReception ? (
+              <Text style={styles.subtitle} numberOfLines={1}>
+                帮「{buyerNickname || "老板"}」派单
+              </Text>
+            ) : null}
+          </View>
           <Pressable
             accessibilityLabel="关闭"
             hitSlop={8}
@@ -534,19 +572,21 @@ export function ClubQuickMatchSheet({
             <LightStepper value={form.quantity} onChange={form.setQuantity} />
           </View>
 
-          <View style={styles.field}>
-            <LightFieldLabel label="试音" required />
-            <View style={styles.options}>
-              {MATCH_VOICE_OPTIONS.map((option) => (
-                <LightChip
-                  key={option}
-                  label={option}
-                  selected={form.voice === option}
-                  onPress={() => form.setVoice(option)}
-                />
-              ))}
+          {!isReception ? (
+            <View style={styles.field}>
+              <LightFieldLabel label="试音" required />
+              <View style={styles.options}>
+                {MATCH_VOICE_OPTIONS.map((option) => (
+                  <LightChip
+                    key={option}
+                    label={option}
+                    selected={form.voice === option}
+                    onPress={() => form.setVoice(option)}
+                  />
+                ))}
+              </View>
             </View>
-          </View>
+          ) : null}
 
           <View style={[styles.field, styles.fieldCenter]}>
             <LightFieldLabel label="备注" required />
@@ -602,7 +642,11 @@ export function ClubQuickMatchSheet({
               ]}
             >
               <Text style={styles.publishText}>
-                {submitting ? "发布中..." : "立即发布，匹配陪玩"}
+                {submitting
+                  ? "发布中..."
+                  : isReception
+                    ? "为老板发起派单"
+                    : "立即发布，匹配陪玩"}
               </Text>
             </MatchLinearGradient>
           </Pressable>
@@ -631,6 +675,17 @@ export function ClubQuickMatchSheet({
 }
 
 const styles = StyleSheet.create({
+  headerTitles: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 8,
+  },
+  subtitle: {
+    marginTop: 4,
+    color: "#979799",
+    fontSize: 12,
+    lineHeight: 18,
+  },
   sheet: {
     backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 12,
@@ -644,6 +699,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  headerTall: {
+    height: 64,
+    alignItems: "flex-start",
+    paddingTop: 12,
   },
   title: {
     fontFamily: DOUYIN_SANS,

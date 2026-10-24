@@ -85,5 +85,16 @@ export const voiceRoomApi = {
       action: { roomId, roomVersion, clubId },
     });
   },
+  /** 俱乐部接待抢单（对齐 PC claimClubService） */
+  claimClubService(
+    data: { roomId: string; clubId: string; roomVersion: string },
+    token: string,
+  ) {
+    return post<{ roomInfo?: VoiceRoomDetail } & VoiceRoomDetail>(
+      '/client/v1/voiceRoom/claimClubService',
+      token,
+      { action: data },
+    );
+  },
 };
 

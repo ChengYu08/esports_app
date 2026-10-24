@@ -26,6 +26,10 @@ type VoiceRoomToolbarProps = {
   leaving: boolean;
   serviceCalling: boolean;
   distanceEnabled: boolean;
+  /** 房主且房内尚无接待时展示「呼叫接待」 */
+  showCallService?: boolean;
+  /** 当前用户为房间绑定接待时展示「客服派单」 */
+  showServiceDispatch?: boolean;
   showSelectCompanion?: boolean;
   onToggleDistance: () => void;
   onChangeText: (text: string) => void;
@@ -34,6 +38,7 @@ type VoiceRoomToolbarProps = {
   onOpenMessages: () => void;
   onInvite: () => void;
   onCallService: () => void;
+  onServiceDispatch?: () => void;
   onSelectCompanion?: () => void;
 };
 
@@ -47,6 +52,8 @@ export function VoiceRoomToolbar({
   leaving,
   serviceCalling,
   distanceEnabled,
+  showCallService = false,
+  showServiceDispatch = false,
   showSelectCompanion = false,
   onToggleDistance,
   onChangeText,
@@ -55,6 +62,7 @@ export function VoiceRoomToolbar({
   onOpenMessages,
   onInvite,
   onCallService,
+  onServiceDispatch,
   onSelectCompanion,
 }: VoiceRoomToolbarProps) {
   const { width } = useWindowDimensions();
@@ -127,6 +135,77 @@ export function VoiceRoomToolbar({
           <Image source={inviteIcon} style={styles.icon} contentFit="contain" />
         </Pressable>
       </View>
+      {showCallService ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={serviceCalling ? "呼叫中" : "呼叫接待"}
+          accessibilityState={{ disabled: serviceCalling || leaving, busy: serviceCalling }}
+          disabled={serviceCalling || leaving}
+          onPress={onCallService}
+          hitSlop={4}
+          style={({ pressed }) => [
+            styles.actionPillButton,
+            (serviceCalling || leaving) && styles.disabled,
+            pressed && styles.pressed,
+          ]}
+        >
+          <LinearGradient
+            colors={["#FF1F2E", "#FF1F69"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[
+              styles.actionPillContent,
+              compact && styles.actionPillContentCompact,
+            ]}
+          >
+            <Text
+              numberOfLines={1}
+              maxFontSizeMultiplier={1.2}
+              style={[
+                styles.actionPillText,
+                compact && styles.actionPillTextCompact,
+              ]}
+            >
+              {serviceCalling ? "呼叫中…" : "呼叫接待"}
+            </Text>
+          </LinearGradient>
+        </Pressable>
+      ) : null}
+      {showServiceDispatch ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="客服派单"
+          disabled={leaving}
+          onPress={onServiceDispatch}
+          hitSlop={4}
+          style={({ pressed }) => [
+            styles.actionPillButton,
+            leaving && styles.disabled,
+            pressed && styles.pressed,
+          ]}
+        >
+          <LinearGradient
+            colors={["#FF1F2E", "#FF1F69"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[
+              styles.actionPillContent,
+              compact && styles.actionPillContentCompact,
+            ]}
+          >
+            <Text
+              numberOfLines={1}
+              maxFontSizeMultiplier={1.2}
+              style={[
+                styles.actionPillText,
+                compact && styles.actionPillTextCompact,
+              ]}
+            >
+              客服派单
+            </Text>
+          </LinearGradient>
+        </Pressable>
+      ) : null}
       {showSelectCompanion ? (
         <Pressable
           accessibilityRole="button"
@@ -231,6 +310,22 @@ const styles = StyleSheet.create({
     tintColor: "#FFA500",
   },
   icon: { width: 20, height: 20 },
+  actionPillButton: { flexShrink: 0, borderRadius: 18 },
+  actionPillContent: {
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderRadius: 18,
+  },
+  actionPillContentCompact: { paddingHorizontal: 8 },
+  actionPillText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: "600",
+  },
+  actionPillTextCompact: { fontSize: 12 },
   selectCompanionButton: { flexShrink: 0, borderRadius: 18 },
   selectCompanionContent: {
     height: 36,

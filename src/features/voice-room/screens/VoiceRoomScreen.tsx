@@ -1,6 +1,14 @@
 import { clientAuthApi } from "@/features/auth/client-auth.api";
-import { fetchActiveQuickMatch } from "@/features/match/api/match.api";
+import {
+  cancelQuickMatch,
+  fetchActiveQuickMatch,
+  fetchDispatchActiveQuickMatch,
+  fetchQuickMatchClubDetail,
+  fetchQuickMatchGames,
+} from "@/features/match/api/match.api";
 import { isQuickMatchActive } from "@/features/match/api/match.types";
+import type { MatchGame } from "@/features/match/api/match.types";
+import { ClubQuickMatchSheet } from "@/features/match/components/ClubQuickMatchSheet";
 import { messageStore } from "@/features/message/message-store";
 import { useAuthStore } from "@esports/auth";
 import {
@@ -56,6 +64,9 @@ import type {
   VoiceRoomMember,
   VoiceRoomMessage,
 } from "../voice-room.types";
+
+/** 呼叫接待超时（秒），对齐 PC CS_CALL_TIMEOUT_SECONDS */
+const CS_CALL_TIMEOUT_SECONDS = 60;
 
 const backIcon = require("../../../../assets/voice-room/back.svg");
 const BG_GRADIENT = ["#0C0C2E", "#120D2B"] as const;
@@ -147,6 +158,8 @@ export default function VoiceRoomScreen() {
     gameId?: string | string[];
     gameName?: string | string[];
     gameIconUrl?: string | string[];
+    /** 俱乐部接待派单进房后自动呼叫接待 */
+    callService?: string | string[];
   }>();
   const accessToken = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.user);
@@ -160,6 +173,7 @@ export default function VoiceRoomScreen() {
   const routeGameId = paramStr(params.gameId);
   const routeGameName = paramStr(params.gameName);
   const routeGameIconUrl = paramStr(params.gameIconUrl);
+  const shouldAutoCallService = paramStr(params.callService) === "1";
   const sessionActiveRoom = useVoiceRoomSessionStore((state) => state.activeRoom);
   const [room, setRoom] = useState<VoiceRoomDetail | null>(null);
   const [members, setMembers] = useState<VoiceRoomMember[]>(() =>
@@ -203,14 +217,31 @@ export default function VoiceRoomScreen() {
   const [micChanging, setMicChanging] = useState(false);
   const [serviceCalling, setServiceCalling] = useState(false);
   const [distanceEnabled, setDistanceEnabled] = useState(false);
+  const [receptionVisible, setReceptionVisible] = useState(false);
+  const [receptionPreparing, setReceptionPreparing] = useState(false);
+  const [receptionClub, setReceptionClub] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [receptionGames, setReceptionGames] = useState<MatchGame[]>([]);
+  const [receptionBuyerId, setReceptionBuyerId] = useState<string>("");
+  const [receptionBuyerName, setReceptionBuyerName] = useState("");
+  const autoCallServiceDoneRef = useRef(false);
+  const csTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loading, setLoading] = useState(() => Boolean(roomId && accessToken));
   const [error, setError] = useState<string | null>(() =>
     !roomId ? "语聊房不存在" : !accessToken ? "请先登录后进入语聊房" : null,
   );
-  /** null=校验中不展示按钮；true 才显示「选择陪玩」 */
+  /**
+   * 两套独立校验态（null=校验中不展示）：
+   * - audition：老板需试音自发
+   * - quickMatchCreated：客服代发 QUICK_MATCH_CREATED
+   */
   const [matchActiveForAudition, setMatchActiveForAudition] = useState<
     boolean | null
   >(null);
+  const [matchActiveForQuickMatchCreated, setMatchActiveForQuickMatchCreated] =
+    useState<boolean | null>(null);
 
   const roomVersion = room?.roomVersion ?? "1";
   const chatroomId = room?.rongChatroomId;
@@ -219,6 +250,14 @@ export default function VoiceRoomScreen() {
   const isOwner =
     Boolean(currentUser?.id) &&
     String(room?.creatorUserId ?? "") === String(currentUser?.id);
+  const hasService = Boolean(room?.serviceUserId);
+  const canServiceDispatch =
+    Boolean(currentUser?.id) &&
+    room?.serviceUserId != null &&
+    String(room.serviceUserId) === String(currentUser?.id);
+  const showCallService = isOwner && !hasService;
+
+  // ---- 场景 A：试音自发 ----
   const auditionFromSession =
     sessionActiveRoom &&
     sessionActiveRoom.roomId === roomId &&
@@ -229,11 +268,27 @@ export default function VoiceRoomScreen() {
     routeScene === "audition" || Boolean(auditionFromSession);
   const auditionRequestNo =
     routeRequestNo || auditionFromSession?.matchRequestNo || undefined;
+
+  // ---- 场景 B：QUICK_MATCH_CREATED 客服代发（仅 session，不走路由 scene）----
+  const quickMatchCreatedFromSession =
+    sessionActiveRoom &&
+    sessionActiveRoom.roomId === roomId &&
+    sessionActiveRoom.scene === "quickMatchCreated"
+      ? sessionActiveRoom
+      : null;
+  const isQuickMatchCreatedScene = Boolean(quickMatchCreatedFromSession);
+  const quickMatchCreatedRequestNo =
+    quickMatchCreatedFromSession?.matchRequestNo || undefined;
+
   const showSelectCompanion =
-    isOwner &&
-    isAuditionScene &&
-    Boolean(auditionRequestNo) &&
-    matchActiveForAudition === true;
+    (isOwner &&
+      isAuditionScene &&
+      Boolean(auditionRequestNo) &&
+      matchActiveForAudition === true) ||
+    (isOwner &&
+      isQuickMatchCreatedScene &&
+      Boolean(quickMatchCreatedRequestNo) &&
+      matchActiveForQuickMatchCreated === true);
   const rtcReady = Boolean(roomId && rtcReadyRoomId === roomId);
   const muted = !roomId || micState?.roomId !== roomId || micState.muted;
   const profileRequests = useRef(new Set<string>());
@@ -246,9 +301,11 @@ export default function VoiceRoomScreen() {
     else router.replace("/(tabs)");
   }, []);
 
+  /** 仅清除 audition 场景标记，不影响 quickMatchCreated */
   const clearAuditionSessionMarkers = useCallback((targetRoomId: string) => {
     const current = useVoiceRoomSessionStore.getState().activeRoom;
     if (!current || current.roomId !== targetRoomId) return;
+    if (current.scene != null && current.scene !== "audition") return;
     if (
       current.scene == null &&
       current.matchRequestNo == null &&
@@ -270,21 +327,58 @@ export default function VoiceRoomScreen() {
     });
   }, []);
 
+  /** 仅清除 quickMatchCreated 场景标记，不影响 audition */
+  const clearQuickMatchCreatedSessionMarkers = useCallback(
+    (targetRoomId: string) => {
+      const current = useVoiceRoomSessionStore.getState().activeRoom;
+      if (!current || current.roomId !== targetRoomId) return;
+      if (current.scene !== "quickMatchCreated") return;
+      useVoiceRoomSessionStore.getState().setActiveRoom({
+        roomId: current.roomId,
+        roomVersion: current.roomVersion,
+        rongChatroomId: current.rongChatroomId,
+        roomName: current.roomName,
+        creatorUserId: current.creatorUserId,
+        ownerName: current.ownerName,
+        ownerAvatar: current.ownerAvatar,
+      });
+    },
+    [],
+  );
+
   const openSelectCompanion = useCallback(() => {
-    if (!auditionRequestNo) return;
+    const useQuickMatchCreated =
+      matchActiveForQuickMatchCreated === true &&
+      Boolean(quickMatchCreatedRequestNo);
+    const requestNo = useQuickMatchCreated
+      ? quickMatchCreatedRequestNo
+      : auditionRequestNo;
+    if (!requestNo) return;
+
     const matchMeta =
-      sessionActiveRoom?.roomId === roomId ? sessionActiveRoom : null;
-    const expireTime =
-      routeExpireTime || matchMeta?.matchExpireTime || undefined;
-    const gameId = routeGameId || matchMeta?.matchGameId || undefined;
-    const gameName = routeGameName || matchMeta?.matchGameName || undefined;
-    const gameIconUrl =
-      routeGameIconUrl || matchMeta?.matchGameIconUrl || undefined;
+      sessionActiveRoom &&
+      sessionActiveRoom.roomId === roomId &&
+      sessionActiveRoom.scene ===
+        (useQuickMatchCreated ? "quickMatchCreated" : "audition")
+        ? sessionActiveRoom
+        : null;
+    const expireTime = useQuickMatchCreated
+      ? matchMeta?.matchExpireTime
+      : routeExpireTime || matchMeta?.matchExpireTime || undefined;
+    const gameId = useQuickMatchCreated
+      ? matchMeta?.matchGameId
+      : routeGameId || matchMeta?.matchGameId || undefined;
+    const gameName = useQuickMatchCreated
+      ? matchMeta?.matchGameName
+      : routeGameName || matchMeta?.matchGameName || undefined;
+    const gameIconUrl = useQuickMatchCreated
+      ? matchMeta?.matchGameIconUrl
+      : routeGameIconUrl || matchMeta?.matchGameIconUrl || undefined;
     // push 压在语聊房之上；勿用 navigate/singular，否则会重排栈并可能清掉首页
     router.push({
       pathname: "/match/matching/[requestNo]",
       params: {
-        requestNo: auditionRequestNo,
+        requestNo,
         ...(expireTime ? { expireTime } : {}),
         ...(gameId && gameName
           ? {
@@ -297,6 +391,8 @@ export default function VoiceRoomScreen() {
     });
   }, [
     auditionRequestNo,
+    matchActiveForQuickMatchCreated,
+    quickMatchCreatedRequestNo,
     roomId,
     routeExpireTime,
     routeGameId,
@@ -305,12 +401,14 @@ export default function VoiceRoomScreen() {
     sessionActiveRoom,
   ]);
 
-  /** 路由带试音标记时补写到 session，小窗再进仍可带上 requestNo 做校验 */
+  /** 路由带试音标记时补写到 session（只写 audition，不覆盖 quickMatchCreated） */
   useEffect(() => {
     if (!roomId || routeScene !== "audition" || !routeRequestNo) return;
     if (matchActiveForAudition === false) return;
     const current = useVoiceRoomSessionStore.getState().activeRoom;
     if (!current || current.roomId !== roomId) return;
+    // 客服代发占用中不抢写为 audition
+    if (current.scene === "quickMatchCreated") return;
     if (
       current.scene === "audition" &&
       current.matchRequestNo === routeRequestNo
@@ -342,14 +440,20 @@ export default function VoiceRoomScreen() {
       focusedRef.current = true;
       // A private chat can cover this screen while the global listener exits it.
       if (kickedRef.current) minimize();
+      return () => {
+        focusedRef.current = false;
+      };
+    }, [minimize]),
+  );
 
+  /** 场景 A：试音自发 — fetchActiveQuickMatch 校验 */
+  useFocusEffect(
+    useCallback(() => {
       const needsAuditionCheck =
         isOwner && isAuditionScene && Boolean(auditionRequestNo);
       if (!needsAuditionCheck || !accessToken || !auditionRequestNo) {
         setMatchActiveForAudition(needsAuditionCheck ? null : false);
-        return () => {
-          focusedRef.current = false;
-        };
+        return;
       }
 
       let cancelled = false;
@@ -374,7 +478,6 @@ export default function VoiceRoomScreen() {
 
       return () => {
         cancelled = true;
-        focusedRef.current = false;
       };
     }, [
       accessToken,
@@ -382,7 +485,60 @@ export default function VoiceRoomScreen() {
       clearAuditionSessionMarkers,
       isAuditionScene,
       isOwner,
-      minimize,
+      roomId,
+    ]),
+  );
+
+  /** 场景 B：QUICK_MATCH_CREATED — 同样调 fetchActiveQuickMatch，独立状态 */
+  useFocusEffect(
+    useCallback(() => {
+      const needsQuickMatchCreatedCheck =
+        isOwner &&
+        isQuickMatchCreatedScene &&
+        Boolean(quickMatchCreatedRequestNo);
+      if (
+        !needsQuickMatchCreatedCheck ||
+        !accessToken ||
+        !quickMatchCreatedRequestNo
+      ) {
+        setMatchActiveForQuickMatchCreated(
+          needsQuickMatchCreatedCheck ? null : false,
+        );
+        return;
+      }
+
+      let cancelled = false;
+      setMatchActiveForQuickMatchCreated(null);
+      void (async () => {
+        try {
+          const active = await fetchActiveQuickMatch(accessToken);
+          if (cancelled) return;
+          const ok =
+            Boolean(active) &&
+            isQuickMatchActive(active) &&
+            active!.requestNo === quickMatchCreatedRequestNo;
+          setMatchActiveForQuickMatchCreated(ok);
+          if (!ok && roomId) clearQuickMatchCreatedSessionMarkers(roomId);
+        } catch (error) {
+          if (cancelled) return;
+          console.warn(
+            "[voice-room] quickMatchCreated match check failed",
+            error,
+          );
+          setMatchActiveForQuickMatchCreated(false);
+          if (roomId) clearQuickMatchCreatedSessionMarkers(roomId);
+        }
+      })();
+
+      return () => {
+        cancelled = true;
+      };
+    }, [
+      accessToken,
+      clearQuickMatchCreatedSessionMarkers,
+      isOwner,
+      isQuickMatchCreatedScene,
+      quickMatchCreatedRequestNo,
       roomId,
     ]),
   );
@@ -508,12 +664,35 @@ export default function VoiceRoomScreen() {
           prevRoom?.roomId === roomId && prevRoom.scene === "audition"
             ? prevRoom
             : null;
-        const auditionScene =
-          routeScene === "audition" || Boolean(prevAudition)
-            ? ("audition" as const)
-            : undefined;
-        const matchRequestNo =
-          routeRequestNo || prevAudition?.matchRequestNo || undefined;
+        const prevQuickMatchCreated =
+          prevRoom?.roomId === roomId && prevRoom.scene === "quickMatchCreated"
+            ? prevRoom
+            : null;
+        // 路由试音优先；否则保留 session 上的 audition / quickMatchCreated 标记，避免进房覆盖丢失
+        const preservedMatch =
+          routeScene === "audition" || prevAudition
+            ? {
+                scene: "audition" as const,
+                matchRequestNo:
+                  routeRequestNo || prevAudition?.matchRequestNo || undefined,
+                matchExpireTime:
+                  routeExpireTime || prevAudition?.matchExpireTime || undefined,
+                matchGameId: routeGameId || prevAudition?.matchGameId || undefined,
+                matchGameName:
+                  routeGameName || prevAudition?.matchGameName || undefined,
+                matchGameIconUrl:
+                  routeGameIconUrl || prevAudition?.matchGameIconUrl || undefined,
+              }
+            : prevQuickMatchCreated?.matchRequestNo
+              ? {
+                  scene: "quickMatchCreated" as const,
+                  matchRequestNo: prevQuickMatchCreated.matchRequestNo,
+                  matchExpireTime: prevQuickMatchCreated.matchExpireTime,
+                  matchGameId: prevQuickMatchCreated.matchGameId,
+                  matchGameName: prevQuickMatchCreated.matchGameName,
+                  matchGameIconUrl: prevQuickMatchCreated.matchGameIconUrl,
+                }
+              : null;
         joining = {
           roomId,
           roomVersion: String(prepared.roomVersion ?? detail.roomVersion ?? "1"),
@@ -524,17 +703,14 @@ export default function VoiceRoomScreen() {
             ? currentUser?.nickname || "我" : "房间成员",
           ownerAvatar: String(detail.creatorUserId ?? "") === String(currentUser?.id ?? "")
             ? currentUser?.headImage : undefined,
-          ...(auditionScene && matchRequestNo
+          ...(preservedMatch?.matchRequestNo
             ? {
-                scene: auditionScene,
-                matchRequestNo,
-                matchExpireTime:
-                  routeExpireTime || prevAudition?.matchExpireTime || undefined,
-                matchGameId: routeGameId || prevAudition?.matchGameId || undefined,
-                matchGameName:
-                  routeGameName || prevAudition?.matchGameName || undefined,
-                matchGameIconUrl:
-                  routeGameIconUrl || prevAudition?.matchGameIconUrl || undefined,
+                scene: preservedMatch.scene,
+                matchRequestNo: preservedMatch.matchRequestNo,
+                matchExpireTime: preservedMatch.matchExpireTime,
+                matchGameId: preservedMatch.matchGameId,
+                matchGameName: preservedMatch.matchGameName,
+                matchGameIconUrl: preservedMatch.matchGameIconUrl,
               }
             : {}),
         };
@@ -671,6 +847,220 @@ export default function VoiceRoomScreen() {
     roomId,
   ]);
 
+  const clearCsTimeout = useCallback(() => {
+    if (csTimeoutRef.current) {
+      clearTimeout(csTimeoutRef.current);
+      csTimeoutRef.current = null;
+    }
+  }, []);
+
+  const startCsTimeout = useCallback(() => {
+    clearCsTimeout();
+    csTimeoutRef.current = setTimeout(() => {
+      csTimeoutRef.current = null;
+      setServiceCalling((calling) => {
+        if (calling) {
+          Toast.show("当前无空闲接待，请稍后再试", {
+            duration: Toast.durations.SHORT,
+          });
+        }
+        return false;
+      });
+    }, CS_CALL_TIMEOUT_SECONDS * 1000);
+  }, [clearCsTimeout]);
+
+  const callService = useCallback(async () => {
+    if (!roomId || !accessToken || serviceCalling) return;
+    if (!room?.clubId) {
+      Toast.show("当前房间暂未绑定俱乐部，无法呼叫接待", {
+        duration: Toast.durations.SHORT,
+      });
+      return;
+    }
+    if (room.serviceUserId) return;
+    setServiceCalling(true);
+    startCsTimeout();
+    try {
+      await voiceRoomApi.inviteClubService(
+        roomId,
+        roomVersion,
+        room.clubId,
+        accessToken,
+      );
+      Toast.show("已呼叫俱乐部接待，请稍候", {
+        duration: Toast.durations.SHORT,
+      });
+    } catch (cause) {
+      clearCsTimeout();
+      setServiceCalling(false);
+      Toast.show(
+        cause instanceof Error ? cause.message : "呼叫接待失败，请稍后重试",
+        { duration: Toast.durations.SHORT },
+      );
+    }
+  }, [
+    accessToken,
+    clearCsTimeout,
+    room?.clubId,
+    room?.serviceUserId,
+    roomId,
+    roomVersion,
+    serviceCalling,
+    startCsTimeout,
+  ]);
+
+  /** 俱乐部接待派单进房后自动呼叫接待（仅一次） */
+  useEffect(() => {
+    if (!shouldAutoCallService || autoCallServiceDoneRef.current) return;
+    if (!roomId || !accessToken || loading || !room || !rtcReady) return;
+    if (!isOwner || room.serviceUserId) {
+      autoCallServiceDoneRef.current = true;
+      return;
+    }
+    autoCallServiceDoneRef.current = true;
+    void callService();
+  }, [
+    accessToken,
+    callService,
+    isOwner,
+    loading,
+    room,
+    roomId,
+    rtcReady,
+    shouldAutoCallService,
+  ]);
+
+  useEffect(() => () => clearCsTimeout(), [clearCsTimeout]);
+
+  /** 呼叫中成员加入时反查 serviceUserId，确认接待是否已接单 */
+  const refreshServiceUserId = useCallback(
+    async (joinedUserId?: string) => {
+      if (!roomId || !accessToken) return;
+      try {
+        const detail = await voiceRoomApi.getDetail(roomId, accessToken);
+        const serviceUserId =
+          detail.serviceUserId == null ? "" : String(detail.serviceUserId);
+        setRoom((prev) =>
+          prev
+            ? {
+                ...prev,
+                serviceUserId: detail.serviceUserId ?? prev.serviceUserId,
+                clubId: detail.clubId ?? prev.clubId,
+              }
+            : prev,
+        );
+        if (
+          serviceCalling &&
+          serviceUserId &&
+          (!joinedUserId || serviceUserId === joinedUserId)
+        ) {
+          clearCsTimeout();
+          setServiceCalling(false);
+          Toast.show("接待已接单", { duration: Toast.durations.SHORT });
+        }
+      } catch {
+        /* 反查失败静默，等下一次成员变更或超时兜底 */
+      }
+    },
+    [accessToken, clearCsTimeout, roomId, serviceCalling],
+  );
+
+  const onServiceDispatch = useCallback(async () => {
+    if (!canServiceDispatch) {
+      Toast.show("只有当前房间绑定的接待客服可以派单", {
+        duration: Toast.durations.SHORT,
+      });
+      return;
+    }
+    if (!accessToken || !room) return;
+    const clubId = room.clubId;
+    const ownerId = room.creatorUserId;
+    if (clubId == null || clubId === "" || ownerId == null || ownerId === "") {
+      Toast.show("房间信息不完整，无法派单", {
+        duration: Toast.durations.SHORT,
+      });
+      return;
+    }
+    if (receptionPreparing) return;
+    setReceptionPreparing(true);
+    const selfId = String(currentUser?.id || "");
+    const valid = () =>
+      !!useAuthStore.getState().accessToken &&
+      String(useAuthStore.getState().user?.id || "") === selfId &&
+      canServiceDispatch;
+
+    try {
+      const active = await fetchDispatchActiveQuickMatch(accessToken);
+      if (!valid()) return;
+      if (active && isQuickMatchActive(active)) {
+        Alert.alert(
+          "代发派单进行中",
+          `需求 ${active.requestNo} 仍在匹配中，可取消后重新派单。`,
+          [
+            { text: "知道了", style: "cancel" },
+            {
+              text: "取消派单",
+              style: "destructive",
+              onPress: () => {
+                void (async () => {
+                  try {
+                    await cancelQuickMatch(active.requestNo, accessToken);
+                    Toast.show("已取消派单", {
+                      duration: Toast.durations.SHORT,
+                    });
+                  } catch (error) {
+                    Toast.show(
+                      error instanceof Error
+                        ? error.message
+                        : "取消派单失败，请稍后重试",
+                      { duration: Toast.durations.SHORT },
+                    );
+                  }
+                })();
+              },
+            },
+          ],
+        );
+        return;
+      }
+
+      const [detail, gameList, ownerProfile] = await Promise.all([
+        fetchQuickMatchClubDetail(clubId, accessToken),
+        fetchQuickMatchGames(accessToken, undefined, clubId),
+        clientAuthApi
+          .getUserProfile(accessToken, String(ownerId))
+          .catch(() => null),
+      ]);
+      if (!valid()) return;
+      if (!detail) {
+        Toast.show("俱乐部信息获取失败，请稍后重试", {
+          duration: Toast.durations.SHORT,
+        });
+        return;
+      }
+      setReceptionBuyerId(String(ownerId));
+      setReceptionBuyerName(ownerProfile?.nickname || "");
+      setReceptionClub({ id: detail.id, name: detail.name });
+      setReceptionGames(gameList);
+      setReceptionVisible(true);
+    } catch (error) {
+      if (valid()) {
+        Toast.show(
+          error instanceof Error ? error.message : "派单准备失败，请重试",
+          { duration: Toast.durations.SHORT },
+        );
+      }
+    } finally {
+      setReceptionPreparing(false);
+    }
+  }, [
+    accessToken,
+    canServiceDispatch,
+    currentUser?.id,
+    receptionPreparing,
+    room,
+  ]);
+
   useEffect(() => {
     if (!chatroomId) return;
     const stopMessages = subscribeVoiceChatMessages((targetId, message) => {
@@ -683,9 +1073,14 @@ export default function VoiceRoomScreen() {
       if (targetId !== chatroomId) return;
       actions.forEach((action) => {
         const userId = action.userId == null ? "" : String(action.userId);
-        if (action.actionType === 1)
+        if (action.actionType === 1) {
           hydrateMemberProfile(userId, accessToken || "");
+          // 呼叫接待期间成员加入 → 反查是否为接单接待
+          if (serviceCalling) void refreshServiceUserId(userId);
+        }
       });
+      // 成员变更时校准 serviceUserId（接待离开后清空）
+      void refreshServiceUserId();
       setMembers((items) =>
         actions.reduce<VoiceRoomMember[]>((next, action) => {
           const userId = action.userId == null ? "" : String(action.userId);
@@ -725,8 +1120,10 @@ export default function VoiceRoomScreen() {
     chatroomId,
     currentUser?.id,
     hydrateMemberProfile,
+    refreshServiceUserId,
     room?.creatorUserId,
     room?.serviceUserId,
+    serviceCalling,
   ]);
 
   const confirmExit = async () => {
@@ -864,31 +1261,6 @@ export default function VoiceRoomScreen() {
       });
     } finally {
       setMicChanging(false);
-    }
-  };
-
-  const callService = async () => {
-    if (!roomId || !accessToken || serviceCalling) return;
-    if (!room?.clubId) {
-      Alert.alert("客服派单", "当前房间暂未绑定俱乐部客服。");
-      return;
-    }
-    setServiceCalling(true);
-    try {
-      await voiceRoomApi.inviteClubService(
-        roomId,
-        roomVersion,
-        room.clubId,
-        accessToken,
-      );
-      Alert.alert("客服派单", "已呼叫俱乐部接待，请稍候。");
-    } catch (cause) {
-      Alert.alert(
-        "客服派单失败",
-        cause instanceof Error ? cause.message : "请稍后重试",
-      );
-    } finally {
-      setServiceCalling(false);
     }
   };
 
@@ -1081,6 +1453,8 @@ export default function VoiceRoomScreen() {
           leaving={leaving}
           serviceCalling={serviceCalling}
           distanceEnabled={distanceEnabled}
+          showCallService={showCallService}
+          showServiceDispatch={canServiceDispatch}
           showSelectCompanion={showSelectCompanion}
           onToggleDistance={() => setDistanceEnabled((prev) => !prev)}
           onChangeText={setInput}
@@ -1097,6 +1471,7 @@ export default function VoiceRoomScreen() {
             setConversationsSheetVisible(true);
           }}
           onCallService={() => void callService()}
+          onServiceDispatch={() => void onServiceDispatch()}
           onSelectCompanion={openSelectCompanion}
         />
       </View>
@@ -1117,6 +1492,17 @@ export default function VoiceRoomScreen() {
           conversationsSheetMode === "invite" ? sendInviteLink : undefined
         }
       />
+      {receptionClub ? (
+        <ClubQuickMatchSheet
+          visible={receptionVisible}
+          onClose={() => setReceptionVisible(false)}
+          club={receptionClub}
+          games={receptionGames}
+          mode="reception"
+          buyerUserId={receptionBuyerId}
+          buyerNickname={receptionBuyerName}
+        />
+      ) : null}
       <VoiceRoomMemberSheet
         visible={memberSheetVisible}
         member={

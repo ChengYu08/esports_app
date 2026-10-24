@@ -41,6 +41,7 @@ export function VoiceRoomMiniPlayer() {
       params: {
         id: room.roomId,
         v: room.roomVersion,
+        // 试音场景靠路由回填；quickMatchCreated 仅依赖 session，进房后由 VoiceRoomScreen 读 session
         ...(room.scene === 'audition' && room.matchRequestNo
           ? {
               scene: 'audition',

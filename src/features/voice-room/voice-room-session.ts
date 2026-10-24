@@ -1,7 +1,11 @@
 import { create } from 'zustand';
 
-/** 试音派单进入的语聊房场景 */
-export type VoiceRoomScene = 'audition';
+/**
+ * 语聊房匹配选人场景（互斥，勿混用）：
+ * - audition：老板一键匹配「需试音」自发进房
+ * - quickMatchCreated：收到 QUICK_MATCH_CREATED（客服代发）后标记，供老板房内「选择陪玩」
+ */
+export type VoiceRoomScene = 'audition' | 'quickMatchCreated';
 
 export type ActiveVoiceRoom = {
   roomId: string;
@@ -11,7 +15,7 @@ export type ActiveVoiceRoom = {
   creatorUserId: string;
   ownerName: string;
   ownerAvatar?: string;
-  /** 从快速匹配「需试音」进入时标记，用于底栏「选择陪玩」 */
+  /** 匹配选人场景标记，用于底栏「选择陪玩」 */
   scene?: VoiceRoomScene;
   matchRequestNo?: string;
   matchExpireTime?: string;

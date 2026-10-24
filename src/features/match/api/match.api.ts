@@ -85,6 +85,10 @@ type ApiRequestDetail = {
   remark?: string;
   status?: string;
   expireTime?: string;
+  publishType?: string;
+  buyerUserId?: number | string;
+  buyerNickname?: string;
+  dispatcherUserId?: number | string;
 };
 
 type ApiPayable = {
@@ -148,6 +152,10 @@ function mapRequestDetail(item: ApiRequestDetail | null | undefined): QuickMatch
     remark: item.remark,
     status: item.status,
     expireTime: item.expireTime,
+    publishType: item.publishType,
+    buyerUserId: toOptionalString(item.buyerUserId),
+    buyerNickname: item.buyerNickname,
+    dispatcherUserId: toOptionalString(item.dispatcherUserId),
   };
 }
 
@@ -171,9 +179,14 @@ function mapGrabItem(item: ApiGrab): QuickMatchGrabItem {
 export async function fetchQuickMatchGames(
   token: string,
   signal?: AbortSignal,
+  clubId?: string | number | null,
 ): Promise<MatchGame[]> {
+  const query =
+    clubId != null && clubId !== ""
+      ? `?clubId=${encodeURIComponent(String(clubId))}`
+      : "";
   const response = await apiClient<ApiEnvelope<ApiGame[]>>(
-    "/client/v1/companion/getQuickMatchGameList",
+    `/client/v1/companion/getQuickMatchGameList${query}`,
     { method: "GET", token, signal },
   );
   const list = requireSuccess(response, "游戏列表加载失败");
@@ -182,6 +195,29 @@ export async function fetchQuickMatchGames(
     name: item.gameName || "未命名游戏",
     iconUrl: item.iconUrl,
   }));
+}
+
+/** 查询俱乐部公开详情（接待代发弹窗展示当前房所属俱乐部） */
+export async function fetchQuickMatchClubDetail(
+  clubId: string | number,
+  token: string,
+  signal?: AbortSignal,
+): Promise<MatchClub | null> {
+  const response = await apiClient<ApiEnvelope<ApiClub | null>>(
+    `/client/v1/club/public/detail?id=${encodeURIComponent(String(clubId))}`,
+    { method: "GET", token, signal },
+  );
+  if (response.code !== "SUCCESS") {
+    throw new Error(response.info || "俱乐部详情加载失败");
+  }
+  const item = response.data;
+  if (!item?.id) return null;
+  return {
+    id: String(item.id),
+    name: item.clubName || "未命名俱乐部",
+    logoUrl: item.logoUrl,
+    memberCount: item.memberCount,
+  };
 }
 
 export async function fetchQuickMatchClubs(
@@ -297,6 +333,21 @@ export async function fetchActiveQuickMatch(
   );
   if (response.code !== "SUCCESS") {
     throw new Error(response.info || "进行中需求查询失败");
+  }
+  return mapRequestDetail(response.data ?? null);
+}
+
+/** 查询当前客服代发的进行中需求（不含本人作为老板发布的需求） */
+export async function fetchDispatchActiveQuickMatch(
+  token: string,
+  signal?: AbortSignal,
+): Promise<QuickMatchRequestDetail | null> {
+  const response = await apiClient<ApiEnvelope<ApiRequestDetail | null>>(
+    "/client/v1/quickMatch/dispatch/active/detail",
+    { method: "GET", token, signal },
+  );
+  if (response.code !== "SUCCESS") {
+    throw new Error(response.info || "代发需求查询失败");
   }
   return mapRequestDetail(response.data ?? null);
 }

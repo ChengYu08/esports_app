@@ -26,6 +26,7 @@ import {
 import { InAppNotificationBanner } from "@/features/message/components/InAppNotificationBanner";
 import { VoiceRoomMiniPlayer } from "@/features/voice-room/components/VoiceRoomMiniPlayer";
 import { VoiceRoomKickListener } from "@/features/voice-room/components/VoiceRoomKickListener";
+import { ReceptionCommandListener } from "@/features/voice-room/components/ReceptionCommandListener";
 import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
 import { leaveVoiceChatRoom } from "@/features/voice-room/voice-room-rongcloud";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
@@ -228,6 +229,7 @@ export default function RootLayout() {
             <InAppNotificationBanner visible={!pathname.startsWith("/voice-room/")} />
             <VoiceRoomMiniPlayer />
             <VoiceRoomKickListener />
+            <ReceptionCommandListener />
           </RootSiblingParent>
         </GestureHandlerRootView>
       </SafeAreaProvider>

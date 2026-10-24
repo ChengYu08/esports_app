@@ -9,6 +9,7 @@ import {
   ClubDetailSkeleton,
 } from "@/features/home/components/ClubDetailSkeleton";
 import { ClubQuickMatchSheet } from "@/features/match/components/ClubQuickMatchSheet";
+import { useCustomerDispatch } from "@/features/voice-room/use-customer-dispatch";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
@@ -67,6 +68,7 @@ export default function ClubDetailScreen() {
   const [showPriceEmptyModal, setShowPriceEmptyModal] = useState(false);
   const [quickMatchVisible, setQuickMatchVisible] = useState(false);
   const accessToken = useAuthStore((state) => state.accessToken);
+  const { dispatch: dispatchReception } = useCustomerDispatch();
   const [priceSort, setPriceSort] =
     useState<CompanionFilters["priceSort"]>("DEFAULT");
   const [selectedSex, setSelectedSex] = useState<CompanionFilters["sex"]>();
@@ -571,7 +573,7 @@ export default function ClubDetailScreen() {
         <Pressable
           style={styles.actionButton}
           onPress={() => {
-            Toast.show("功能即将开放", { duration: Toast.durations.SHORT });
+            void dispatchReception({ clubId: club?.id });
           }}
         >
           <Text style={styles.actionButtonText}>接待派单</Text>

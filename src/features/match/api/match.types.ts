@@ -40,7 +40,9 @@ export type MatchVoiceOption = "不试音" | "需试音";
 
 export type PublishQuickMatchPayload = {
   clubId: number;
-  publishType: "BUYER";
+  publishType: "BUYER" | "RECEPTION";
+  /** 接待代发时必填：老板（语聊房房主）用户 ID */
+  buyerUserId?: number;
   gameId: number;
   gameModeId: number;
   gameLevelId: number;
@@ -97,6 +99,10 @@ export type QuickMatchRequestDetail = {
   /** MATCHING / ORDERED / CANCELLED / EXPIRED */
   status?: string;
   expireTime?: string;
+  publishType?: "BUYER" | "RECEPTION" | string;
+  buyerUserId?: string;
+  buyerNickname?: string;
+  dispatcherUserId?: string;
 };
 
 export type QuickMatchPayable = {
