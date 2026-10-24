@@ -35,6 +35,8 @@ import {
 import Toast from "react-native-root-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useAppConfirm } from "@/shared/ui/app-confirm";
+
 import { VoiceRoomConversationsSheet } from "../components/VoiceRoomConversationsSheet";
 import { VoiceRoomExitDialog } from "../components/VoiceRoomExitDialog";
 import { VoiceRoomMemberSheet } from "../components/VoiceRoomMemberSheet";
@@ -993,34 +995,27 @@ export default function VoiceRoomScreen() {
       const active = await fetchDispatchActiveQuickMatch(accessToken);
       if (!valid()) return;
       if (active && isQuickMatchActive(active)) {
-        Alert.alert(
-          "代发派单进行中",
-          `需求 ${active.requestNo} 仍在匹配中，可取消后重新派单。`,
-          [
-            { text: "知道了", style: "cancel" },
-            {
-              text: "取消派单",
-              style: "destructive",
-              onPress: () => {
-                void (async () => {
-                  try {
-                    await cancelQuickMatch(active.requestNo, accessToken);
-                    Toast.show("已取消派单", {
-                      duration: Toast.durations.SHORT,
-                    });
-                  } catch (error) {
-                    Toast.show(
-                      error instanceof Error
-                        ? error.message
-                        : "取消派单失败，请稍后重试",
-                      { duration: Toast.durations.SHORT },
-                    );
-                  }
-                })();
-              },
-            },
-          ],
-        );
+        const confirmed = await useAppConfirm.getState().confirm({
+          title: "派单进行中",
+          message: `订单 ${active.requestNo} 仍在匹配中，可取消后重新派单。`,
+          cancelText: "知道了",
+          confirmText: "取消派单",
+        });
+        if (confirmed) {
+          try {
+            await cancelQuickMatch(active.requestNo, accessToken);
+            Toast.show("已取消派单", {
+              duration: Toast.durations.SHORT,
+            });
+          } catch (error) {
+            Toast.show(
+              error instanceof Error
+                ? error.message
+                : "取消派单失败，请稍后重试",
+              { duration: Toast.durations.SHORT },
+            );
+          }
+        }
         return;
       }
 

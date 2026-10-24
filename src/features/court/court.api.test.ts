@@ -87,6 +87,31 @@ describe("platform ticket API contract", () => {
     request.mockResolvedValue({ code: "FAIL", info: "该诉告对象不可投诉" });
     await expect(courtApi.createTicket({ reasonType: "OTHER", targetUid: "123", content: "内容", evidenceObjectKeys: [] })).rejects.toThrow("该诉告对象不可投诉");
   });
+
+  it.each([
+    ["createTicket", () => courtApi.createTicket({ reasonType: "PLATFORM_SUGGESTION", content: "建议", evidenceObjectKeys: [] })],
+    ["resubmitTicket", () => courtApi.resubmitTicket("42", { reasonType: "OTHER", content: "内容", evidenceObjectKeys: [] }, [])],
+    ["vote", () => courtApi.vote(42, "FIRST", "DEFENDANT_WIN")],
+  ])("rejects %s when success carries no data", async (_name, action) => {
+    request.mockResolvedValue({ code: "SUCCESS", info: "操作成功" });
+    await expect(action()).rejects.toThrow();
+  });
+
+  it("rejects evidence upload when the STS success carries no data", async () => {
+    const image = { uri: "file:///export.heic", name: "IMG_1001.jpg", mimeType: "image/jpeg" };
+    vi.mocked(getEvidenceUploadFile).mockReturnValue(image);
+    request.mockResolvedValue({ code: "SUCCESS", info: "操作成功" });
+
+    await expect(courtApi.uploadEvidence(image.uri, "IMG_1001.HEIC")).rejects.toThrow();
+    expect(uploadClientObject).not.toHaveBeenCalled();
+  });
+
+  it("keeps void POST endpoints lenient when success carries no data", async () => {
+    request.mockResolvedValue({ code: "SUCCESS", info: "操作成功" });
+
+    await expect(courtApi.applyReviewer()).resolves.toBeUndefined();
+    await expect(courtApi.replyTicket(42, "已收到")).resolves.toBeUndefined();
+  });
 });
 
 describe("court viewer state", () => {

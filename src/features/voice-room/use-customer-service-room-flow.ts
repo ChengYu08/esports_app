@@ -3,8 +3,9 @@
  */
 import { useAuthStore } from "@esports/auth";
 import { router } from "expo-router";
-import { Alert } from "react-native";
 import Toast from "react-native-root-toast";
+
+import { useAppConfirm } from "@/shared/ui/app-confirm";
 
 import { exitVoiceRoom } from "./exit-voice-room";
 import { resolveVoiceRoomId, voiceRoomApi } from "./voice-room.api";
@@ -42,16 +43,11 @@ function confirmRoomSwitch(current: VoiceRoomDetail, resumed: boolean): Promise<
     : "退出当前房间并进入老板的语聊房，其他成员不受影响。";
   const roomName = current.roomName || "当前房间";
 
-  return new Promise((resolve) => {
-    Alert.alert(
-      resumed ? "进入接待房间" : "切换语聊房并接单",
-      `你当前正在「${roomName}」中。${isOwner ? "你是该房间的房主。" : ""}${prefix}${consequence}`,
-      [
-        { text: "暂不处理", style: "cancel", onPress: () => resolve(false) },
-        { text: resumed ? "继续进入" : "继续接单", onPress: () => resolve(true) },
-      ],
-      { cancelable: true, onDismiss: () => resolve(false) },
-    );
+  return useAppConfirm.getState().confirm({
+    title: resumed ? "进入接待房间" : "切换语聊房并接单",
+    message: `你当前正在「${roomName}」中。${isOwner ? "你是该房间的房主。" : ""}${prefix}${consequence}`,
+    cancelText: "暂不处理",
+    confirmText: resumed ? "继续进入" : "继续接单",
   });
 }
 

@@ -34,6 +34,7 @@ import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-sessi
 import { PrivacyConsentGate } from "@/features/privacy/components/PrivacyConsentGate";
 import { readPrivacyConsent } from "@/features/privacy/privacy-consent";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { AppConfirmHost } from "@/shared/ui/AppConfirmHost";
 import { StartupSplash } from "@/shared/ui/StartupSplash";
 
 // Keep the native screen until the full-screen artwork is ready to display.
@@ -234,6 +235,7 @@ export default function RootLayout() {
             <VoiceRoomMiniPlayer />
             <VoiceRoomKickListener />
             <ReceptionCommandListener />
+            <AppConfirmHost />
           </RootSiblingParent>
         </GestureHandlerRootView>
       </SafeAreaProvider>

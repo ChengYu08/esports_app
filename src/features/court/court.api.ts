@@ -210,6 +210,13 @@ async function post<T>(path: string, body?: unknown) {
   return response.data as T;
 }
 
+// 数据类 POST：后端成功包络可能省略 data，缺失时不能把 undefined 当业务数据返回。
+async function postRequireData<T>(path: string, body?: unknown) {
+  const data = await post<T>(path, body);
+  if (data === undefined || data === null) throw new Error("响应数据缺失，请稍后重试");
+  return data;
+}
+
 export const courtApi = {
   async getPage(scope: CourtScope, page = 1, pageSize = 20, keyword?: string) {
     if (scope === "MY") {
@@ -316,7 +323,7 @@ export const courtApi = {
     level: CourtLevel,
     voteResult: CourtResult,
   ) {
-    return post<{ plaintiffVoteCount?: number; defendantVoteCount?: number }>(
+    return postRequireData<{ plaintiffVoteCount?: number; defendantVoteCount?: number }>(
       "/client/v1/court/vote",
       { caseId: Number(caseId), level, voteResult },
     );
@@ -345,7 +352,7 @@ export const courtApi = {
     return post("/client/v1/court/reviewer/apply");
   },
   async getEvidenceSts(objectName: string) {
-    const data = await post<
+    const data = await postRequireData<
       Parameters<typeof uploadClientObject>[0] & { objectList?: string[] }
     >("/client/v1/court/evidence/sts", {
       action: { objectNames: [objectName] },
@@ -413,7 +420,7 @@ export const courtApi = {
     );
   },
   async createTicket(input: TicketInput) {
-    return post<PlatformTicket>("/client/v1/platform-ticket/create", {
+    return postRequireData<PlatformTicket>("/client/v1/platform-ticket/create", {
       ...input,
       idempotencyKey: input.idempotencyKey ?? makeIdempotencyKey("ticket"),
     });
@@ -425,7 +432,7 @@ export const courtApi = {
   ) {
     const idempotencyKey =
       input.idempotencyKey ?? makeIdempotencyKey(`ticket-resubmit-${ticketId}`);
-    return post<PlatformTicket>("/client/v1/platform-ticket/resubmit", {
+    return postRequireData<PlatformTicket>("/client/v1/platform-ticket/resubmit", {
       ticketId,
       form: { ...input, idempotencyKey },
       retainedEvidenceKeys,
