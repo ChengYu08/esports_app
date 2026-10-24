@@ -14,6 +14,7 @@ import { releaseCsInviteKey } from "./ReceptionCommandListener";
 
 const TAB_BAR_HEIGHT = 58;
 const MIN_BAR_DURATION_MS = 2000;
+const MAX_BAR_DURATION_MS = 15000;
 
 const tradeNoticeIcon = require("../../../../assets/svgs/cs-invite-trade-notice.svg");
 const arrowRightIcon = require("../../../../assets/svgs/cs-invite-arrow-right.svg");
@@ -24,11 +25,15 @@ function CsInviteBarImpl({ visible }: { visible?: boolean }) {
   const dismiss = useCsInviteBar((state) => state.dismiss);
   const [claiming, setClaiming] = useState(false);
 
-  // 到期自动消失；最少展示 2 秒，防止刚弹出就被过期数据收走
+  // 到期或最长 15 秒后消失；最少展示 2 秒，防止刚弹出就被过期数据收走
   useEffect(() => {
     if (!invite) return;
     const remainMs = invite.expireAt * 1000 - Date.now();
-    const timer = setTimeout(dismiss, Math.max(remainMs, MIN_BAR_DURATION_MS));
+    const duration = Math.min(
+      Math.max(remainMs, MIN_BAR_DURATION_MS),
+      MAX_BAR_DURATION_MS,
+    );
+    const timer = setTimeout(dismiss, duration);
     return () => {
       clearTimeout(timer);
       // 条已消失（到期/接单成功/被新邀请替换），释放去重键允许下一轮邀请再次提示

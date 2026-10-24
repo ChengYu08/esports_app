@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   useInAppNotification,
 } from "../notification-hub";
-import { getConversationAvatarUri } from "../message-avatar";
+import { getConversationAvatarUri, resolveConversationAvatar } from "../message-avatar";
 
 const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
 const systemNotificationAvatar = require("../../../../assets/message/message-system-notice.svg");
@@ -42,8 +42,13 @@ function InAppNotificationBannerImpl({ visible = true }: { visible?: boolean }) 
     });
   };
 
-  const avatarUri = getConversationAvatarUri(notification.avatar);
-  const isSystem = notification.isSystem;
+  const fallback = notification.isSystem ? systemNotificationAvatar : defaultAvatar;
+  const resolvedAvatar = resolveConversationAvatar(
+    notification.avatar,
+    fallback,
+    notification.peerId,
+  );
+  const avatarUri = getConversationAvatarUri(resolvedAvatar);
   const avatarError = failedAvatarKey === notification.key;
 
   return (
@@ -64,11 +69,11 @@ function InAppNotificationBannerImpl({ visible = true }: { visible?: boolean }) 
       >
         <Image
           source={
-            avatarUri && !avatarError
-              ? { uri: avatarUri }
-              : isSystem
-                ? systemNotificationAvatar
-                : defaultAvatar
+            avatarUri
+              ? avatarError
+                ? fallback
+                : { uri: avatarUri }
+              : resolvedAvatar
           }
           style={styles.avatar}
           onError={() => setFailedAvatarKey(notification.key)}
