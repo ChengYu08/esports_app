@@ -19,8 +19,8 @@ import { BottomSheet } from "@/shared/ui/BottomSheet";
 
 const CONFIRM_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
 
-const closeIcon = require("../../../../assets/match/icon-close.svg");
-const searchIcon = require("../../../../assets/match/icon-search.svg");
+const closeIcon = require("../../../../assets/svgs/icon-close.svg");
+const searchIcon = require("../../../../assets/svgs/icon-search.svg");
 
 type ClubSelectSheetProps = {
   visible: boolean;

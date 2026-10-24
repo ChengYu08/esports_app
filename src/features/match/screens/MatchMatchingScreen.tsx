@@ -17,7 +17,7 @@ import { useQuickMatchSession } from "@/features/match/hooks/use-quick-match-ses
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 
-const backIcon = require("../../../../assets/match/icon-back.svg");
+const backIcon = require("../../../../assets/svgs/icon-back.svg");
 const BG_GRADIENT = ["#0C0C2E", "#120D2B"] as const;
 
 type MatchMatchingScreenProps = {

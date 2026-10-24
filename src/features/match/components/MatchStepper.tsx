@@ -3,8 +3,8 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 
-const decreaseIcon = require("../../../../assets/match/icon-decrease.svg");
-const increaseIcon = require("../../../../assets/match/icon-increase.svg");
+const decreaseIcon = require("../../../../assets/svgs/icon-decrease.svg");
+const increaseIcon = require("../../../../assets/svgs/icon-increase.svg");
 
 type MatchStepperProps = {
   value: number;

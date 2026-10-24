@@ -112,7 +112,7 @@ export default function CourtTargetPickerScreen() {
       <View style={styles.searchSection}>
         <View style={styles.searchBox}>
           <CachedImage
-            source={require("../../../../assets/court/ticket-search.svg")}
+            source={require("../../../../assets/svgs/icon-search.svg")}
             style={styles.searchIcon}
           />
           <TextInput

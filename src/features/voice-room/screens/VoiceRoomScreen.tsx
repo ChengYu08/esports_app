@@ -71,7 +71,7 @@ import type {
 /** 呼叫接待超时（秒），对齐 PC CS_CALL_TIMEOUT_SECONDS */
 const CS_CALL_TIMEOUT_SECONDS = 60;
 
-const backIcon = require("../../../../assets/voice-room/back.svg");
+const backIcon = require("../../../../assets/svgs/icon-back.svg");
 const BG_GRADIENT = ["#0C0C2E", "#120D2B"] as const;
 const closeIcon = require("../../../../assets/voice-room/navbar-exit.svg");
 const inviteIcon = require("../../../../assets/voice-room/invite.svg");

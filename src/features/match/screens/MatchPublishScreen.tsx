@@ -41,8 +41,8 @@ import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-sessi
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 
-const backIcon = require("../../../../assets/match/icon-back.svg");
-const arrowDownIcon = require("../../../../assets/match/icon-arrow-down.svg");
+const backIcon = require("../../../../assets/svgs/icon-back.svg");
+const arrowDownIcon = require("../../../../assets/svgs/icon-arrow-down.svg");
 const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
 
 const BG_GRADIENT = ["#0C0C2E", "#120D2B"] as const;
