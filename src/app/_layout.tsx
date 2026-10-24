@@ -27,6 +27,7 @@ import { InAppNotificationBanner } from "@/features/message/components/InAppNoti
 import { VoiceRoomMiniPlayer } from "@/features/voice-room/components/VoiceRoomMiniPlayer";
 import { VoiceRoomKickListener } from "@/features/voice-room/components/VoiceRoomKickListener";
 import { ReceptionCommandListener } from "@/features/voice-room/components/ReceptionCommandListener";
+import { CsInviteBar } from "@/features/voice-room/components/CsInviteBar";
 import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
 import { leaveVoiceChatRoom } from "@/features/voice-room/voice-room-rongcloud";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
@@ -39,6 +40,8 @@ import { StartupSplash } from "@/shared/ui/StartupSplash";
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 const STARTUP_TIMEOUT_MS = 8000;
+
+const MAIN_TAB_PATHS = new Set(["/", "/order", "/message", "/mine"]);
 
 function withStartupTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
   return new Promise((resolve) => {
@@ -227,6 +230,7 @@ export default function RootLayout() {
               <PrivacyConsentGate onAccepted={() => setPrivacyAccepted(true)} />
             )}
             <InAppNotificationBanner visible={!pathname.startsWith("/voice-room/")} />
+            <CsInviteBar visible={MAIN_TAB_PATHS.has(pathname)} />
             <VoiceRoomMiniPlayer />
             <VoiceRoomKickListener />
             <ReceptionCommandListener />

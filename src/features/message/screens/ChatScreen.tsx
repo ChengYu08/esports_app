@@ -799,6 +799,7 @@ const ChatBubble = memo(function ChatBubble({
           item.kind === "image" && styles.imageBubble,
           item.kind === "roomInvite" && styles.roomInviteBubble,
           (item.kind === "orderNotify" || item.kind === "csInvite") && styles.orderNotifyBubble,
+          item.kind === "csInvite" && { maxWidth: Math.round(windowWidth * 0.68) },
         ]}
       >
         {item.kind === "image" ? (

@@ -1,33 +1,25 @@
 /**
  * 全局接待/代发相关融云命令监听：
- * - CUSTOMER_SERVICE_INVITE：接待邀请 → Alert 接单
+ * - CUSTOMER_SERVICE_INVITE：接待邀请 → 底部抢单条（CsInviteBar，到期自动消失）
  * - QUICK_MATCH_CREATED：接待代发创建 → 写入 quickMatchCreated 场景标记（不弹窗；是否显示「选择陪玩」由语聊房调 active/detail 决定）
  */
 import { useAuthStore } from "@esports/auth";
 import { useEffect } from "react";
-import { Alert } from "react-native";
-import Toast from "react-native-root-toast";
 
 import { subscribeRongCommands } from "@/features/message/rongcloud-im";
-import {
-  markCsInviteClaimed,
-  markCsInviteUnclaimed,
-} from "@/features/message/cs-invite-claim-state";
 import type { RongCommand } from "@/features/message/rongcloud-command";
 
-import { claimAndEnterCustomerServiceRoom } from "../use-customer-service-room-flow";
+import { useCsInviteBar } from "../cs-invite-bar-store";
 import { useVoiceRoomSessionStore } from "../voice-room-session";
 
 const PLATFORM_NOTICE_USER_ID = "50000000";
 const CUSTOMER_SERVICE_INVITE = "CUSTOMER_SERVICE_INVITE";
 const QUICK_MATCH_CREATED = "QUICK_MATCH_CREATED";
 
-/** 邀请通知去重：roomId_roomVersion */
-const csInviteKeys = new Set<string>();
+/** 邀请通知去重：roomId_roomVersion（条到期后清除，允许同房间下一轮邀请再次提示） */
+const csInviteKeys = new Map<string, number>();
 /** 代发创建通知去重：requestNo */
 const quickMatchCreatedKeys = new Set<string>();
-/** 接单进行中 */
-const claimingKeys = new Set<string>();
 
 function stringField(data: Record<string, unknown>, key: string): string {
   const value = data[key];
@@ -47,67 +39,19 @@ function handleCustomerServiceInvite(command: RongCommand) {
   if (csInviteKeys.has(key)) return;
 
   const expireAt = Number(command.data.expireAt);
-  if (Number.isFinite(expireAt) && expireAt * 1000 <= Date.now()) return;
-  const claimExpireAt = Number.isFinite(expireAt) ? expireAt : undefined;
+  if (!Number.isFinite(expireAt)) return;
+  if (expireAt * 1000 <= Date.now()) return;
 
-  csInviteKeys.add(key);
-  const playerName =
-    stringField(command.data, "playerName") ||
-    (stringField(command.data, "playerUserId")
-      ? `玩家${stringField(command.data, "playerUserId")}`
-      : "玩家");
-
-  Alert.alert(
-    "接待邀请",
-    `玩家「${playerName}」正在呼叫接待，是否接单？`,
-    [
-      {
-        text: "忽略",
-        style: "cancel",
-        onPress: () => {
-          csInviteKeys.delete(key);
-        },
-      },
-      {
-        text: "接单",
-        onPress: () => {
-          void (async () => {
-            if (claimingKeys.has(key)) return;
-            claimingKeys.add(key);
-            try {
-              const result = await claimAndEnterCustomerServiceRoom({
-                roomId,
-                clubId,
-                roomVersion,
-              });
-              if (result.status === "cancelled") {
-                csInviteKeys.delete(key);
-                return;
-              }
-              if (result.status === "failed") {
-                csInviteKeys.delete(key);
-                markCsInviteUnclaimed(roomId, roomVersion, claimExpireAt);
-                Toast.show(result.message, { duration: Toast.durations.SHORT });
-                return;
-              }
-              markCsInviteClaimed(roomId, roomVersion, claimExpireAt, false);
-              Toast.show("接单成功，已进入房间", {
-                duration: Toast.durations.SHORT,
-              });
-            } finally {
-              claimingKeys.delete(key);
-            }
-          })();
-        },
-      },
-    ],
-    {
-      cancelable: true,
-      onDismiss: () => {
-        csInviteKeys.delete(key);
-      },
-    },
-  );
+  csInviteKeys.set(key, expireAt);
+  useCsInviteBar.getState().show({
+    key,
+    roomId,
+    clubId,
+    roomVersion,
+    playerUserId: stringField(command.data, "playerUserId"),
+    playerName: stringField(command.data, "playerName"),
+    expireAt,
+  });
 }
 
 function handleQuickMatchCreated(command: RongCommand) {
@@ -130,6 +74,11 @@ function handleQuickMatchCreated(command: RongCommand) {
     matchRequestNo: requestNo,
     ...(expireTime ? { matchExpireTime: expireTime } : {}),
   });
+}
+
+/** 抢单条消失（到期/接单成功）时释放去重键，允许下一轮邀请再次提示 */
+export function releaseCsInviteKey(key: string) {
+  csInviteKeys.delete(key);
 }
 
 export function ReceptionCommandListener() {

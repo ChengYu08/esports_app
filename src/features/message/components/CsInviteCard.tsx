@@ -1,4 +1,3 @@
-import { HeadphonesRegular } from "@fluentui/react-native-icons";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Toast from "react-native-root-toast";
@@ -68,35 +67,30 @@ export const CsInviteCard = memo(function CsInviteCard({ item }: { item: CsInvit
 
   return (
     <View style={[styles.card, done && styles.cardDone]}>
-      <View style={styles.iconWrap}>
-        <HeadphonesRegular color="#FE1F4C" width={20} height={20} />
+      <View style={styles.titleRow}>
+        <Text style={styles.title}>接待邀请</Text>
+        {canClaim ? (
+          <Text style={styles.countdown}>剩余 {remainingSeconds} 秒</Text>
+        ) : null}
       </View>
-      <View style={styles.body}>
-        <View style={styles.titleRow}>
-          <Text style={styles.title}>接待邀请</Text>
-          {canClaim ? (
-            <Text style={styles.countdown}>剩余 {remainingSeconds} 秒</Text>
-          ) : null}
-        </View>
-        <Text numberOfLines={1} style={styles.sub}>
-          {playerName} 请求接待
-        </Text>
+      <Text style={styles.subtitle}>{playerName} 请求接待</Text>
+      <View style={styles.actionRow}>
+        {canClaim || canEnterClaimed ? (
+          <Pressable
+            accessibilityLabel={canEnterClaimed ? "进入房间" : "接单"}
+            accessibilityRole="button"
+            disabled={claiming}
+            onPress={() => {
+              void handleClaim(canEnterClaimed);
+            }}
+            style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+          >
+            <Text style={styles.buttonText}>{canEnterClaimed ? "进入房间" : "接单"}</Text>
+          </Pressable>
+        ) : (
+          <Text style={styles.status}>{statusHint}</Text>
+        )}
       </View>
-      {canClaim || canEnterClaimed ? (
-        <Pressable
-          accessibilityLabel={canEnterClaimed ? "进入房间" : "接单"}
-          accessibilityRole="button"
-          disabled={claiming}
-          onPress={() => {
-            void handleClaim(canEnterClaimed);
-          }}
-          style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-        >
-          <Text style={styles.buttonText}>{canEnterClaimed ? "进入房间" : "接单"}</Text>
-        </Pressable>
-      ) : (
-        <Text style={styles.status}>{statusHint}</Text>
-      )}
     </View>
   );
 });
@@ -106,58 +100,58 @@ const styles = StyleSheet.create({
     width: "100%",
     minWidth: 0,
     maxWidth: "100%",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
     padding: 12,
     borderRadius: 8,
     backgroundColor: "#FFFFFF",
+    gap: 8,
   },
   cardDone: { opacity: 0.65 },
-  iconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FFE6EB",
-    flexShrink: 0,
-  },
-  body: { flex: 1, minWidth: 0, gap: 2 },
   titleRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     gap: 8,
   },
   title: {
+    flex: 1,
     color: "#0A0A0A",
     fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "500",
-    lineHeight: 20,
+    lineHeight: 22,
   },
   countdown: {
     color: "#FF8A9B",
     fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
+    flexShrink: 0,
   },
-  sub: {
-    color: "#808080",
+  subtitle: {
+    color: "#0A0A0A",
     fontFamily: DOUYIN_SANS,
     fontSize: 12,
+    fontWeight: "400",
     lineHeight: 18,
   },
+  actionRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+  },
   button: {
-    flexShrink: 0,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    height: 26,
+    minWidth: 72,
+    paddingHorizontal: 24,
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: 999,
-    backgroundColor: "#FE1F4C",
+    borderWidth: 1,
+    borderColor: "#FE1F4C",
+    backgroundColor: "#FFFFFF",
   },
   buttonPressed: { opacity: 0.78 },
   buttonText: {
-    color: "#FFFFFF",
+    color: "#FE1F4C",
     fontFamily: DOUYIN_SANS,
     fontSize: 12,
     fontWeight: "500",
@@ -168,6 +162,5 @@ const styles = StyleSheet.create({
     fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
-    flexShrink: 0,
   },
 });
