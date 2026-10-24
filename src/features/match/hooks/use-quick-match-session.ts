@@ -1,4 +1,5 @@
 import { useAuthStore } from "@esports/auth";
+import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Toast from "react-native-root-toast";
@@ -16,6 +17,7 @@ import {
   type QuickMatchGrabItem,
   type QuickMatchRequestDetail,
 } from "@/features/match/api/match.types";
+import { quickMatchGamesQueryKey } from "@/features/match/hooks/use-match-form";
 import { exitVoiceRoom } from "@/features/voice-room/exit-voice-room";
 import { resolveVoiceRoomId } from "@/features/voice-room/voice-room.api";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
@@ -43,6 +45,7 @@ function resolveExpireAtMs(expireTime?: string): number {
 /** 发布页：若有进行中需求则恢复；需试音优先回试音房 */
 export function useRestoreActiveMatch() {
   const token = useAuthStore((state) => state.accessToken);
+  const queryClient = useQueryClient();
   const [restoring, setRestoring] = useState(true);
 
   useEffect(() => {
@@ -60,7 +63,10 @@ export function useRestoreActiveMatch() {
             null;
           try {
             if (active.gameId) {
-              const games = await fetchQuickMatchGames(token);
+              const games = await queryClient.fetchQuery({
+                queryKey: quickMatchGamesQueryKey(token),
+                queryFn: ({ signal }) => fetchQuickMatchGames(token, signal),
+              });
               if (cancelled) return;
               const matched = games.find((g) => g.id === active.gameId);
               if (matched) {
@@ -128,7 +134,7 @@ export function useRestoreActiveMatch() {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [queryClient, token]);
 
   return { restoring };
 }
