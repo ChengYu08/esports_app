@@ -8,6 +8,8 @@ import type {
   MatchService,
   PublishQuickMatchPayload,
   QuickMatchAuditionRoom,
+  QuickMatchCreatedOrder,
+  QuickMatchCreatedOrders,
   QuickMatchGrabItem,
   QuickMatchPayable,
   QuickMatchPublishResult,
@@ -88,6 +90,16 @@ type ApiRequestDetail = {
 type ApiPayable = {
   orderCount?: number;
   totalPrice?: number | string;
+};
+
+type ApiCreatedOrder = {
+  orderId?: number | string;
+  serviceUserId?: number | string;
+};
+
+type ApiCreatedOrders = {
+  totalPrice?: number | string;
+  orders?: ApiCreatedOrder[];
 };
 
 function requireSuccess<T>(response: ApiEnvelope<T>, fallback: string): T {
@@ -315,8 +327,8 @@ export async function selectAndCreateOrder(
   requestNo: string,
   grabIds: string[],
   token: string,
-): Promise<{ totalPrice: number }> {
-  const response = await apiClient<ApiEnvelope<{ totalPrice?: number | string }>>(
+): Promise<QuickMatchCreatedOrders> {
+  const response = await apiClient<ApiEnvelope<ApiCreatedOrders>>(
     "/client/v1/quickMatch/selectAndCreateOrder",
     {
       method: "POST",
@@ -325,7 +337,14 @@ export async function selectAndCreateOrder(
     },
   );
   const data = requireSuccess(response, "创建订单失败");
-  return { totalPrice: toNumber(data.totalPrice) };
+  const orders: QuickMatchCreatedOrder[] = [];
+  for (const item of data.orders ?? []) {
+    const orderId = toOptionalString(item.orderId);
+    if (!orderId) continue;
+    const serviceUserId = toOptionalString(item.serviceUserId);
+    orders.push(serviceUserId ? { orderId, serviceUserId } : { orderId });
+  }
+  return { totalPrice: toNumber(data.totalPrice), orders };
 }
 
 export async function fetchQuickMatchPayable(

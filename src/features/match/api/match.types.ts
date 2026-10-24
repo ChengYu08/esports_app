@@ -104,6 +104,16 @@ export type QuickMatchPayable = {
   totalPrice: number;
 };
 
+export type QuickMatchCreatedOrder = {
+  orderId: string;
+  serviceUserId?: string;
+};
+
+export type QuickMatchCreatedOrders = {
+  totalPrice: number;
+  orders: QuickMatchCreatedOrder[];
+};
+
 export type QuickMatchAuditionRoom = {
   id: string;
   roomVersion?: string | number;
