@@ -8,7 +8,7 @@ import type {
 
 import { ApiError } from '@/core/network/api-client';
 import { logger } from '@/core/logging/logger';
-import { mapRongMessage, parseRoomInviteLink, type RongSdkMessage } from './chat-message';
+import { mapRongMessage, messagePreview, type RongSdkMessage } from './chat-message';
 import type { ManagedMessage, MessageConversation, MessageHistoryPage } from './message-state';
 import type { AfterSaleCardPayload } from '@/features/order/after-sale-card';
 import { getRongConversationTargetId, getSystemConversationTitle, isSystemConversationId, normalizeSystemConversationId } from './system-conversations';
@@ -76,15 +76,15 @@ function getSdkEnums() {
 }
 
 function mapPreview(message?: RCIMIWMessage) {
-  const content = message as (RCIMIWMessage & { text?: string; content?: string }) | undefined;
   const enums = getSdkEnums();
+  const time = message?.sentTime ? new Date(message.sentTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '';
+  const mapped = message && enums
+    ? mapRongMessage(message as RongSdkMessage, { image: enums.imageType, send: enums.directionSend })
+    : null;
+  if (mapped) return { preview: messagePreview(mapped), time };
+  const content = message as (RCIMIWMessage & { text?: string; content?: string }) | undefined;
   const text = content?.text || content?.content;
-  return {
-    preview: text && parseRoomInviteLink(text)
-      ? '[语聊房邀请]'
-      : text || (message?.messageType === enums?.imageType ? '[图片]' : '新消息'),
-    time: message?.sentTime ? new Date(message.sentTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '',
-  };
+  return { preview: text || '新消息', time };
 }
 
 function mapConversation(conversation: RCIMIWConversation): RongConversation {

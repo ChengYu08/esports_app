@@ -157,6 +157,26 @@ describe('message store', () => {
     expect(store.getState().conversations[0].unreadCount).toBe(0);
   });
 
+  it('creates the dispatch assistant conversation with a card preview when an invite arrives', async () => {
+    let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
+    const store = createMessageStore(makeAdapter({
+      subscribeMessages: vi.fn((listener) => { receiveMessage = listener; return () => undefined; }),
+    }));
+    await store.getState().initialize('token');
+    const invite: ManagedMessage = {
+      id: 'cs-1', kind: 'csInvite', roomId: '123', clubId: '45', roomVersion: '2',
+      playerName: '小明', expireAt: 1_792_128_660, time: '10:00', isMine: false, status: 'sent', sentAt: 20,
+    };
+    receiveMessage?.('rc_p_50000001', invite, { ...conversation, id: 'rc_p_50000001', title: '50000001' });
+    expect(store.getState().conversations[0]).toMatchObject({
+      id: 'rc_p_50000001',
+      title: '派单助手',
+      preview: '[接待邀请]',
+      unreadCount: 1,
+    });
+    await store.getState().reset();
+  });
+
   it('clears unread counts for every conversation and marks unread peers as read', async () => {
     const markRead = vi.fn(async () => true);
     const store = createMessageStore(makeAdapter({

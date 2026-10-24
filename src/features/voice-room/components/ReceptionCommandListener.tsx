@@ -9,6 +9,10 @@ import { Alert } from "react-native";
 import Toast from "react-native-root-toast";
 
 import { subscribeRongCommands } from "@/features/message/rongcloud-im";
+import {
+  markCsInviteClaimed,
+  markCsInviteUnclaimed,
+} from "@/features/message/cs-invite-claim-state";
 import type { RongCommand } from "@/features/message/rongcloud-command";
 
 import { claimAndEnterCustomerServiceRoom } from "../use-customer-service-room-flow";
@@ -44,6 +48,7 @@ function handleCustomerServiceInvite(command: RongCommand) {
 
   const expireAt = Number(command.data.expireAt);
   if (Number.isFinite(expireAt) && expireAt * 1000 <= Date.now()) return;
+  const claimExpireAt = Number.isFinite(expireAt) ? expireAt : undefined;
 
   csInviteKeys.add(key);
   const playerName =
@@ -81,9 +86,11 @@ function handleCustomerServiceInvite(command: RongCommand) {
               }
               if (result.status === "failed") {
                 csInviteKeys.delete(key);
+                markCsInviteUnclaimed(roomId, roomVersion, claimExpireAt);
                 Toast.show(result.message, { duration: Toast.durations.SHORT });
                 return;
               }
+              markCsInviteClaimed(roomId, roomVersion, claimExpireAt, false);
               Toast.show("接单成功，已进入房间", {
                 duration: Toast.durations.SHORT,
               });

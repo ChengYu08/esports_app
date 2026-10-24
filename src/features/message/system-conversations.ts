@@ -22,6 +22,10 @@ export function isOrderAssistantConversationId(value: string | undefined | null)
   return Boolean(value && rawSystemId(String(value)) === SYSTEM_CONVERSATION_IDS.order);
 }
 
+export function isDispatchAssistantConversationId(value: string | undefined | null): boolean {
+  return Boolean(value && rawSystemId(String(value)) === SYSTEM_CONVERSATION_IDS.dispatch);
+}
+
 export function normalizeSystemConversationId(value: string): string {
   const raw = rawSystemId(value);
   return SYSTEM_TITLES[raw] ? `rc_p_${raw}` : value;

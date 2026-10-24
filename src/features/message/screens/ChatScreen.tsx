@@ -30,6 +30,7 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import { CsInviteCard } from "../components/CsInviteCard";
 import { OrderNotifyCard } from "../components/OrderNotifyCard";
 import { resolveConversationAvatar } from "../message-avatar";
 import type { ManagedMessage } from "../message-state";
@@ -37,6 +38,7 @@ import { useMessageStore } from "../message-store";
 import { getConversationDisplayTitle } from "../message-title";
 import {
   getSystemConversationTitle,
+  isDispatchAssistantConversationId,
   isOrderAssistantConversationId,
   isSystemConversationId,
   isSelfConversationId,
@@ -182,6 +184,7 @@ export default function ChatScreen() {
     }, [accessToken, refreshOnlineStatuses]),
   );
   const isOrderAssistant = isOrderAssistantConversationId(conversationId);
+  const isDispatchAssistant = isDispatchAssistantConversationId(conversationId);
   const isPinned = Boolean(conversation?.isPinned);
   const scrollToLatest = useCallback(() => {
     isNearBottom.current = true;
@@ -479,7 +482,7 @@ export default function ChatScreen() {
         <Text style={styles.errorBanner}>{lastError}</Text>
       ) : null}
 
-      {!isOrderAssistant ? (
+      {!isOrderAssistant && !isDispatchAssistant ? (
         <ChatComposer
           bottomInset={insets.bottom}
           onSendText={handleSendText}
@@ -771,7 +774,7 @@ const ChatBubble = memo(function ChatBubble({
       style={[
         styles.bubbleRow,
         item.isMine && styles.mineRow,
-        item.kind === "orderNotify" && !item.isMine && styles.orderNotifyMessageRow,
+        (item.kind === "orderNotify" || item.kind === "csInvite") && !item.isMine && styles.orderNotifyMessageRow,
       ]}
     >
       {!item.isMine && (
@@ -795,7 +798,7 @@ const ChatBubble = memo(function ChatBubble({
           item.isMine ? styles.mineBubble : styles.theirBubble,
           item.kind === "image" && styles.imageBubble,
           item.kind === "roomInvite" && styles.roomInviteBubble,
-          item.kind === "orderNotify" && styles.orderNotifyBubble,
+          (item.kind === "orderNotify" || item.kind === "csInvite") && styles.orderNotifyBubble,
         ]}
       >
         {item.kind === "image" ? (
@@ -864,6 +867,8 @@ const ChatBubble = memo(function ChatBubble({
           </View>
         ) : item.kind === "orderNotify" ? (
           <OrderNotifyCard item={item} onOpenOrder={onOpenOrder} />
+        ) : item.kind === "csInvite" ? (
+          <CsInviteCard item={item} />
         ) : (
           <Text style={styles.bubbleText}>{item.text}</Text>
         )}
