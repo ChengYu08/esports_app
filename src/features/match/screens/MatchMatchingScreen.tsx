@@ -1,6 +1,7 @@
 import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { Stack, router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useCallback, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Toast from "react-native-root-toast";
@@ -116,6 +117,7 @@ export default function MatchMatchingScreen({
 
   return (
     <View style={styles.root}>
+      <StatusBar style="light" />
       <Stack.Screen options={{ headerShown: false }} />
       <MatchLinearGradient
         colors={BG_GRADIENT}

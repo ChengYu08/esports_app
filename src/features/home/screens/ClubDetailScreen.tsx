@@ -13,6 +13,7 @@ import { useCustomerDispatch } from "@/features/voice-room/use-customer-dispatch
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -221,6 +222,7 @@ export default function ClubDetailScreen() {
     return <ErrorState onRetry={() => void clubQuery.refetch()} />;
   return (
     <View style={styles.screen}>
+      <StatusBar style="light" />
       <LinearGradient
         colors={["#3b6f75", "#2a6681"]}
         end={{ x: 1, y: 0.8 }}

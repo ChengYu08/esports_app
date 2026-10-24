@@ -3,6 +3,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { useFonts } from "expo-font";
 import { router, Stack, usePathname } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RootSiblingParent } from "react-native-root-siblings";
 import Toast from "react-native-root-toast";
@@ -207,6 +208,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <RootSiblingParent>
+            <StatusBar style="dark" />
             <NetworkRecovery />
             {privacyAccepted ? (
               <Stack

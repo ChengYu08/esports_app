@@ -6,6 +6,7 @@ import {
 } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import {
   FlatList,
@@ -467,6 +468,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.screen}>
+      <StatusBar style="light" />
       <View style={styles.cover}>
         {coverPreviewParams ? (
           <Pressable

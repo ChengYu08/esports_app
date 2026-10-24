@@ -18,6 +18,7 @@ import {
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -1306,6 +1307,7 @@ export default function VoiceRoomScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={0}
     >
+      <StatusBar style="light" />
       <LinearGradient
         colors={BG_GRADIENT}
         start={{ x: 0.5, y: 0 }}

@@ -1,6 +1,7 @@
 import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { Stack, router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -262,6 +263,7 @@ export default function MatchPublishScreen() {
 
   return (
     <View style={styles.root}>
+      <StatusBar style="light" />
       <Stack.Screen options={{ headerShown: false }} />
       <MatchLinearGradient
         colors={BG_GRADIENT}
