@@ -5,7 +5,6 @@ import {
   resetActionNoticeStore,
   useActionNoticeStore,
 } from "@/shared/ui/action-notice/action-notice-store";
-import { useActionCommandDialog } from "./action-command-store";
 import type { RongCommand } from "@/features/message/rongcloud-command";
 
 vi.mock("react-native-root-toast", () => ({
@@ -20,11 +19,22 @@ vi.mock("@/features/match/grab-quick-match-flow", () => ({
   grabQuickMatchAndEnterAudition: vi.fn(),
 }));
 
+vi.mock("@esports/auth", () => ({
+  useAuthStore: { getState: () => ({ accessToken: "token" }) },
+}));
+
+vi.mock("expo-router", () => ({
+  router: { push: vi.fn() },
+}));
+
+vi.mock("@/features/order/order.api", () => ({
+  acceptOrder: vi.fn(),
+}));
+
 const {
   handleOrderNotifyPopup,
   handleQuickMatchExpired,
   handleQuickMatchNotice,
-  releaseOrderPayKey,
   resetActionCommandDedupKeys,
 } = await import("./action-command-handlers");
 
@@ -33,10 +43,6 @@ const PLATFORM = "50000000";
 
 function command(name: string, data: Record<string, unknown>, senderId = PLATFORM): RongCommand {
   return { senderId, name, data };
-}
-
-function resetStore() {
-  useActionCommandDialog.setState({ current: null, queue: [] });
 }
 
 describe("handleQuickMatchNotice", () => {
@@ -64,7 +70,7 @@ describe("handleQuickMatchNotice", () => {
       id: "qm:QM1",
       text: "「老板A」发布了王者荣耀需求",
       expireAt: new Date("2026-10-20T12:30:00").getTime(),
-      maxDurationMs: 30_000,
+      maxDurationMs: 15_000,
     });
   });
 
@@ -89,9 +95,9 @@ describe("handleQuickMatchNotice", () => {
     expect(useActionNoticeStore.getState().items).toHaveLength(0);
   });
 
-  it("expireTime 不可解析时按 30 秒兜底", () => {
+  it("expireTime 不可解析时按 15 秒兜底", () => {
     handleQuickMatchNotice(command("QUICK_MATCH_NOTICE", { requestNo: "QM1" }), NOW);
-    expect(useActionNoticeStore.getState().items[0]?.expireAt).toBe(NOW + 30_000);
+    expect(useActionNoticeStore.getState().items[0]?.expireAt).toBe(NOW + 15_000);
   });
 
   it("服务字段全空时降级文案", () => {
@@ -128,11 +134,9 @@ describe("handleQuickMatchNotice", () => {
 });
 
 describe("handleOrderNotifyPopup", () => {
-  const show = vi.fn();
-
   beforeEach(() => {
-    show.mockClear();
     resetActionCommandDedupKeys();
+    resetActionNoticeStore();
   });
 
   const payload = {
@@ -143,43 +147,53 @@ describe("handleOrderNotifyPopup", () => {
     buyerHeadImage: "https://example.com/a.png",
   };
 
-  it("首次命令触发 show 且字段完整", () => {
-    handleOrderNotifyPopup(command("ORDER_NOTIFY", payload), show);
-    expect(show).toHaveBeenCalledWith({
-      key: "pay:PZ1",
-      orderId: "123",
-      orderNo: "PZ1",
-      title: "订单支付通知",
-      buyerNickname: "老板B",
-      buyerHeadImage: "https://example.com/a.png",
+  it("首次命令入队且文案完整", () => {
+    handleOrderNotifyPopup(command("ORDER_NOTIFY", payload), NOW);
+    const items = useActionNoticeStore.getState().items;
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      id: "pay:PZ1",
+      text: "「老板B」已支付订单，请尽快接单",
+      actionText: "接单",
+      expireAt: NOW + 15_000,
+      maxDurationMs: 15_000,
     });
   });
 
-  it("同 orderNo 二次不弹，释放后可再弹", () => {
+  it("同 orderNo 二次不弹，dismiss 后可再弹", () => {
     const cmd = command("ORDER_NOTIFY", payload);
-    handleOrderNotifyPopup(cmd, show);
-    handleOrderNotifyPopup(cmd, show);
-    expect(show).toHaveBeenCalledTimes(1);
-    releaseOrderPayKey("PZ1");
-    handleOrderNotifyPopup(cmd, show);
-    expect(show).toHaveBeenCalledTimes(2);
+    handleOrderNotifyPopup(cmd, NOW);
+    handleOrderNotifyPopup(cmd, NOW);
+    expect(useActionNoticeStore.getState().items).toHaveLength(1);
+    actionNotice.dismiss("pay:PZ1");
+    handleOrderNotifyPopup(cmd, NOW);
+    expect(useActionNoticeStore.getState().items).toHaveLength(1);
   });
 
   it("orderId 无效丢弃", () => {
-    handleOrderNotifyPopup(command("ORDER_NOTIFY", { ...payload, orderId: 0 }), show);
-    handleOrderNotifyPopup(command("ORDER_NOTIFY", { ...payload, orderNo: "" }), show);
-    expect(show).not.toHaveBeenCalled();
+    handleOrderNotifyPopup(command("ORDER_NOTIFY", { ...payload, orderId: 0 }), NOW);
+    handleOrderNotifyPopup(command("ORDER_NOTIFY", { ...payload, orderNo: "" }), NOW);
+    expect(useActionNoticeStore.getState().items).toHaveLength(0);
   });
 
   it("非平台发送方忽略", () => {
-    handleOrderNotifyPopup(command("ORDER_NOTIFY", payload, "60000000"), show);
-    expect(show).not.toHaveBeenCalled();
+    handleOrderNotifyPopup(command("ORDER_NOTIFY", payload, "60000000"), NOW);
+    expect(useActionNoticeStore.getState().items).toHaveLength(0);
+  });
+
+  it("昵称为空时降级文案", () => {
+    handleOrderNotifyPopup(
+      command("ORDER_NOTIFY", { ...payload, buyerNickname: "" }),
+      NOW,
+    );
+    expect(useActionNoticeStore.getState().items[0]?.text).toBe(
+      "「老板」已支付订单，请尽快接单",
+    );
   });
 });
 
 describe("handleQuickMatchExpired", () => {
   beforeEach(() => {
-    resetStore();
     resetActionCommandDedupKeys();
   });
 
@@ -232,41 +246,5 @@ describe("handleQuickMatchExpired", () => {
     });
     expect(notifyEnded).not.toHaveBeenCalled();
     expect(dismissQuickMatchBar).not.toHaveBeenCalled();
-  });
-});
-
-describe("useActionCommandDialog 队列（仅 orderPay）", () => {
-  function pay(key: string) {
-    return { key, orderId: key, orderNo: key, title: "t", buyerNickname: "b" };
-  }
-
-  beforeEach(() => {
-    resetStore();
-    resetActionCommandDedupKeys();
-  });
-
-  it("current 为空直接展示，occupied 时入队", () => {
-    const { show, dismiss } = useActionCommandDialog.getState();
-    show(pay("pay:1"));
-    show(pay("pay:2"));
-    expect(useActionCommandDialog.getState().current?.key).toBe("pay:1");
-    expect(useActionCommandDialog.getState().queue.map((item) => item.key)).toEqual(["pay:2"]);
-
-    dismiss();
-    expect(useActionCommandDialog.getState().current?.key).toBe("pay:2");
-    expect(useActionCommandDialog.getState().queue).toHaveLength(0);
-  });
-
-  it("队满保留最新、丢弃最旧", () => {
-    const { show } = useActionCommandDialog.getState();
-    show(pay("pay:1"));
-    show(pay("pay:2"));
-    show(pay("pay:3"));
-    show(pay("pay:4"));
-    expect(useActionCommandDialog.getState().queue.map((item) => item.key)).toEqual([
-      "pay:2",
-      "pay:3",
-      "pay:4",
-    ]);
   });
 });
