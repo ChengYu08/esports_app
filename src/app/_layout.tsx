@@ -26,10 +26,9 @@ import {
 } from "@/features/message/message-store";
 import { InAppNotificationBanner } from "@/features/message/components/InAppNotificationBanner";
 import { ActionCommandDialog } from "@/features/message/action-command/ActionCommandDialog";
-import { ActionCommandListener } from "@/features/message/action-command/ActionCommandListener";
+import { RongCommandHost } from "@/features/message/rong-command-dispatch/RongCommandHost";
 import { VoiceRoomMiniPlayer } from "@/features/voice-room/components/VoiceRoomMiniPlayer";
 import { VoiceRoomKickListener } from "@/features/voice-room/components/VoiceRoomKickListener";
-import { ReceptionCommandListener } from "@/features/voice-room/components/ReceptionCommandListener";
 import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
 import { leaveVoiceChatRoom } from "@/features/voice-room/voice-room-rongcloud";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
@@ -236,8 +235,7 @@ export default function RootLayout() {
             <ActionNoticeHost />
             <VoiceRoomMiniPlayer />
             <VoiceRoomKickListener />
-            <ReceptionCommandListener />
-            <ActionCommandListener />
+            <RongCommandHost />
             <ActionCommandDialog />
             <AppConfirmHost />
           </RootSiblingParent>

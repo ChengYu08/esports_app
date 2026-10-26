@@ -1,20 +1,18 @@
 /**
- * 全局接待/代发相关融云命令监听：
+ * 全局接待/代发相关融云命令：
  * - CUSTOMER_SERVICE_INVITE：接待邀请 → 全局 ActionNotice 抢单条（到期自动消失）
- * - QUICK_MATCH_CREATED：接待代发创建 → 写入 quickMatchCreated 场景标记（不弹窗；是否显示「选择陪玩」由语聊房调 active/detail 决定）
+ * - QUICK_MATCH_CREATED：接待代发创建 → 写入 quickMatchCreated 场景标记
  */
-import { useAuthStore } from "@esports/auth";
-import { useEffect } from "react";
 import Toast from "react-native-root-toast";
 
-import { subscribeRongCommands } from "@/features/message/rongcloud-im";
-import type { RongCommand } from "@/features/message/rongcloud-command";
 import { markCsInviteClaimed, markCsInviteUnclaimed } from "@/features/message/cs-invite-claim-state";
+import type { RongCommand } from "@/features/message/rongcloud-command";
+import { registerRongCommandHandler } from "@/features/message/rong-command-dispatch/rong-command-registry";
 import { actionNotice } from "@/shared/ui/action-notice/action-notice-store";
 import { TRADE_NOTICE_ICON } from "@/shared/ui/action-notice/trade-notice-icon";
 
-import { claimAndEnterCustomerServiceRoom } from "../use-customer-service-room-flow";
-import { useVoiceRoomSessionStore } from "../voice-room-session";
+import { claimAndEnterCustomerServiceRoom } from "./use-customer-service-room-flow";
+import { useVoiceRoomSessionStore } from "./voice-room-session";
 
 const PLATFORM_NOTICE_USER_ID = "50000000";
 const CUSTOMER_SERVICE_INVITE = "CUSTOMER_SERVICE_INVITE";
@@ -32,7 +30,7 @@ function stringField(data: Record<string, unknown>, key: string): string {
   return String(value);
 }
 
-function handleCustomerServiceInvite(command: RongCommand) {
+export function handleCustomerServiceInvite(command: RongCommand) {
   if (command.name !== CUSTOMER_SERVICE_INVITE) return;
 
   const roomId = stringField(command.data, "roomId");
@@ -84,7 +82,7 @@ function handleCustomerServiceInvite(command: RongCommand) {
   );
 }
 
-function handleQuickMatchCreated(command: RongCommand) {
+export function handleQuickMatchCreated(command: RongCommand) {
   if (command.name !== QUICK_MATCH_CREATED) return;
   if (command.senderId !== PLATFORM_NOTICE_USER_ID) return;
 
@@ -111,15 +109,12 @@ export function releaseCsInviteKey(key: string) {
   csInviteKeys.delete(key);
 }
 
-export function ReceptionCommandListener() {
-  useEffect(() => {
-    return subscribeRongCommands((command) => {
-      const { accessToken } = useAuthStore.getState();
-      if (!accessToken) return;
+export function registerReceptionCommandHandlers(): () => void {
+  return registerRongCommandHandler({
+    id: "reception-command",
+    handle(command) {
       handleCustomerServiceInvite(command);
       handleQuickMatchCreated(command);
-    });
-  }, []);
-
-  return null;
+    },
+  });
 }
