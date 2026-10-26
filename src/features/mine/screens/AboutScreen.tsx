@@ -63,7 +63,7 @@ export default function AboutScreen() {
         </View>
 
         <View style={styles.list}>
-          {/* <AboutRow label="检测更新" onPress={() => Alert.alert("检查更新", "请前往应用商店查看是否有新版本")} /> */}
+          {/* <AboutRow label="检测更新" onPress={() => void useAppConfirm.getState().confirm({ title: "检查更新", message: "请前往应用商店查看是否有新版本" })} /> */}
           <AboutRow
             label="用户协议"
             onPress={() => void openExternalLink(APP_LINKS.userAgreement)}

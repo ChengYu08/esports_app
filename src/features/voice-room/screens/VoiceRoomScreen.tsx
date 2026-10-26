@@ -23,7 +23,6 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
@@ -1186,9 +1185,12 @@ export default function VoiceRoomScreen() {
     };
     setMessages((items) => [...items, local].slice(-80));
     if (chatroomId)
-      await sendVoiceChatMessage(chatroomId, text).catch(() =>
-        Alert.alert("发送失败", "请稍后重试"),
-      );
+      await sendVoiceChatMessage(chatroomId, text).catch(() => {
+        void useAppConfirm.getState().confirm({
+          title: "发送失败",
+          message: "请稍后重试",
+        });
+      });
   };
 
   const ensureMicrophonePermission = async () => {
@@ -1204,56 +1206,40 @@ export default function VoiceRoomScreen() {
     if (currentPermission?.granted) return true;
 
     if (currentPermission && !currentPermission.canAskAgain) {
-      Alert.alert(
-        "需要麦克风权限",
-        "请在系统设置中允许盼之电竞使用麦克风后再开麦。",
-        [
-          { text: "取消", style: "cancel" },
-          { text: "去设置", onPress: () => void Linking.openSettings() },
-        ],
-      );
+      const goSettings = await useAppConfirm.getState().confirm({
+        title: "需要麦克风权限",
+        message: "请在系统设置中允许盼之电竞使用麦克风后再开麦。",
+        cancelText: "取消",
+        confirmText: "去设置",
+      });
+      if (goSettings) void Linking.openSettings();
       return false;
     }
 
-    return await new Promise<boolean>((resolve) => {
-      Alert.alert(
-        "需要麦克风权限",
-        "开麦需要使用麦克风，请允许盼之电竞访问麦克风。",
-        [
-          { text: "取消", style: "cancel", onPress: () => resolve(false) },
-          {
-            text: "去授权",
-            onPress: () => {
-              void (async () => {
-                try {
-                  const permission = await requestRecordingPermissionsAsync();
-                  if (permission.granted) {
-                    resolve(true);
-                    return;
-                  }
-                  if (!permission.canAskAgain) {
-                    Alert.alert(
-                      "麦克风权限已关闭",
-                      "请在系统设置中允许盼之电竞使用麦克风后再开麦。",
-                      [
-                        { text: "取消", style: "cancel" },
-                        {
-                          text: "去设置",
-                          onPress: () => void Linking.openSettings(),
-                        },
-                      ],
-                    );
-                  }
-                } catch {
-                  // The caller keeps the room in listen-only mode when permission cannot be requested.
-                }
-                resolve(false);
-              })();
-            },
-          },
-        ],
-      );
+    const goAuthorize = await useAppConfirm.getState().confirm({
+      title: "需要麦克风权限",
+      message: "开麦需要使用麦克风，请允许盼之电竞访问麦克风。",
+      cancelText: "取消",
+      confirmText: "去授权",
     });
+    if (!goAuthorize) return false;
+
+    try {
+      const permission = await requestRecordingPermissionsAsync();
+      if (permission.granted) return true;
+      if (!permission.canAskAgain) {
+        const goSettings = await useAppConfirm.getState().confirm({
+          title: "麦克风权限已关闭",
+          message: "请在系统设置中允许盼之电竞使用麦克风后再开麦。",
+          cancelText: "取消",
+          confirmText: "去设置",
+        });
+        if (goSettings) void Linking.openSettings();
+      }
+    } catch {
+      // The caller keeps the room in listen-only mode when permission cannot be requested.
+    }
+    return false;
   };
 
   const toggleMute = async () => {

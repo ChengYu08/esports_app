@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -16,6 +15,7 @@ import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import type { OrderReview } from "../order.api";
 
@@ -70,10 +70,10 @@ export function OrderReviewSheet({
       Keyboard.dismiss();
       onClose();
     } catch (error) {
-      Alert.alert(
-        "评价提交失败",
-        error instanceof Error ? error.message : "请稍后重试",
-      );
+      void useAppConfirm.getState().confirm({
+        title: "评价提交失败",
+        message: error instanceof Error ? error.message : "请稍后重试",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -83,7 +83,10 @@ export function OrderReviewSheet({
     if (readonly || submitting || images.length >= MAX_IMAGES) return;
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert("需要相册权限", "允许访问相册后才能添加评价图片");
+      void useAppConfirm.getState().confirm({
+        title: "需要相册权限",
+        message: "允许访问相册后才能添加评价图片",
+      });
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({

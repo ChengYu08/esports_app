@@ -5,7 +5,6 @@ import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
@@ -27,6 +26,7 @@ import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import type { AfterSaleCardPayload } from "@/features/order/after-sale-card";
 import { afterSaleCardRows } from "@/features/order/after-sale-card";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { CachedImage } from "@/shared/ui/CachedImage";
@@ -223,19 +223,19 @@ export default function ChatScreen() {
       const uri = await resolveImagePreview(conversationId, message);
       router.push({ pathname: "/image-preview", params: createImagePreviewParams([uri], 0) });
     } catch (error) {
-      Alert.alert(
-        "图片预览失败",
-        error instanceof Error ? error.message : "融云图片下载失败",
-      );
+      void useAppConfirm.getState().confirm({
+        title: "图片预览失败",
+        message: error instanceof Error ? error.message : "融云图片下载失败",
+      });
     }
   }, [conversationId, resolveImagePreview]);
   const openProfile = useCallback(() => {
     setSettingsVisible(false);
     if (!/^\d+$/.test(conversationId)) {
-      Alert.alert(
-        "暂无法查看主页",
-        "当前会话缺少主页信息，请从用户主页重新发起聊天。",
-      );
+      void useAppConfirm.getState().confirm({
+        title: "暂无法查看主页",
+        message: "当前会话缺少主页信息，请从用户主页重新发起聊天。",
+      });
       return;
     }
     const targetClubId =
@@ -641,10 +641,10 @@ const ChatComposer = memo(function ChatComposer({
     setEmojiPickerOpen(false);
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert(
-        "需要访问相册",
-        "请在系统设置中允许访问照片，用于发送聊天图片。",
-      );
+      void useAppConfirm.getState().confirm({
+        title: "需要访问相册",
+        message: "请在系统设置中允许访问照片，用于发送聊天图片。",
+      });
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({

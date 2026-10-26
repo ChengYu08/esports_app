@@ -5,7 +5,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Toast from "react-native-root-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -33,6 +33,7 @@ import {
 import type { OrderAction, OrderActionKey, OrderItemModel, OrderScope } from "@/features/order/order.types";
 import { requireLogin } from "@/shared/navigation/require-login";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { CachedImage } from "@/shared/ui/CachedImage";
 
@@ -201,7 +202,10 @@ export default function OrderDetailRoute() {
     else if (action.key === "complete") setCompletePromptVisible(true);
     else if (action.key === "afterSales") {
       if (order.clubId == null) {
-        Alert.alert("暂无法申请售后", "缺少俱乐部信息，无法申请售后");
+        void useAppConfirm.getState().confirm({
+          title: "暂无法申请售后",
+          message: "缺少俱乐部信息，无法申请售后",
+        });
         return;
       }
       setAfterSaleVisible(true);

@@ -1,4 +1,5 @@
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
@@ -326,38 +327,15 @@ export default function MineScreen() {
           </Pressable>
         ) : null}
       </ScrollView>
-      <Modal
-        transparent
+      <AppPrompt
         visible={logoutVisible}
-        animationType="fade"
-        onRequestClose={() => setLogoutVisible(false)}
-      >
-        <View style={styles.dialogBackdrop}>
-          <View style={styles.logoutDialog}>
-            <View style={styles.logoutMark}>
-              <Text style={styles.logoutMarkText}>!</Text>
-            </View>
-            <Text style={styles.logoutTitle}>退出登录</Text>
-            <Text style={styles.logoutMessage}>
-              确认退出当前账号吗？您的数据将被清除！
-            </Text>
-            <View style={styles.logoutActions}>
-              <Pressable
-                onPress={() => setLogoutVisible(false)}
-                style={styles.logoutCancel}
-              >
-                <Text style={styles.logoutCancelText}>取消</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => void confirmLogout()}
-                style={styles.logoutConfirm}
-              >
-                <Text style={styles.logoutConfirmText}>退出登录</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        title="退出登录"
+        message="确认退出当前账号吗？您的数据将被清除！"
+        cancelText="取消"
+        confirmText="退出登录"
+        onCancel={() => setLogoutVisible(false)}
+        onConfirm={() => void confirmLogout()}
+      />
       <JoinQrCodeModal
         type={qrCodeModal}
         onClose={() => setQrCodeModal(null)}
@@ -552,68 +530,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   logoutText: { color: "#FF1F4C", fontFamily: DOUYIN_SANS, fontSize: 15 },
-  dialogBackdrop: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 28,
-    backgroundColor: "rgba(0,0,0,0.45)",
-  },
-  logoutDialog: {
-    width: "100%",
-    borderRadius: 12,
-    backgroundColor: "#FFF",
-    padding: 24,
-    alignItems: "center",
-  },
-  logoutMark: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#FFF1F3",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-  logoutMarkText: { color: "#FF1F4C", fontSize: 22, fontWeight: "700" },
-  logoutTitle: {
-    color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 17,
-    fontWeight: "600",
-  },
-  logoutMessage: {
-    color: "#666",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 13,
-    lineHeight: 20,
-    marginTop: 8,
-    textAlign: "center",
-  },
-  logoutActions: {
-    width: "100%",
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 22,
-  },
-  logoutCancel: {
-    flex: 1,
-    height: 44,
-    borderRadius: 8,
-    backgroundColor: "#F7F7F7",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoutCancelText: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 15 },
-  logoutConfirm: {
-    flex: 1,
-    height: 44,
-    borderRadius: 8,
-    backgroundColor: "#FF1F4C",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoutConfirmText: { color: "#FFF", fontFamily: DOUYIN_SANS, fontSize: 15 },
   qrModalBackdrop: {
     flex: 1,
     alignItems: "center",

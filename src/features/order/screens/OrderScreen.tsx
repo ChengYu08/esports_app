@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "@esports/auth";
+import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 
@@ -89,7 +90,10 @@ export default function OrderScreen() {
     }
     if (action === "afterSales") {
       if (item.clubId == null) {
-        Alert.alert("暂无法申请售后", "缺少俱乐部信息，无法申请售后");
+        void useAppConfirm.getState().confirm({
+          title: "暂无法申请售后",
+          message: "缺少俱乐部信息，无法申请售后",
+        });
         return;
       }
       setAfterSaleTarget(item);

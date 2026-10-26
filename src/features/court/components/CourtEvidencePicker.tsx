@@ -1,5 +1,6 @@
 import { complaintStyles } from "@/features/court/complaint.styles";
 import { preparePickedEvidenceImage } from "@/features/court/court-evidence-image";
+import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import * as ImagePicker from "expo-image-picker";
@@ -7,7 +8,6 @@ import { router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Pressable,
   Text,
@@ -58,7 +58,10 @@ export function useEvidenceImages(
       const permission =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert("需要相册权限", "允许访问相册后才能添加证据截图");
+        void useAppConfirm.getState().confirm({
+          title: "需要相册权限",
+          message: "允许访问相册后才能添加证据截图",
+        });
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
