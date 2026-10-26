@@ -25,10 +25,13 @@ import {
   useMessageStore,
 } from "@/features/message/message-store";
 import { InAppNotificationBanner } from "@/features/message/components/InAppNotificationBanner";
+import { ActionCommandDialog } from "@/features/message/action-command/ActionCommandDialog";
+import { ActionCommandListener } from "@/features/message/action-command/ActionCommandListener";
 import { VoiceRoomMiniPlayer } from "@/features/voice-room/components/VoiceRoomMiniPlayer";
 import { VoiceRoomKickListener } from "@/features/voice-room/components/VoiceRoomKickListener";
 import { ReceptionCommandListener } from "@/features/voice-room/components/ReceptionCommandListener";
-import { CsInviteBar } from "@/features/voice-room/components/CsInviteBar";
+import { CustomerServiceInviteBar } from "@/features/voice-room/components/CustomerServiceInviteBar";
+import { QuickMatchNoticeBar } from "@/features/match/components/QuickMatchNoticeBar";
 import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
 import { leaveVoiceChatRoom } from "@/features/voice-room/voice-room-rongcloud";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
@@ -233,10 +236,13 @@ export default function RootLayout() {
               <PrivacyConsentGate onAccepted={() => setPrivacyAccepted(true)} />
             )}
             <InAppNotificationBanner visible={!pathname.startsWith("/voice-room/")} />
-            <CsInviteBar visible={MAIN_TAB_PATHS.has(pathname)} />
+            <CustomerServiceInviteBar visible={MAIN_TAB_PATHS.has(pathname)} />
+            <QuickMatchNoticeBar visible={MAIN_TAB_PATHS.has(pathname)} />
             <VoiceRoomMiniPlayer />
             <VoiceRoomKickListener />
             <ReceptionCommandListener />
+            <ActionCommandListener />
+            <ActionCommandDialog />
             <AppConfirmHost />
           </RootSiblingParent>
         </GestureHandlerRootView>

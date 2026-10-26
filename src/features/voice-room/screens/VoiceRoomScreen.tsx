@@ -8,6 +8,7 @@ import {
 } from "@/features/match/api/match.api";
 import { isQuickMatchActive } from "@/features/match/api/match.types";
 import type { MatchGame } from "@/features/match/api/match.types";
+import { useQuickMatchEndSignals } from "@/features/match/quick-match-end-signals";
 import { ClubQuickMatchSheet } from "@/features/match/components/ClubQuickMatchSheet";
 import { messageStore } from "@/features/message/message-store";
 import { useAuthStore } from "@esports/auth";
@@ -75,7 +76,7 @@ const backIcon = require("../../../../assets/svgs/icon-back.svg");
 const BG_GRADIENT = ["#0C0C2E", "#120D2B"] as const;
 const closeIcon = require("../../../../assets/voice-room/navbar-exit.svg");
 const inviteIcon = require("../../../../assets/voice-room/invite.svg");
-const defaultAvatar = require("../../../../assets/voice-room/avatar-default.png");
+const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
 const ringOwner = require("../../../../assets/voice-room/ring-owner.svg");
 const ringInvite = require("../../../../assets/voice-room/ring-invite.svg");
 
@@ -348,6 +349,29 @@ export default function VoiceRoomScreen() {
     },
     [],
   );
+
+  // 快速匹配超时/取消信令：清除 audition/quickMatchCreated 场景标记（不强制退房，对齐 PC 只清会话）
+  const sceneRequestNo = auditionRequestNo || quickMatchCreatedRequestNo;
+  useEffect(() => {
+    if (!sceneRequestNo || !roomId) return;
+    const consumeEndSignal = () => {
+      const reason = useQuickMatchEndSignals.getState().consume(sceneRequestNo);
+      if (!reason) return;
+      clearAuditionSessionMarkers(roomId);
+      clearQuickMatchCreatedSessionMarkers(roomId);
+      Toast.show(
+        reason === "expired" ? "派单已超时自动取消" : "派单已取消",
+        { duration: Toast.durations.SHORT },
+      );
+    };
+    consumeEndSignal();
+    return useQuickMatchEndSignals.subscribe(consumeEndSignal);
+  }, [
+    clearAuditionSessionMarkers,
+    clearQuickMatchCreatedSessionMarkers,
+    roomId,
+    sceneRequestNo,
+  ]);
 
   const openSelectCompanion = useCallback(() => {
     const useQuickMatchCreated =

@@ -1,3 +1,5 @@
+import { parseServerDateTime } from "@/shared/time/server-date";
+
 export type MatchGame = {
   id: string;
   name: string;
@@ -130,5 +132,5 @@ export type QuickMatchAuditionRoom = {
 export function isQuickMatchActive(request: QuickMatchRequestDetail | null): boolean {
   if (!request || request.status !== "MATCHING") return false;
   if (!request.expireTime) return true;
-  return new Date(request.expireTime).getTime() > Date.now();
+  return parseServerDateTime(request.expireTime) > Date.now();
 }

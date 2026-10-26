@@ -14,6 +14,7 @@ import type { AfterSaleCardPayload } from '@/features/order/after-sale-card';
 import { getRongConversationTargetId, getSystemConversationTitle, isSystemConversationId, normalizeSystemConversationId } from './system-conversations';
 import { loadConversationSnapshot } from './conversation-loader';
 import { parseRongCommand, type RongCommand } from './rongcloud-command';
+import { KNOWN_RONG_COMMAND_NAMES } from './rongcloud-commands';
 
 export type RongConversation = MessageConversation;
 export type RongTextMessage = ManagedMessage;
@@ -338,7 +339,15 @@ function installListeners() {
         private: sdk.RCIMIWConversationType.PRIVATE,
         command: sdk.RCIMIWMessageType.COMMAND,
       });
-      if (command) commandListeners.forEach((listener) => listener(command));
+      if (command) {
+        if (!KNOWN_RONG_COMMAND_NAMES.has(command.name)) {
+          logger.warn('Unknown RongCloud command received', {
+            name: command.name,
+            senderId: command.senderId,
+          });
+        }
+        commandListeners.forEach((listener) => listener(command));
+      }
       return;
     }
     if (sdk && message.conversationType === sdk.RCIMIWConversationType.CHATROOM) {

@@ -1,6 +1,6 @@
 /**
  * 全局接待/代发相关融云命令监听：
- * - CUSTOMER_SERVICE_INVITE：接待邀请 → 底部抢单条（CsInviteBar，到期自动消失）
+ * - CUSTOMER_SERVICE_INVITE：接待邀请 → 底部抢单条（CustomerServiceInviteBar，到期自动消失）
  * - QUICK_MATCH_CREATED：接待代发创建 → 写入 quickMatchCreated 场景标记（不弹窗；是否显示「选择陪玩」由语聊房调 active/detail 决定）
  */
 import { useAuthStore } from "@esports/auth";

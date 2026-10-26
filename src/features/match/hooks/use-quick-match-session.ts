@@ -18,6 +18,8 @@ import {
   type QuickMatchRequestDetail,
 } from "@/features/match/api/match.types";
 import { quickMatchGamesQueryKey } from "@/features/match/hooks/use-match-form";
+import { useQuickMatchEndSignals } from "@/features/match/quick-match-end-signals";
+import { parseServerDateTime } from "@/shared/time/server-date";
 import { exitVoiceRoom } from "@/features/voice-room/exit-voice-room";
 import { resolveVoiceRoomId } from "@/features/voice-room/voice-room.api";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
@@ -37,7 +39,7 @@ function formatCountdown(sec: number): string {
 }
 
 function resolveExpireAtMs(expireTime?: string): number {
-  const serverExpireAt = expireTime ? new Date(expireTime).getTime() : NaN;
+  const serverExpireAt = parseServerDateTime(expireTime);
   if (Number.isFinite(serverExpireAt)) return serverExpireAt;
   return Date.now() + DEFAULT_COUNTDOWN_SEC * 1000;
 }
@@ -303,7 +305,7 @@ export function useQuickMatchSession(
       }
       setDetail(nextDetail);
       if (nextDetail.expireTime) {
-        const nextExpire = new Date(nextDetail.expireTime).getTime();
+        const nextExpire = parseServerDateTime(nextDetail.expireTime);
         if (Number.isFinite(nextExpire)) expireAtRef.current = nextExpire;
       }
       if (!isQuickMatchActive(nextDetail)) {
@@ -353,6 +355,21 @@ export function useQuickMatchSession(
     }, POLL_INTERVAL_MS);
     return () => clearInterval(timer);
   }, [orderPending, pollGrabList, requestNo, token]);
+
+  // 服务端超时/取消信令（QUICK_MATCH_EXPIRED / QUICK_MATCH_CANCELLED）
+  useEffect(() => {
+    if (!requestNo) return;
+    const pendingSignal = useQuickMatchEndSignals.getState().consume(requestNo);
+    if (pendingSignal && !orderPendingRef.current && !endedRef.current) {
+      void endMatching(pendingSignal);
+    }
+    return useQuickMatchEndSignals.subscribe((state) => {
+      const reason = state.signals[requestNo];
+      if (!reason || orderPendingRef.current || endedRef.current) return;
+      useQuickMatchEndSignals.getState().consume(requestNo);
+      void endMatching(reason);
+    });
+  }, [endMatching, requestNo]);
 
   const cancelMatching = useCallback(async (): Promise<boolean> => {
     const no = requestNo;
