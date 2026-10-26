@@ -1,3 +1,5 @@
+import { parseServerDateTime } from "@/shared/time/server-date";
+
 export type MatchGame = {
   id: string;
   name: string;
@@ -40,7 +42,9 @@ export type MatchVoiceOption = "不试音" | "需试音";
 
 export type PublishQuickMatchPayload = {
   clubId: number;
-  publishType: "BUYER";
+  publishType: "BUYER" | "RECEPTION";
+  /** 接待代发时必填：老板（语聊房房主）用户 ID */
+  buyerUserId?: number;
   gameId: number;
   gameModeId: number;
   gameLevelId: number;
@@ -97,11 +101,25 @@ export type QuickMatchRequestDetail = {
   /** MATCHING / ORDERED / CANCELLED / EXPIRED */
   status?: string;
   expireTime?: string;
+  publishType?: "BUYER" | "RECEPTION" | string;
+  buyerUserId?: string;
+  buyerNickname?: string;
+  dispatcherUserId?: string;
 };
 
 export type QuickMatchPayable = {
   orderCount: number;
   totalPrice: number;
+};
+
+export type QuickMatchCreatedOrder = {
+  orderId: string;
+  serviceUserId?: string;
+};
+
+export type QuickMatchCreatedOrders = {
+  totalPrice: number;
+  orders: QuickMatchCreatedOrder[];
 };
 
 export type QuickMatchAuditionRoom = {
@@ -114,5 +132,5 @@ export type QuickMatchAuditionRoom = {
 export function isQuickMatchActive(request: QuickMatchRequestDetail | null): boolean {
   if (!request || request.status !== "MATCHING") return false;
   if (!request.expireTime) return true;
-  return new Date(request.expireTime).getTime() > Date.now();
+  return parseServerDateTime(request.expireTime) > Date.now();
 }

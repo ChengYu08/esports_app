@@ -1,6 +1,7 @@
 import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { Stack, router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -40,8 +41,8 @@ import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-sessi
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 
-const backIcon = require("../../../../assets/match/icon-back.svg");
-const arrowDownIcon = require("../../../../assets/match/icon-arrow-down.svg");
+const backIcon = require("../../../../assets/svgs/icon-back.svg");
+const arrowDownIcon = require("../../../../assets/svgs/icon-arrow-down.svg");
 const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
 
 const BG_GRADIENT = ["#0C0C2E", "#120D2B"] as const;
@@ -115,13 +116,36 @@ export default function MatchPublishScreen() {
   }, []);
 
   const enterAuditionRoom = useCallback(
-    async (requestNo: string) => {
+    async (
+      requestNo: string,
+      options?: {
+        expireTime?: string;
+        game?: { id: string; name: string; iconUrl?: string } | null;
+      },
+    ) => {
       if (!form.token) return false;
       try {
         const room = await ensureAuditionRoom(requestNo, form.token);
         const roomId = resolveVoiceRoomId(room) || room.id;
         if (!roomId) throw new Error("试音房信息不存在");
-        router.push({ pathname: "/voice-room/[id]", params: { id: roomId } });
+        const game = options?.game;
+        // replace：替换发布页，避免语聊房返回又回到发布表单（与不试音 goMatching 一致）
+        router.replace({
+          pathname: "/voice-room/[id]",
+          params: {
+            id: roomId,
+            scene: "audition",
+            requestNo,
+            ...(options?.expireTime ? { expireTime: options.expireTime } : {}),
+            ...(game?.id && game.name
+              ? {
+                  gameId: game.id,
+                  gameName: game.name,
+                  ...(game.iconUrl ? { gameIconUrl: game.iconUrl } : {}),
+                }
+              : {}),
+          },
+        });
         return true;
       } catch (error) {
         Toast.show(
@@ -210,10 +234,14 @@ export default function MatchPublishScreen() {
       );
 
       const selectedGame = form.games.find((item) => item.id === form.gameId);
-      // 先落匹配中页，再进试音房，从语聊房返回仍在匹配中
-      goMatching(result.requestNo, result.expireTime, selectedGame ?? null);
       if (needVoice) {
-        await enterAuditionRoom(result.requestNo);
+        // 需试音：直接进试音房，不落匹配等待页；选人由房内「选择陪玩」再 push
+        await enterAuditionRoom(result.requestNo, {
+          expireTime: result.expireTime,
+          game: selectedGame ?? null,
+        });
+      } else {
+        goMatching(result.requestNo, result.expireTime, selectedGame ?? null);
       }
     } catch (error) {
       Toast.show(error instanceof Error ? error.message : "发布失败，请重试", {
@@ -235,6 +263,7 @@ export default function MatchPublishScreen() {
 
   return (
     <View style={styles.root}>
+      <StatusBar style="light" />
       <Stack.Screen options={{ headerShown: false }} />
       <MatchLinearGradient
         colors={BG_GRADIENT}

@@ -2,39 +2,22 @@ import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
   Edit24Regular,
-  Flag24Regular,
   MoreHorizontal24Regular,
-  PersonProhibited24Regular,
 } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import {
-  Animated,
-  Easing,
   FlatList,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
-  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import {
-  buildCreateOrderAction,
-  createCompanionOrder,
-  fetchCompanionServices,
-  fetchStarBalance,
-  payCompanionOrder,
-  type CompanionOrderContext,
-  type CompanionServiceOption,
-} from "@/features/mine/api/companion-order.api";
 import {
   getFirstProfileGameId,
   getProfileRouteParams,
@@ -53,10 +36,13 @@ import {
   subscribeBlacklist,
 } from "@/features/mine/blacklist";
 import { fetchBlacklistStatus } from "@/features/mine/api/blacklist.api";
+import { CompanionOrderSheet } from "@/features/mine/components/CompanionOrderSheet";
+import { ProfileActionsSheet } from "@/features/mine/components/ProfileActionsSheet";
 import {
   ProfileGameSkeleton,
   ProfileSkeleton,
 } from "@/features/mine/components/ProfileSkeleton";
+import { StarPaymentSheet } from "@/features/mine/components/StarPaymentSheet";
 import {
   useProfileDetail,
   useProfileGameDetail,
@@ -67,12 +53,9 @@ import {
   useUserFollowState,
 } from "@/features/mine/hooks/use-user-follow";
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
-import {
-  handleOrderFailurePromptConfirm,
-  requiresRealNameVerification,
-} from "@/features/mine/order-real-name";
 import { createProfileAvatarPreviewParams } from "@/features/mine/profile-avatar-preview";
 import { createProfileChatParams } from "@/features/mine/profile-chat";
+import { calculateAge } from "@/features/mine/profile-utils";
 import { invalidateOrderQueries } from "@/features/order/order-query";
 import { cancelOrder } from "@/features/order/order.api";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
@@ -81,9 +64,8 @@ import { requireLogin } from "@/shared/navigation/require-login";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { EmptyState } from "@/shared/ui/AsyncStates";
-import { BottomSheet } from "@/shared/ui/BottomSheet";
 import Toast from "react-native-root-toast";
-// mine-avatar
+
 const fallbackAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const background = require("../../../../assets/mine/figma/profile-bg.png");
 const maleIcon = require("../../../../assets/home/club-detail/male.svg");
@@ -93,7 +75,6 @@ const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const diamondIcon = require("../../../../assets/home/club-detail/icon-diamond.svg");
 const idleStatusIcon = require("../../../../assets/home/club-detail/status-idle.svg");
 const playingStatusIcon = require("../../../../assets/home/club-detail/status-playing.svg");
-const paymentCloseIcon = require("../../../../assets/mine/payment-close.svg");
 type ProfileTab = "技能" | "评价";
 type ProfileListItem = { key: string; content: ReactElement };
 
@@ -109,7 +90,6 @@ export default function ProfileScreen() {
   const [tab, setTab] = useState<ProfileTab>("技能");
   const [selectedGameId, setSelectedGameId] = useState("");
   const [orderCard, setOrderCard] = useState<ProfileSkillCard | null>(null);
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [paymentOrder, setPaymentOrder] = useState<{
     orderId: number;
@@ -511,6 +491,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.screen}>
+      <StatusBar style="light" />
       <View style={styles.cover}>
         {coverPreviewParams ? (
           <Pressable
@@ -684,6 +665,8 @@ export default function ProfileScreen() {
       {orderCard && gameDetail ? (
         <CompanionOrderSheet
           card={orderCard}
+          profile={profile}
+          gameName={gameDetail.gameName}
           context={{
             serviceUserId: profile.userId,
             clubId: profile.clubId,
@@ -700,7 +683,6 @@ export default function ProfileScreen() {
           }
           onOrderCreated={(order) => {
             setOrderCard(null);
-            setPaymentSuccess(false);
             setPaymentError(null);
             setPaymentOrder(order);
             setPaymentSheetVisible(true);
@@ -716,27 +698,19 @@ export default function ProfileScreen() {
             void cancelPendingPaymentOrder();
           }}
           onPaid={() => {
+            const paidOrderId = paymentOrder.orderId;
             setPaymentSheetVisible(false);
             setPaymentOrder(null);
             setPaymentError(null);
-            void invalidateOrderQueries(paymentOrder.orderId);
-            setPaymentSuccess(true);
+            void invalidateOrderQueries(paidOrderId);
+            router.push({
+              pathname: "/order/[id]",
+              params: { id: String(paidOrderId) },
+            });
           }}
           onPaymentFailed={(message) => setPaymentError(message)}
         />
       ) : null}
-      <AppPrompt
-        visible={paymentSuccess}
-        title="支付成功"
-        message="订单已支付，前往聊天与对方沟通服务安排。订单进度可在订单页面查看。"
-        confirmText="去聊天"
-        cancelText="稍后联系"
-        onCancel={() => setPaymentSuccess(false)}
-        onConfirm={() => {
-          setPaymentSuccess(false);
-          void handleChatPress();
-        }}
-      />
       <AppPrompt
         visible={Boolean(paymentError)}
         title="支付失败"
@@ -764,7 +738,6 @@ export default function ProfileScreen() {
       await cancelOrder(String(pendingOrder.orderId), token);
       void invalidateOrderQueries(pendingOrder.orderId);
     } catch (error) {
-      setPaymentSuccess(false);
       setPaymentOrder(null);
       // The payment sheet is already dismissed; surface a cancellation error
       // without allowing the user to retry payment for the same order.
@@ -794,132 +767,6 @@ export default function ProfileScreen() {
   }
 }
 
-function ProfileActionsSheet({
-  visible,
-  bottomInset,
-  isBlacklisted,
-  onClose,
-  onReportRequest,
-  onBlockRequest,
-}: {
-  visible: boolean;
-  bottomInset: number;
-  isBlacklisted: boolean;
-  onClose: () => void;
-  onReportRequest: () => void;
-  onBlockRequest: () => void;
-}) {
-  const { height: windowHeight } = useWindowDimensions();
-  const [backdropOpacity] = useState(() => new Animated.Value(0));
-  const [sheetTranslateY] = useState(() => new Animated.Value(windowHeight));
-  const isClosing = useRef(false);
-
-  useEffect(() => {
-    if (!visible) return;
-
-    isClosing.current = false;
-    backdropOpacity.setValue(0);
-    sheetTranslateY.setValue(windowHeight);
-    const animation = Animated.parallel([
-      Animated.timing(backdropOpacity, {
-        toValue: 1,
-        duration: 180,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-      Animated.timing(sheetTranslateY, {
-        toValue: 0,
-        duration: 260,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]);
-
-    animation.start();
-    return () => animation.stop();
-  }, [backdropOpacity, sheetTranslateY, visible, windowHeight]);
-
-  function closeSheet(afterClose?: () => void) {
-    if (!visible || isClosing.current) return;
-    isClosing.current = true;
-    Animated.parallel([
-      Animated.timing(backdropOpacity, {
-        toValue: 0,
-        duration: 160,
-        easing: Easing.in(Easing.quad),
-        useNativeDriver: true,
-      }),
-      Animated.timing(sheetTranslateY, {
-        toValue: windowHeight,
-        duration: 220,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start(({ finished }) => {
-      if (!finished) return;
-      isClosing.current = false;
-      onClose();
-      afterClose?.();
-    });
-  }
-
-  return (
-    <Modal
-      transparent
-      visible={visible}
-      animationType="none"
-      onRequestClose={() => closeSheet()}
-    >
-      <Animated.View
-        style={[styles.profileActionsBackdrop, { opacity: backdropOpacity }]}
-      >
-        <Pressable
-          accessibilityLabel="关闭更多操作"
-          onPress={() => closeSheet()}
-          style={StyleSheet.absoluteFill}
-        />
-        <Animated.View
-          style={[
-            styles.profileActionsSheet,
-            {
-              paddingBottom: Math.max(bottomInset, 16),
-              transform: [{ translateY: sheetTranslateY }],
-            },
-          ]}
-        >
-          <View style={styles.profileActionsHandle} />
-          <Pressable
-            accessibilityLabel="举报"
-            accessibilityRole="button"
-            onPress={() => closeSheet(onReportRequest)}
-            style={({ pressed }) => [
-              styles.profileActionRow,
-              pressed && styles.profileActionRowPressed,
-            ]}
-          >
-            <Flag24Regular color="#333" height={24} width={24} />
-            <Text style={styles.profileActionLabel}>举报</Text>
-          </Pressable>
-          <View style={styles.profileActionsDivider} />
-          <Pressable
-            accessibilityLabel={isBlacklisted ? "取消拉黑" : "拉黑"}
-            accessibilityRole="button"
-            onPress={() => closeSheet(onBlockRequest)}
-            style={({ pressed }) => [
-              styles.profileActionRow,
-              pressed && styles.profileActionRowPressed,
-            ]}
-          >
-            <PersonProhibited24Regular color="#333" height={24} width={24} />
-            <Text style={styles.profileActionLabel}>
-              {isBlacklisted ? "取消拉黑" : "拉黑"}
-            </Text>
-          </Pressable>
-        </Animated.View>
-      </Animated.View>
-    </Modal>
-  );
-}
 
 function ProfileIdentity({
   profile,
@@ -1165,389 +1012,6 @@ function ServiceCard({
   );
 }
 
-function CompanionOrderSheet({
-  card,
-  context,
-  token,
-  onClose,
-  onRealNameVerificationRequired,
-  onOrderCreated,
-}: {
-  card: ProfileSkillCard;
-  context: CompanionOrderContext;
-  token: string | null;
-  onClose: () => void;
-  onRealNameVerificationRequired: () => void;
-  onOrderCreated: (order: { orderId: number; total: number }) => void;
-}) {
-  const [services, setServices] = useState<CompanionServiceOption[]>([]);
-  const [selectedServiceId, setSelectedServiceId] = useState(
-    card.companionServiceId,
-  );
-  const [quantity, setQuantity] = useState("1");
-  const [remark, setRemark] = useState("");
-  const [agreed, setAgreed] = useState(false);
-  const [loading, setLoading] = useState(Boolean(token));
-  const [submitting, setSubmitting] = useState(false);
-  const [prompt, setPrompt] = useState<{
-    title?: string;
-    message: string;
-  } | null>(null);
-  const [sheetY] = useState(() => new Animated.Value(420));
-  const [backdropOpacity] = useState(() => new Animated.Value(0));
-  const closing = useRef(false);
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(sheetY, {
-        toValue: 0,
-        duration: 260,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(backdropOpacity, {
-        toValue: 1,
-        duration: 220,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-    ]).start();
-    return () => {
-      sheetY.stopAnimation();
-      backdropOpacity.stopAnimation();
-    };
-  }, [backdropOpacity, sheetY]);
-
-  useEffect(() => {
-    if (!token) return;
-    void fetchCompanionServices(
-      {
-        clubId: context.clubId,
-        serviceUserId: context.serviceUserId,
-        gameLevelId: context.gameLevelId,
-      },
-      token,
-    )
-      .then((items) => {
-        setServices(items);
-        if (
-          !items.some((item) => item.companionServiceId === selectedServiceId)
-        ) {
-          setSelectedServiceId(items[0]?.companionServiceId ?? 0);
-        }
-      })
-      .catch((error: Error) => setPrompt({ message: error.message }))
-      .finally(() => setLoading(false));
-  }, [
-    context.clubId,
-    context.gameLevelId,
-    context.serviceUserId,
-    selectedServiceId,
-    token,
-  ]);
-
-  const selectedService = services.find(
-    (item) => item.companionServiceId === selectedServiceId,
-  );
-  const count = Math.max(1, Number.parseInt(quantity, 10) || 1);
-  const total = (selectedService?.price ?? card.price) * count;
-
-  async function submitOrder() {
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-    if (!selectedService || !agreed)
-      return setPrompt({ message: "请选择服务并同意服务协议" });
-    setSubmitting(true);
-    try {
-      const action = buildCreateOrderAction(
-        context,
-        selectedService,
-        count,
-        remark,
-      );
-      const order = await createCompanionOrder(action, token);
-      onOrderCreated({
-        orderId: order.orderId,
-        total: Number(order.totalPrice) || action.total,
-      });
-    } catch (error) {
-      setPrompt({
-        title: "订单创建失败",
-        message: error instanceof Error ? error.message : "创建订单失败",
-      });
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  function closeSheet(afterClose?: () => void) {
-    if (closing.current) return;
-    closing.current = true;
-    Animated.parallel([
-      Animated.timing(sheetY, {
-        toValue: 420,
-        duration: 210,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(backdropOpacity, {
-        toValue: 0,
-        duration: 170,
-        easing: Easing.in(Easing.quad),
-        useNativeDriver: true,
-      }),
-    ]).start(({ finished }) => {
-      if (finished) {
-        onClose();
-        afterClose?.();
-      }
-    });
-  }
-
-  return (
-    <Modal
-      animationType="none"
-      transparent
-      visible
-      onRequestClose={() => closeSheet()}
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.orderKeyboardAvoiding}
-      >
-        <Animated.View
-          style={[styles.orderModalBackdrop, { opacity: backdropOpacity }]}
-        >
-          <>
-            <Pressable
-              accessibilityLabel="关闭下单弹窗"
-              onPress={() => closeSheet()}
-              style={StyleSheet.absoluteFill}
-            />
-            <Animated.View
-              style={[
-                styles.orderModal,
-                { transform: [{ translateY: sheetY }] },
-              ]}
-            >
-              <View style={styles.orderModalHeader}>
-                <Text style={styles.orderModalTitle}>陪玩下单</Text>
-                <Pressable onPress={() => closeSheet()}>
-                  <Text style={styles.orderClose}>×</Text>
-                </Pressable>
-              </View>
-              <>
-                <Text style={styles.orderLocked}>
-                  {card.modeName}-{card.levelName}
-                </Text>
-                {loading ? (
-                  <Text style={styles.orderHint}>服务加载中...</Text>
-                ) : (
-                  services.map((service) => (
-                    <Pressable
-                      key={service.companionServiceId}
-                      onPress={() =>
-                        setSelectedServiceId(service.companionServiceId)
-                      }
-                      style={[
-                        styles.serviceOption,
-                        selectedServiceId === service.companionServiceId &&
-                          styles.serviceOptionActive,
-                      ]}
-                    >
-                      <Text style={styles.serviceOptionName}>
-                        {service.name}
-                      </Text>
-                      <Text style={styles.serviceOptionPrice}>
-                        {service.price} 星钻
-                      </Text>
-                    </Pressable>
-                  ))
-                )}
-                <View style={styles.quantityRow}>
-                  <Text style={styles.orderLabel}>数量</Text>
-                  <TextInput
-                    keyboardType="number-pad"
-                    value={quantity}
-                    onChangeText={setQuantity}
-                    style={styles.quantityInput}
-                  />
-                </View>
-                <TextInput
-                  placeholder="备注（选填）"
-                  value={remark}
-                  onChangeText={setRemark}
-                  style={styles.remarkInput}
-                />
-                <Pressable
-                  onPress={() => setAgreed((value) => !value)}
-                  style={styles.agreementRow}
-                >
-                  <Text style={styles.checkbox}>{agreed ? "✓" : ""}</Text>
-                  <Text style={styles.agreementText}>
-                    我已阅读并同意服务协议
-                  </Text>
-                </Pressable>
-                <Text style={styles.orderTotal}>合计：{total} 星钻</Text>
-                <Pressable
-                  style={[
-                    styles.orderSubmit,
-                    (!agreed ||
-                      submitting ||
-                      (Boolean(token) && !selectedService)) &&
-                      styles.orderSubmitDisabled,
-                  ]}
-                  onPress={() => void submitOrder()}
-                  disabled={
-                    !agreed ||
-                    submitting ||
-                    (Boolean(token) && !selectedService)
-                  }
-                >
-                  <Text style={styles.orderSubmitText}>
-                    {submitting ? "提交中..." : "确认下单"}
-                  </Text>
-                </Pressable>
-              </>
-            </Animated.View>
-          </>
-        </Animated.View>
-      </KeyboardAvoidingView>
-      <AppPrompt
-        visible={Boolean(prompt)}
-        title={prompt?.title}
-        message={prompt?.message ?? ""}
-        cancelText={
-          requiresRealNameVerification(prompt?.message ?? "")
-            ? "我知道了"
-            : undefined
-        }
-        confirmText={
-          requiresRealNameVerification(prompt?.message ?? "")
-            ? "去认证"
-            : undefined
-        }
-        onCancel={() => setPrompt(null)}
-        onConfirm={() => {
-          handleOrderFailurePromptConfirm(prompt?.message ?? "", {
-            dismissPrompt: () => setPrompt(null),
-            dismissSheet: closeSheet,
-            openVerification: onRealNameVerificationRequired,
-          });
-        }}
-      />
-    </Modal>
-  );
-}
-
-function StarPaymentSheet({
-  order,
-  visible,
-  token,
-  onClose,
-  onPaid,
-  onPaymentFailed,
-}: {
-  order: { orderId: number; total: number };
-  visible: boolean;
-  token: string | null;
-  onClose: () => void | Promise<void>;
-  onPaid: () => void;
-  onPaymentFailed: (message: string) => void;
-}) {
-  const insets = useSafeAreaInsets();
-  const [balance, setBalance] = useState<number | null>(null);
-  const [paying, setPaying] = useState(false);
-  const settledRef = useRef(false);
-  const [prompt, setPrompt] = useState<{
-    title?: string;
-    message: string;
-  } | null>(null);
-
-  useEffect(() => {
-    if (!token) return;
-    void fetchStarBalance(token)
-      .then(setBalance)
-      .catch((error: Error) => setPrompt({ message: error.message }));
-  }, [token]);
-
-  async function pay() {
-    if (!token) return setPrompt({ message: "请先登录" });
-    if ((balance ?? 0) < order.total)
-      return setPrompt({
-        title: "余额不足",
-        message: "当前星钻余额不足，请充值后再支付",
-      });
-    setPaying(true);
-    try {
-      await payCompanionOrder(order.orderId, token);
-      settledRef.current = true;
-      onPaid();
-    } catch (error) {
-      onPaymentFailed(error instanceof Error ? error.message : "支付失败");
-      if (!settledRef.current) {
-        settledRef.current = true;
-        await onClose();
-      }
-    } finally {
-      setPaying(false);
-    }
-  }
-
-  return (
-    <>
-      <BottomSheet
-        visible={visible}
-        onClose={() => void onClose()}
-        scrollable
-        contentStyle={[
-          styles.paymentModal,
-          { paddingBottom: Math.max(insets.bottom, 16) },
-        ]}
-      >
-        <View style={styles.paymentModalHeader}>
-          <View style={styles.paymentModalHeading}>
-            <Text style={styles.paymentModalTitle}>星钻支付</Text>
-            <Text style={styles.paymentModalHint}>
-              请在5分钟内支付，否则订单自动取消
-            </Text>
-          </View>
-          <Pressable
-            accessibilityLabel="关闭星钻支付"
-            hitSlop={8}
-            onPress={() => void onClose()}
-            style={styles.paymentClose}
-          >
-            <Image source={paymentCloseIcon} style={styles.paymentCloseIcon} />
-          </Pressable>
-        </View>
-        <View style={styles.orderPaymentContent}>
-          <Text style={styles.orderPayAmount}>支付 {order.total} 星钻</Text>
-          <Text style={styles.orderBalance}>
-            当前余额：{balance ?? "加载中..."} 星钻
-          </Text>
-          <Pressable
-            style={styles.orderSubmit}
-            onPress={() => void pay()}
-            disabled={paying || balance === null}
-          >
-            <Text style={styles.orderSubmitText}>
-              {paying ? "支付中..." : "确认支付"}
-            </Text>
-          </Pressable>
-        </View>
-      </BottomSheet>
-      <AppPrompt
-        visible={Boolean(prompt)}
-        title={prompt?.title}
-        message={prompt?.message ?? ""}
-        onConfirm={() => setPrompt(null)}
-      />
-    </>
-  );
-}
 
 function ReviewCard({ review }: { review: ProfileReview }) {
   return (
@@ -1679,17 +1143,6 @@ function getStatus(onlineStatus: number, gameStatus: number) {
   return null;
 }
 
-function calculateAge(birth: string) {
-  const date = new Date(birth);
-  if (Number.isNaN(date.getTime())) return "";
-  const now = new Date();
-  let age = now.getFullYear() - date.getFullYear();
-  const birthdayPassed =
-    now.getMonth() > date.getMonth() ||
-    (now.getMonth() === date.getMonth() && now.getDate() >= date.getDate());
-  if (!birthdayPassed) age -= 1;
-  return age > 0 ? String(age) : "";
-}
 
 function formatReviewDate(value?: string) {
   if (!value) return "";
@@ -1736,44 +1189,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   backIcon: { width: 24, height: 24, tintColor: "#fff" },
-  profileActionsBackdrop: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.45)",
-  },
-  profileActionsSheet: {
-    paddingTop: 10,
-    paddingHorizontal: 16,
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
-  profileActionsHandle: {
-    alignSelf: "center",
-    width: 36,
-    height: 4,
-    marginBottom: 8,
-    borderRadius: 2,
-    backgroundColor: "#D9D9D9",
-  },
-  profileActionRow: {
-    height: 56,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 4,
-  },
-  profileActionRowPressed: { opacity: 0.6 },
-  profileActionLabel: {
-    marginLeft: 12,
-    color: "#222",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 16,
-  },
-  profileActionsDivider: {
-    height: StyleSheet.hairlineWidth,
-    marginLeft: 40,
-    backgroundColor: "#EEEEEE",
-  },
   identity: {
     position: "absolute",
     left: 16,
@@ -1983,174 +1398,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   moreText: { color: "#fff", fontSize: 18, fontWeight: "600" },
-  orderModalBackdrop: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.45)",
-  },
-  orderKeyboardAvoiding: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  orderModal: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    padding: 20,
-    paddingBottom: 30,
-    gap: 14,
-  },
-  orderModalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  orderModalTitle: {
-    color: "#111",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  orderClose: { color: "#777", fontSize: 28, lineHeight: 28 },
-  paymentModal: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-  },
-  paymentModalHeader: {
-    minHeight: 74,
-    paddingLeft: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  paymentModalHeading: { flex: 1, minWidth: 0, gap: 8 },
-  paymentModalTitle: {
-    color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 16,
-    fontWeight: "500",
-    lineHeight: 24,
-  },
-  paymentModalHint: {
-    color: "#808080",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  paymentClose: {
-    width: 32,
-    height: 32,
-    marginRight: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  paymentCloseIcon: { width: 32, height: 32 },
-  orderPaymentContent: { paddingHorizontal: 16, gap: 12 },
-  orderLocked: { color: "#333", fontFamily: DOUYIN_SANS, fontSize: 15 },
-  orderHint: { color: "#999", fontFamily: DOUYIN_SANS, fontSize: 14 },
-  serviceOption: {
-    minHeight: 48,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#F6F6F6",
-  },
-  serviceOptionActive: {
-    backgroundColor: "#FFF0F3",
-    borderWidth: 1,
-    borderColor: "#FF3158",
-  },
-  serviceOptionName: {
-    flex: 1,
-    color: "#222",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 14,
-  },
-  serviceOptionPrice: {
-    color: "#FF3158",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  quantityRow: {
-    height: 46,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  orderLabel: { color: "#222", fontFamily: DOUYIN_SANS, fontSize: 15 },
-  quantityInput: {
-    width: 92,
-    height: 38,
-    borderRadius: 6,
-    backgroundColor: "#F6F6F6",
-    color: "#222",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 15,
-    textAlign: "center",
-  },
-  remarkInput: {
-    minHeight: 48,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: "#F6F6F6",
-    color: "#222",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 14,
-  },
-  agreementRow: { flexDirection: "row", alignItems: "center", gap: 7 },
-  checkbox: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#FF3158",
-    color: "#FF3158",
-    fontSize: 12,
-    lineHeight: 14,
-    textAlign: "center",
-  },
-  agreementText: { color: "#777", fontFamily: DOUYIN_SANS, fontSize: 12 },
-  orderTotal: {
-    color: "#111",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 17,
-    fontWeight: "600",
-    textAlign: "right",
-  },
-  orderSubmit: {
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#FF3158",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  orderSubmitDisabled: { backgroundColor: "#F4A8B7" },
-  orderSubmitText: {
-    color: "#fff",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  orderPayAmount: {
-    color: "#111",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 20,
-    fontWeight: "600",
-    textAlign: "center",
-    marginTop: 12,
-  },
-  orderBalance: {
-    color: "#777",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 14,
-    textAlign: "center",
-    marginBottom: 12,
-  },
   successBackdrop: {
     flex: 1,
     paddingHorizontal: 36,

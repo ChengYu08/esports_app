@@ -3,17 +3,18 @@ import { useMutation } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useProfileDetail } from '@/features/mine/hooks/use-profile-data';
 import { useToggleUserFollow, useUserFollowState } from '@/features/mine/hooks/use-user-follow';
+import { useAppConfirm } from '@/shared/ui/app-confirm';
 import { BottomSheet } from '@/shared/ui/BottomSheet';
 import { canKickVoiceRoomMember, getMemberAge } from '../member-profile';
 import { voiceRoomApi } from '../voice-room.api';
 import type { VoiceRoomDetail, VoiceRoomMember } from '../voice-room.types';
 
-const defaultAvatar = require('../../../../assets/voice-room/avatar-default.png');
+const defaultAvatar = require('../../../../assets/coms/avatar_default.webp');
 const femaleIcon = require('../../../../assets/voice-room/member-female.svg');
 const maleIcon = require('../../../../assets/home/club-detail/male.svg');
 const idIcon = require('../../../../assets/voice-room/member-id.svg');
@@ -42,7 +43,12 @@ export function VoiceRoomMemberSheet({ visible, member, room, roomId, onClose, o
     mutationFn: (params: { roomId: string; roomVersion: string | number; userId: string; token: string }) =>
       voiceRoomApi.kickMember(params.roomId, params.roomVersion, params.userId, params.token),
     onSuccess: (_, params) => onMemberKicked(params.userId),
-    onError: (error) => Alert.alert('踢出失败', error.message || '请稍后重试'),
+    onError: (error) => {
+      void useAppConfirm.getState().confirm({
+        title: '踢出失败',
+        message: error.message || '请稍后重试',
+      });
+    },
   });
 
   if (!member) return null;
@@ -61,10 +67,15 @@ export function VoiceRoomMemberSheet({ visible, member, room, roomId, onClose, o
   function confirmKick() {
     if (!canKick || !member || !room || !roomId || !token || busy) return;
     const params = { roomId, roomVersion: room.roomVersion, userId: member.userId, token };
-    Alert.alert('踢出用户', `确定将“${nickname}”踢出语聊房？`, [
-      { text: '取消', style: 'cancel' },
-      { text: '踢出', style: 'destructive', onPress: () => kickMember.mutate(params) },
-    ]);
+    void (async () => {
+      const confirmed = await useAppConfirm.getState().confirm({
+        title: '踢出用户',
+        message: `确定将“${nickname}”踢出语聊房？`,
+        cancelText: '取消',
+        confirmText: '踢出',
+      });
+      if (confirmed) kickMember.mutate(params);
+    })();
   }
 
   async function handleFollow() {
@@ -81,7 +92,10 @@ export function VoiceRoomMemberSheet({ visible, member, room, roomId, onClose, o
         viewerUserId: viewerId,
       });
     } catch (error) {
-      Alert.alert('操作失败', error instanceof Error ? error.message : '请稍后重试');
+      void useAppConfirm.getState().confirm({
+        title: '操作失败',
+        message: error instanceof Error ? error.message : '请稍后重试',
+      });
     }
   }
 

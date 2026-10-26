@@ -3,6 +3,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { useFonts } from "expo-font";
 import { router, Stack, usePathname } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RootSiblingParent } from "react-native-root-siblings";
 import Toast from "react-native-root-toast";
@@ -24,6 +25,7 @@ import {
   useMessageStore,
 } from "@/features/message/message-store";
 import { InAppNotificationBanner } from "@/features/message/components/InAppNotificationBanner";
+import { RongCommandHost } from "@/features/message/rong-command-dispatch/RongCommandHost";
 import { VoiceRoomMiniPlayer } from "@/features/voice-room/components/VoiceRoomMiniPlayer";
 import { VoiceRoomKickListener } from "@/features/voice-room/components/VoiceRoomKickListener";
 import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
@@ -32,6 +34,8 @@ import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-sessi
 import { PrivacyConsentGate } from "@/features/privacy/components/PrivacyConsentGate";
 import { readPrivacyConsent } from "@/features/privacy/privacy-consent";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { ActionNoticeHost } from "@/shared/ui/action-notice";
+import { AppConfirmHost } from "@/shared/ui/AppConfirmHost";
 import { StartupSplash } from "@/shared/ui/StartupSplash";
 
 // Keep the native screen until the full-screen artwork is ready to display.
@@ -202,32 +206,39 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <RootSiblingParent>
-            <NetworkRecovery />
+            <StatusBar style="dark" />
             {privacyAccepted ? (
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  gestureEnabled: true,
-                  animation: "fade",
-                  animationMatchesGesture: false,
-                  fullScreenGestureEnabled: false,
-                }}
-              >
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                <Stack.Screen
-                  name="image-preview"
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen name="basic-settings" />
-                <Stack.Screen name="account-settings" />
-                <Stack.Screen name="about" />
-              </Stack>
+              <>
+                {/* Network monitoring starts only after privacy consent. */}
+                <NetworkRecovery />
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    gestureEnabled: true,
+                    animation: "fade",
+                    animationMatchesGesture: false,
+                    fullScreenGestureEnabled: false,
+                  }}
+                >
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  <Stack.Screen
+                    name="image-preview"
+                    options={{ headerShown: false }}
+                  />
+                  <Stack.Screen name="basic-settings" />
+                  <Stack.Screen name="account-settings" />
+                  <Stack.Screen name="about" />
+                </Stack>
+              </>
             ) : (
               <PrivacyConsentGate onAccepted={() => setPrivacyAccepted(true)} />
             )}
             <InAppNotificationBanner visible={!pathname.startsWith("/voice-room/")} />
+            <ActionNoticeHost />
             <VoiceRoomMiniPlayer />
             <VoiceRoomKickListener />
+            <RongCommandHost />
+            <AppConfirmHost />
           </RootSiblingParent>
         </GestureHandlerRootView>
       </SafeAreaProvider>

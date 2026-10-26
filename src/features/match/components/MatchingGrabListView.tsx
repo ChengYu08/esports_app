@@ -15,7 +15,7 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const PUBLISH_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
 const FOOTER_CONTENT_BOTTOM = 22;
-const defaultAvatar = require("../../../../assets/voice-room/avatar-default.png");
+const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
 
 type MatchingGrabListViewProps = {
   countdownText: string;

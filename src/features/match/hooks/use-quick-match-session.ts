@@ -1,10 +1,12 @@
 import { useAuthStore } from "@esports/auth";
+import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Toast from "react-native-root-toast";
 
 import {
   cancelQuickMatch,
+  ensureAuditionRoom,
   fetchActiveQuickMatch,
   fetchQuickMatchDetail,
   fetchQuickMatchGames,
@@ -15,6 +17,12 @@ import {
   type QuickMatchGrabItem,
   type QuickMatchRequestDetail,
 } from "@/features/match/api/match.types";
+import { quickMatchGamesQueryKey } from "@/features/match/hooks/use-match-form";
+import { useQuickMatchEndSignals } from "@/features/match/quick-match-end-signals";
+import { parseServerDateTime } from "@/shared/time/server-date";
+import { exitVoiceRoom } from "@/features/voice-room/exit-voice-room";
+import { resolveVoiceRoomId } from "@/features/voice-room/voice-room.api";
+import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
 
 const POLL_INTERVAL_MS = 4000;
 const DEFAULT_COUNTDOWN_SEC = 30 * 60;
@@ -31,14 +39,15 @@ function formatCountdown(sec: number): string {
 }
 
 function resolveExpireAtMs(expireTime?: string): number {
-  const serverExpireAt = expireTime ? new Date(expireTime).getTime() : NaN;
+  const serverExpireAt = parseServerDateTime(expireTime);
   if (Number.isFinite(serverExpireAt)) return serverExpireAt;
   return Date.now() + DEFAULT_COUNTDOWN_SEC * 1000;
 }
 
-/** 发布页：若有进行中需求则 replace 到匹配中页 */
+/** 发布页：若有进行中需求则恢复；需试音优先回试音房 */
 export function useRestoreActiveMatch() {
   const token = useAuthStore((state) => state.accessToken);
+  const queryClient = useQueryClient();
   const [restoring, setRestoring] = useState(true);
 
   useEffect(() => {
@@ -56,7 +65,10 @@ export function useRestoreActiveMatch() {
             null;
           try {
             if (active.gameId) {
-              const games = await fetchQuickMatchGames(token);
+              const games = await queryClient.fetchQuery({
+                queryKey: quickMatchGamesQueryKey(token),
+                queryFn: ({ signal }) => fetchQuickMatchGames(token, signal),
+              });
               if (cancelled) return;
               const matched = games.find((g) => g.id === active.gameId);
               if (matched) {
@@ -76,21 +88,41 @@ export function useRestoreActiveMatch() {
               name: active.gameName,
             };
           }
+          const matchParams = {
+            requestNo: active.requestNo,
+            ...(active.expireTime ? { expireTime: active.expireTime } : {}),
+            ...(gamePayload
+              ? {
+                  gameId: gamePayload.id,
+                  gameName: gamePayload.name,
+                  ...(gamePayload.iconUrl
+                    ? { gameIconUrl: gamePayload.iconUrl }
+                    : {}),
+                }
+              : {}),
+          };
+          if (active.needVoice) {
+            try {
+              const room = await ensureAuditionRoom(active.requestNo, token);
+              if (cancelled) return;
+              const roomId = resolveVoiceRoomId(room) || room.id;
+              if (!roomId) throw new Error("试音房信息不存在");
+              router.replace({
+                pathname: "/voice-room/[id]",
+                params: {
+                  id: roomId,
+                  scene: "audition",
+                  ...matchParams,
+                },
+              });
+              return;
+            } catch {
+              // 试音房恢复失败则回落匹配中页，避免卡在发布表单
+            }
+          }
           router.replace({
             pathname: "/match/matching/[requestNo]",
-            params: {
-              requestNo: active.requestNo,
-              ...(active.expireTime ? { expireTime: active.expireTime } : {}),
-              ...(gamePayload
-                ? {
-                    gameId: gamePayload.id,
-                    gameName: gamePayload.name,
-                    ...(gamePayload.iconUrl
-                      ? { gameIconUrl: gamePayload.iconUrl }
-                      : {}),
-                  }
-                : {}),
-            },
+            params: matchParams,
           });
           return;
         }
@@ -104,7 +136,7 @@ export function useRestoreActiveMatch() {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [queryClient, token]);
 
   return { restoring };
 }
@@ -114,12 +146,55 @@ type UseQuickMatchSessionOptions = {
   onEnded?: (reason: MatchEndReason) => void;
 };
 
+/** 关闭关联试音房；调用方负责 catch */
+async function closeAuditionRoomIfNeeded(
+  requestNo: string,
+  token: string,
+  userId: string,
+  needVoice: boolean,
+): Promise<void> {
+  const activeRoom = useVoiceRoomSessionStore.getState().activeRoom;
+  const auditionFromSession =
+    activeRoom?.scene === "audition" && activeRoom.matchRequestNo === requestNo
+      ? activeRoom
+      : null;
+  if (!needVoice && !auditionFromSession) return;
+
+  let roomToExit: {
+    roomId: string;
+    roomVersion: string | number;
+    creatorUserId?: string | number;
+    rongChatroomId?: string;
+  } | null = auditionFromSession
+    ? {
+        roomId: auditionFromSession.roomId,
+        roomVersion: auditionFromSession.roomVersion,
+        creatorUserId: auditionFromSession.creatorUserId,
+        rongChatroomId: auditionFromSession.rongChatroomId,
+      }
+    : null;
+
+  if (!roomToExit) {
+    const room = await ensureAuditionRoom(requestNo, token);
+    const roomId = resolveVoiceRoomId(room) || room.id;
+    if (!roomId) return;
+    roomToExit = {
+      roomId,
+      roomVersion: room.roomVersion ?? "1",
+      creatorUserId: room.creatorUserId ?? userId,
+    };
+  }
+
+  await exitVoiceRoom(roomToExit, userId, token);
+}
+
 /** 匹配中页：按路由 requestNo 轮询抢单列表 */
 export function useQuickMatchSession(
   requestNo: string,
   options: UseQuickMatchSessionOptions = {},
 ) {
   const token = useAuthStore((state) => state.accessToken);
+  const userId = useAuthStore((state) => state.user?.id);
   const { expireTime, onEnded } = options;
 
   const [detail, setDetail] = useState<QuickMatchRequestDetail | null>(null);
@@ -137,6 +212,7 @@ export function useQuickMatchSession(
   const orderPendingRef = useRef(false);
   const onEndedRef = useRef(onEnded);
   const endedRef = useRef(false);
+  const detailRef = useRef<QuickMatchRequestDetail | null>(null);
 
   useEffect(() => {
     requestNoRef.current = requestNo;
@@ -149,6 +225,10 @@ export function useQuickMatchSession(
   useEffect(() => {
     onEndedRef.current = onEnded;
   }, [onEnded]);
+
+  useEffect(() => {
+    detailRef.current = detail;
+  }, [detail]);
 
   const finishEnded = useCallback((reason: MatchEndReason, message?: string) => {
     if (orderPendingRef.current || endedRef.current) return;
@@ -164,6 +244,31 @@ export function useQuickMatchSession(
     onEndedRef.current?.(reason);
   }, []);
 
+  const endMatching = useCallback(
+    async (reason: MatchEndReason, message?: string) => {
+      if (orderPendingRef.current || endedRef.current) return;
+      // TODO(临时注释): 取消/超时关闭试音房
+      // if (
+      //   (reason === "cancelled" || reason === "expired") &&
+      //   token &&
+      //   userId
+      // ) {
+      //   try {
+      //     await closeAuditionRoomIfNeeded(
+      //       requestNoRef.current,
+      //       token,
+      //       String(userId),
+      //       Boolean(detailRef.current?.needVoice),
+      //     );
+      //   } catch (error) {
+      //     console.warn("[match] close audition room on end failed", error);
+      //   }
+      // }
+      finishEnded(reason, message);
+    },
+    [finishEnded],
+  );
+
   // 初始化倒计时
   useEffect(() => {
     endedRef.current = false;
@@ -176,9 +281,9 @@ export function useQuickMatchSession(
     setDetail(null);
     setOrderPending(false);
     if (sec <= 0) {
-      finishEnded("expired");
+      void endMatching("expired");
     }
-  }, [expireTime, finishEnded, requestNo]);
+  }, [endMatching, expireTime, requestNo]);
 
   const pollGrabList = useCallback(async () => {
     const no = requestNoRef.current;
@@ -200,12 +305,12 @@ export function useQuickMatchSession(
       }
       setDetail(nextDetail);
       if (nextDetail.expireTime) {
-        const nextExpire = new Date(nextDetail.expireTime).getTime();
+        const nextExpire = parseServerDateTime(nextDetail.expireTime);
         if (Number.isFinite(nextExpire)) expireAtRef.current = nextExpire;
       }
       if (!isQuickMatchActive(nextDetail)) {
         if (nextDetail.status === "EXPIRED" || nextDetail.status === "MATCHING") {
-          finishEnded("expired");
+          void endMatching("expired");
         } else {
           finishEnded("ended");
         }
@@ -227,7 +332,7 @@ export function useQuickMatchSession(
     } finally {
       pollBusyRef.current = false;
     }
-  }, [finishEnded, token]);
+  }, [endMatching, finishEnded, token]);
 
   // 倒计时
   useEffect(() => {
@@ -236,10 +341,10 @@ export function useQuickMatchSession(
       if (orderPendingRef.current || endedRef.current) return;
       const sec = Math.max(0, Math.floor((expireAtRef.current - Date.now()) / 1000));
       setCountdownSec(sec);
-      if (sec <= 0) finishEnded("expired");
+      if (sec <= 0) void endMatching("expired");
     }, 1000);
     return () => clearInterval(timer);
-  }, [finishEnded, orderPending, requestNo]);
+  }, [endMatching, orderPending, requestNo]);
 
   // 抢单轮询
   useEffect(() => {
@@ -251,13 +356,28 @@ export function useQuickMatchSession(
     return () => clearInterval(timer);
   }, [orderPending, pollGrabList, requestNo, token]);
 
+  // 服务端超时/取消信令（QUICK_MATCH_EXPIRED / QUICK_MATCH_CANCELLED）
+  useEffect(() => {
+    if (!requestNo) return;
+    const pendingSignal = useQuickMatchEndSignals.getState().consume(requestNo);
+    if (pendingSignal && !orderPendingRef.current && !endedRef.current) {
+      void endMatching(pendingSignal);
+    }
+    return useQuickMatchEndSignals.subscribe((state) => {
+      const reason = state.signals[requestNo];
+      if (!reason || orderPendingRef.current || endedRef.current) return;
+      useQuickMatchEndSignals.getState().consume(requestNo);
+      void endMatching(reason);
+    });
+  }, [endMatching, requestNo]);
+
   const cancelMatching = useCallback(async (): Promise<boolean> => {
     const no = requestNo;
     if (!no || !token || submitting) return false;
     setSubmitting(true);
     try {
       await cancelQuickMatch(no, token);
-      finishEnded("cancelled", "已取消派单");
+      await endMatching("cancelled", "已取消派单");
       return true;
     } catch (error) {
       Toast.show(error instanceof Error ? error.message : "取消派单失败，请稍后重试", {
@@ -268,7 +388,21 @@ export function useQuickMatchSession(
     } finally {
       setSubmitting(false);
     }
-  }, [finishEnded, pollGrabList, requestNo, submitting, token]);
+  }, [endMatching, pollGrabList, requestNo, submitting, token]);
+
+  const closeAuditionRoom = useCallback(async () => {
+    if (!token || !userId) return;
+    try {
+      await closeAuditionRoomIfNeeded(
+        requestNo,
+        token,
+        String(userId),
+        Boolean(detailRef.current?.needVoice),
+      );
+    } catch (error) {
+      console.warn("[match] close audition room failed", error);
+    }
+  }, [requestNo, token, userId]);
 
   const toggleGrab = useCallback((grabId: string) => {
     setSelectedGrabIds((prev) => {
@@ -295,6 +429,7 @@ export function useQuickMatchSession(
     setSubmitting,
     setOrderPending,
     cancelMatching,
+    closeAuditionRoom,
     toggleGrab,
   };
 }

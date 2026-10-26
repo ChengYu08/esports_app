@@ -28,30 +28,30 @@ const items = [
   {
     route: "index",
     label: "首页",
-    icon: require("../../../assets/coms/tab-home.svg"),
-    selectedIcon: require("../../../assets/coms/tab-home-selected.svg"),
+    icon: require("../../../assets/svgs/tab-home.svg"),
+    selectedIcon: require("../../../assets/svgs/tab-home-selected.svg"),
   },
   {
     route: "order",
     label: "订单",
-    icon: require("../../../assets/coms/tab-order.svg"),
-    selectedIcon: require("../../../assets/coms/tab-order-selected.svg"),
+    icon: require("../../../assets/svgs/tab-order.svg"),
+    selectedIcon: require("../../../assets/svgs/tab-order-selected.svg"),
   },
   {
     route: "message",
     label: "消息",
-    icon: require("../../../assets/coms/tab-message.svg"),
-    selectedIcon: require("../../../assets/coms/tab-message-selected.svg"),
+    icon: require("../../../assets/svgs/tab-message.svg"),
+    selectedIcon: require("../../../assets/svgs/tab-message-selected.svg"),
   },
   {
     route: "mine",
     label: "我的",
-    icon: require("../../../assets/coms/tab-mine.svg"),
-    selectedIcon: require("../../../assets/coms/tab-mine-selected.svg"),
+    icon: require("../../../assets/svgs/tab-mine.svg"),
+    selectedIcon: require("../../../assets/svgs/tab-mine-selected.svg"),
   },
 ] as const;
 
-const matchIcon = require("../../../assets/coms/tab-match.svg");
+const matchIcon = require("../../../assets/svgs/tab-match.svg");
 
 export function AppTabBar({ state, navigation }: AppTabBarProps) {
   const insets = useSafeAreaInsets();

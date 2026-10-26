@@ -8,6 +8,8 @@ import type {
   MatchService,
   PublishQuickMatchPayload,
   QuickMatchAuditionRoom,
+  QuickMatchCreatedOrder,
+  QuickMatchCreatedOrders,
   QuickMatchGrabItem,
   QuickMatchPayable,
   QuickMatchPublishResult,
@@ -83,11 +85,25 @@ type ApiRequestDetail = {
   remark?: string;
   status?: string;
   expireTime?: string;
+  publishType?: string;
+  buyerUserId?: number | string;
+  buyerNickname?: string;
+  dispatcherUserId?: number | string;
 };
 
 type ApiPayable = {
   orderCount?: number;
   totalPrice?: number | string;
+};
+
+type ApiCreatedOrder = {
+  orderId?: number | string;
+  serviceUserId?: number | string;
+};
+
+type ApiCreatedOrders = {
+  totalPrice?: number | string;
+  orders?: ApiCreatedOrder[];
 };
 
 function requireSuccess<T>(response: ApiEnvelope<T>, fallback: string): T {
@@ -136,6 +152,10 @@ function mapRequestDetail(item: ApiRequestDetail | null | undefined): QuickMatch
     remark: item.remark,
     status: item.status,
     expireTime: item.expireTime,
+    publishType: item.publishType,
+    buyerUserId: toOptionalString(item.buyerUserId),
+    buyerNickname: item.buyerNickname,
+    dispatcherUserId: toOptionalString(item.dispatcherUserId),
   };
 }
 
@@ -159,9 +179,14 @@ function mapGrabItem(item: ApiGrab): QuickMatchGrabItem {
 export async function fetchQuickMatchGames(
   token: string,
   signal?: AbortSignal,
+  clubId?: string | number | null,
 ): Promise<MatchGame[]> {
+  const query =
+    clubId != null && clubId !== ""
+      ? `?clubId=${encodeURIComponent(String(clubId))}`
+      : "";
   const response = await apiClient<ApiEnvelope<ApiGame[]>>(
-    "/client/v1/companion/getQuickMatchGameList",
+    `/client/v1/companion/getQuickMatchGameList${query}`,
     { method: "GET", token, signal },
   );
   const list = requireSuccess(response, "游戏列表加载失败");
@@ -170,6 +195,29 @@ export async function fetchQuickMatchGames(
     name: item.gameName || "未命名游戏",
     iconUrl: item.iconUrl,
   }));
+}
+
+/** 查询俱乐部公开详情（接待代发弹窗展示当前房所属俱乐部） */
+export async function fetchQuickMatchClubDetail(
+  clubId: string | number,
+  token: string,
+  signal?: AbortSignal,
+): Promise<MatchClub | null> {
+  const response = await apiClient<ApiEnvelope<ApiClub | null>>(
+    `/client/v1/club/public/detail?id=${encodeURIComponent(String(clubId))}`,
+    { method: "GET", token, signal },
+  );
+  if (response.code !== "SUCCESS") {
+    throw new Error(response.info || "俱乐部详情加载失败");
+  }
+  const item = response.data;
+  if (!item?.id) return null;
+  return {
+    id: String(item.id),
+    name: item.clubName || "未命名俱乐部",
+    logoUrl: item.logoUrl,
+    memberCount: item.memberCount,
+  };
 }
 
 export async function fetchQuickMatchClubs(
@@ -289,6 +337,21 @@ export async function fetchActiveQuickMatch(
   return mapRequestDetail(response.data ?? null);
 }
 
+/** 查询当前客服代发的进行中需求（不含本人作为老板发布的需求） */
+export async function fetchDispatchActiveQuickMatch(
+  token: string,
+  signal?: AbortSignal,
+): Promise<QuickMatchRequestDetail | null> {
+  const response = await apiClient<ApiEnvelope<ApiRequestDetail | null>>(
+    "/client/v1/quickMatch/dispatch/active/detail",
+    { method: "GET", token, signal },
+  );
+  if (response.code !== "SUCCESS") {
+    throw new Error(response.info || "代发需求查询失败");
+  }
+  return mapRequestDetail(response.data ?? null);
+}
+
 export async function fetchQuickMatchGrabList(
   requestNo: string,
   token: string,
@@ -315,8 +378,8 @@ export async function selectAndCreateOrder(
   requestNo: string,
   grabIds: string[],
   token: string,
-): Promise<{ totalPrice: number }> {
-  const response = await apiClient<ApiEnvelope<{ totalPrice?: number | string }>>(
+): Promise<QuickMatchCreatedOrders> {
+  const response = await apiClient<ApiEnvelope<ApiCreatedOrders>>(
     "/client/v1/quickMatch/selectAndCreateOrder",
     {
       method: "POST",
@@ -325,7 +388,14 @@ export async function selectAndCreateOrder(
     },
   );
   const data = requireSuccess(response, "创建订单失败");
-  return { totalPrice: toNumber(data.totalPrice) };
+  const orders: QuickMatchCreatedOrder[] = [];
+  for (const item of data.orders ?? []) {
+    const orderId = toOptionalString(item.orderId);
+    if (!orderId) continue;
+    const serviceUserId = toOptionalString(item.serviceUserId);
+    orders.push(serviceUserId ? { orderId, serviceUserId } : { orderId });
+  }
+  return { totalPrice: toNumber(data.totalPrice), orders };
 }
 
 export async function fetchQuickMatchPayable(

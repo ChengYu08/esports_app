@@ -1,6 +1,7 @@
 import { ImageZoom } from "@likashefqet/react-native-image-zoom";
 import { Image, type ImageErrorEventData } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, NativeScrollEvent, NativeSyntheticEvent, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import type { ImageErrorEvent as NativeImageErrorEvent } from "react-native";
@@ -119,6 +120,7 @@ export default function ImagePreviewScreen() {
 
   return (
     <GestureHandlerRootView style={styles.screen}>
+      <StatusBar style="light" />
       <FlatList
         data={images}
         horizontal

@@ -1,6 +1,7 @@
 import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { Stack, router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useCallback, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Toast from "react-native-root-toast";
@@ -16,7 +17,7 @@ import { useQuickMatchSession } from "@/features/match/hooks/use-quick-match-ses
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 
-const backIcon = require("../../../../assets/match/icon-back.svg");
+const backIcon = require("../../../../assets/svgs/icon-back.svg");
 const BG_GRADIENT = ["#0C0C2E", "#120D2B"] as const;
 
 type MatchMatchingScreenProps = {
@@ -34,17 +35,13 @@ export default function MatchMatchingScreen({
   const token = useAuthStore((state) => state.accessToken);
   const [payVisible, setPayVisible] = useState(false);
   const [payTotal, setPayTotal] = useState(0);
+  const [paidOrderId, setPaidOrderId] = useState<string | null>(null);
   const [cancelPromptVisible, setCancelPromptVisible] = useState(false);
 
-  /** 左上角返回：只离开当前页，不取消派单 */
-  const leaveMatchStack = useCallback(() => {
+  /** 按路由栈返回进入匹配前的页面；无可返回时回 tabs */
+  const leaveMatchFlow = useCallback(() => {
     if (router.canGoBack()) router.back();
     else router.replace("/(tabs)");
-  }, []);
-
-  /** 取消/结束/支付完成：关掉匹配中页 + 发布页，回到进入匹配前 */
-  const leaveMatchFlow = useCallback(() => {
-    router.dismissTo("/(tabs)");
   }, []);
 
   const handleEnded = useCallback(() => {
@@ -72,6 +69,10 @@ export default function MatchMatchingScreen({
       return;
     }
     if (session.submitting) return;
+    const firstGrabId = session.selectedGrabIds[0];
+    const firstCompanionUserId = session.candidates.find(
+      (item) => item.id === firstGrabId,
+    )?.companionUserId;
     session.setSubmitting(true);
     try {
       const created = await selectAndCreateOrder(
@@ -79,6 +80,12 @@ export default function MatchMatchingScreen({
         session.selectedGrabIds,
         token,
       );
+      const matchedOrder = firstCompanionUserId
+        ? created.orders.find(
+            (order) => order.serviceUserId === firstCompanionUserId,
+          )
+        : undefined;
+      setPaidOrderId(matchedOrder?.orderId ?? null);
       session.setOrderPending(true);
       setPayTotal(created.totalPrice);
       setPayVisible(true);
@@ -91,14 +98,26 @@ export default function MatchMatchingScreen({
     }
   }, [requestNo, session, token]);
 
+  // TODO(临时注释): 支付成功关闭试音房
+  // const closeAuditionRoom = session.closeAuditionRoom;
   const handlePaid = useCallback(() => {
     setPayVisible(false);
     Toast.show("支付成功", { duration: Toast.durations.SHORT });
+    // void (async () => {
+    //   await closeAuditionRoom();
+    //   leaveMatchFlow();
+    // })();
+    if (paidOrderId) {
+      // replace：用订单详情替换匹配页，返回键回到进入匹配前的页面
+      router.replace(`/order/${paidOrderId}?scope=place`);
+      return;
+    }
     leaveMatchFlow();
-  }, [leaveMatchFlow]);
+  }, [leaveMatchFlow, paidOrderId]);
 
   return (
     <View style={styles.root}>
+      <StatusBar style="light" />
       <Stack.Screen options={{ headerShown: false }} />
       <MatchLinearGradient
         colors={BG_GRADIENT}
@@ -113,7 +132,7 @@ export default function MatchMatchingScreen({
             accessibilityRole="button"
             accessibilityLabel="返回"
             hitSlop={12}
-            onPress={leaveMatchStack}
+            onPress={leaveMatchFlow}
             style={styles.backButton}
           >
             <Image source={backIcon} style={styles.backIcon} />

@@ -60,25 +60,32 @@ function unwrap<T>(response: ClientApiResponse<T>): T {
   return response.data;
 }
 
+// 数据类端点：后端成功包络可能省略 data，缺失时不能把 undefined 当业务数据返回。
+function requireData<T>(response: ClientApiResponse<T>): T {
+  const data = unwrap(response);
+  if (data === undefined || data === null) throw new Error('响应数据缺失，请稍后重试');
+  return data;
+}
+
 export function createClientAuthContract(requester: AuthRequester) {
   return {
     async exchangeIdToken(idToken: string, registerWay = 'SMS_CODE') {
-      return unwrap(await requester<ClientLoginResult>('/client/v1/user/public/login/idtoken', {
+      return requireData(await requester<ClientLoginResult>('/client/v1/user/public/login/idtoken', {
         method: 'POST', body: { action: { idToken, registerWay } },
       }));
     },
     async fetchCurrentUser(token: string) {
-      return unwrap(await requester<ClientUserInfo>('/client/v1/user/login/info', {
+      return requireData(await requester<ClientUserInfo>('/client/v1/user/login/info', {
         method: 'POST', token,
       }));
     },
     async updateProfile(token: string, data: ClientProfileUpdate) {
-      return unwrap(await requester<ClientUserInfo>('/client/v1/user/update/profile', {
+      return requireData(await requester<ClientUserInfo>('/client/v1/user/update/profile', {
         method: 'POST', token, body: { action: data },
       }));
     },
     async getOssSts(token: string, bizType: string, objectNames: string[]) {
-      return unwrap(await requester<ClientOssSts>('/client/v1/oss/sts', {
+      return requireData(await requester<ClientOssSts>('/client/v1/oss/sts', {
         method: 'POST', token, body: { action: { bizType, objectNames } },
       }));
     },
@@ -110,17 +117,17 @@ export function createClientAuthContract(requester: AuthRequester) {
       }));
     },
     async getImToken(token: string) {
-      return unwrap(await requester<ClientImToken>('/client/v1/im/token', {
+      return requireData(await requester<ClientImToken>('/client/v1/im/token', {
         method: 'POST', token,
       }));
     },
     async getUserProfile(token: string, userId: string) {
-      return unwrap(await requester<ClientUserProfile>(`/client/v1/user/profile/${encodeURIComponent(userId)}`, {
+      return requireData(await requester<ClientUserProfile>(`/client/v1/user/profile/${encodeURIComponent(userId)}`, {
         method: 'POST', token,
       }));
     },
     async getUserOnlineStatus(token: string, userIds: string[]) {
-      return unwrap(await requester<Record<string, number>>('/client/v1/user/profile/online-status', {
+      return requireData(await requester<Record<string, number>>('/client/v1/user/profile/online-status', {
         method: 'POST', token, body: userIds,
       }));
     },

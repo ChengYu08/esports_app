@@ -10,14 +10,14 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 const FOOTER_CONTENT_BOTTOM = 22;
 
 /** Figma 532:105048~055 导出的小图（@2x，单张约 3~24KB） */
-const avatar1 = require("../../../../assets/match/radar-avatar-1.png");
-const avatar2 = require("../../../../assets/match/radar-avatar-2.png");
-const avatar3 = require("../../../../assets/match/radar-avatar-3.png");
-const avatar4 = require("../../../../assets/match/radar-avatar-4.png");
-const avatar5 = require("../../../../assets/match/radar-avatar-5.png");
-const avatar6 = require("../../../../assets/match/radar-avatar-6.png");
-const avatar7 = require("../../../../assets/match/radar-avatar-7.png");
-const avatar8 = require("../../../../assets/match/radar-avatar-8.png");
+const avatar1 = require("../../../../assets/images/radar-avatar-1.png");
+const avatar2 = require("../../../../assets/images/radar-avatar-2.png");
+const avatar3 = require("../../../../assets/images/radar-avatar-3.png");
+const avatar4 = require("../../../../assets/images/radar-avatar-4.png");
+const avatar5 = require("../../../../assets/images/radar-avatar-5.png");
+const avatar6 = require("../../../../assets/images/radar-avatar-6.png");
+const avatar7 = require("../../../../assets/images/radar-avatar-7.png");
+const avatar8 = require("../../../../assets/images/radar-avatar-8.png");
 
 /** Figma 532:105041 雷达尺寸 */
 const RADAR_SIZE = 279;

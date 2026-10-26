@@ -5,7 +5,6 @@ import { useAuthStore } from "@esports/auth";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert,
   FlatList,
   Pressable,
   RefreshControl,
@@ -13,6 +12,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -189,7 +189,10 @@ export default function OrderScreen() {
     }
     if (action === "afterSales") {
       if (item.clubId == null) {
-        Alert.alert("暂无法申请售后", "缺少俱乐部信息，无法申请售后");
+        void useAppConfirm.getState().confirm({
+          title: "暂无法申请售后",
+          message: "缺少俱乐部信息，无法申请售后",
+        });
         return;
       }
       setAfterSaleTarget(item);

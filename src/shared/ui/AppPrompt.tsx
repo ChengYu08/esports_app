@@ -2,6 +2,8 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+const BRAND = "#FE1F4C";
+
 export function AppPrompt({
   visible,
   title = "提示",
@@ -58,10 +60,7 @@ export function AppPrompt({
             )}
             <Pressable
               accessibilityRole="button"
-              style={[
-                styles.button,
-                cancelText ? styles.confirmButton : styles.singleButton,
-              ]}
+              style={[styles.button, styles.confirmButton]}
               onPress={onConfirm}
             >
               <Text style={styles.buttonText}>{confirmText}</Text>
@@ -86,66 +85,76 @@ const styles = StyleSheet.create({
     maxWidth: 360,
     maxHeight: "100%",
     flexShrink: 1,
-    borderRadius: 20,
-    alignItems: "center",
-    padding: 24,
-    backgroundColor: "#fff",
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "#FFFFFF",
   },
   copy: { alignSelf: "stretch", flexGrow: 0, flexShrink: 1 },
-  copyContent: { alignItems: "center" },
-  iconText: { color: "#FF3158", fontSize: 28, fontWeight: "700" },
-  title: {
-    marginTop: 14,
-    color: "#111",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 18,
-    fontWeight: "600",
+  copyContent: {
+    gap: 12,
+    padding: 16,
   },
-  message: {
-    marginTop: 8,
-    color: "#777",
+  title: {
+    color: "#333333",
     fontFamily: DOUYIN_SANS,
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: 16,
+    fontWeight: "600",
+    lineHeight: 24,
     textAlign: "center",
   },
-  button: {
-    alignSelf: "stretch",
-    minHeight: 44,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    marginTop: 20,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FF3158",
+  message: {
+    color: "#666666",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 14,
+    fontWeight: "400",
+    lineHeight: 22,
+    textAlign: "left",
   },
   actions: {
     flexShrink: 0,
     alignSelf: "stretch",
     flexDirection: "row",
+    alignItems: "center",
     gap: 12,
-    marginTop: 20,
+    height: 56,
+    paddingTop: 4,
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+    backgroundColor: "#FFFFFF",
+  },
+  button: {
+    flex: 1,
+    minWidth: 86,
+    minHeight: 36,
+    maxHeight: 36,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
   cancelButton: {
-    flex: 1,
-    marginTop: 0,
-    alignSelf: "auto",
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: BRAND,
   },
-  confirmButton: { flex: 1, marginTop: 0, alignSelf: "auto" },
-  singleButton: { flex: 1, marginTop: 0, alignSelf: "auto" },
+  confirmButton: {
+    backgroundColor: BRAND,
+  },
   cancelText: {
-    color: "#333",
+    color: BRAND,
     fontFamily: DOUYIN_SANS,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "600",
+    lineHeight: 22,
+    textAlign: "center",
   },
   buttonText: {
-    textAlign: "center",
-    color: "#fff",
+    color: "#FFFFFF",
     fontFamily: DOUYIN_SANS,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "600",
+    lineHeight: 22,
+    textAlign: "center",
   },
 });

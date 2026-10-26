@@ -12,7 +12,11 @@ import {
 import type {
   MatchClub,
   MatchCompanionPreference,
+  MatchGame,
   MatchGenderRequirement,
+  MatchLevel,
+  MatchMode,
+  MatchService,
   MatchVoiceOption,
 } from "@/features/match/api/match.types";
 
@@ -35,6 +39,15 @@ export const MATCH_COMPANION_PREFERENCE_OPTIONS: {
 /** 备注字数上限，对齐 PC ClubQuickMatchModal */
 export const MATCH_REMARK_MAX = 200;
 
+const EMPTY_GAMES: MatchGame[] = [];
+const EMPTY_CLUBS: MatchClub[] = [];
+const EMPTY_MODES: MatchMode[] = [];
+const EMPTY_LEVELS: MatchLevel[] = [];
+const EMPTY_SERVICES: MatchService[] = [];
+
+export const quickMatchGamesQueryKey = (token: string) =>
+  ["quick-match", "games", token] as const;
+
 function formatPrice(value: number): string {
   if (!Number.isFinite(value)) return "0";
   return Number(value.toFixed(2)).toString();
@@ -47,11 +60,31 @@ function formatPriceRange(first: number, second: number): string {
   return `${formatPrice(min)}~${formatPrice(max)}`;
 }
 
-export function useMatchForm() {
+export type UseMatchFormOptions = {
+  /** 为 false 时不发起级联查询（弹层关闭时避免后台请求） */
+  enabled?: boolean;
+  /**
+   * 俱乐部主页场景：固定俱乐部，不拉俱乐部列表；
+   * 切换游戏时保持该俱乐部（无需出现在 getQuickMatchClubList 中）。
+   */
+  lockedClub?: Pick<MatchClub, "id" | "name"> | null;
+  /**
+   * 外部传入的游戏列表（如俱乐部详情 clubGames）。
+   * 传入后跳过 getQuickMatchGameList，不影响平台发布页默认拉全量。
+   */
+  providedGames?: MatchGame[] | null;
+};
+
+export function useMatchForm(options: UseMatchFormOptions = {}) {
+  const enabled = options.enabled !== false;
+  const lockedClub = options.lockedClub ?? null;
+  const clubLockedMode = Boolean(lockedClub);
+  const providedGames = options.providedGames ?? null;
+  const hasProvidedGames = providedGames !== null;
   const token = useAuthStore((state) => state.accessToken);
 
   const [gameId, setGameId] = useState<string | null>(null);
-  const [club, setClub] = useState<MatchClub | null>(null);
+  const [selectedClub, setSelectedClub] = useState<MatchClub | null>(null);
   const [modeId, setModeId] = useState<string | null>(null);
   const [levelId, setLevelId] = useState<string | null>(null);
   const [serviceId, setServiceId] = useState<string | null>(null);
@@ -62,42 +95,60 @@ export function useMatchForm() {
   const [voice, setVoice] = useState<MatchVoiceOption>("不试音");
   const [remark, setRemark] = useState("");
 
+  // 弹层关闭时清空选择，避免下次打开带着旧 gameId 先打一枪再被 bootstrap 改掉（双请求）
+  useEffect(() => {
+    if (enabled) return;
+    setGameId(null);
+    setSelectedClub(null);
+    setModeId(null);
+    setLevelId(null);
+    setServiceId(null);
+    setGender(0);
+    setCompanionPreference(1);
+    setQuantity(1);
+    setVoice("不试音");
+    setRemark("");
+  }, [enabled]);
+
+  // 俱乐部锁定场景直接使用外部俱乐部，避免 state 先清空再由 effect 恢复。
+  const club = lockedClub ?? selectedClub;
+
   const gamesQuery = useQuery({
-    queryKey: ["quick-match", "games", token],
+    queryKey: quickMatchGamesQueryKey(token as string),
     queryFn: ({ signal }) => fetchQuickMatchGames(token as string, signal),
-    enabled: Boolean(token),
+    enabled: enabled && Boolean(token) && !hasProvidedGames,
   });
 
   const clubsQuery = useQuery({
     queryKey: ["quick-match", "clubs", token, gameId],
     queryFn: ({ signal }) => fetchQuickMatchClubs(gameId as string, token as string, signal),
-    enabled: Boolean(token && gameId),
+    enabled: enabled && !clubLockedMode && Boolean(token && gameId),
   });
 
   const modesQuery = useQuery({
     queryKey: ["quick-match", "modes", token, club?.id, gameId],
     queryFn: ({ signal }) =>
       fetchClubGameModes(club!.id, gameId as string, token as string, signal),
-    enabled: Boolean(token && club?.id && gameId),
+    enabled: enabled && Boolean(token && club?.id && gameId),
   });
 
   const levelsQuery = useQuery({
     queryKey: ["quick-match", "levels", token, modeId],
     queryFn: ({ signal }) => fetchClubGameLevels(modeId as string, token as string, signal),
-    enabled: Boolean(token && modeId),
+    enabled: enabled && Boolean(token && modeId),
   });
 
   const servicesQuery = useQuery({
     queryKey: ["quick-match", "services", token, levelId],
     queryFn: ({ signal }) => fetchClubGameServices(levelId as string, token as string, signal),
-    enabled: Boolean(token && levelId),
+    enabled: enabled && Boolean(token && levelId),
   });
 
-  const games = gamesQuery.data ?? [];
-  const clubs = clubsQuery.data ?? [];
-  const modes = modesQuery.data ?? [];
-  const levels = levelsQuery.data ?? [];
-  const services = servicesQuery.data ?? [];
+  const games = providedGames ?? gamesQuery.data ?? EMPTY_GAMES;
+  const clubs = clubsQuery.data ?? EMPTY_CLUBS;
+  const modes = modesQuery.data ?? EMPTY_MODES;
+  const levels = levelsQuery.data ?? EMPTY_LEVELS;
+  const services = servicesQuery.data ?? EMPTY_SERVICES;
 
   const selectedService = useMemo(
     () => services.find((item) => item.id === serviceId) ?? null,
@@ -110,23 +161,25 @@ export function useMatchForm() {
 
   // 游戏列表加载后默认选中第一项
   useEffect(() => {
+    if (!enabled) return;
     if (!gameId && games.length > 0) {
       setGameId(games[0].id);
     }
-  }, [gameId, games]);
+  }, [enabled, gameId, games]);
 
-  // 俱乐部列表变化时，若当前俱乐部不在列表中则清空
+  // 俱乐部列表变化时，若当前俱乐部不在列表中则清空（平台选俱乐部模式）
   useEffect(() => {
+    if (clubLockedMode) return;
     if (!club) return;
     if (clubsQuery.isFetching) return;
     if (!clubs.some((item) => item.id === club.id)) {
-      setClub(null);
+      setSelectedClub(null);
       setModeId(null);
       setLevelId(null);
       setServiceId(null);
       setCompanionPreference(1);
     }
-  }, [club, clubs, clubsQuery.isFetching]);
+  }, [clubLockedMode, club, clubs, clubsQuery.isFetching]);
 
   useEffect(() => {
     if (!modeId) return;
@@ -168,16 +221,18 @@ export function useMatchForm() {
 
   const selectGame = useCallback((nextGameId: string) => {
     setGameId(nextGameId);
-    setClub(null);
+    if (!clubLockedMode) {
+      setSelectedClub(null);
+    }
     setModeId(null);
     setLevelId(null);
     setServiceId(null);
     setGender(0);
     setCompanionPreference(1);
-  }, []);
+  }, [clubLockedMode]);
 
   const selectClub = useCallback((nextClub: MatchClub) => {
-    setClub(nextClub);
+    setSelectedClub(nextClub);
     setModeId(null);
     setLevelId(null);
     setServiceId(null);
@@ -250,7 +305,7 @@ export function useMatchForm() {
     selectedService,
     showCompanionPreference,
     estimatedPriceText,
-    gamesLoading: gamesQuery.isLoading,
+    gamesLoading: hasProvidedGames ? false : gamesQuery.isLoading,
     clubsLoading: clubsQuery.isLoading || clubsQuery.isFetching,
     modesLoading: modesQuery.isLoading || modesQuery.isFetching,
     levelsLoading: levelsQuery.isLoading || levelsQuery.isFetching,

@@ -1,0 +1,29 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g id="&#233;&#135;&#145;&#229;&#136;&#154;&#228;&#189;&#141;/&#230;&#184;&#184;&#230;&#136;&#143;">
+<mask id="mask0_0_690" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="22" height="22">
+<g id="b">
+<path id="Vector" d="M0 0H22V22H0V0Z" fill="white"/>
+</g>
+</mask>
+<g mask="url(#mask0_0_690)">
+<g id="Subtract">
+<use xlink:href="#stroke0_0_690" fill="url(#paint0_linear_0_690)"/>
+<mask id="stroke1_0_690" fill="white">
+<use xlink:href="#stroke0_0_690"/>
+</mask>
+<path d="M12.5283 4.58252H14.001C17.867 4.58252 21.001 7.71653 21.001 11.5825C21.0004 15.4481 17.8666 18.5825 14.001 18.5825H8.00098C4.13531 18.5825 1.0015 15.4481 1.00098 11.5825C1.00098 7.71653 4.13498 4.58252 8.00098 4.58252H9.47266V2.44385H12.5283V4.58252ZM6.50879 9.47119V11.0913H4.88867V12.7407H6.50879V14.3599H8.15918V12.7407H9.77832V11.0913H8.15918V9.47119H6.50879ZM15.2773 9.77686C14.0963 9.77706 13.1388 10.7345 13.1387 11.9155C13.1387 13.0966 14.0963 14.054 15.2773 14.0542C16.4584 14.054 17.4169 13.0966 17.417 11.9155C17.4169 10.7344 16.4584 9.77703 15.2773 9.77686Z" stroke="url(#paint1_linear_0_690)" mask="url(#stroke1_0_690)"/>
+</g>
+</g>
+</g>
+<defs>
+<linearGradient id="paint0_linear_0_690" x1="11.001" y1="2.44385" x2="11.2828" y2="15.1514" gradientUnits="userSpaceOnUse">
+<stop stop-color="white" stop-opacity="0.85"/>
+<stop offset="1" stop-color="white" stop-opacity="0.95"/>
+</linearGradient>
+<linearGradient id="paint1_linear_0_690" x1="12.8878" y1="17.718" x2="9.83643" y2="-0.901946" gradientUnits="userSpaceOnUse">
+<stop stop-color="white" stop-opacity="0"/>
+<stop offset="1" stop-color="white"/>
+</linearGradient>
+<path id="stroke0_0_690" d="M12.5283 4.58252H14.001C17.867 4.58252 21.001 7.71653 21.001 11.5825C21.0005 15.4481 17.8666 18.5825 14.001 18.5825H8.00098C4.13531 18.5825 1.0015 15.4481 1.00098 11.5825C1.00098 7.71653 4.13498 4.58252 8.00098 4.58252H9.47266V2.44385H12.5283V4.58252ZM6.50879 9.47119V11.0913H4.88867V12.7407H6.50879V14.3599H8.15918V12.7407H9.77832V11.0913H8.15918V9.47119H6.50879ZM15.2773 9.77686C14.0963 9.77706 13.1388 10.7345 13.1387 11.9155C13.1387 13.0966 14.0963 14.054 15.2773 14.0542C16.4584 14.054 17.4169 13.0966 17.417 11.9155C17.4169 10.7344 16.4584 9.77703 15.2773 9.77686Z"/>
+</defs>
+</svg>
