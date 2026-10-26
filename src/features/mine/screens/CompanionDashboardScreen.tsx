@@ -109,7 +109,8 @@ export default function CompanionDashboardScreen() {
     stop();
     router.push({ pathname, params: { gameId } });
   };
-  const rate = orders.isError ? "--" : format(orders.data?.goodRate);
+  const formattedRate = format(orders.data?.goodRate);
+  const rate = formattedRate === "--" ? "0" : formattedRate;
 
   return (
     <View style={styles.screen}>
@@ -193,7 +194,7 @@ export default function CompanionDashboardScreen() {
               <Text style={styles.statCaption}>
                 好评
                 <Text style={styles.captionValue}>
-                  {rate === "--" ? rate : `${rate}%`}
+                  {rate}%
                 </Text>
               </Text>
             </View>
