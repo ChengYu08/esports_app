@@ -1,0 +1,9 @@
+# Optional metadata for hosts that recognize agents/openai.yaml.
+# Other agents use SKILL.md and may ignore or omit this file.
+interface:
+  display_name: "React Native Update"
+  short_description: "Integrate and recover Pushy/Cresc OTA"
+  default_prompt: "Use $react-native-update to integrate or troubleshoot OTA updates with compatible recovery safeguards."
+
+policy:
+  allow_implicit_invocation: true
