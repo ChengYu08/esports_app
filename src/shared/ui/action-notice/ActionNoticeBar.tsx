@@ -7,13 +7,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 
-const ARROW_ICON = require("../../../assets/svgs/cs-invite-arrow-right.svg");
+const ARROW_ICON = require("../../../../assets/svgs/cs-invite-arrow-right.svg");
 
 const TAB_BAR_HEIGHT = 58;
 const MIN_DURATION_MS = 2000;
 
 type ActionNoticeBarProps = {
-  visible?: boolean;
   text: string;
   actionText: string;
   icon: ImageSource | number;
@@ -23,16 +22,13 @@ type ActionNoticeBarProps = {
   expireAt: number;
   maxDurationMs: number;
   minDurationMs?: number;
-  /** 到期自动消失时调用（清业务 store） */
+  /** 到期自动消失时调用（清队列条目） */
   onDismiss: () => void;
-  /** 条消失（到期/动作完成/被替换/被撤）时调用（释放去重键等） */
-  onDisappear?: () => void;
-  /** 与其它条叠加时的额外底部偏移 */
+  /** 与其它条叠加时的额外底部偏移（由 Host 计算） */
   extraBottomOffset?: number;
 };
 
 export function ActionNoticeBar({
-  visible,
   text,
   actionText,
   icon,
@@ -42,32 +38,25 @@ export function ActionNoticeBar({
   maxDurationMs,
   minDurationMs = MIN_DURATION_MS,
   onDismiss,
-  onDisappear,
   extraBottomOffset = 0,
 }: ActionNoticeBarProps) {
   const insets = useSafeAreaInsets();
   const onDismissRef = useRef(onDismiss);
-  const onDisappearRef = useRef(onDisappear);
 
   useEffect(() => {
     onDismissRef.current = onDismiss;
-    onDisappearRef.current = onDisappear;
-  }, [onDismiss, onDisappear]);
+  }, [onDismiss]);
 
   // 到期或达到上限时长后消失；最少展示 minDuration，防止刚弹出就被过期数据收走。
-  // 不感知 visible：隐藏页面期间计时继续，回到可见页时按剩余时间展示（对齐原接待条行为）。
-  // 调用方应传 key 以便新条替换旧条时触发卸载（cleanup 释放去重键）
+  // 计时不随页面切换暂停。onDisappear 由 store dismiss/挤旧/clear 统一触发。
   useEffect(() => {
     const remainMs = expireAt - Date.now();
     const duration = Math.min(Math.max(remainMs, minDurationMs), maxDurationMs);
     const timer = setTimeout(() => onDismissRef.current(), duration);
     return () => {
       clearTimeout(timer);
-      onDisappearRef.current?.();
     };
   }, [expireAt, maxDurationMs, minDurationMs]);
-
-  if (!visible) return null;
 
   return (
     <Animated.View

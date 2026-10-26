@@ -1,15 +1,16 @@
 /**
  * 操作型命令信令监听：
- * - QUICK_MATCH_NOTICE：快速匹配抢单通知 → 底部通知条（QuickMatchNoticeBar，仅主 tab 可见）
+ * - QUICK_MATCH_NOTICE：快速匹配抢单通知 → 全局 ActionNotice 条
  * - ORDER_NOTIFY（RC:CmdMsg 弹窗信令，仅支付事件）：支付催单弹窗（接单按钮）
  * - QUICK_MATCH_EXPIRED / QUICK_MATCH_CANCELLED：终止信号（撤条 + 消费方结束会话）
  */
 import { useAuthStore } from "@esports/auth";
 import { useEffect } from "react";
 
+import { logger } from "@/core/logging/logger";
 import { useQuickMatchEndSignals } from "@/features/match/quick-match-end-signals";
-import { useQuickMatchNoticeBar } from "@/features/match/quick-match-invite-bar-store";
 import { subscribeRongCommands } from "@/features/message/rongcloud-im";
+import { actionNotice } from "@/shared/ui/action-notice/action-notice-store";
 import { useActionCommandDialog } from "./action-command-store";
 import {
   handleOrderNotifyPopup,
@@ -20,16 +21,22 @@ import {
 export function ActionCommandListener() {
   useEffect(() => {
     return subscribeRongCommands((command) => {
+      logger.info("action_command.received", {
+        name: command.name,
+        senderId: command.senderId,
+      });
       const { accessToken } = useAuthStore.getState();
-      if (!accessToken) return;
+      if (!accessToken) {
+        logger.warn("action_command.skipped_no_auth", { name: command.name });
+        return;
+      }
       const { show } = useActionCommandDialog.getState();
-      handleQuickMatchNotice(command, useQuickMatchNoticeBar.getState().show);
+      handleQuickMatchNotice(command);
       handleOrderNotifyPopup(command, show);
       handleQuickMatchExpired(command, {
         notifyEnded: useQuickMatchEndSignals.getState().notifyEnded,
         dismissQuickMatchBar: (requestNo) => {
-          const bar = useQuickMatchNoticeBar.getState();
-          if (bar.invite?.requestNo === requestNo) bar.dismiss();
+          actionNotice.dismiss(`qm:${requestNo}`);
         },
       });
     });

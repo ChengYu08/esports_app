@@ -1,20 +1,25 @@
 /**
  * 全局接待/代发相关融云命令监听：
- * - CUSTOMER_SERVICE_INVITE：接待邀请 → 底部抢单条（CustomerServiceInviteBar，到期自动消失）
+ * - CUSTOMER_SERVICE_INVITE：接待邀请 → 全局 ActionNotice 抢单条（到期自动消失）
  * - QUICK_MATCH_CREATED：接待代发创建 → 写入 quickMatchCreated 场景标记（不弹窗；是否显示「选择陪玩」由语聊房调 active/detail 决定）
  */
 import { useAuthStore } from "@esports/auth";
 import { useEffect } from "react";
+import Toast from "react-native-root-toast";
 
 import { subscribeRongCommands } from "@/features/message/rongcloud-im";
 import type { RongCommand } from "@/features/message/rongcloud-command";
+import { markCsInviteClaimed, markCsInviteUnclaimed } from "@/features/message/cs-invite-claim-state";
+import { actionNotice } from "@/shared/ui/action-notice/action-notice-store";
+import { TRADE_NOTICE_ICON } from "@/shared/ui/action-notice/trade-notice-icon";
 
-import { useCsInviteBar } from "../cs-invite-bar-store";
+import { claimAndEnterCustomerServiceRoom } from "../use-customer-service-room-flow";
 import { useVoiceRoomSessionStore } from "../voice-room-session";
 
 const PLATFORM_NOTICE_USER_ID = "50000000";
 const CUSTOMER_SERVICE_INVITE = "CUSTOMER_SERVICE_INVITE";
 const QUICK_MATCH_CREATED = "QUICK_MATCH_CREATED";
+const MAX_BAR_DURATION_MS = 15_000;
 
 /** 邀请通知去重：roomId_roomVersion（条到期后清除，允许同房间下一轮邀请再次提示） */
 const csInviteKeys = new Map<string, number>();
@@ -38,20 +43,45 @@ function handleCustomerServiceInvite(command: RongCommand) {
   const key = `${roomId}_${roomVersion}`;
   if (csInviteKeys.has(key)) return;
 
-  const expireAt = Number(command.data.expireAt);
-  if (!Number.isFinite(expireAt)) return;
-  if (expireAt * 1000 <= Date.now()) return;
+  const expireAtSec = Number(command.data.expireAt);
+  if (!Number.isFinite(expireAtSec)) return;
+  if (expireAtSec * 1000 <= Date.now()) return;
 
-  csInviteKeys.set(key, expireAt);
-  useCsInviteBar.getState().show({
-    key,
-    roomId,
-    clubId,
-    roomVersion,
-    playerUserId: stringField(command.data, "playerUserId"),
-    playerName: stringField(command.data, "playerName"),
-    expireAt,
-  });
+  const playerUserId = stringField(command.data, "playerUserId");
+  const playerName =
+    stringField(command.data, "playerName")
+    || (playerUserId ? `玩家${playerUserId}` : "玩家");
+  const noticeId = `cs:${key}`;
+
+  csInviteKeys.set(key, expireAtSec);
+  actionNotice.push(
+    {
+      id: noticeId,
+      text: `${playerName} 请求接待`,
+      actionText: "去抢单",
+      icon: TRADE_NOTICE_ICON,
+      expireAt: expireAtSec * 1000,
+      maxDurationMs: MAX_BAR_DURATION_MS,
+    },
+    {
+      onAction: async () => {
+        const result = await claimAndEnterCustomerServiceRoom({
+          roomId,
+          clubId,
+          roomVersion,
+        });
+        if (result.status === "cancelled") return;
+        if (result.status === "failed") {
+          markCsInviteUnclaimed(roomId, roomVersion, expireAtSec);
+          Toast.show(result.message, { duration: Toast.durations.SHORT });
+          return;
+        }
+        markCsInviteClaimed(roomId, roomVersion, expireAtSec, false);
+        actionNotice.dismiss(noticeId);
+      },
+      onDisappear: () => releaseCsInviteKey(key),
+    },
+  );
 }
 
 function handleQuickMatchCreated(command: RongCommand) {

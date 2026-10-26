@@ -1,3 +1,5 @@
+import Toast from "react-native-root-toast";
+
 import type { RongCommand } from "@/features/message/rongcloud-command";
 import {
   parseOrderNotifyPopup,
@@ -5,7 +7,9 @@ import {
   parseQuickMatchNotice,
   PLATFORM_NOTICE_USER_ID,
 } from "@/features/message/rongcloud-commands";
-import type { QuickMatchNoticeBarInvite } from "@/features/match/quick-match-invite-bar-store";
+import { grabQuickMatchAndEnterAudition } from "@/features/match/grab-quick-match-flow";
+import { actionNotice } from "@/shared/ui/action-notice/action-notice-store";
+import { TRADE_NOTICE_ICON } from "@/shared/ui/action-notice/trade-notice-icon";
 
 import type { OrderPayDialogData } from "./action-command-store";
 
@@ -55,29 +59,14 @@ const orderPayKeys = new Set<string>();
 function buildQuickMatchMessage(payload: {
   buyerNickname: string;
   gameName: string;
-  modeName: string;
-  levelName: string;
-  serviceName: string;
 }) {
   const buyer = payload.buyerNickname || "老板";
-  const serviceText = [
-    payload.gameName,
-    payload.modeName,
-    payload.levelName,
-    payload.serviceName,
-  ]
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .join("·");
-  if (!serviceText) return `「${buyer}」发布了快速匹配需求`;
-  return `「${buyer}」发布 ${serviceText} 需求`;
+  const game = payload.gameName.trim();
+  if (!game) return `「${buyer}」发布了快速匹配需求`;
+  return `「${buyer}」发布了${game}需求`;
 }
 
-export function handleQuickMatchNotice(
-  command: RongCommand,
-  show: (invite: QuickMatchNoticeBarInvite) => void,
-  now = Date.now(),
-) {
+export function handleQuickMatchNotice(command: RongCommand, now = Date.now()) {
   if (command.name !== QUICK_MATCH_NOTICE) return;
   if (command.senderId !== PLATFORM_NOTICE_USER_ID) return;
 
@@ -90,13 +79,29 @@ export function handleQuickMatchNotice(
     : now + MAX_QUICK_MATCH_DURATION_MS;
   if (expireAt - now <= 0) return;
 
+  const noticeId = `qm:${payload.requestNo}`;
   quickMatchNoticeKeys.add(payload.requestNo);
-  show({
-    key: `qm:${payload.requestNo}`,
-    requestNo: payload.requestNo,
-    text: buildQuickMatchMessage(payload),
-    expireAt,
-  });
+  actionNotice.push(
+    {
+      id: noticeId,
+      text: buildQuickMatchMessage(payload),
+      actionText: "去抢单",
+      icon: TRADE_NOTICE_ICON,
+      expireAt,
+      maxDurationMs: MAX_QUICK_MATCH_DURATION_MS,
+    },
+    {
+      onAction: async () => {
+        const result = await grabQuickMatchAndEnterAudition(payload.requestNo);
+        if (result.status === "failed") {
+          Toast.show(result.message, { duration: Toast.durations.SHORT });
+          return;
+        }
+        actionNotice.dismiss(noticeId);
+      },
+      onDisappear: () => releaseQuickMatchNoticeKey(payload.requestNo),
+    },
+  );
 }
 
 export function handleOrderNotifyPopup(

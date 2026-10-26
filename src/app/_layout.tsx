@@ -30,14 +30,13 @@ import { ActionCommandListener } from "@/features/message/action-command/ActionC
 import { VoiceRoomMiniPlayer } from "@/features/voice-room/components/VoiceRoomMiniPlayer";
 import { VoiceRoomKickListener } from "@/features/voice-room/components/VoiceRoomKickListener";
 import { ReceptionCommandListener } from "@/features/voice-room/components/ReceptionCommandListener";
-import { CustomerServiceInviteBar } from "@/features/voice-room/components/CustomerServiceInviteBar";
-import { QuickMatchNoticeBar } from "@/features/match/components/QuickMatchNoticeBar";
 import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
 import { leaveVoiceChatRoom } from "@/features/voice-room/voice-room-rongcloud";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
 import { PrivacyConsentGate } from "@/features/privacy/components/PrivacyConsentGate";
 import { readPrivacyConsent } from "@/features/privacy/privacy-consent";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { ActionNoticeHost } from "@/shared/ui/action-notice";
 import { AppConfirmHost } from "@/shared/ui/AppConfirmHost";
 import { StartupSplash } from "@/shared/ui/StartupSplash";
 
@@ -45,8 +44,6 @@ import { StartupSplash } from "@/shared/ui/StartupSplash";
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 const STARTUP_TIMEOUT_MS = 8000;
-
-const MAIN_TAB_PATHS = new Set(["/", "/order", "/message", "/mine"]);
 
 function withStartupTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
   return new Promise((resolve) => {
@@ -236,8 +233,7 @@ export default function RootLayout() {
               <PrivacyConsentGate onAccepted={() => setPrivacyAccepted(true)} />
             )}
             <InAppNotificationBanner visible={!pathname.startsWith("/voice-room/")} />
-            <CustomerServiceInviteBar visible={MAIN_TAB_PATHS.has(pathname)} />
-            <QuickMatchNoticeBar visible={MAIN_TAB_PATHS.has(pathname)} />
+            <ActionNoticeHost />
             <VoiceRoomMiniPlayer />
             <VoiceRoomKickListener />
             <ReceptionCommandListener />

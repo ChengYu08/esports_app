@@ -1,16 +1,32 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useActionCommandDialog } from "./action-command-store";
 import {
+  actionNotice,
+  resetActionNoticeStore,
+  useActionNoticeStore,
+} from "@/shared/ui/action-notice/action-notice-store";
+import { useActionCommandDialog } from "./action-command-store";
+import type { RongCommand } from "@/features/message/rongcloud-command";
+
+vi.mock("react-native-root-toast", () => ({
+  default: { show: vi.fn(), durations: { SHORT: 2000 } },
+}));
+
+vi.mock("@/shared/ui/action-notice/trade-notice-icon", () => ({
+  TRADE_NOTICE_ICON: 1,
+}));
+
+vi.mock("@/features/match/grab-quick-match-flow", () => ({
+  grabQuickMatchAndEnterAudition: vi.fn(),
+}));
+
+const {
   handleOrderNotifyPopup,
   handleQuickMatchExpired,
   handleQuickMatchNotice,
   releaseOrderPayKey,
-  releaseQuickMatchNoticeKey,
   resetActionCommandDedupKeys,
-} from "./action-command-handlers";
-import type { RongCommand } from "@/features/message/rongcloud-command";
-import type { QuickMatchNoticeBarInvite } from "@/features/match/quick-match-invite-bar-store";
+} = await import("./action-command-handlers");
 
 const NOW = new Date("2026-10-20T12:00:00").getTime();
 const PLATFORM = "50000000";
@@ -24,14 +40,12 @@ function resetStore() {
 }
 
 describe("handleQuickMatchNotice", () => {
-  const show = vi.fn<(invite: QuickMatchNoticeBarInvite) => void>();
-
   beforeEach(() => {
-    show.mockClear();
     resetActionCommandDedupKeys();
+    resetActionNoticeStore();
   });
 
-  it("首次命令触发 show 且文案包含游戏·模式·等级·服务", () => {
+  it("首次命令入队且文案仅含游戏名", () => {
     handleQuickMatchNotice(
       command("QUICK_MATCH_NOTICE", {
         requestNo: "QM1",
@@ -42,15 +56,15 @@ describe("handleQuickMatchNotice", () => {
         serviceName: "陪玩",
         expireTime: "2026-10-20 12:30:00",
       }),
-      show,
       NOW,
     );
-    expect(show).toHaveBeenCalledTimes(1);
-    expect(show).toHaveBeenCalledWith({
-      key: "qm:QM1",
-      requestNo: "QM1",
-      text: "「老板A」发布 王者荣耀·上分·钻石·陪玩 需求",
+    const items = useActionNoticeStore.getState().items;
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      id: "qm:QM1",
+      text: "「老板A」发布了王者荣耀需求",
       expireAt: new Date("2026-10-20T12:30:00").getTime(),
+      maxDurationMs: 30_000,
     });
   });
 
@@ -59,9 +73,9 @@ describe("handleQuickMatchNotice", () => {
       requestNo: "QM1",
       expireTime: "2026-10-20 12:30:00",
     });
-    handleQuickMatchNotice(cmd, show, NOW);
-    handleQuickMatchNotice(cmd, show, NOW);
-    expect(show).toHaveBeenCalledTimes(1);
+    handleQuickMatchNotice(cmd, NOW);
+    handleQuickMatchNotice(cmd, NOW);
+    expect(useActionNoticeStore.getState().items).toHaveLength(1);
   });
 
   it("expireTime 已过期不弹", () => {
@@ -70,42 +84,35 @@ describe("handleQuickMatchNotice", () => {
         requestNo: "QM1",
         expireTime: "2026-10-20 11:00:00",
       }),
-      show,
       NOW,
     );
-    expect(show).not.toHaveBeenCalled();
+    expect(useActionNoticeStore.getState().items).toHaveLength(0);
   });
 
   it("expireTime 不可解析时按 30 秒兜底", () => {
-    handleQuickMatchNotice(
-      command("QUICK_MATCH_NOTICE", { requestNo: "QM1" }),
-      show,
-      NOW,
-    );
-    expect(show.mock.calls[0][0].expireAt).toBe(NOW + 30_000);
+    handleQuickMatchNotice(command("QUICK_MATCH_NOTICE", { requestNo: "QM1" }), NOW);
+    expect(useActionNoticeStore.getState().items[0]?.expireAt).toBe(NOW + 30_000);
   });
 
   it("服务字段全空时降级文案", () => {
     handleQuickMatchNotice(
       command("QUICK_MATCH_NOTICE", { requestNo: "QM1", expireTime: "2026-10-20 12:30:00" }),
-      show,
       NOW,
     );
-    expect(show.mock.calls[0][0].text).toBe("「老板」发布了快速匹配需求");
+    expect(useActionNoticeStore.getState().items[0]?.text).toBe("「老板」发布了快速匹配需求");
   });
 
   it("非平台发送方忽略", () => {
     handleQuickMatchNotice(
       command("QUICK_MATCH_NOTICE", { requestNo: "QM1" }, "60000000"),
-      show,
       NOW,
     );
-    expect(show).not.toHaveBeenCalled();
+    expect(useActionNoticeStore.getState().items).toHaveLength(0);
   });
 
   it("其它命令名忽略", () => {
-    handleQuickMatchNotice(command("ROOM_KICKED", { requestNo: "QM1" }), show, NOW);
-    expect(show).not.toHaveBeenCalled();
+    handleQuickMatchNotice(command("ROOM_KICKED", { requestNo: "QM1" }), NOW);
+    expect(useActionNoticeStore.getState().items).toHaveLength(0);
   });
 
   it("释放去重键后同 requestNo 可再次弹", () => {
@@ -113,10 +120,10 @@ describe("handleQuickMatchNotice", () => {
       requestNo: "QM1",
       expireTime: "2026-10-20 12:30:00",
     });
-    handleQuickMatchNotice(cmd, show, NOW);
-    releaseQuickMatchNoticeKey("QM1");
-    handleQuickMatchNotice(cmd, show, NOW);
-    expect(show).toHaveBeenCalledTimes(2);
+    handleQuickMatchNotice(cmd, NOW);
+    actionNotice.dismiss("qm:QM1");
+    handleQuickMatchNotice(cmd, NOW);
+    expect(useActionNoticeStore.getState().items).toHaveLength(1);
   });
 });
 
