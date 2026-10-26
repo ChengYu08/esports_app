@@ -7,6 +7,8 @@ import {
   Swipeable,
 } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Toast from "react-native-root-toast";
+import { useAuthStore } from "@esports/auth";
 
 import {
   readBlacklist,
@@ -16,6 +18,7 @@ import {
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import { requireLogin } from "@/shared/navigation/require-login";
 
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 
@@ -34,8 +37,17 @@ export default function BlacklistScreen() {
   }, []);
 
   const removeEntry = async (userId: string) => {
-    await removeFromBlacklist(userId);
-    setEntries((current) => current.filter((entry) => entry.userId !== userId));
+    if (!requireLogin()) return;
+    const token = useAuthStore.getState().accessToken;
+    if (!token) return;
+    try {
+      await removeFromBlacklist(userId, token);
+      setEntries((current) => current.filter((entry) => entry.userId !== userId));
+    } catch (error) {
+      Toast.show(error instanceof Error ? error.message : "操作失败", {
+        duration: Toast.durations.SHORT,
+      });
+    }
   };
 
   return (

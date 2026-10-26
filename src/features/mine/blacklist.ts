@@ -1,3 +1,7 @@
+import {
+  addBlacklistedUser,
+  removeBlacklistedUser,
+} from "@/features/mine/api/blacklist.api";
 import { storage } from "@/core/storage/storage";
 
 export type BlacklistEntry = {
@@ -46,14 +50,18 @@ export async function isUserBlacklisted(userId: string | number): Promise<boolea
   return entries.some((entry) => entry.userId === normalizedUserId);
 }
 
-export async function addToBlacklist(entry: BlacklistEntry): Promise<void> {
+export async function addToBlacklist(entry: BlacklistEntry, token: string): Promise<void> {
+  // 先写后端关联表，成功后再更新本地镜像（黑名单列表页/消息过滤仍读本地）
+  await addBlacklistedUser(entry.userId, token);
   const current = await readBlacklist();
   const next = [entry, ...current.filter((item) => item.userId !== entry.userId)];
   await storage.set(BLACKLIST_STORAGE_KEY, JSON.stringify(next));
   notifyBlacklistChanged(next);
 }
 
-export async function removeFromBlacklist(userId: string): Promise<void> {
+export async function removeFromBlacklist(userId: string, token: string): Promise<void> {
+  // 先调后端解除，成功后再移除本地镜像
+  await removeBlacklistedUser(userId, token);
   const current = await readBlacklist();
   const next = current.filter((item) => item.userId !== userId);
   await storage.set(BLACKLIST_STORAGE_KEY, JSON.stringify(next));

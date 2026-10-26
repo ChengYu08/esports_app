@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
-import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -14,7 +14,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Toast from "react-native-root-toast";
+import { useAuthStore } from "@esports/auth";
 
+import { submitReport } from "@/features/mine/api/report.api";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
@@ -31,26 +33,45 @@ const REPORT_REASONS = [
 
 export default function ReportScreen() {
   const insets = useSafeAreaInsets();
+  const { userId } = useLocalSearchParams<{ userId?: string | string[] }>();
   const [selectedReason, setSelectedReason] = useState<
     (typeof REPORT_REASONS)[number] | ""
   >("");
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const submitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const trimmedDescription = description.trim();
   const canSubmit = Boolean(selectedReason && trimmedDescription) && !submitting;
+  const reportedUserId = typeof userId === "string" ? userId : userId?.[0] ?? "";
 
-  useEffect(() => () => {
-    if (submitTimer.current !== null) clearTimeout(submitTimer.current);
-  }, []);
-
-  function handleSubmit() {
-    if (!canSubmit || submitTimer.current !== null) return;
+  async function handleSubmit() {
+    if (!canSubmit) return;
+    if (!reportedUserId) {
+      Toast.show("缺少举报对象", { duration: Toast.durations.SHORT });
+      return;
+    }
+    const token = useAuthStore.getState().accessToken;
+    if (!token) {
+      Toast.show("请先登录", { duration: Toast.durations.SHORT });
+      return;
+    }
     setSubmitting(true);
-    submitTimer.current = setTimeout(() => {
+    try {
+      await submitReport(
+        {
+          reportedUserId,
+          reason: selectedReason,
+          description: trimmedDescription,
+        },
+        token,
+      );
       Toast.show("举报成功", { duration: Toast.durations.SHORT });
       router.back();
-    }, 1000);
+    } catch (error) {
+      setSubmitting(false);
+      Toast.show(error instanceof Error ? error.message : "举报失败", {
+        duration: Toast.durations.SHORT,
+      });
+    }
   }
 
   return (

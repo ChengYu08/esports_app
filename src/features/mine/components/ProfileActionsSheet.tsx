@@ -19,6 +19,7 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 type ProfileActionsSheetProps = {
   visible: boolean;
   bottomInset: number;
+  isBlacklisted: boolean;
   onClose: () => void;
   onReportRequest: () => void;
   onBlockRequest: () => void;
@@ -27,6 +28,7 @@ type ProfileActionsSheetProps = {
 export function ProfileActionsSheet({
   visible,
   bottomInset,
+  isBlacklisted,
   onClose,
   onReportRequest,
   onBlockRequest,
@@ -124,7 +126,7 @@ export function ProfileActionsSheet({
           </Pressable>
           <View style={styles.profileActionsDivider} />
           <Pressable
-            accessibilityLabel="拉黑"
+            accessibilityLabel={isBlacklisted ? "取消拉黑" : "拉黑"}
             accessibilityRole="button"
             onPress={() => closeSheet(onBlockRequest)}
             style={({ pressed }) => [
@@ -133,7 +135,9 @@ export function ProfileActionsSheet({
             ]}
           >
             <PersonProhibited24Regular color="#333" height={24} width={24} />
-            <Text style={styles.profileActionLabel}>拉黑</Text>
+            <Text style={styles.profileActionLabel}>
+              {isBlacklisted ? "取消拉黑" : "拉黑"}
+            </Text>
           </Pressable>
         </Animated.View>
       </Animated.View>
