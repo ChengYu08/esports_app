@@ -1,18 +1,11 @@
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
-  BuildingPeople24Regular,
+  ChevronRight16Regular,
   Dismiss24Regular,
-  Password24Regular,
-  PeopleCommunity24Regular,
-  PersonDelete24Regular,
-  PersonProhibited24Regular,
-  PersonStar24Regular,
-  Settings24Regular,
 } from "@fluentui/react-native-icons";
-import * as Clipboard from "expo-clipboard";
-import { Image } from "expo-image";
+import { Image, type ImageSource } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -27,66 +20,125 @@ import Toast from "react-native-root-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { clientAuthApi } from "@/features/auth/client-auth.api";
-import { clearAuthSession } from "@/features/auth/session-persistence";
-import { messageStore } from "@/features/message/message-store";
+import { fetchStarBalance } from "@/features/mine/api/companion-order.api";
 import { useUserFollowCount } from "@/features/mine/hooks/use-user-follow";
 import {
   resolveVoiceRoomId,
   voiceRoomApi,
 } from "@/features/voice-room/voice-room.api";
 import { requireLogin } from "@/shared/navigation/require-login";
+import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const avatar = require("../../../../assets/mine/figma/mine-avatar.png");
-const female = require("../../../../assets/mine/figma/mine-female.svg");
 const clubFlag = require("../../../../assets/mine/figma/mine-club-flag.svg");
-const copyIcon = require("../../../../assets/mine/figma/mine-copy.svg");
-const arrow = require("../../../../assets/mine/figma/mine-arrow-right.svg");
-const clubEntryQrCode = require("../../../../assets/coms/qrcode-jlb.png");
+const settingsIcon = require("../../../../assets/mine/figma/mine-settings.svg");
+const maleIcon = require("../../../../assets/home/club-detail/male.svg");
+const femaleIcon = require("../../../../assets/home/club-detail/female.svg");
 const companionEntryQrCode = require("../../../../assets/coms/qrcode-pws.png");
-
-type QrCodeModalType = "club" | "companion";
-
-type MenuIcon = typeof Settings24Regular;
+const menuRoomIcon = require("../../../../assets/mine/figma/mine-menu-room.svg");
+const menuCompanionIcon = require("../../../../assets/mine/figma/mine-menu-companion.svg");
+const menuSettingsIcon = require("../../../../assets/mine/figma/mine-menu-settings.svg");
 
 type MenuItem = {
-  icon: MenuIcon;
+  key: string;
+  icon: ImageSource;
   onPress: () => void;
   title: string;
 };
+
+/** 由出生日期计算周岁；无法解析或年龄非法时返回 null。 */
+function calcAge(birth?: string): number | null {
+  if (!birth) return null;
+  const trimmed = birth.trim();
+  let date: Date | null = null;
+  const dateMatch = trimmed.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+  if (dateMatch) {
+    const parsed = new Date(
+      Number(dateMatch[1]),
+      Number(dateMatch[2]) - 1,
+      Number(dateMatch[3]),
+    );
+    if (!Number.isNaN(parsed.getTime())) date = parsed;
+  } else {
+    const timestamp = Number(trimmed);
+    if (Number.isFinite(timestamp) && timestamp > 0) {
+      const parsed = new Date(timestamp * (timestamp < 1e12 ? 1000 : 1));
+      if (!Number.isNaN(parsed.getTime())) date = parsed;
+    }
+  }
+  if (!date) return null;
+  const now = new Date();
+  let age = now.getFullYear() - date.getFullYear();
+  const monthDiff = now.getMonth() - date.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < date.getDate())) {
+    age -= 1;
+  }
+  return age >= 0 ? age : null;
+}
 
 export default function MineScreen() {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
   const accessToken = useAuthStore((state) => state.accessToken);
-  const clearSession = useAuthStore((state) => state.clearSession);
+  const isCompanion = useAuthStore((state) => state.isCompanion);
   // 只解构 refetch 函数作为 focus effect 的稳定依赖；整个 query result
   // 每次渲染都会生成新引用，导致接口被重复触发。
-  const {
-    data: followCount,
-    refetch: refetchFollowCount,
-  } = useUserFollowCount(user?.id);
-  const [logoutVisible, setLogoutVisible] = useState(false);
-  const [qrCodeModal, setQrCodeModal] = useState<QrCodeModalType | null>(null);
+  const { data: followCount, refetch: refetchFollowCount } = useUserFollowCount(
+    user?.id,
+  );
+  const [qrCodeVisible, setQrCodeVisible] = useState(false);
   const [openingVoiceRoom, setOpeningVoiceRoom] = useState(false);
+
+  const userId = user?.id;
 
   useFocusEffect(
     useCallback(() => {
       void refetchFollowCount();
-      if (accessToken && user?.id)
-        void clientAuthApi
-          .fetchCurrentUser(accessToken)
-          .then((profile) => {
-            // 余额未变化时保留原 user 对象，避免触发额外渲染和 focus 循环。
-            useAuthStore.setState((state) =>
-              state.user?.id !== String(profile.id) ||
-              state.user.starBalance === profile.starBalance
-                ? state
-                : { user: { ...state.user, starBalance: profile.starBalance } },
-            );
-          })
-          .catch(() => undefined);
-    }, [refetchFollowCount, accessToken, user?.id]),
+      if (!accessToken || !userId) return;
+      const requestedUserId = userId;
+      // 资料走 login/info：昵称、头像、性别、生日、俱乐部等在资料编辑后回首页保持最新。
+      void clientAuthApi
+        .fetchCurrentUser(accessToken)
+        .then((profile) => {
+          useAuthStore.setState((state) => {
+            // 切换账号后丢弃旧账号的迟到结果，防止覆盖新用户。
+            if (!state.user || state.user.id !== String(profile.id))
+              return state;
+            const nextUser = {
+              ...state.user,
+              nickname: profile.nickname ?? state.user.nickname,
+              headImage: profile.headImage || state.user.headImage,
+              gender: profile.gender ?? state.user.gender,
+              birth: profile.birth ?? state.user.birth,
+              signature: profile.signature ?? state.user.signature,
+              isRealName: profile.isRealName ?? state.user.isRealName,
+              realName: profile.realName ?? state.user.realName,
+              clubInfo: profile.clubInfo ?? state.user.clubInfo,
+              positions: profile.positions ?? state.user.positions,
+            };
+            const unchanged =
+              JSON.stringify(state.user) === JSON.stringify(nextUser);
+            return unchanged ? state : { user: nextUser };
+          });
+        })
+        .catch(() => undefined);
+      // 余额单独走 pay/starBalance，与充值模块同源，不依赖 login/info 的余额字段。
+      void fetchStarBalance(accessToken)
+        .then((balance) => {
+          useAuthStore.setState((state) => {
+            if (!state.user || state.user.id !== requestedUserId) return state;
+            const current = Number(state.user.starBalance);
+            const unchanged =
+              state.user.starBalance !== undefined && current === balance;
+            return unchanged
+              ? state
+              : { user: { ...state.user, starBalance: balance } };
+          });
+        })
+        .catch(() => undefined);
+    }, [refetchFollowCount, accessToken, userId]),
   );
+
   const displayName = useMemo(
     () =>
       user?.nickname ||
@@ -95,32 +147,7 @@ export default function MineScreen() {
         : "登录 / 注册"),
     [user],
   );
-  const copyUserId = async () => {
-    if (!user?.id) return;
-    await Clipboard.setStringAsync(String(user.id));
-    Toast.show("ID 已复制到剪贴板", { duration: Toast.durations.SHORT });
-  };
 
-  const confirmLogout = async () => {
-    setLogoutVisible(false);
-    if (accessToken)
-      void clientAuthApi.logout(accessToken).catch(() => undefined);
-    try {
-      await clearAuthSession();
-    } catch {
-      /* Keep the UI signed out. */
-    }
-    clearSession();
-    void messageStore
-      .getState()
-      .reset()
-      .catch(() => undefined);
-    router.replace("/");
-  };
-
-  const logout = () => {
-    setLogoutVisible(true);
-  };
   const openRelations = (type: "following" | "fans") => {
     if (!requireLogin() || !user?.id) return;
     router.push({
@@ -159,46 +186,47 @@ export default function MineScreen() {
       setOpeningVoiceRoom(false);
     }
   };
+  const openHomepage = () => {
+    if (!requireLogin()) return;
+    if (user?.clubInfo?.id && user.id) {
+      router.push({
+        pathname: "/profile",
+        params: {
+          clubId: String(user.clubInfo.id),
+          userId: String(user.id),
+        },
+      });
+      return;
+    }
+    router.push("/profile");
+  };
+
+  const age = calcAge(user?.birth);
+  const genderIcon =
+    user?.gender === 1 ? maleIcon : user?.gender === 2 ? femaleIcon : null;
+  const showBadge = Boolean(genderIcon) || age !== null;
+
   const menuItems = [
     {
+      key: "room",
       title: openingVoiceRoom ? "正在进入房间" : "我的房间",
-      icon: PeopleCommunity24Regular,
+      icon: menuRoomIcon,
       onPress: () => void openMyRoom(),
     },
     {
-      title: "基础设置",
-      icon: Settings24Regular,
-      onPress: () => router.push("/basic-settings"),
-    },
-    {
-      title: "俱乐部入驻",
-      icon: BuildingPeople24Regular,
-      onPress: () => setQrCodeModal("club"),
-    },
-    {
-      title: "成为陪玩师",
-      icon: PersonStar24Regular,
-      onPress: () => setQrCodeModal("companion"),
-    },
-
-    {
-      title: "修改密码",
-      icon: Password24Regular,
+      key: "companion",
+      title: isCompanion ? "陪玩管理" : "成为陪玩师",
+      icon: menuCompanionIcon,
       onPress: () =>
-        router.push({
-          pathname: "/forgot-password",
-          params: { phone: user?.phone || "" },
-        }),
+        isCompanion
+          ? router.push("/companion-dashboard")
+          : setQrCodeVisible(true),
     },
     {
-      title: "黑名单",
-      icon: PersonProhibited24Regular,
-      onPress: () => router.push("/blacklist"),
-    },
-    {
-      title: "注销账号",
-      icon: PersonDelete24Regular,
-      onPress: () => router.push("/account-cancellation"),
+      key: "settings",
+      title: "基础设置",
+      icon: menuSettingsIcon,
+      onPress: () => router.push("/basic-settings"),
     },
   ] satisfies readonly MenuItem[];
 
@@ -206,13 +234,35 @@ export default function MineScreen() {
     <View style={styles.screen}>
       <ScrollView
         contentContainerStyle={{
-          paddingTop: insets.top,
-          paddingBottom: 60 + insets.bottom,
+          paddingBottom: Math.max(insets.bottom, 16) + 60,
         }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.profile}>
-          <View style={styles.profileMain}>
+        <View style={styles.hero}>
+          <LinearGradient
+            pointerEvents="none"
+            colors={["#FCEFF0", "#EDF2FA", "#F5F6F7"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <View
+            style={[
+              styles.toolbar,
+              { paddingTop: insets.top, height: 44 + insets.top },
+            ]}
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="基础设置"
+              hitSlop={8}
+              onPress={() => router.push("/basic-settings")}
+              style={styles.settingsButton}
+            >
+              <Image source={settingsIcon} style={styles.settingsIcon} />
+            </Pressable>
+          </View>
+          <View style={styles.profile}>
             <Pressable
               accessibilityRole="link"
               accessibilityLabel={user ? "账号设置" : "登录 / 注册"}
@@ -224,162 +274,108 @@ export default function MineScreen() {
               />
             </Pressable>
             <View style={styles.profileCopy}>
-              <Text style={styles.name}>{displayName}</Text>
-              <View style={styles.detailLine}>
-                {user?.gender === 2 ? (
-                  <Image source={female} style={styles.tinyIcon} />
-                ) : null}
-                {user?.clubInfo ? (
-                  <>
-                    <Image source={clubFlag} style={styles.tinyIcon} />
-                    <Text style={styles.club}>{user.clubInfo.clubName}</Text>
-                  </>
+              <View style={styles.nameLine}>
+                <Text
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                  style={styles.name}
+                >
+                  {displayName}
+                </Text>
+                {showBadge ? (
+                  <View style={styles.badge}>
+                    {genderIcon ? (
+                      <Image source={genderIcon} style={styles.genderIcon} />
+                    ) : null}
+                    {age !== null ? (
+                      <Text style={styles.ageText}>{age}岁</Text>
+                    ) : null}
+                  </View>
                 ) : null}
               </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="复制用户 ID"
-                hitSlop={8}
-                onPress={() => void copyUserId()}
-                style={styles.detailLine}
-              >
-                <Text style={styles.uid}>
-                  {user ? `ID: ${user.id}` : "登录后查看 ID"}
-                </Text>
-                {user ? (
-                  <Image source={copyIcon} style={styles.copyIcon} />
-                ) : null}
-              </Pressable>
+              {user?.clubInfo ? (
+                <View style={styles.clubLine}>
+                  <Image source={clubFlag} style={styles.clubFlag} />
+                  <Text
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    style={styles.clubName}
+                  >
+                    {user.clubInfo.clubName}
+                  </Text>
+                </View>
+              ) : null}
             </View>
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel="个人主页"
+              onPress={openHomepage}
+              style={styles.homepageCapsule}
+            >
+              <Text style={styles.homepageText}>个人主页</Text>
+              <ChevronRight16Regular color="#FFFFFF" width={12} height={12} />
+            </Pressable>
           </View>
-          <Pressable
-            accessibilityRole="link"
-            accessibilityLabel="个人主页"
-            hitSlop={10}
-            style={styles.homepage}
-            onPress={() => {
-              if (user?.clubInfo?.id && user.id) {
-                router.push({
-                  pathname: "/profile",
-                  params: {
-                    clubId: String(user.clubInfo.id),
-                    userId: String(user.id),
-                  },
-                });
-                return;
-              }
-              router.push("/profile");
-            }}
-          >
-            <Text style={styles.homepageText}>个人主页</Text>
-            <Image source={arrow} style={styles.arrow} />
-          </Pressable>
-        </View>
-        <View style={styles.statsCard}>
-          <Pressable
-            accessibilityRole="link"
-            accessibilityLabel="星钻余额，点击充值"
-            onPress={openStarRecharge}
-            style={styles.stat}
-          >
-            <Text style={styles.statValue}>{user?.starBalance ?? "--"}</Text>
-            <View style={styles.statLabelRow}>
+          <View style={styles.stats}>
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel="星钻余额，点击充值"
+              onPress={openStarRecharge}
+              style={styles.stat}
+            >
+              <Text style={styles.statValue}>{user?.starBalance ?? "--"}</Text>
               <Text style={styles.statLabel}>星钻</Text>
-              {/* <Text style={styles.rechargeHint}>充值 ›</Text> */}
-            </View>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="关注列表"
-            onPress={() => openRelations("following")}
-            style={styles.stat}
-          >
-            <Text style={styles.statValue}>
-              {followCount?.followCount ?? "--"}
-            </Text>
-            <Text style={styles.statLabel}>关注</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="粉丝列表"
-            onPress={() => openRelations("fans")}
-            style={styles.stat}
-          >
-            <Text style={styles.statValue}>
-              {followCount?.fansCount ?? "--"}
-            </Text>
-            <Text style={styles.statLabel}>粉丝</Text>
-          </Pressable>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="关注列表"
+              onPress={() => openRelations("following")}
+              style={styles.stat}
+            >
+              <Text style={styles.statValue}>
+                {followCount?.followCount ?? "--"}
+              </Text>
+              <Text style={styles.statLabel}>关注</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="粉丝列表"
+              onPress={() => openRelations("fans")}
+              style={styles.stat}
+            >
+              <Text style={styles.statValue}>
+                {followCount?.fansCount ?? "--"}
+              </Text>
+              <Text style={styles.statLabel}>粉丝</Text>
+            </Pressable>
+          </View>
         </View>
-        <View style={styles.sectionCard}>
-          {menuItems.map((item) => (
-            <MenuRow key={item.title} {...item} />
+        <View style={styles.menuCard}>
+          {menuItems.map(({ key, ...item }) => (
+            <MenuRow key={key} {...item} />
           ))}
         </View>
-        {user ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={logout}
-            style={styles.logoutButton}
-          >
-            <Text style={styles.logoutText}>退出登录</Text>
-          </Pressable>
-        ) : null}
       </ScrollView>
-      <Modal
-        transparent
-        visible={logoutVisible}
-        animationType="fade"
-        onRequestClose={() => setLogoutVisible(false)}
-      >
-        <View style={styles.dialogBackdrop}>
-          <View style={styles.logoutDialog}>
-            <View style={styles.logoutMark}>
-              <Text style={styles.logoutMarkText}>!</Text>
-            </View>
-            <Text style={styles.logoutTitle}>退出登录</Text>
-            <Text style={styles.logoutMessage}>
-              确认退出当前账号吗？您的数据将被清除！
-            </Text>
-            <View style={styles.logoutActions}>
-              <Pressable
-                onPress={() => setLogoutVisible(false)}
-                style={styles.logoutCancel}
-              >
-                <Text style={styles.logoutCancelText}>取消</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => void confirmLogout()}
-                style={styles.logoutConfirm}
-              >
-                <Text style={styles.logoutConfirmText}>退出登录</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
-      <JoinQrCodeModal
-        type={qrCodeModal}
-        onClose={() => setQrCodeModal(null)}
+      <CompanionQrModal
+        visible={qrCodeVisible}
+        onClose={() => setQrCodeVisible(false)}
       />
     </View>
   );
 }
 
-function JoinQrCodeModal({
-  type,
+function CompanionQrModal({
+  visible,
   onClose,
 }: {
-  type: QrCodeModalType | null;
+  visible: boolean;
   onClose: () => void;
 }) {
-  const isClub = type === "club";
-
   return (
     <Modal
       animationType="fade"
       transparent
-      visible={type !== null}
+      visible={visible}
       onRequestClose={onClose}
     >
       <View style={styles.qrModalBackdrop}>
@@ -390,9 +386,7 @@ function JoinQrCodeModal({
         />
         <View accessibilityViewIsModal style={styles.qrModalCard}>
           <View style={styles.qrModalHeader}>
-            <Text style={styles.qrModalTitle}>
-              {isClub ? "俱乐部入驻" : "成为陪玩师"}
-            </Text>
+            <Text style={styles.qrModalTitle}>成为陪玩师</Text>
             <Pressable
               accessibilityLabel="关闭"
               hitSlop={10}
@@ -403,17 +397,13 @@ function JoinQrCodeModal({
             </Pressable>
           </View>
           <Image
-            accessibilityLabel={
-              isClub ? "俱乐部入驻二维码" : "成为陪玩师二维码"
-            }
+            accessibilityLabel="成为陪玩师二维码"
             contentFit="contain"
-            source={isClub ? clubEntryQrCode : companionEntryQrCode}
+            source={companionEntryQrCode}
             style={styles.qrCode}
           />
           <Text style={styles.qrModalHint}>
-            {isClub
-              ? "扫码联系工作人员，申请俱乐部入驻"
-              : "扫码联系工作人员，申请成为陪玩师"}
+            扫码联系工作人员，申请成为陪玩师
           </Text>
         </View>
       </View>
@@ -421,199 +411,152 @@ function JoinQrCodeModal({
   );
 }
 
-function MenuRow({
-  icon,
-  title,
-  subtitle,
-  onPress,
-}: {
-  icon: MenuIcon;
-  title: string;
-  subtitle?: string;
-  onPress: () => void;
-}) {
-  const Icon = icon;
-
+function MenuRow({ icon, title, onPress }: MenuItem) {
   return (
-    <Pressable style={styles.menuRow} onPress={onPress}>
-      <View style={styles.menuIcon}>
-        <Icon color="#4A4A4A" height={22} width={22} />
-      </View>
-      <View style={styles.menuCopy}>
-        <Text style={styles.menuTitle}>{title}</Text>
-        {subtitle && <Text style={styles.menuSubtitle}>{subtitle}</Text>}
-      </View>
-      <Text style={styles.chevron}>›</Text>
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.menuRow, pressed && styles.menuPressed]}
+    >
+      <Image source={icon} contentFit="contain" style={styles.menuIcon} />
+      <Text style={styles.menuTitle}>{title}</Text>
+      <ChevronRight16Regular color="#B6B6B6" width={14} height={14} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#F7F7F7" },
-  profile: {
-    minHeight: 80,
+  screen: { flex: 1, backgroundColor: "#F5F6F7" },
+  hero: { backgroundColor: "#F5F6F7" },
+  toolbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+  },
+  settingsButton: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  settingsIcon: { width: 24, height: 24, tintColor: "#333333" },
+  profile: {
+    minHeight: 76,
+    paddingHorizontal: 16,
+    paddingTop: 0,
+    paddingBottom: 14,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
   },
-  profileMain: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 },
   avatar: { width: 56, height: 56, borderRadius: 28 },
-  profileCopy: { flex: 1, gap: 4 },
+  profileCopy: { flex: 1, gap: 6 },
+  nameLine: { flexDirection: "row", alignItems: "center", gap: 8 },
   name: {
+    flexShrink: 1,
     fontFamily: DOUYIN_SANS,
     color: "#0A0A0A",
-    fontSize: 16,
-    lineHeight: 24,
-    fontWeight: "500",
-  },
-  detailLine: { flexDirection: "row", alignItems: "center", gap: 4 },
-  tinyIcon: { width: 12, height: 12 },
-  age: { fontFamily: DOUYIN_SANS, color: "#FF4D70", fontSize: 12 },
-  club: { fontFamily: DOUYIN_SANS, color: "#666", fontSize: 11 },
-  uid: { fontFamily: DOUYIN_SANS, color: "#999", fontSize: 11 },
-  copyIcon: { width: 14, height: 14 },
-  homepage: { flexDirection: "row", alignItems: "center", gap: 2 },
-  homepageText: { fontFamily: DOUYIN_SANS, color: "#0A0A0A", fontSize: 11 },
-  arrow: { width: 16, height: 16 },
-  statsCard: {
-    marginHorizontal: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 16,
-    borderRadius: 8,
-    backgroundColor: "#fff",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  stat: { flex: 1, alignItems: "center", gap: 2 },
-  statValue: {
-    color: "#0A0A0A",
-    fontSize: 16,
-    lineHeight: 24,
-    fontWeight: "500",
-  },
-  statLabel: {
-    color: "#999",
-    fontSize: 11,
-    lineHeight: 16,
-  },
-  statLabelRow: { flexDirection: "row", alignItems: "center", gap: 5 },
-  rechargeHint: {
-    fontFamily: DOUYIN_SANS,
-    color: "#FF3158",
-    fontSize: 11,
-    lineHeight: 16,
-  },
-  sectionCard: {
-    marginHorizontal: 12,
-    marginTop: 12,
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: "#fff",
-    gap: 12,
-  },
-  menuRow: {
-    minHeight: 32,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-  },
-  menuIcon: {
-    width: 32,
-    height: 32,
-    marginRight: 2,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  menuCopy: { flex: 1 },
-  menuTitle: {
-    fontFamily: DOUYIN_SANS,
-    color: "#0A0A0A",
-    fontSize: 11,
-    lineHeight: 16,
-  },
-  menuSubtitle: {
-    marginTop: 3,
-    fontFamily: DOUYIN_SANS,
-    color: "#aaa",
-    fontSize: 11,
-  },
-  chevron: { color: "#b6b6b6", fontSize: 28, fontWeight: "300" },
-  logoutButton: {
-    height: 48,
-    marginHorizontal: 12,
-    marginTop: 28,
-    marginBottom: 28,
-    borderRadius: 8,
-    backgroundColor: "#FFF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoutText: { color: "#FF1F4C", fontFamily: DOUYIN_SANS, fontSize: 15 },
-  dialogBackdrop: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 28,
-    backgroundColor: "rgba(0,0,0,0.45)",
-  },
-  logoutDialog: {
-    width: "100%",
-    borderRadius: 12,
-    backgroundColor: "#FFF",
-    padding: 24,
-    alignItems: "center",
-  },
-  logoutMark: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#FFF1F3",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-  logoutMarkText: { color: "#FF1F4C", fontSize: 22, fontWeight: "700" },
-  logoutTitle: {
-    color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 17,
+    fontSize: 18,
+    lineHeight: 26,
     fontWeight: "600",
   },
-  logoutMessage: {
-    color: "#666",
+  badge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    height: 22,
+    paddingHorizontal: 7,
+    borderRadius: 11,
+    backgroundColor: "rgba(255,255,255,0.75)",
+  },
+  genderIcon: { width: 12, height: 12 },
+  ageText: {
     fontFamily: DOUYIN_SANS,
+    color: "#666666",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  clubLine: { flexDirection: "row", alignItems: "center", gap: 4 },
+  clubFlag: { width: 12, height: 12 },
+  clubName: {
+    flexShrink: 1,
+    fontFamily: DOUYIN_SANS,
+    color: "#999999",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  homepageCapsule: {
+    position: "absolute",
+    right: 0,
+    bottom: 10,
+    width: 88,
+    height: 34,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+    borderTopLeftRadius: 24,
+    borderBottomLeftRadius: 24,
+    borderTopRightRadius: 0,
+    borderBottomRightRadius: 0,
+    overflow: "hidden",
+    backgroundColor: "rgba(0, 0, 0, 0.25)",
+  },
+  homepageText: {
+    color: "#FFFFFF",
     fontSize: 13,
     lineHeight: 20,
-    marginTop: 8,
+    fontWeight: "500",
+    includeFontPadding: false,
     textAlign: "center",
+    textAlignVertical: "center",
   },
-  logoutActions: {
-    width: "100%",
+  stats: {
     flexDirection: "row",
-    gap: 10,
-    marginTop: 22,
+    alignItems: "flex-start",
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 12,
   },
-  logoutCancel: {
-    flex: 1,
-    height: 44,
-    borderRadius: 8,
-    backgroundColor: "#F7F7F7",
+  stat: { flex: 1, alignItems: "center", gap: 3 },
+  statValue: {
+    fontFamily: DOUYIN_SANS,
+    color: "#0A0A0A",
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: "600",
+  },
+  statLabel: {
+    fontFamily: DOUYIN_SANS,
+    color: "#999999",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  menuCard: {
+    marginHorizontal: 12,
+    marginTop: 2,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    overflow: "hidden",
+  },
+  menuRow: {
+    height: 56,
+    paddingHorizontal: 16,
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 12,
   },
-  logoutCancelText: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 15 },
-  logoutConfirm: {
+  menuPressed: { backgroundColor: "#F5F6F7" },
+  menuIcon: { width: 18, height: 18 },
+  menuTitle: {
     flex: 1,
-    height: 44,
-    borderRadius: 8,
-    backgroundColor: "#FF1F4C",
-    alignItems: "center",
-    justifyContent: "center",
+    fontFamily: DOUYIN_SANS,
+    color: "#1A1A1A",
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: "400",
   },
-  logoutConfirmText: { color: "#FFF", fontFamily: DOUYIN_SANS, fontSize: 15 },
   qrModalBackdrop: {
     flex: 1,
     alignItems: "center",

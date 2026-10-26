@@ -27,12 +27,14 @@ type OrderCardProps = {
   item: OrderItemModel;
   onAction: (item: OrderItemModel, action: OrderActionKey) => void;
   onPress?: (item: OrderItemModel) => void;
+  actionPending?: boolean;
 };
 
 export const OrderCard = memo(function OrderCard({
   item,
   onAction,
   onPress,
+  actionPending = false,
 }: OrderCardProps) {
   return (
     <View style={styles.card}>
@@ -95,7 +97,7 @@ export const OrderCard = memo(function OrderCard({
 
       {item.actions.length > 0 && <View style={styles.actions}>
         {item.actions.map((action) => (
-          <ActionButton action={action} key={action.key} onPress={() => onAction(item, action.key)} />
+          <ActionButton action={action} key={action.key} disabled={actionPending} onPress={() => onAction(item, action.key)} />
         ))}
       </View>}
     </View>
@@ -114,15 +116,19 @@ function OrderDetailRow({ label, children }: { label: string; children: ReactNod
 function ActionButton({
   action,
   onPress,
+  disabled,
 }: {
   action: OrderAction;
   onPress: () => void;
+  disabled: boolean;
 }) {
   if (action.variant === "primary") {
     return (
       <Pressable
         accessibilityLabel={action.label}
         accessibilityRole="button"
+        accessibilityState={{ disabled, busy: disabled }}
+        disabled={disabled}
         onPress={onPress}
         style={({ pressed }) => pressed && styles.buttonPressed}
       >
@@ -132,7 +138,7 @@ function ActionButton({
           start={{ x: 0, y: 0 }}
           style={styles.primaryButton}
         >
-          <Text style={styles.primaryButtonText}>{action.label}</Text>
+          <Text style={styles.primaryButtonText}>{disabled ? "处理中…" : action.label}</Text>
         </LinearGradient>
       </Pressable>
     );
@@ -142,6 +148,8 @@ function ActionButton({
     <Pressable
       accessibilityLabel={action.label}
       accessibilityRole="button"
+      accessibilityState={{ disabled, busy: disabled }}
+      disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.secondaryButton,

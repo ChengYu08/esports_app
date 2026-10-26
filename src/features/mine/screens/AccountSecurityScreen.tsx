@@ -65,6 +65,33 @@ export default function AccountSecurityScreen() {
             {phone ? "（已绑定）" : ""}
           </Text>
         </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="修改密码"
+          onPress={() =>
+            router.push({
+              pathname: "/forgot-password",
+              params: { phone: user?.phone || "" },
+            })
+          }
+          style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+        >
+          <Text style={styles.label}>修改密码</Text>
+          <View style={styles.rowRight}>
+            <Image source={arrowIcon} style={styles.arrow} />
+          </View>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="黑名单"
+          onPress={() => router.push("/blacklist")}
+          style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+        >
+          <Text style={styles.label}>黑名单</Text>
+          <View style={styles.rowRight}>
+            <Image source={arrowIcon} style={styles.arrow} />
+          </View>
+        </Pressable>
       </View>
       <Pressable
         accessibilityRole="button"
