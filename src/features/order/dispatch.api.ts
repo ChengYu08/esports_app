@@ -132,9 +132,18 @@ export async function fetchDispatchDetail(requestNo: string, token: string, sign
   return response.data;
 }
 
-export async function grabDispatchRequest(requestNo: string, token: string) {
-  const response = await apiClient<ApiEnvelope<unknown>>("/client/v1/quickMatch/grab", {
+/** 陪玩抢单，成功时返回最新需求详情（对齐 PC quickMatch.grab） */
+export async function grabDispatchRequest(
+  requestNo: string,
+  token: string,
+): Promise<DispatchRequest> {
+  const response = await apiClient<ApiEnvelope<DispatchRequest>>("/client/v1/quickMatch/grab", {
     method: "POST", token, body: { action: { requestNo } },
   });
   if (response.code !== "SUCCESS") throw new Error(response.info || "抢单失败");
+  if (!response.data?.requestNo) {
+    // 兼容旧响应无 data：回查详情，避免抢单成功却无法判断试音房
+    return fetchDispatchDetail(requestNo, token);
+  }
+  return response.data;
 }
