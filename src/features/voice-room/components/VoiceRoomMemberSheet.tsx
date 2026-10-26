@@ -13,7 +13,7 @@ import { canKickVoiceRoomMember, getMemberAge } from '../member-profile';
 import { voiceRoomApi } from '../voice-room.api';
 import type { VoiceRoomDetail, VoiceRoomMember } from '../voice-room.types';
 
-const defaultAvatar = require('../../../../assets/voice-room/avatar-default.png');
+const defaultAvatar = require('../../../../assets/coms/avatar_default.webp');
 const femaleIcon = require('../../../../assets/voice-room/member-female.svg');
 const maleIcon = require('../../../../assets/home/club-detail/male.svg');
 const idIcon = require('../../../../assets/voice-room/member-id.svg');
