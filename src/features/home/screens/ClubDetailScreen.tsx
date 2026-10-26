@@ -1,3 +1,4 @@
+import { useAuthStore } from "@esports/auth";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
@@ -7,9 +8,12 @@ import {
   ClubDetailMemberSkeletonList,
   ClubDetailSkeleton,
 } from "@/features/home/components/ClubDetailSkeleton";
+import { ClubQuickMatchSheet } from "@/features/match/components/ClubQuickMatchSheet";
+import { useCustomerDispatch } from "@/features/voice-room/use-customer-dispatch";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -23,6 +27,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import Toast from "react-native-root-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Companion, CompanionFilters, GameKey } from "../api/home.types";
 import {
@@ -62,6 +67,9 @@ export default function ClubDetailScreen() {
   const [openFilter, setOpenFilter] = useState<FilterKey | null>(null);
   const [isFilterSheetVisible, setFilterSheetVisible] = useState(false);
   const [showPriceEmptyModal, setShowPriceEmptyModal] = useState(false);
+  const [quickMatchVisible, setQuickMatchVisible] = useState(false);
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const { dispatch: dispatchReception } = useCustomerDispatch();
   const [priceSort, setPriceSort] =
     useState<CompanionFilters["priceSort"]>("DEFAULT");
   const [selectedSex, setSelectedSex] = useState<CompanionFilters["sex"]>();
@@ -97,6 +105,13 @@ export default function ClubDetailScreen() {
   );
   const voicePlayer = useVoicePlayer();
   const clubId = club?.id ?? "";
+  const quickMatchClub = useMemo(
+    () =>
+      club
+        ? { id: club.id, name: club.name }
+        : { id: "", name: "" },
+    [club?.id, club?.name],
+  );
   const renderMember = useCallback(
     ({ item }: { item: Companion }) => (
       <MemberCard
@@ -207,6 +222,7 @@ export default function ClubDetailScreen() {
     return <ErrorState onRetry={() => void clubQuery.refetch()} />;
   return (
     <View style={styles.screen}>
+      <StatusBar style="light" />
       <LinearGradient
         colors={["#3b6f75", "#2a6681"]}
         end={{ x: 1, y: 0.8 }}
@@ -556,20 +572,38 @@ export default function ClubDetailScreen() {
         >
           <Text style={styles.priceText}>价目表</Text>
         </Pressable>
-        {/* <Pressable
-          style={styles.matchButton}
-          onPress={() => Alert.alert("一键匹配", "正在为你匹配合适的陪玩")}
+        <Pressable
+          style={styles.actionButton}
+          onPress={() => {
+            void dispatchReception({ clubId: club?.id });
+          }}
         >
-          <LinearGradient
-            colors={["#ff1f2e", "#ff1f69"]}
-            end={{ x: 1, y: 1 }}
-            start={{ x: 0, y: 0 }}
-            style={styles.matchButtonGradient}
-          >
-            <Text style={styles.matchText}>一键匹配</Text>
-          </LinearGradient>
-        </Pressable> */}
+          <Text style={styles.actionButtonText}>接待派单</Text>
+        </Pressable>
+        <Pressable
+          style={styles.actionButton}
+          onPress={() => {
+            if (!accessToken) {
+              Toast.show("请先登录", { duration: Toast.durations.SHORT });
+              return;
+            }
+            setQuickMatchVisible(true);
+          }}
+        >
+          <Text style={styles.actionButtonText}>一键匹配</Text>
+        </Pressable>
       </View>
+      <ClubQuickMatchSheet
+        visible={quickMatchVisible}
+        onClose={() => setQuickMatchVisible(false)}
+        club={quickMatchClub}
+        games={games.map((g) => ({
+          id: String(g.id),
+          name: g.name,
+          iconUrl: g.iconUrl,
+        }))}
+        initialGameId={selectedGame || undefined}
+      />
     </View>
   );
 }
@@ -1108,40 +1142,38 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     backgroundColor: "#fff",
     flexDirection: "row",
-    gap: 12,
+    gap: 8,
   },
   priceButton: {
-    // width: 104,
     flex: 1,
-
     height: 42,
+    minWidth: 104,
     borderWidth: 1,
-    borderColor: "#e5e5e5",
-    borderRadius: 9,
+    borderColor: "#e9e9eb",
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "#fff",
   },
   priceText: {
-    color: "#111",
+    color: "#0D0D0F",
     fontFamily: DOUYIN_SANS,
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "500",
   },
-  matchButton: {
+  actionButton: {
     flex: 1,
     height: 42,
-    borderRadius: 9,
-    overflow: "hidden",
-  },
-  matchButtonGradient: {
-    flex: 1,
+    minWidth: 104,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "#fe1f4c",
   },
-  matchText: {
+  actionButtonText: {
     color: "#fff",
     fontFamily: DOUYIN_SANS,
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "500",
   },
 });

@@ -7,26 +7,49 @@
 #   - 分支名包含 test、dev，或其它分支      -> 测试包（.env.development）
 #   - 可用自定义事件变量覆盖：DRONE_ENV=prod|test、DRONE_ABI=arm64|universal|all
 #
-# 注意：仓库为 untrusted，不能挂载 host 卷做缓存（Gradle/npm/NDK 每次构建重新准备）。
-# 若管理员在 Drone 仓库设置勾选 Trusted，可参考 android-v3 的 host.path 卷恢复缓存。
+# 缓存：仓库已设为 Trusted，通过 host 卷挂载持久化 Gradle / npm / NDK 缓存，
+# 首次构建仍需冷启动写入，之后构建速度大幅提升。
+# 注意：并发构建共享同一卷可能冲突（Gradle 自带文件锁基本安全）。
 # =============================================================================
 
 kind: pipeline
 type: docker
 name: android-deployment
 
+# 冷构建（首次写缓存卷）耗时较长，默认 60 分钟会超时被杀
+timeout: 180
+
 image_pull_secrets:
   - dockerconfig
 
+volumes:
+  - name: gradle-cache
+    host:
+      path: /var/lib/drone/cache/esportsapp/gradle
+  - name: npm-cache
+    host:
+      path: /var/lib/drone/cache/esportsapp/npm
+  - name: ndk-cache
+    host:
+      path: /var/lib/drone/cache/esportsapp/android-ndk
+
 steps:
   - name: build-android
-    image: nexus.jinliwangluo.com:8082/panzhi/android-build-box:optimized-1.0.1
+    image: nexus.jinliwangluo.com:8082/panzhi/android-build-box:optimized-1.0.0
     pull: if-not-exists
+    volumes:
+      - name: gradle-cache
+        path: /root/.gradle
+      - name: npm-cache
+        path: /root/.npm
+      - name: ndk-cache
+        path: /opt/android-sdk/ndk
     environment:
       ANDROID_HOME: /opt/android-sdk
       JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
       npm_config_cache: /root/.npm
-      # 镜像内已预装 NDK 27.1.12297006（RN 0.86 要求），无需构建时下载
+      # RN 0.86 默认 NDK（prebuild 生成的 android/ 会要求该版本）
+      ANDROID_NDK_VERSION: "27.1.12297006"
     commands:
       - |
         set -e
@@ -75,13 +98,14 @@ steps:
           yes | sdkmanager --sdk_root="$${ANDROID_HOME}" --licenses >/dev/null || true
         fi
 
-        # 镜像已预装 NDK 27.1.12297006（见注释），此处仅校验存在，避免 RN 构建中途才报缺 NDK
-        NDK_DIR="$${ANDROID_HOME}/ndk/27.1.12297006"
+        # NDK 持久化在 host 卷 /opt/android-sdk/ndk，仅首次构建需要下载安装
+        NDK_DIR="$${ANDROID_HOME}/ndk/$${ANDROID_NDK_VERSION}"
         if [ ! -d "$${NDK_DIR}" ]; then
-          echo "镜像缺少 NDK 27.1.12297006，请更新镜像 panzhi/android-build-box:optimized-1.0.1"
-          exit 1
+          echo "安装 NDK $${ANDROID_NDK_VERSION}（首次会下载，之后走缓存）..."
+          sdkmanager --sdk_root="$${ANDROID_HOME}" "ndk;$${ANDROID_NDK_VERSION}"
+        else
+          echo "已命中 NDK 缓存: $${NDK_DIR}"
         fi
-        echo "NDK 就绪: $${NDK_DIR}"
 
         # 缓存卷跨构建持久化：上次构建若被超时强杀，会遗留守护进程锁文件，
         # 导致本次 Gradle 启动时 "Timeout waiting to lock" 失败，先清理
@@ -90,6 +114,8 @@ steps:
         find /root/.gradle -name '*.lock' -delete 2>/dev/null || true
 
         npm ci --prefer-offline --no-audit --no-fund
+
+        # 冷构建可能远超 60 分钟（NDK + 全量 Gradle 依赖），放宽 pipeline 超时后再跑
         node scripts/build_apk.cjs --env "$${BUILD_ENV}" --abi "$${BUILD_ABI}"
 
         echo "构建完成，产物:"
@@ -121,7 +147,9 @@ steps:
     commands:
       - |
         set -e
-        version=$(node -p "require('./app.json').expo.version")
+        # 该镜像无 node，用 sed 从 app.json 提取 expo.version
+        version=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' ./app.json | head -1)
+        if [ -z "$version" ]; then echo "无法从 app.json 解析 version"; exit 1; fi
         echo "使用版本: $version"
         target="/home/apps/data/baota/wwwroot/dev.jinliwangluo.com/android/esportsapp/${DRONE_BRANCH}/$version/"
         echo "目标路径: $target"

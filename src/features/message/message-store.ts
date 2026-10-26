@@ -30,6 +30,8 @@ import {
   type MessageHistoryPage,
 } from './message-state';
 import type { AfterSaleCardPayload } from '@/features/order/after-sale-card';
+import { messagePreview } from './chat-message';
+import { clearCsInviteClaimStates } from './cs-invite-claim-state';
 import { clientAuthApi } from '@/features/auth/client-auth.api';
 import {
   readBlacklist,
@@ -188,13 +190,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       const normalizedPeerId = normalizeSystemConversationId(peerId);
       const normalizedConversationTitle = getSystemConversationTitle(normalizedPeerId, conversation.title);
       const isActive = get().activePeerId === normalizedPeerId;
-      const preview = message.kind === 'image'
-        ? '[图片]'
-        : message.kind === 'roomInvite'
-          ? '[语聊房邀请]'
-          : message.kind === 'afterSale' || message.kind === 'orderNotify'
-          ? message.title
-          : message.text;
+      const preview = messagePreview(message);
       logger.info('message.new', {
         peerId: normalizedPeerId,
         conversationTitle: normalizedConversationTitle,
@@ -229,6 +225,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           ...normalizedConversation,
           title: getSystemConversationTitle(normalizedPeerId, existing?.title || normalizedConversation.title),
           avatar: existing?.avatar || normalizedConversation.avatar,
+          preview: preview || normalizedConversation.preview,
           isOnline: message.isMine ? existing?.isOnline : true,
           unreadCount: isActive ? 0 : (existing?.unreadCount || 0) + 1,
           updatedAt: message.sentAt,
@@ -244,13 +241,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
     };
 
     const updateLocalPreview = (peerId: string, message: ManagedMessage) => {
-        const preview = message.kind === 'image'
-          ? '[图片]'
-          : message.kind === 'roomInvite'
-            ? '[语聊房邀请]'
-            : message.kind === 'afterSale' || message.kind === 'orderNotify'
-            ? message.title
-            : message.text;
+      const preview = messagePreview(message);
       set((state) => {
         const existing = state.conversations.find((item) => item.id === peerId) || toConversationShell({ id: peerId, title: peerId });
         return { conversations: mergeConversations(state.conversations, { ...existing, preview, time: message.time, updatedAt: message.sentAt }) };
@@ -657,6 +648,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         initializeInProgress = false;
         conversationSyncPending = false;
         reconnectAttempts = 0;
+        clearCsInviteClaimStates();
         if (reconnectTimer) clearTimeout(reconnectTimer);
         reconnectTimer = undefined;
         stopMessageSubscription?.();

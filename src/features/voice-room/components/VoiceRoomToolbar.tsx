@@ -1,7 +1,9 @@
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import {
   Pressable,
   StyleSheet,
+  Text,
   TextInput,
   useWindowDimensions,
   View,
@@ -12,6 +14,7 @@ import { VoiceRoomMicControl } from "./VoiceRoomMicrophone";
 const sendIcon = require("../../../../assets/voice-room/toolbar-send.svg");
 const messageIcon = require("../../../../assets/voice-room/toolbar-message.svg");
 const inviteIcon = require("../../../../assets/voice-room/toolbar-invite.svg");
+const selectCompanionIcon = require("../../../../assets/voice-room/toolbar-select-companion.svg");
 
 type VoiceRoomToolbarProps = {
   bottomInset: number;
@@ -23,6 +26,11 @@ type VoiceRoomToolbarProps = {
   leaving: boolean;
   serviceCalling: boolean;
   distanceEnabled: boolean;
+  /** 房主且房内尚无接待时展示「呼叫接待」 */
+  showCallService?: boolean;
+  /** 当前用户为房间绑定接待时展示「客服派单」 */
+  showServiceDispatch?: boolean;
+  showSelectCompanion?: boolean;
   onToggleDistance: () => void;
   onChangeText: (text: string) => void;
   onSend: () => void;
@@ -30,6 +38,8 @@ type VoiceRoomToolbarProps = {
   onOpenMessages: () => void;
   onInvite: () => void;
   onCallService: () => void;
+  onServiceDispatch?: () => void;
+  onSelectCompanion?: () => void;
 };
 
 export function VoiceRoomToolbar({
@@ -42,6 +52,9 @@ export function VoiceRoomToolbar({
   leaving,
   serviceCalling,
   distanceEnabled,
+  showCallService = false,
+  showServiceDispatch = false,
+  showSelectCompanion = false,
   onToggleDistance,
   onChangeText,
   onSend,
@@ -49,6 +62,8 @@ export function VoiceRoomToolbar({
   onOpenMessages,
   onInvite,
   onCallService,
+  onServiceDispatch,
+  onSelectCompanion,
 }: VoiceRoomToolbarProps) {
   const { width } = useWindowDimensions();
   const compact = width < 360;
@@ -120,42 +135,117 @@ export function VoiceRoomToolbar({
           <Image source={inviteIcon} style={styles.icon} contentFit="contain" />
         </Pressable>
       </View>
-      {/* <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="客服派单"
-        accessibilityState={{ disabled: serviceCalling, busy: serviceCalling }}
-        disabled={serviceCalling}
-        onPress={onCallService}
-        hitSlop={4}
-        style={({ pressed }) => [
-          styles.serviceButton,
-          serviceCalling && styles.disabled,
-          pressed && styles.pressed,
-        ]}
-      >
-        <LinearGradient
-          colors={["#FF1F2E", "#FF1F69"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[
-            styles.serviceContent,
-            compact && styles.serviceContentCompact,
+      {showCallService ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={serviceCalling ? "呼叫中" : "呼叫接待"}
+          accessibilityState={{ disabled: serviceCalling || leaving, busy: serviceCalling }}
+          disabled={serviceCalling || leaving}
+          onPress={onCallService}
+          hitSlop={4}
+          style={({ pressed }) => [
+            styles.actionPillButton,
+            (serviceCalling || leaving) && styles.disabled,
+            pressed && styles.pressed,
           ]}
         >
-          <Image
-            source={serviceIcon}
-            style={styles.serviceIcon}
-            contentFit="contain"
-          />
-          <Text
-            numberOfLines={1}
-            maxFontSizeMultiplier={1.2}
-            style={[styles.serviceText, compact && styles.serviceTextCompact]}
+          <LinearGradient
+            colors={["#FF1F2E", "#FF1F69"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[
+              styles.actionPillContent,
+              compact && styles.actionPillContentCompact,
+            ]}
           >
-            {serviceCalling ? "呼叫中…" : "客服派单"}
-          </Text>
-        </LinearGradient>
-      </Pressable> */}
+            <Text
+              numberOfLines={1}
+              maxFontSizeMultiplier={1.2}
+              style={[
+                styles.actionPillText,
+                compact && styles.actionPillTextCompact,
+              ]}
+            >
+              {serviceCalling ? "呼叫中…" : "呼叫接待"}
+            </Text>
+          </LinearGradient>
+        </Pressable>
+      ) : null}
+      {showServiceDispatch ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="客服派单"
+          disabled={leaving}
+          onPress={onServiceDispatch}
+          hitSlop={4}
+          style={({ pressed }) => [
+            styles.actionPillButton,
+            leaving && styles.disabled,
+            pressed && styles.pressed,
+          ]}
+        >
+          <LinearGradient
+            colors={["#FF1F2E", "#FF1F69"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[
+              styles.actionPillContent,
+              compact && styles.actionPillContentCompact,
+            ]}
+          >
+            <Text
+              numberOfLines={1}
+              maxFontSizeMultiplier={1.2}
+              style={[
+                styles.actionPillText,
+                compact && styles.actionPillTextCompact,
+              ]}
+            >
+              客服派单
+            </Text>
+          </LinearGradient>
+        </Pressable>
+      ) : null}
+      {showSelectCompanion ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="选择陪玩"
+          disabled={leaving}
+          onPress={onSelectCompanion}
+          hitSlop={4}
+          style={({ pressed }) => [
+            styles.selectCompanionButton,
+            leaving && styles.disabled,
+            pressed && styles.pressed,
+          ]}
+        >
+          <LinearGradient
+            colors={["#FF1F2E", "#FF1F69"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[
+              styles.selectCompanionContent,
+              compact && styles.selectCompanionContentCompact,
+            ]}
+          >
+            <Image
+              source={selectCompanionIcon}
+              style={styles.selectCompanionIcon}
+              contentFit="contain"
+            />
+            <Text
+              numberOfLines={1}
+              maxFontSizeMultiplier={1.2}
+              style={[
+                styles.selectCompanionText,
+                compact && styles.selectCompanionTextCompact,
+              ]}
+            >
+              选择陪玩
+            </Text>
+          </LinearGradient>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -220,8 +310,24 @@ const styles = StyleSheet.create({
     tintColor: "#FFA500",
   },
   icon: { width: 20, height: 20 },
-  serviceButton: { flexShrink: 0, borderRadius: 18 },
-  serviceContent: {
+  actionPillButton: { flexShrink: 0, borderRadius: 18 },
+  actionPillContent: {
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderRadius: 18,
+  },
+  actionPillContentCompact: { paddingHorizontal: 8 },
+  actionPillText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: "600",
+  },
+  actionPillTextCompact: { fontSize: 12 },
+  selectCompanionButton: { flexShrink: 0, borderRadius: 18 },
+  selectCompanionContent: {
     height: 36,
     flexDirection: "row",
     alignItems: "center",
@@ -231,15 +337,15 @@ const styles = StyleSheet.create({
     paddingRight: 12,
     borderRadius: 18,
   },
-  serviceContentCompact: { paddingRight: 8 },
-  serviceIcon: { width: 22, height: 22 },
-  serviceText: {
+  selectCompanionContentCompact: { paddingRight: 8 },
+  selectCompanionIcon: { width: 22, height: 22 },
+  selectCompanionText: {
     color: "#FFFFFF",
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "600",
   },
-  serviceTextCompact: { fontSize: 12 },
+  selectCompanionTextCompact: { fontSize: 12 },
   disabled: { opacity: 0.62 },
   pressed: { opacity: 0.8 },
 });

@@ -7,9 +7,10 @@ function unwrap<T>(response: Envelope<T> | T): T {
   if (response && typeof response === 'object' && 'success' in response && response.success === false) {
     throw new Error((response as Envelope<T>).info || '语聊房请求失败');
   }
-  if (response && typeof response === 'object' && 'data' in response && response.data !== undefined) {
-    const envelope = response as Envelope<T>;
-    return envelope.data as T;
+  // panzhi /client/v1 包络成功但省略 data 时表示无数据（如 joined/current 不在房间），必须返回 null
+  // 而不是整个包络，否则包络会被误当成业务对象（对齐 PC apiRequest 的 body.data ?? null）。
+  if (response && typeof response === 'object' && ('success' in response || 'code' in response)) {
+    return ((response as Envelope<T>).data ?? null) as T;
   }
   return response as T;
 }
@@ -84,6 +85,17 @@ export const voiceRoomApi = {
     return post<unknown>('/client/v1/voiceRoom/inviteClubService', token, {
       action: { roomId, roomVersion, clubId },
     });
+  },
+  /** 俱乐部接待抢单（对齐 PC claimClubService） */
+  claimClubService(
+    data: { roomId: string; clubId: string; roomVersion: string },
+    token: string,
+  ) {
+    return post<{ roomInfo?: VoiceRoomDetail } & VoiceRoomDetail>(
+      '/client/v1/voiceRoom/claimClubService',
+      token,
+      { action: data },
+    );
   },
 };
 

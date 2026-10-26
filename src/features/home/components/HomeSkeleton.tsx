@@ -16,11 +16,6 @@ export function HomeSkeleton({ bottomPadding = 0 }: HomeSkeletonProps) {
       contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
       showsVerticalScrollIndicator={false}
     >
-      <View style={styles.topBar}>
-        <Skeleton width={58} height={24} radius={6} />
-        <Skeleton width={30} height={30} radius={15} />
-      </View>
-
       <View style={styles.gameTabs}>
         {[72, 82, 72, 82].map((width, index) => (
           <View key={index} style={styles.gameTab}>
@@ -52,13 +47,6 @@ export function HomeSkeleton({ bottomPadding = 0 }: HomeSkeletonProps) {
 
 const styles = StyleSheet.create({
   content: { flexGrow: 1, backgroundColor: colors.surface },
-  topBar: {
-    height: 44,
-    paddingHorizontal: spacing.lg,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
   gameTabs: {
     height: 55,
     paddingHorizontal: spacing.lg,

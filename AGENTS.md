@@ -58,11 +58,25 @@ Docs: https://docs.expo.dev/eas/index.md
 - 还原figma 页面，需要自动切图，如何切图根据当前页面的功能进行分析，是否会有变化的地方，切图尽量大。
 - 需要查看当前项目package.json 已经存在的库，在执行策略。
 - figma 页面 顶部手机状态栏需要去掉，真实代码不需要这个，真机默认会有
+- 代码里面不要用void fn (){ } 这种写法
+- 如果是需要用if 不要用 if() return; 这种写法，都要用
 
-当前项目所有的代码在 '/Users/yucheng/Desktop/盼之电竞'其中包含
-pc端： '/Users/yucheng/Desktop/盼之电竞/pzdj-pc'
-admin端：'/Users/yucheng/Desktop/盼之电竞/pzdj-admin'
-移动端：'/Users/yucheng/Desktop/盼之电竞/esports_app'
-后端: '/Users/yucheng/Desktop/盼之电竞/pzdj-service'
+```
+if(){
+    return xxx
+}
+```
 
-'/Users/yucheng/Desktop/盼之电竞/pzdj-task-service'
+这种
+
+- 在onPress这种事件里面 不要这样去调用
+
+```
+onPress={void fn()}
+```
+
+这样去写 标准的写法的
+
+```
+onPress={fn}
+```

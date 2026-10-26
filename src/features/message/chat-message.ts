@@ -50,7 +50,41 @@ export type OrderNotifyCardMessage = {
   isMine: boolean;
 };
 
-export type ChatMessage = ChatTextMessage | ChatImageMessage | RoomInviteMessage | AfterSaleCardMessage | OrderNotifyCardMessage;
+export const CS_INVITE_CARD_TITLE = "接待邀请";
+
+export type CsInviteCardMessage = {
+  id: string;
+  kind: "csInvite";
+  roomId: string;
+  clubId: string;
+  roomVersion: string;
+  playerUserId?: string;
+  playerName?: string;
+  /** Unix seconds，与后端 CustomerServiceInviteCommand.expireAt 一致 */
+  expireAt?: number;
+  rongChatroomId?: string;
+  rtcChannelName?: string;
+  time: string;
+  isMine: boolean;
+};
+
+export type ChatMessage = ChatTextMessage | ChatImageMessage | RoomInviteMessage | AfterSaleCardMessage | OrderNotifyCardMessage | CsInviteCardMessage;
+
+export function messagePreview(message: ChatMessage): string {
+  switch (message.kind) {
+    case "image":
+      return "[图片]";
+    case "roomInvite":
+      return "[语聊房邀请]";
+    case "afterSale":
+    case "orderNotify":
+      return message.title;
+    case "csInvite":
+      return "[接待邀请]";
+    case "text":
+      return message.text;
+  }
+}
 
 export type RongSdkMessage = {
   messageType?: number;
@@ -144,6 +178,29 @@ export function mapRongMessage(message: RongSdkMessage, enums: { image: number; 
       numDesc: payload.numDesc == null ? undefined : String(payload.numDesc),
       totalPriceDesc: payload.totalPriceDesc == null ? undefined : String(payload.totalPriceDesc),
       createTime: payload.createTime == null ? undefined : String(payload.createTime),
+      time,
+      isMine,
+    };
+  }
+
+  if (customName === "dispatchInvite") {
+    const payload = mergeCustomPayload(fields, customPayload);
+    const roomId = payload.roomId == null ? "" : String(payload.roomId);
+    const clubId = payload.clubId == null ? "" : String(payload.clubId);
+    const roomVersion = payload.roomVersion == null ? "" : String(payload.roomVersion);
+    if (!roomId || !clubId || !roomVersion) return null;
+    const expireAt = Number(payload.expireAt);
+    return {
+      id,
+      kind: "csInvite",
+      roomId,
+      clubId,
+      roomVersion,
+      playerUserId: payload.playerUserId == null ? undefined : String(payload.playerUserId),
+      playerName: payload.playerName == null ? undefined : String(payload.playerName),
+      expireAt: Number.isFinite(expireAt) ? expireAt : undefined,
+      rongChatroomId: payload.rongChatroomId == null ? undefined : String(payload.rongChatroomId),
+      rtcChannelName: payload.rtcChannelName == null ? undefined : String(payload.rtcChannelName),
       time,
       isMine,
     };

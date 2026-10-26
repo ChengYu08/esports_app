@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DISPATCH_ASSISTANT_AVATAR,
   ORDER_ASSISTANT_AVATAR,
   resolveConversationAvatar,
 } from "./message-avatar";
@@ -12,6 +13,15 @@ describe("resolveConversationAvatar", () => {
     expect(
       resolveConversationAvatar(undefined, defaultAvatar, "rc_p_50000002"),
     ).toBe(ORDER_ASSISTANT_AVATAR);
+  });
+
+  it("uses the Dispatch Assistant avatar asset", () => {
+    expect(
+      resolveConversationAvatar(undefined, defaultAvatar, "rc_p_50000001"),
+    ).toBe(DISPATCH_ASSISTANT_AVATAR);
+    expect(
+      resolveConversationAvatar(undefined, defaultAvatar, "50000001"),
+    ).toBe(DISPATCH_ASSISTANT_AVATAR);
   });
 
   it("uses the default avatar for other system conversations", () => {
