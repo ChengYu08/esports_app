@@ -1,26 +1,49 @@
-import { useEffect, useRef, useState } from "react";
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
-import { router } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useAuthStore } from "@esports/auth";
-import { useAppConfirm } from "@/shared/ui/app-confirm";
+import { queryClient } from "@/core/query/query-client";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
+import { useAuthStore } from "@esports/auth";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { useAppConfirm } from "@/shared/ui/app-confirm";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import {
+  fetchStarBalance,
+  payCompanionOrder,
+} from "@/features/mine/api/companion-order.api";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
-import { OrderCard } from "../components/OrderCard";
-import { OrderAfterSaleSheet } from "../components/OrderAfterSaleSheet";
-import { OrderCompleteConfirmSheet } from "../components/OrderCompleteConfirmSheet";
 import { buildAfterSalePayload } from "../after-sale-card";
-import { OrderReviewSheet } from "../components/OrderReviewSheet";
+import { OrderAfterSaleSheet } from "../components/OrderAfterSaleSheet";
+import { OrderCard } from "../components/OrderCard";
+import { OrderCompleteConfirmSheet } from "../components/OrderCompleteConfirmSheet";
 import { OrderHeader } from "../components/OrderHeader";
+import { OrderReviewSheet } from "../components/OrderReviewSheet";
 import { OrderScopeTabs } from "../components/OrderScopeTabs";
 import { OrderTabs } from "../components/OrderTabs";
-import { useOrderPage } from "../hooks/use-order-page";
-import { invalidateOrderQueries } from "../order-query";
-import { acceptOrder, cancelOrder as cancelOrderRequest, completeOrder as completeOrderRequest, fetchAfterSaleMembers, fetchOrderReview, freeOrderService, rejectOrder, startOrderService, submitOrderReview, type AfterSaleMember, type OrderReview } from "../order.api";
 import { grabDispatchRequest } from "../dispatch.api";
-import { fetchStarBalance, payCompanionOrder } from "@/features/mine/api/companion-order.api";
+import { useOrderPage } from "../hooks/use-order-page";
+import { invalidateOrderQueries, refreshStartedOrder } from "../order-query";
+import {
+  acceptOrder,
+  cancelOrder as cancelOrderRequest,
+  completeOrder as completeOrderRequest,
+  fetchAfterSaleMembers,
+  fetchOrderReview,
+  freeOrderService,
+  rejectOrder,
+  startOrderService,
+  submitOrderReview,
+  type AfterSaleMember,
+  type OrderReview,
+} from "../order.api";
 import type {
   OrderActionKey,
   OrderFilter,
@@ -29,36 +52,88 @@ import type {
 
 export default function OrderScreen() {
   const insets = useSafeAreaInsets();
+  const { scope: requestedScope } = useLocalSearchParams<{ scope?: string }>();
   const isCompanion = useAuthStore((state) => state.isCompanion);
-  const [selectedScope, setSelectedScope] = useState<"dispatch" | "accept" | "place">(() => isCompanion ? "dispatch" : "place");
-  const [filter, setFilter] = useState<OrderFilter>(() => isCompanion ? "grabbing" : "all");
+  const [selectedScope, setSelectedScope] = useState<
+    "dispatch" | "accept" | "place"
+  >(() => (isCompanion ? "dispatch" : "place"));
+  const [filter, setFilter] = useState<OrderFilter>(() =>
+    isCompanion ? "grabbing" : "all",
+  );
+  useFocusEffect(
+    useCallback(() => {
+      if (requestedScope === "accept" && isCompanion) {
+        setSelectedScope("accept");
+        setFilter("all");
+        router.setParams({ scope: undefined });
+      }
+    }, [requestedScope, isCompanion]),
+  );
   const scope = isCompanion ? selectedScope : "place";
-  const visibleFilter = scope === "dispatch"
-    ? filter === "history" ? "history" : "grabbing"
-    : filter === "grabbing" || filter === "history" ? "all" : filter;
+  const visibleFilter =
+    scope === "dispatch"
+      ? filter === "history"
+        ? "history"
+        : "grabbing"
+      : filter === "grabbing" || filter === "history"
+        ? "all"
+        : filter;
   const orders = useOrderPage(scope, visibleFilter);
   const token = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.user);
+  const currentUserId = currentUser?.id;
+  const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
+  const pendingOrderRef = useRef<string | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      if (token && currentUserId)
+        void queryClient.refetchQueries(
+          {
+            queryKey: ["orders", scope, visibleFilter, currentUserId],
+            exact: true,
+            type: "active",
+          },
+          { cancelRefetch: false },
+        );
+    }, [token, currentUserId, scope, visibleFilter]),
+  );
   const [cancelTarget, setCancelTarget] = useState<OrderItemModel | null>(null);
-  const [completeTarget, setCompleteTarget] = useState<OrderItemModel | null>(null);
+  const [completeTarget, setCompleteTarget] = useState<OrderItemModel | null>(
+    null,
+  );
   const [completePromptVisible, setCompletePromptVisible] = useState(false);
   const [completing, setCompleting] = useState(false);
-  const [afterSaleTarget, setAfterSaleTarget] = useState<OrderItemModel | null>(null);
-  const [afterSaleMembers, setAfterSaleMembers] = useState<AfterSaleMember[]>([]);
+  const [afterSaleTarget, setAfterSaleTarget] = useState<OrderItemModel | null>(
+    null,
+  );
+  const [afterSaleMembers, setAfterSaleMembers] = useState<AfterSaleMember[]>(
+    [],
+  );
   const [afterSaleLoading, setAfterSaleLoading] = useState(false);
   const [reviewTarget, setReviewTarget] = useState<OrderItemModel | null>(null);
   const [reviewDetail, setReviewDetail] = useState<OrderReview | null>(null);
   const [payTarget, setPayTarget] = useState<OrderItemModel | null>(null);
   const [freeTarget, setFreeTarget] = useState<OrderItemModel | null>(null);
-  const [prompt, setPrompt] = useState<{ title: string; message: string; confirmText?: string } | null>(null);
+  const [prompt, setPrompt] = useState<{
+    title: string;
+    message: string;
+    confirmText?: string;
+  } | null>(null);
   const cancelingPaymentRef = useRef(false);
   const items = orders.data?.pages.flatMap((page) => page.items) ?? [];
-  const emptyMessage = scope === "dispatch"
-    ? visibleFilter === "history" ? "暂无抢单记录" : "暂无可抢需求"
-    : visibleFilter === "all" ? "暂无订单"
-      : `暂无${visibleFilter === "inProgress" ? "进行中" : visibleFilter === "completed" ? "已完成" : "已取消"}订单`;
+  const emptyMessage =
+    scope === "dispatch"
+      ? visibleFilter === "history"
+        ? "暂无抢单记录"
+        : "暂无可抢需求"
+      : visibleFilter === "all"
+        ? "暂无订单"
+        : `暂无${visibleFilter === "inProgress" ? "进行中" : visibleFilter === "completed" ? "已完成" : "已取消"}订单`;
 
-  const handleOrderAction = async (item: OrderItemModel, action: OrderActionKey) => {
+  const handleOrderAction = async (
+    item: OrderItemModel,
+    action: OrderActionKey,
+  ) => {
     if (action === "pay") {
       setPayTarget(item);
       return;
@@ -74,18 +149,42 @@ export default function OrderScreen() {
         await grabDispatchRequest(item.requestNo, token);
         await orders.refetch();
       } catch (error) {
-        setPrompt({ title: "抢单失败", message: error instanceof Error ? error.message : "请稍后重试" });
+        setPrompt({
+          title: "抢单失败",
+          message: error instanceof Error ? error.message : "请稍后重试",
+        });
       }
     }
-    if ((action === "accept" || action === "reject" || action === "start") && token) {
+    if (
+      (action === "accept" || action === "reject" || action === "start") &&
+      token
+    ) {
+      if (pendingOrderRef.current) return;
+      pendingOrderRef.current = item.id;
+      setPendingOrderId(item.id);
+      let actionSucceeded = false;
       try {
         if (action === "accept") await acceptOrder(item.id, token);
         if (action === "reject") await rejectOrder(item.id, token);
         if (action === "start") await startOrderService(item.id, token);
-        await invalidateOrderQueries(item.id);
-        await orders.refetch();
+        actionSucceeded = true;
+        if (action === "start" && currentUser?.id) {
+          await refreshStartedOrder(item.id, token, currentUser.id);
+        } else {
+          await invalidateOrderQueries(item.id);
+        }
       } catch (error) {
-        setPrompt({ title: "订单操作失败", message: error instanceof Error ? error.message : "请稍后重试" });
+        setPrompt({
+          title: actionSucceeded ? "订单已更新" : "订单操作失败",
+          message: actionSucceeded
+            ? "状态刷新失败，请下拉刷新订单列表"
+            : error instanceof Error
+              ? error.message
+              : "请稍后重试",
+        });
+      } finally {
+        pendingOrderRef.current = null;
+        setPendingOrderId(null);
       }
     }
     if (action === "afterSales") {
@@ -99,15 +198,28 @@ export default function OrderScreen() {
       setAfterSaleTarget(item);
       if (token && item.clubId) {
         setAfterSaleLoading(true);
-        void fetchAfterSaleMembers(item.clubId, token).then(setAfterSaleMembers).catch(() => setAfterSaleMembers([])).finally(() => setAfterSaleLoading(false));
+        void fetchAfterSaleMembers(item.clubId, token)
+          .then(setAfterSaleMembers)
+          .catch(() => setAfterSaleMembers([]))
+          .finally(() => setAfterSaleLoading(false));
       } else setAfterSaleMembers([]);
     }
     if (action === "review") {
       setReviewTarget(item);
       setReviewDetail(null);
-      if (item.reviewId && token) void fetchOrderReview(item.reviewId, token).then(setReviewDetail).catch(() => undefined);
+      if (item.reviewId && token)
+        void fetchOrderReview(item.reviewId, token)
+          .then(setReviewDetail)
+          .catch(() => undefined);
     }
-    if (action === "reorder") router.push({ pathname: "/profile", params: { clubId: String(item.clubId || ""), userId: String(item.receiverUserId || "") } });
+    if (action === "reorder")
+      router.push({
+        pathname: "/profile",
+        params: {
+          clubId: String(item.clubId || ""),
+          userId: String(item.receiverUserId || ""),
+        },
+      });
   };
 
   const confirmCancel = async () => {
@@ -117,9 +229,11 @@ export default function OrderScreen() {
     try {
       await cancelOrderRequest(target.id, token);
       await invalidateOrderQueries(target.id);
-      await orders.refetch();
     } catch (error) {
-      setPrompt({ title: "取消订单失败", message: error instanceof Error ? error.message : "请稍后重试" });
+      setPrompt({
+        title: "取消订单失败",
+        message: error instanceof Error ? error.message : "请稍后重试",
+      });
     }
   };
 
@@ -132,9 +246,11 @@ export default function OrderScreen() {
       await completeOrderRequest(target.id, token);
       setCompletePromptVisible(false);
       await invalidateOrderQueries(target.id);
-      await orders.refetch();
     } catch (error) {
-      setPrompt({ title: "完成订单失败", message: error instanceof Error ? error.message : "请稍后重试" });
+      setPrompt({
+        title: "完成订单失败",
+        message: error instanceof Error ? error.message : "请稍后重试",
+      });
     } finally {
       setCompleting(false);
     }
@@ -161,21 +277,48 @@ export default function OrderScreen() {
         data={items}
         ItemSeparatorComponent={OrderSeparator}
         keyExtractor={(item) => item.id}
-        ListEmptyComponent={orders.isLoading ? <LoadingState /> : orders.isError ? <ErrorState onRetry={() => void orders.refetch()} /> : <View style={styles.empty}><EmptyState message={emptyMessage} /></View>}
-        ListFooterComponent={orders.isFetchingNextPage ? <Text style={styles.listFooter}>加载中...</Text> : null}
-        onEndReached={() => { if (orders.hasNextPage && !orders.isFetchingNextPage) void orders.fetchNextPage(); }}
+        ListEmptyComponent={
+          orders.isLoading ? (
+            <LoadingState />
+          ) : orders.isError ? (
+            <ErrorState onRetry={() => void orders.refetch()} />
+          ) : (
+            <View style={styles.empty}>
+              <EmptyState message={emptyMessage} />
+            </View>
+          )
+        }
+        ListFooterComponent={
+          orders.isFetchingNextPage ? (
+            <Text style={styles.listFooter}>加载中...</Text>
+          ) : null
+        }
+        onEndReached={() => {
+          if (orders.hasNextPage && !orders.isFetchingNextPage)
+            void orders.fetchNextPage();
+        }}
         onEndReachedThreshold={0.35}
         renderItem={({ item }) => (
           <OrderCard
             item={item}
+            actionPending={pendingOrderId === item.id}
             onAction={handleOrderAction}
             onPress={(order) => {
-              if (order.requestNo) router.push(`/order/dispatch/${encodeURIComponent(order.requestNo)}`);
+              if (order.requestNo)
+                router.push(
+                  `/order/dispatch/${encodeURIComponent(order.requestNo)}`,
+                );
               else router.push(`/order/${order.id}?scope=${scope}`);
             }}
           />
         )}
-        refreshControl={<RefreshControl refreshing={orders.isRefetching} onRefresh={() => void orders.refetch()} tintColor="#ff214b" />}
+        refreshControl={
+          <RefreshControl
+            refreshing={orders.isRefetching}
+            onRefresh={() => void orders.refetch()}
+            tintColor="#ff214b"
+          />
+        }
         showsVerticalScrollIndicator={false}
       />
       <AppPrompt
@@ -187,14 +330,47 @@ export default function OrderScreen() {
         onCancel={() => setCancelTarget(null)}
         onConfirm={() => void confirmCancel()}
       />
-      <OrderAfterSaleSheet visible={Boolean(afterSaleTarget)} loading={afterSaleLoading} members={afterSaleMembers} onClose={() => setAfterSaleTarget(null)} onContact={(member) => {
-        const order = afterSaleTarget;
-        setAfterSaleTarget(null);
-        if (!order) return;
-        const payload = buildAfterSalePayload(order, member.userId);
-        router.push({ pathname: "/chat/[id]", params: { id: String(member.userId), title: member.nickname || "售后客服", avatar: member.headImage || "", afterSale: JSON.stringify(payload) } });
-      }} />
-      <OrderReviewSheet visible={Boolean(reviewTarget)} readonly={Boolean(reviewTarget?.reviewExists)} detail={reviewDetail} onClose={() => setReviewTarget(null)} onSubmit={async (rating, content) => { if (!reviewTarget || !token) return; await submitOrderReview(reviewTarget.orderNo || reviewTarget.id, rating, content, token); setReviewTarget((current) => current ? { ...current, reviewExists: true } : current); setReviewDetail({ rating, content }); await orders.refetch(); }} />
+      <OrderAfterSaleSheet
+        visible={Boolean(afterSaleTarget)}
+        loading={afterSaleLoading}
+        members={afterSaleMembers}
+        onClose={() => setAfterSaleTarget(null)}
+        onContact={(member) => {
+          const order = afterSaleTarget;
+          setAfterSaleTarget(null);
+          if (!order) return;
+          const payload = buildAfterSalePayload(order, member.userId);
+          router.push({
+            pathname: "/chat/[id]",
+            params: {
+              id: String(member.userId),
+              title: member.nickname || "售后客服",
+              avatar: member.headImage || "",
+              afterSale: JSON.stringify(payload),
+            },
+          });
+        }}
+      />
+      <OrderReviewSheet
+        visible={Boolean(reviewTarget)}
+        readonly={Boolean(reviewTarget?.reviewExists)}
+        detail={reviewDetail}
+        onClose={() => setReviewTarget(null)}
+        onSubmit={async (rating, content) => {
+          if (!reviewTarget || !token) return;
+          await submitOrderReview(
+            reviewTarget.orderNo || reviewTarget.id,
+            rating,
+            content,
+            token,
+          );
+          setReviewTarget((current) =>
+            current ? { ...current, reviewExists: true } : current,
+          );
+          setReviewDetail({ rating, content });
+          await orders.refetch();
+        }}
+      />
       <AppPrompt
         visible={completePromptVisible && scope !== "accept"}
         title="提示"
@@ -208,9 +384,23 @@ export default function OrderScreen() {
         <OrderCompleteConfirmSheet
           visible={completePromptVisible && scope === "accept"}
           order={completeTarget}
-          companionName={completeTarget.receiverName || currentUser?.nickname || "陪玩师"}
-          companionAvatar={completeTarget.receiverAvatar ?? (currentUser?.headImage ? { uri: currentUser.headImage } : undefined)}
-          serviceTime={(completeTarget.serviceStartTime || completeTarget.serviceEndTime || completeTarget.createTime || "-").replace("T", " ").slice(0, 19)}
+          companionName={
+            completeTarget.receiverName || currentUser?.nickname || "陪玩师"
+          }
+          companionAvatar={
+            completeTarget.receiverAvatar ??
+            (currentUser?.headImage
+              ? { uri: currentUser.headImage }
+              : undefined)
+          }
+          serviceTime={(
+            completeTarget.serviceStartTime ||
+            completeTarget.serviceEndTime ||
+            completeTarget.createTime ||
+            "-"
+          )
+            .replace("T", " ")
+            .slice(0, 19)}
           loading={completing}
           onClose={() => {
             if (!completing) setCompletePromptVisible(false);
@@ -229,12 +419,20 @@ export default function OrderScreen() {
           const target = freeTarget;
           setFreeTarget(null);
           if (!target || !token) return;
-          void freeOrderService(target.id, Number(target.totalPrice) || 0, token)
+          void freeOrderService(
+            target.id,
+            Number(target.totalPrice) || 0,
+            token,
+          )
             .then(async () => {
               await invalidateOrderQueries(target.id);
-              await orders.refetch();
             })
-            .catch((error) => setPrompt({ title: "免单失败", message: error instanceof Error ? error.message : "请稍后重试" }));
+            .catch((error) =>
+              setPrompt({
+                title: "免单失败",
+                message: error instanceof Error ? error.message : "请稍后重试",
+              }),
+            );
         }}
       />
       <StarPaymentPrompt
@@ -250,10 +448,16 @@ export default function OrderScreen() {
           void cancelOrderRequest(target.id, token)
             .then(async () => {
               await invalidateOrderQueries(target.id);
-              await orders.refetch();
             })
-            .catch((error) => setPrompt({ title: "取消订单失败", message: error instanceof Error ? error.message : "请稍后重试" }))
-            .finally(() => { cancelingPaymentRef.current = false; });
+            .catch((error) =>
+              setPrompt({
+                title: "取消订单失败",
+                message: error instanceof Error ? error.message : "请稍后重试",
+              }),
+            )
+            .finally(() => {
+              cancelingPaymentRef.current = false;
+            });
         }}
         onPaid={() => {
           const paid = payTarget;
@@ -265,11 +469,17 @@ export default function OrderScreen() {
               params: {
                 id: String(paid.receiverUserId),
                 title: paid.receiverName || "用户聊天",
-                avatar: paid.receiverAvatar && "uri" in paid.receiverAvatar ? String(paid.receiverAvatar.uri) : "",
+                avatar:
+                  paid.receiverAvatar && "uri" in paid.receiverAvatar
+                    ? String(paid.receiverAvatar.uri)
+                    : "",
               },
             });
           } else {
-            setPrompt({ title: "支付成功", message: "订单已支付，可在订单页面查看进度" });
+            setPrompt({
+              title: "支付成功",
+              message: "订单已支付，可在订单页面查看进度",
+            });
           }
         }}
       />
@@ -303,7 +513,10 @@ function StarPaymentPrompt({
   const settledRef = useRef(false);
 
   useEffect(() => {
-    if (item && token) void fetchStarBalance(token).then(setBalance).catch((error: Error) => setMessage(error.message));
+    if (item && token)
+      void fetchStarBalance(token)
+        .then(setBalance)
+        .catch((error: Error) => setMessage(error.message));
   }, [item, token]);
 
   const pay = async () => {
@@ -330,18 +543,50 @@ function StarPaymentPrompt({
     }
   };
 
-  return <>
-    <BottomSheet scrollable visible={Boolean(item)} onClose={() => void onClose()} contentStyle={[styles.paymentSheet, { paddingBottom: 24 + insets.bottom }]}>
-          <Text style={styles.paymentTitle}>星钻支付</Text>
-          <Text style={styles.paymentAmount}>支付 {item?.totalPrice ?? 0} 星钻</Text>
-          <Text style={styles.paymentBalance}>当前余额：{balance === null ? "加载中..." : `${balance} 星钻`}</Text>
-          <View style={styles.paymentActions}>
-            <Pressable style={styles.paymentCancel} onPress={() => void onClose()}><Text>取消</Text></Pressable>
-            <Pressable style={styles.paymentConfirm} disabled={paying || balance === null} onPress={() => void pay()}><Text style={styles.paymentConfirmText}>{paying ? "支付中..." : "确认支付"}</Text></Pressable>
-          </View>
-    </BottomSheet>
-    <AppPrompt visible={Boolean(message)} title="支付提示" message={message ?? ""} onConfirm={() => setMessage(null)} />
-  </>;
+  return (
+    <>
+      <BottomSheet
+        scrollable
+        visible={Boolean(item)}
+        onClose={() => void onClose()}
+        contentStyle={[
+          styles.paymentSheet,
+          { paddingBottom: 24 + insets.bottom },
+        ]}
+      >
+        <Text style={styles.paymentTitle}>星钻支付</Text>
+        <Text style={styles.paymentAmount}>
+          支付 {item?.totalPrice ?? 0} 星钻
+        </Text>
+        <Text style={styles.paymentBalance}>
+          当前余额：{balance === null ? "加载中..." : `${balance} 星钻`}
+        </Text>
+        <View style={styles.paymentActions}>
+          <Pressable
+            style={styles.paymentCancel}
+            onPress={() => void onClose()}
+          >
+            <Text>取消</Text>
+          </Pressable>
+          <Pressable
+            style={styles.paymentConfirm}
+            disabled={paying || balance === null}
+            onPress={() => void pay()}
+          >
+            <Text style={styles.paymentConfirmText}>
+              {paying ? "支付中..." : "确认支付"}
+            </Text>
+          </Pressable>
+        </View>
+      </BottomSheet>
+      <AppPrompt
+        visible={Boolean(message)}
+        title="支付提示"
+        message={message ?? ""}
+        onConfirm={() => setMessage(null)}
+      />
+    </>
+  );
 }
 
 function OrderSeparator() {
@@ -352,14 +597,59 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F7F7" },
   content: { flexGrow: 1, paddingTop: 8 },
   separator: { height: 8 },
-  empty: { flex: 1, minHeight: 320, alignItems: "center", justifyContent: "center" },
-  listFooter: { paddingVertical: 16, color: "#999", fontSize: 12, textAlign: "center" },
-  paymentSheet: { padding: 24, borderTopLeftRadius: 20, borderTopRightRadius: 20, backgroundColor: "#fff" },
-  paymentTitle: { color: "#111", fontSize: 18, fontWeight: "600", textAlign: "center" },
-  paymentAmount: { marginTop: 24, color: "#111", fontSize: 22, fontWeight: "700", textAlign: "center" },
-  paymentBalance: { marginTop: 12, color: "#777", fontSize: 14, textAlign: "center" },
+  empty: {
+    flex: 1,
+    minHeight: 320,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  listFooter: {
+    paddingVertical: 16,
+    color: "#999",
+    fontSize: 12,
+    textAlign: "center",
+  },
+  paymentSheet: {
+    padding: 24,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    backgroundColor: "#fff",
+  },
+  paymentTitle: {
+    color: "#111",
+    fontSize: 18,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  paymentAmount: {
+    marginTop: 24,
+    color: "#111",
+    fontSize: 22,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  paymentBalance: {
+    marginTop: 12,
+    color: "#777",
+    fontSize: 14,
+    textAlign: "center",
+  },
   paymentActions: { flexDirection: "row", gap: 12, marginTop: 24 },
-  paymentCancel: { flex: 1, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "#F5F5F5" },
-  paymentConfirm: { flex: 1, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "#FF3158" },
+  paymentCancel: {
+    flex: 1,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F5F5F5",
+  },
+  paymentConfirm: {
+    flex: 1,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FF3158",
+  },
   paymentConfirmText: { color: "#fff", fontWeight: "600" },
 });
