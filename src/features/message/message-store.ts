@@ -43,7 +43,7 @@ import {
   isSystemConversationId,
   normalizeSystemConversationId,
 } from './system-conversations';
-import { dispatchInAppNotification } from './notification-hub';
+import { dispatchInAppNotification, shouldSuppressInAppBanner } from './notification-hub';
 
 export type MessageConnectionState = 'idle' | 'connecting' | 'ready' | 'unavailable' | 'error';
 
@@ -210,7 +210,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         return;
       }
       const normalizedConversation = { ...conversation, id: normalizedPeerId, title: normalizedConversationTitle };
-      if (!isActive && !message.isMine) {
+      if (!isActive && !message.isMine && !shouldSuppressInAppBanner(message.kind)) {
         dispatchInAppNotification({
           peerId: normalizedPeerId,
           title: getSystemConversationTitle(normalizedPeerId, normalizedConversation.title),
