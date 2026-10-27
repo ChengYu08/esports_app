@@ -1,3 +1,4 @@
+import { ChevronLeft24Regular, Search24Regular } from "@fluentui/react-native-icons";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
@@ -100,21 +101,14 @@ export default function CourtTargetPickerScreen() {
           onPress={back}
           style={styles.back}
         >
-          <CachedImage
-            source={require("../../../../assets/home/club-detail/icon-back.svg")}
-            tintColor="#0A0A0A"
-            style={styles.backIcon}
-          />
+          <ChevronLeft24Regular color="#0A0A0A" width={24} height={24} style={styles.backIcon} />
         </Pressable>
         <Text style={styles.title}>选择诉告人</Text>
         <View style={styles.back} />
       </View>
       <View style={styles.searchSection}>
         <View style={styles.searchBox}>
-          <CachedImage
-            source={require("../../../../assets/svgs/icon-search.svg")}
-            style={styles.searchIcon}
-          />
+          <Search24Regular color="#0A0A0A" width={20} height={20} style={styles.searchIcon} />
           <TextInput
             accessibilityLabel="搜索昵称或ID"
             value={keyword}

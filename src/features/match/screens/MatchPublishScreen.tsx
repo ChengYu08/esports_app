@@ -1,3 +1,4 @@
+import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { Stack, router } from "expo-router";
@@ -41,7 +42,6 @@ import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-sessi
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 
-const backIcon = require("../../../../assets/svgs/icon-back.svg");
 const arrowDownIcon = require("../../../../assets/svgs/icon-arrow-down.svg");
 const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
 
@@ -139,10 +139,10 @@ export default function MatchPublishScreen() {
             ...(options?.expireTime ? { expireTime: options.expireTime } : {}),
             ...(game?.id && game.name
               ? {
-                  gameId: game.id,
-                  gameName: game.name,
-                  ...(game.iconUrl ? { gameIconUrl: game.iconUrl } : {}),
-                }
+                gameId: game.id,
+                gameName: game.name,
+                ...(game.iconUrl ? { gameIconUrl: game.iconUrl } : {}),
+              }
               : {}),
           },
         });
@@ -285,7 +285,7 @@ export default function MatchPublishScreen() {
               onPress={goBack}
               style={styles.backButton}
             >
-              <Image source={backIcon} style={styles.backIcon} />
+              <ChevronLeft24Regular color="white" width={24} height={24} style={styles.backIcon} />
             </Pressable>
             <Text style={styles.navTitle}>一键匹配</Text>
             <View style={styles.navRight} />

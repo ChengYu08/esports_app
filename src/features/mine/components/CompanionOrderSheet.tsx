@@ -1,3 +1,4 @@
+import { Dismiss16Regular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -42,7 +43,6 @@ const maleIcon = require("../../../../assets/home/club-detail/male.svg");
 const femaleIcon = require("../../../../assets/mine/figma/mine-female.svg");
 const clubIcon = require("../../../../assets/mine/figma/mine-club-flag.svg");
 const starDiamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
-const paymentCloseIcon = require("../../../../assets/mine/payment-close.svg");
 
 const ORDER_QTY_MIN = 1;
 const ORDER_QTY_MAX = 99;
@@ -248,10 +248,9 @@ export function CompanionOrderSheet({
                 onPress={() => closeSheet()}
                 style={styles.orderCloseButton}
               >
-                <Image
-                  source={paymentCloseIcon}
-                  style={styles.orderCloseIcon}
-                />
+                <View style={styles.orderCloseIcon}>
+                  <Dismiss16Regular color="#CCCCCC" width={15} height={15} />
+                </View>
               </Pressable>
             </View>
 
@@ -522,7 +521,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  orderCloseIcon: { width: 24, height: 24 },
+  orderCloseIcon: {
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   orderModalBody: {
     paddingHorizontal: 16,
     paddingTop: 4,

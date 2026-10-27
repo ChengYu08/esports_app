@@ -1,3 +1,4 @@
+import { Add24Regular } from "@fluentui/react-native-icons";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -23,7 +24,6 @@ const RATING_LABELS = ["非常差", "差", "一般", "好", "非常好"];
 const MAX_IMAGES = 5;
 const MAX_CONTENT_LENGTH = 50;
 const starIcon = require("../../../../assets/order/review-star.svg");
-const addIcon = require("../../../../assets/order/review-add.svg");
 
 type Props = {
   visible: boolean;
@@ -225,7 +225,9 @@ export function OrderReviewSheet({
                       onPress={() => void pickImages()}
                       style={styles.addImage}
                     >
-                      <Image contentFit="contain" source={addIcon} style={styles.addIcon} />
+                      <View style={styles.addIcon}>
+                        <Add24Regular color="#CCCCCC" width={24} height={24} />
+                      </View>
                     </Pressable>
                   )}
                 </View>
@@ -378,7 +380,12 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: "#F7F7F7",
   },
-  addIcon: { width: 34, height: 34 },
+  addIcon: {
+    width: 34,
+    height: 34,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   anonymousSection: { minHeight: 130, backgroundColor: "#FFFFFF", paddingHorizontal: 16, paddingTop: 16 },
   anonymousOptions: { flexDirection: "row", gap: 8, paddingHorizontal: 0, paddingTop: 16, paddingBottom: 16 },
   anonymousOption: {

@@ -1,3 +1,4 @@
+import { Dismiss16Regular } from "@fluentui/react-native-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import type { ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -8,7 +9,6 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { CachedImage } from "@/shared/ui/CachedImage";
 
-const closeIcon = require("../../../../assets/mine/payment-close.svg");
 const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
 const fallbackAvatar = require("../../../../assets/coms/avatar_default.webp");
 
@@ -60,7 +60,9 @@ export function OrderCompleteConfirmSheet({
               onPress={onClose}
               style={styles.closeButton}
             >
-              <CachedImage source={closeIcon} style={styles.closeIcon} />
+              <View style={styles.closeIcon}>
+                <Dismiss16Regular color="#CCCCCC" width={20} height={20} />
+              </View>
             </Pressable>
           </View>
           <Text style={styles.orderNumber}>订单编号：{order.orderNo || order.id}</Text>
@@ -180,8 +182,18 @@ const styles = StyleSheet.create({
   scroll: { flexShrink: 1 },
   header: { minHeight: 32, flexDirection: "row", alignItems: "center" },
   title: { flex: 1, color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 16, fontWeight: "600" },
-  closeButton: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
-  closeIcon: { width: 32, height: 32 },
+  closeButton: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  closeIcon: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   orderNumber: { marginTop: 2, color: "#999999", fontFamily: DOUYIN_SANS, fontSize: 12, lineHeight: 18 },
   participants: { flexDirection: "row", gap: 8, marginTop: 8, marginBottom: 12 },
   participant: {
@@ -224,6 +236,10 @@ const styles = StyleSheet.create({
   diamondIcon: { width: 14, height: 11 },
   confirmButton: { height: 42, marginTop: 16, overflow: "hidden", borderRadius: 8 },
   confirmButtonDisabled: { opacity: 0.7 },
-  confirmGradient: { flex: 1, alignItems: "center", justifyContent: "center" },
+  confirmGradient: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   confirmText: { color: "#FFFFFF", fontFamily: DOUYIN_SANS, fontSize: 14, fontWeight: "600" },
 });

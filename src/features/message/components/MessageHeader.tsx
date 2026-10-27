@@ -1,3 +1,5 @@
+import { Search24Regular } from "@fluentui/react-native-icons";
+import type { ReactNode } from "react";
 import { Image } from "expo-image";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -5,7 +7,6 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const icons = {
   clear: require("../../../../assets/message/message-clear.svg"),
-  search: require("../../../../assets/message/message-search.svg"),
 };
 
 type MessageHeaderProps = {
@@ -20,8 +21,16 @@ export function MessageHeader({ onClear, onSearch }: MessageHeaderProps) {
         消息
       </Text>
       <View style={styles.spacer} />
-      <IconButton accessibilityLabel="清除所有未读消息" icon={icons.clear} onPress={onClear} />
-      <IconButton accessibilityLabel="搜索消息中的用户" icon={icons.search} onPress={onSearch} />
+      <IconButton
+        accessibilityLabel="清除所有未读消息"
+        icon={<Image source={icons.clear} style={styles.icon} />}
+        onPress={onClear}
+      />
+      <IconButton
+        accessibilityLabel="搜索消息中的用户"
+        icon={<Search24Regular color="#1A1A1A" width={24} height={24} />}
+        onPress={onSearch}
+      />
     </View>
   );
 }
@@ -32,7 +41,7 @@ function IconButton({
   onPress,
 }: {
   accessibilityLabel: string;
-  icon: number;
+  icon: ReactNode;
   onPress: () => void;
 }) {
   return (
@@ -43,7 +52,7 @@ function IconButton({
       onPress={onPress}
       style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
     >
-      <Image source={icon} style={styles.icon} />
+      {icon}
     </Pressable>
   );
 }

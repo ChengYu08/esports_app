@@ -1,5 +1,5 @@
+import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { useAuthStore } from "@esports/auth";
-import { Image } from "expo-image";
 import { router } from "expo-router";
 import Toast from "react-native-root-toast";
 import { useEffect, useMemo, useState } from "react";
@@ -21,7 +21,6 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 
-const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const impacts = [
   ["账号完成注销后无法恢复", "注销完成后，当前账号不能再登录，原账号及关联资料也不能恢复。"],
   ["历史信息会被删除或匿名化", "个人资料、绑定资料、聊天和核验记录会按规则删除或匿名化。"],
@@ -158,7 +157,7 @@ export default function AccountCancellationScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Image source={backIcon} style={styles.backIcon} />
+          <ChevronLeft24Regular color="#0A0A0A" width={24} height={24} style={styles.backIcon} />
         </Pressable>
         <Text style={styles.headerTitle}>注销账号</Text>
         <View style={styles.headerSpace} />
@@ -326,7 +325,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#EBEBEB",
   },
   backButton: { width: 28, height: 28, justifyContent: "center" },
-  backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
+  backIcon: { width: 24, height: 24 },
   headerSpace: { width: 28 },
   headerTitle: {
     color: "#0A0A0A",

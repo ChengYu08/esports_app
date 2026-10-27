@@ -1,5 +1,9 @@
 import { useAuthStore } from "@esports/auth";
-import { Delete24Regular } from "@fluentui/react-native-icons";
+import {
+  ChevronLeft24Regular,
+  ChevronRight16Regular,
+  Delete24Regular,
+} from "@fluentui/react-native-icons";
 import { Paths } from "expo-file-system";
 import { Image } from "expo-image";
 import { router } from "expo-router";
@@ -23,9 +27,6 @@ import { clearAuthSession } from "@/features/auth/session-persistence";
 import { messageStore } from "@/features/message/message-store";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
-
-const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
-const arrowIcon = require("../../../../assets/mine/figma/mine-arrow-right.svg");
 
 function readCacheSize() {
   if (Platform.OS === "web") return 0;
@@ -127,7 +128,7 @@ export default function BasicSettingsScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Image source={backIcon} style={styles.backIcon} />
+          <ChevronLeft24Regular color="#0A0A0A" width={24} height={24} style={styles.backIcon} />
         </Pressable>
         <Text style={styles.headerTitle}>基础设置</Text>
         <View style={styles.headerEnd} />
@@ -263,7 +264,7 @@ function SettingsRow({
       <Text style={styles.rowLabel}>{label}</Text>
       <View style={styles.rowRight}>
         {value ? <Text style={styles.rowValue}>{value}</Text> : null}
-        <Image source={arrowIcon} style={styles.arrow} />
+        <ChevronRight16Regular color="#0A0A0A" width={18} height={18} style={styles.arrow} />
       </View>
     </Pressable>
   );
@@ -279,7 +280,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   backButton: { width: 44, height: 44, justifyContent: "center" },
-  backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
+  backIcon: { width: 24, height: 24 },
   headerTitle: {
     color: "#0A0A0A",
     fontFamily: DOUYIN_SANS,

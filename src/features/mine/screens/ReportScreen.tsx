@@ -1,4 +1,4 @@
-import { Image } from "expo-image";
+import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
@@ -18,8 +18,6 @@ import { useAuthStore } from "@esports/auth";
 
 import { submitReport } from "@/features/mine/api/report.api";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
-
-const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 
 const REPORT_REASONS = [
   "政治",
@@ -92,7 +90,7 @@ export default function ReportScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Image source={backIcon} style={styles.backIcon} />
+          <ChevronLeft24Regular color="#111111" width={24} height={24} style={styles.backIcon} />
         </Pressable>
         <Text style={styles.headerTitle}>举报</Text>
         <View style={styles.headerEnd} />
@@ -187,7 +185,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 28,
   },
-  backIcon: { height: 24, width: 24, tintColor: "#111111" },
+  backIcon: { height: 24, width: 24 },
   headerTitle: {
     color: "#111111",
     fontFamily: DOUYIN_SANS,

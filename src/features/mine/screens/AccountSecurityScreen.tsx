@@ -1,5 +1,5 @@
+import { ChevronLeft24Regular, ChevronRight16Regular } from "@fluentui/react-native-icons";
 import { useAuthStore } from "@esports/auth";
-import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -7,9 +7,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { RealNameVerificationSheet } from "@/features/mine/components/RealNameVerificationSheet";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
-
-const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
-const arrowIcon = require("../../../../assets/mine/figma/mine-arrow-right.svg");
 
 export default function AccountSecurityScreen() {
   const insets = useSafeAreaInsets();
@@ -36,7 +33,7 @@ export default function AccountSecurityScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Image source={backIcon} style={styles.backIcon} />
+          <ChevronLeft24Regular color="#0A0A0A" width={24} height={24} style={styles.backIcon} />
         </Pressable>
         <Text style={styles.title}>账号与安全</Text>
         <View style={styles.headerEnd} />
@@ -55,7 +52,7 @@ export default function AccountSecurityScreen() {
                 ? `已认证（${user.realName || "本人"}）`
                 : "未认证"}
             </Text>
-            <Image source={arrowIcon} style={styles.arrow} />
+            <ChevronRight16Regular color="#0A0A0A" width={18} height={18} style={styles.arrow} />
           </View>
         </Pressable>
         <View style={[styles.row, styles.lastRow]}>
@@ -78,7 +75,7 @@ export default function AccountSecurityScreen() {
         >
           <Text style={styles.label}>修改密码</Text>
           <View style={styles.rowRight}>
-            <Image source={arrowIcon} style={styles.arrow} />
+            <ChevronRight16Regular color="#0A0A0A" width={18} height={18} style={styles.arrow} />
           </View>
         </Pressable>
         <Pressable
@@ -89,7 +86,7 @@ export default function AccountSecurityScreen() {
         >
           <Text style={styles.label}>黑名单</Text>
           <View style={styles.rowRight}>
-            <Image source={arrowIcon} style={styles.arrow} />
+            <ChevronRight16Regular color="#0A0A0A" width={18} height={18} style={styles.arrow} />
           </View>
         </Pressable>
       </View>
@@ -121,7 +118,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   backButton: { width: 44, height: 44, justifyContent: "center" },
-  backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
+  backIcon: { width: 24, height: 24 },
   headerEnd: { width: 44 },
   title: {
     color: "#0A0A0A",

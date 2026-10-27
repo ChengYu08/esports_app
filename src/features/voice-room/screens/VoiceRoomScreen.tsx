@@ -1,3 +1,4 @@
+import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { clientAuthApi } from "@/features/auth/client-auth.api";
 import {
   cancelQuickMatch,
@@ -71,7 +72,6 @@ import type {
 /** 呼叫接待超时（秒），对齐 PC CS_CALL_TIMEOUT_SECONDS */
 const CS_CALL_TIMEOUT_SECONDS = 60;
 
-const backIcon = require("../../../../assets/svgs/icon-back.svg");
 const BG_GRADIENT = ["#0C0C2E", "#120D2B"] as const;
 const closeIcon = require("../../../../assets/voice-room/navbar-exit.svg");
 const inviteIcon = require("../../../../assets/voice-room/invite.svg");
@@ -320,14 +320,14 @@ export default function VoiceRoomScreen() {
       return;
     }
     useVoiceRoomSessionStore.getState().setActiveRoom({
-      roomId: current.roomId,
-      roomVersion: current.roomVersion,
-      rongChatroomId: current.rongChatroomId,
-      roomName: current.roomName,
-      creatorUserId: current.creatorUserId,
-      ownerName: current.ownerName,
-      ownerAvatar: current.ownerAvatar,
-    });
+        roomId: current.roomId,
+        roomVersion: current.roomVersion,
+        rongChatroomId: current.rongChatroomId,
+        roomName: current.roomName,
+        creatorUserId: current.creatorUserId,
+        ownerName: current.ownerName,
+        ownerAvatar: current.ownerAvatar,
+      });
   }, []);
 
   /** 仅清除 quickMatchCreated 场景标记，不影响 audition */
@@ -848,8 +848,8 @@ export default function VoiceRoomScreen() {
         setError(null);
         if (staleInvite) {
           Toast.show("语聊房已重新开启，已为你进入最新房间", {
-            duration: Toast.durations.SHORT,
-          });
+        duration: Toast.durations.SHORT,
+      });
         }
       } catch (cause) {
         await cleanupCancelledJoin();
@@ -887,8 +887,8 @@ export default function VoiceRoomScreen() {
       setServiceCalling((calling) => {
         if (calling) {
           Toast.show("当前无空闲接待，请稍后再试", {
-            duration: Toast.durations.SHORT,
-          });
+        duration: Toast.durations.SHORT,
+      });
         }
         return false;
       });
@@ -1029,8 +1029,8 @@ export default function VoiceRoomScreen() {
           try {
             await cancelQuickMatch(active.requestNo, accessToken);
             Toast.show("已取消派单", {
-              duration: Toast.durations.SHORT,
-            });
+        duration: Toast.durations.SHORT,
+      });
           } catch (error) {
             Toast.show(
               error instanceof Error
@@ -1053,8 +1053,8 @@ export default function VoiceRoomScreen() {
       if (!valid()) return;
       if (!detail) {
         Toast.show("俱乐部信息获取失败，请稍后重试", {
-          duration: Toast.durations.SHORT,
-        });
+        duration: Toast.durations.SHORT,
+      });
         return;
       }
       setReceptionBuyerId(String(ownerId));
@@ -1292,8 +1292,8 @@ export default function VoiceRoomScreen() {
       const state = messageStore.getState();
       if (state.connectionState !== "ready") {
         Toast.show("消息服务未连接，请稍后再试", {
-          duration: Toast.durations.SHORT,
-        });
+        duration: Toast.durations.SHORT,
+      });
         return;
       }
       await state.sendText(peerId, inviteLink);
@@ -1334,7 +1334,7 @@ export default function VoiceRoomScreen() {
             hitSlop={12}
             style={styles.headerButton}
           >
-            <Image source={backIcon} style={styles.headerIcon} />
+            <ChevronLeft24Regular color="white" width={24} height={24} style={styles.headerIcon} />
           </Pressable>
           <Text style={styles.title}>{roomTitle}</Text>
           <Pressable

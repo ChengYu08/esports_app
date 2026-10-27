@@ -1,3 +1,4 @@
+import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import {
   toUploadItems,
   useCaseDetail,
@@ -28,7 +29,6 @@ import {
   type CourtSource,
   type TicketTarget,
 } from "@/features/court/court.api";
-import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -390,11 +390,7 @@ export default function CourtComplaintScreen() {
           onPress={() => router.back()}
           style={styles.back}
         >
-          <CachedImage
-            source={require("../../../../assets/home/club-detail/icon-back.svg")}
-            tintColor="#0D0D0F"
-            style={styles.backIcon}
-          />
+          <ChevronLeft24Regular color="#0D0D0F" width={24} height={24} style={styles.backIcon} />
         </Pressable>
         <Text style={styles.headerTitle}>{title}</Text>
         <View style={styles.back} />

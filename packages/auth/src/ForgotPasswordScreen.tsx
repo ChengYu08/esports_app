@@ -1,4 +1,4 @@
-import { Image } from "expo-image";
+import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -18,11 +18,8 @@ import {
   validatePhone,
 } from "./password-validation";
 import type { ForgotPasswordPayload } from "./sso-adapter";
+import { PasswordVisibilityIcon } from "./PasswordVisibilityIcon";
 import { DOUYIN_SANS } from "./typography";
-
-const backIcon = require("../assets/back.svg");
-const eyeOpenIcon = require("../assets/eye-open.svg");
-const eyeClosedIcon = require("../assets/eye-closed.svg");
 
 export type ForgotPasswordScreenProps = {
   initialPhone?: string;
@@ -130,11 +127,9 @@ export function ForgotPasswordScreen({
               onPress={onBack}
               style={styles.backButton}
             >
-              <Image
-                source={backIcon}
-                style={styles.backIcon}
-                contentFit="contain"
-              />
+              <View style={styles.backIcon}>
+                <ChevronLeft24Regular color="#333333" width={18} height={18} />
+              </View>
             </Pressable>
             <Text accessibilityRole="header" style={styles.title}>
               忘记密码
@@ -215,12 +210,7 @@ export function ForgotPasswordScreen({
                 hitSlop={8}
                 onPress={() => setPasswordVisible((visible) => !visible)}
               >
-                <Image
-                  accessible={false}
-                  source={passwordVisible ? eyeOpenIcon : eyeClosedIcon}
-                  style={styles.eyeIcon}
-                  contentFit="contain"
-                />
+                <PasswordVisibilityIcon visible={passwordVisible} size={22} />
               </Pressable>
             </View>
 
@@ -249,12 +239,7 @@ export function ForgotPasswordScreen({
                 hitSlop={8}
                 onPress={() => setConfirmationVisible((visible) => !visible)}
               >
-                <Image
-                  accessible={false}
-                  source={confirmationVisible ? eyeOpenIcon : eyeClosedIcon}
-                  style={styles.eyeIcon}
-                  contentFit="contain"
-                />
+                <PasswordVisibilityIcon visible={confirmationVisible} size={22} />
               </Pressable>
             </View>
 
@@ -301,7 +286,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   backButton: { width: 40, height: 40, justifyContent: "center" },
-  backIcon: { width: 24, height: 24 },
+  backIcon: {
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   title: {
     color: "#222",
     fontFamily: DOUYIN_SANS,
@@ -337,7 +327,6 @@ const styles = StyleSheet.create({
   divider: { width: 1, height: 16, backgroundColor: "#ddd" },
   sendCode: { color: "#e01b28", fontFamily: DOUYIN_SANS, fontSize: 14 },
   muted: { color: "#999" },
-  eyeIcon: { width: 22, height: 22 },
   passwordHint: {
     color: "#999",
     fontFamily: DOUYIN_SANS,

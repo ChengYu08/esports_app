@@ -1,3 +1,4 @@
+import { Copy16Regular } from "@fluentui/react-native-icons";
 import { CourtEvidenceSubmission } from "@/features/court/components/CourtEvidenceSubmission";
 import { CourtProcessTimeline } from "@/features/court/components/CourtProcessTimeline";
 import { CourtAvatar } from "@/features/court/components/CourtAvatar";
@@ -83,7 +84,6 @@ export default function CourtDetailScreen() {
       loadRequestRef.current += 1;
     };
   }, [load]));
-
 
   const stage = useMemo(() => (item ? mapCaseStage(item) : null), [item]);
   async function copyCaseId() {
@@ -434,10 +434,7 @@ function Metadata({
           style={styles.metadataCopy}
         >
           <Text numberOfLines={1} style={styles.metadataValue}>{value}</Text>
-          <CachedImage
-            source={require("../../../../assets/coms/copy.svg")}
-            style={styles.copyIcon}
-          />
+          <Copy16Regular color="#808080" width={12} height={12} style={styles.copyIcon} />
         </Pressable>
       ) : (
         <Text numberOfLines={1} style={styles.metadataValue}>{value}</Text>

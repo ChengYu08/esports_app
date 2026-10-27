@@ -1,3 +1,4 @@
+import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { courtApi, type CourtReviewerStatus } from "@/features/court/court.api";
 import { canApplyCourtReviewer, isCourtReviewerApproved } from "@/features/court/court-vote";
 import { RealNameVerificationSheet } from "@/features/mine/components/RealNameVerificationSheet";
@@ -107,11 +108,7 @@ export default function CourtReviewerScreen() {
           onPress={() => router.back()}
           style={styles.back}
         >
-          <CachedImage
-            source={require("../../../../assets/home/club-detail/icon-back.svg")}
-            tintColor="#111111"
-            style={styles.backIcon}
-          />
+          <ChevronLeft24Regular color="#111111" width={24} height={24} style={styles.backIcon} />
         </Pressable>
         <Text accessibilityRole="header" style={styles.title}>成为评审员</Text>
         <View style={styles.back} />

@@ -1,3 +1,4 @@
+import { ChevronLeft24Regular, ChevronRight16Regular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import {
@@ -14,8 +15,6 @@ import { APP_LINKS } from "@/core/config/links";
 import { openExternalLink } from "@/shared/navigation/open-external-link";
 
 const appIcon = require("../../../../assets/images/icon.png");
-const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
-const arrowIcon = require("../../../../assets/mine/figma/mine-arrow-right.svg");
 
 const VERSION = "v1.0.0";
 
@@ -37,7 +36,7 @@ export default function AboutScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Image source={backIcon} style={styles.backIcon} />
+          <ChevronLeft24Regular color="#0A0A0A" width={24} height={24} style={styles.backIcon} />
         </Pressable>
         <Text style={styles.headerTitle}>关于盼之电竞</Text>
         <View style={styles.headerSpace} />
@@ -82,7 +81,7 @@ function AboutRow({ label, onPress }: { label: string; onPress: () => void }) {
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
-      <Image source={arrowIcon} style={styles.arrowIcon} />
+      <ChevronRight16Regular color="#0A0A0A" width={18} height={18} style={styles.arrowIcon} />
     </Pressable>
   );
 }
@@ -102,7 +101,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
+  backIcon: { width: 24, height: 24 },
   headerTitle: {
     color: "#0A0A0A",
     fontFamily: DOUYIN_SANS,
