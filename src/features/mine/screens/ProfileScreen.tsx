@@ -2,9 +2,9 @@ import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
   Edit24Regular,
-  MoreHorizontal24Regular,
 } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
@@ -266,21 +266,75 @@ export default function ProfileScreen() {
     );
   }
 
-  const profileIntro = (
-    <View style={styles.scrollIntro}>
-      <View style={styles.stats}>
-        <Stat
-          value={profile.followCount}
-          label="关注"
+  const profileCover = (
+    <View style={styles.cover}>
+      {coverPreviewParams ? (
+        <Pressable
+          accessibilityLabel="预览主页背景图"
+          accessibilityRole="button"
+          onPress={() =>
+            router.push({
+              pathname: "/image-preview",
+              params: coverPreviewParams,
+            })
+          }
+          style={StyleSheet.absoluteFill}
+        >
+          <Image
+            source={{ uri: coverImageUrl }}
+            contentFit="cover"
+            style={StyleSheet.absoluteFill}
+          />
+        </Pressable>
+      ) : (
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Image
+            source={background}
+            contentFit="cover"
+            style={StyleSheet.absoluteFill}
+          />
+        </View>
+      )}
+      <LinearGradient
+        pointerEvents="none"
+        style={StyleSheet.absoluteFill}
+        colors={["#3B79BA00", "#3B79BA", "#3B79BA"]}
+        locations={[0, 0.6, 1]}
+      />
+      <LinearGradient
+        pointerEvents="none"
+        style={StyleSheet.absoluteFill}
+        colors={["rgba(0,0,0,0.2)", "rgba(0,0,0,0.8)"]}
+      />
+      <ProfileIdentity
+        profile={profile}
+        isBlacklisted={
+          !isMine &&
+          blacklistStatus.userId === String(profile.userId) &&
+          blacklistStatus.isBlacklisted
+        }
+      />
+      <View style={styles.headerStats}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`关注列表，${profile.followCount}人`}
           onPress={() => openProfileRelation("following")}
-        />
-        <Stat
-          value={profile.fansCount}
-          label="粉丝"
+          style={styles.headerStat}
+        >
+          <Text style={styles.headerStatValue}>{profile.followCount}</Text>
+          <Text style={styles.headerStatLabel}>关注</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`粉丝列表，${profile.fansCount}人`}
           onPress={() => openProfileRelation("fans")}
-        />
+          style={styles.headerStat}
+        >
+          <Text style={styles.headerStatValue}>{profile.fansCount}</Text>
+          <Text style={styles.headerStatLabel}>粉丝</Text>
+        </Pressable>
       </View>
-      <Text style={styles.signature}>
+      <Text style={styles.headerIntro}>
         {profile.signature || "暂无个人简介"}
       </Text>
     </View>
@@ -308,6 +362,7 @@ export default function ProfileScreen() {
   );
 
   const profileListItems: ProfileListItem[] = [
+    { key: "profile-cover", content: profileCover },
     { key: "profile-tabs", content: profileTabs },
   ];
 
@@ -469,75 +524,22 @@ export default function ProfileScreen() {
   return (
     <View style={styles.screen}>
       <StatusBar style="light" />
-      <View style={styles.cover}>
-        {coverPreviewParams ? (
-          <Pressable
-            accessibilityLabel="预览主页背景图"
-            accessibilityRole="button"
-            onPress={() =>
-              router.push({
-                pathname: "/image-preview",
-                params: coverPreviewParams,
-              })
-            }
-            style={StyleSheet.absoluteFill}
-          >
-            <Image
-              source={{ uri: coverImageUrl }}
-              contentFit="cover"
-              style={StyleSheet.absoluteFill}
-            />
-            <View pointerEvents="none" style={styles.coverShade} />
-          </Pressable>
-        ) : (
-          <View style={StyleSheet.absoluteFill} pointerEvents="none">
-            <Image
-              source={background}
-              contentFit="cover"
-              style={StyleSheet.absoluteFill}
-            />
-            <View style={styles.coverShade} />
-          </View>
-        )}
-        <View style={[styles.navbar, { paddingTop: insets.top }]}>
-          <Pressable
-            accessibilityLabel="返回"
-            hitSlop={12}
-            onPress={() => router.back()}
-            style={styles.navButton}
-          >
-            <Image source={backIcon} style={styles.backIcon} />
-          </Pressable>
-          {!isMine ? (
-            <Pressable
-              accessibilityLabel="更多操作"
-              accessibilityRole="button"
-              hitSlop={12}
-              onPress={() => setProfileActionsVisible(true)}
-              style={styles.navButton}
-            >
-              <MoreHorizontal24Regular color="#fff" height={24} width={24} />
-            </Pressable>
-          ) : (
-            <View style={styles.navButton} />
-          )}
-        </View>
-        <ProfileIdentity
-          profile={profile}
-          isBlacklisted={
-            !isMine &&
-            blacklistStatus.userId === String(profile.userId) &&
-            blacklistStatus.isBlacklisted
-          }
-        />
+      <View style={[styles.navbar, styles.navbarOverlay, { paddingTop: insets.top }]}>
+        <Pressable
+          accessibilityLabel="返回"
+          hitSlop={12}
+          onPress={() => router.back()}
+          style={styles.navButton}
+        >
+          <Image source={backIcon} style={styles.backIcon} />
+        </Pressable>
+        <View style={styles.navButton} />
       </View>
-
       <FlatList
         style={styles.scrollView}
         data={profileListItems}
         keyExtractor={(item) => item.key}
         renderItem={({ item }) => item.content}
-        ListHeaderComponent={profileIntro}
         ListFooterComponent={editProfileButton}
         ListFooterComponentStyle={isMine ? styles.profileListFooter : undefined}
         stickyHeaderIndices={[1]}
@@ -780,21 +782,22 @@ function ProfileIdentity({
           ) : null}
 
           {profile.sex === 1 || profile.sex === 2 ? (
-            <Image
-              source={profile.sex === 1 ? maleIcon : femaleIcon}
-              style={styles.gender}
-            />
-          ) : null}
-
-          {age ? (
-            <Text style={profile.sex === 2 ? styles.femaleAge : styles.male}>
-              {age}
-            </Text>
+            <View style={styles.headerPill}>
+              <Image
+                source={profile.sex === 1 ? maleIcon : femaleIcon}
+                style={styles.gender}
+              />
+              {age ? (
+                <Text
+                  style={profile.sex === 2 ? styles.femaleAge : styles.male}
+                >
+                  {age}
+                </Text>
+              ) : null}
+            </View>
           ) : null}
           {status ? (
-            <View
-              style={[styles.online, { backgroundColor: `${status.color}24` }]}
-            >
+            <View style={styles.headerPill}>
               <Image
                 source={
                   status.label === "游戏中" ? playingStatusIcon : idleStatusIcon
@@ -815,28 +818,6 @@ function ProfileIdentity({
         </View>
       </View>
     </View>
-  );
-}
-
-function Stat({
-  value,
-  label,
-  onPress,
-}: {
-  value: number;
-  label: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${label}列表，${value}人`}
-      onPress={onPress}
-      style={styles.stat}
-    >
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </Pressable>
   );
 }
 
@@ -1098,8 +1079,8 @@ function toLocalProfile(
 }
 
 function getStatus(onlineStatus: number, gameStatus: number) {
-  if (gameStatus === 1) return { label: "游戏中", color: "#1E5EFF" };
-  if (onlineStatus === 1) return { label: "空闲中", color: "#16C978" };
+  if (gameStatus === 1) return { label: "游戏中", color: "#F5821D" };
+  if (onlineStatus === 1) return { label: "空闲中", color: "#14A357" };
   return null;
 }
 
@@ -1129,7 +1110,58 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   retryText: { color: "#FF3158", fontFamily: DOUYIN_SANS, fontSize: 14 },
-  cover: { height: 185, overflow: "hidden", backgroundColor: "#617181" },
+  cover: {
+    overflow: "hidden",
+    backgroundColor: "#617181",
+    justifyContent: "flex-end",
+    paddingTop: 168,
+    paddingHorizontal: 16,
+    paddingBottom: 28,
+  },
+  headerPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    height: 18,
+    paddingHorizontal: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.15)",
+  },
+  headerStats: {
+    flexDirection: "row",
+    gap: 16,
+    marginTop: 12,
+  },
+  headerStat: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  headerStatValue: {
+    color: "#FFF",
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: "600",
+  },
+  headerStatLabel: {
+    color: "#FFF",
+    fontSize: 12,
+    lineHeight: 22,
+  },
+  headerIntro: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: "center",
+    marginTop: 12,
+  },
+  navbarOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
   scrollView: { flex: 1, backgroundColor: "#fff" },
   coverShade: {
     ...StyleSheet.absoluteFill,
@@ -1150,13 +1182,10 @@ const styles = StyleSheet.create({
   },
   backIcon: { width: 24, height: 24, tintColor: "#fff" },
   identity: {
-    position: "absolute",
-    left: 16,
-    right: 16,
-    bottom: 16,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    marginBottom: 12,
   },
   avatar: {
     width: 72,
@@ -1176,8 +1205,8 @@ const styles = StyleSheet.create({
   name: {
     flexShrink: 1,
     color: "#fff",
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 18,
+    lineHeight: 26,
     fontWeight: "600",
   },
   blacklistTag: {
@@ -1222,9 +1251,9 @@ const styles = StyleSheet.create({
   },
   onlineIcon: { width: 12, height: 12 },
   onlineText: {
-    fontFamily: DOUYIN_SANS,
-    fontSize: 12,
-    lineHeight: 12,
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: "500",
   },
   clubLine: { flexDirection: "row", alignItems: "center", gap: 6 },
   clubIcon: { width: 14, height: 14, tintColor: "#D7DCE2" },

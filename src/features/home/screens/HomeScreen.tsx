@@ -1,4 +1,5 @@
 import { CourtHomeScreen } from "@/features/court/screens/CourtHomeScreen";
+import GodListScreen from "@/features/god/screens/GodListScreen";
 import type { GameKey, HomeTab } from "@/features/home/api/home.types";
 import { ClubCard } from "@/features/home/components/ClubCard";
 import { HomeBackground } from "@/features/home/components/HomeBackground";
@@ -108,6 +109,8 @@ export default function HomeScreen() {
       <HomeTopBar tab={topTab} onTabChange={selectTopTab} />
       {isHomeLoading && topTab === "home" ? (
         <HomeSkeleton bottomPadding={100 + insets.bottom} />
+      ) : topTab === "god" ? (
+        <GodListScreen />
       ) : topTab === "court" ? (
         <CourtHomeScreen
           key={courtEntry}
