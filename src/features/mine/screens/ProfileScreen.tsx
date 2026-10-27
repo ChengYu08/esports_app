@@ -334,7 +334,7 @@ export default function ProfileScreen() {
           <Text style={styles.headerStatLabel}>粉丝</Text>
         </Pressable>
       </View>
-      <Text style={styles.headerIntro}>
+      <Text numberOfLines={2} ellipsizeMode="tail" style={styles.headerIntro}>
         {profile.signature || "暂无个人简介"}
       </Text>
     </View>
@@ -1122,7 +1122,8 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "#617181",
     justifyContent: "flex-end",
-    paddingTop: 168,
+    // 头像顶部距屏幕顶部 92(含状态栏),与头像下方留白(92)一致
+    paddingTop: 92,
     paddingHorizontal: 16,
     paddingBottom: 28,
   },
@@ -1160,7 +1161,7 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.6)",
     fontSize: 11,
     lineHeight: 16,
-    textAlign: "center",
+    textAlign: "left",
     marginTop: 12,
   },
   navbarOverlay: {
