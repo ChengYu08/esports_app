@@ -1,3 +1,4 @@
+import { Dismiss16Regular } from "@fluentui/react-native-icons";
 import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { router } from "expo-router";
@@ -35,7 +36,6 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 
-const closeIcon = require("../../../../assets/svgs/icon-close.svg");
 const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
 
 const PUBLISH_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
@@ -249,10 +249,10 @@ export function ClubQuickMatchSheet({
             ...(options?.expireTime ? { expireTime: options.expireTime } : {}),
             ...(game?.id && game.name
               ? {
-                  gameId: game.id,
-                  gameName: game.name,
-                  ...(game.iconUrl ? { gameIconUrl: game.iconUrl } : {}),
-                }
+                gameId: game.id,
+                gameName: game.name,
+                ...(game.iconUrl ? { gameIconUrl: game.iconUrl } : {}),
+              }
               : {}),
           },
         });
@@ -428,7 +428,9 @@ export function ClubQuickMatchSheet({
             onPress={onClose}
             style={styles.closeButton}
           >
-            <Image source={closeIcon} style={styles.closeIcon} />
+            <View style={styles.closeIcon}>
+              <Dismiss16Regular color="rgba(0, 0, 0, 0.2)" width={13} height={13} />
+            </View>
           </Pressable>
         </View>
 
@@ -721,6 +723,8 @@ const styles = StyleSheet.create({
   closeIcon: {
     width: 20,
     height: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
   scroll: {
     flexGrow: 0,

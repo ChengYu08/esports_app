@@ -1,6 +1,6 @@
+import { ChevronLeft24Regular, ChevronRight16Regular } from "@fluentui/react-native-icons";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
-import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
@@ -30,8 +30,6 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 
-const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
-const arrowIcon = require("../../../../assets/mine/figma/mine-arrow-right.svg");
 const avatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const SMS_NOTIFY_KEY_PREFIX = "pzdj:sms-notify:";
 
@@ -253,7 +251,7 @@ export default function AccountSettingsScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Image source={backIcon} style={styles.backIcon} />
+          <ChevronLeft24Regular color="#0A0A0A" width={24} height={24} style={styles.backIcon} />
         </Pressable>
         <Text style={styles.headerTitle}>账号设置</Text>
         <View style={styles.headerSpace} />
@@ -471,7 +469,7 @@ function SettingRow({
             {value}
           </Text>
         )}
-        {onPress ? <Image source={arrowIcon} style={styles.arrow} /> : null}
+        {onPress ? <ChevronRight16Regular color="#0A0A0A" width={16} height={16} style={styles.arrow} /> : null}
       </View>
     </Pressable>
   );
@@ -528,7 +526,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   backButton: { width: 28, height: 28, justifyContent: "center" },
-  backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
+  backIcon: { width: 24, height: 24 },
   headerSpace: { width: 28 },
   headerTitle: {
     color: "#0A0A0A",

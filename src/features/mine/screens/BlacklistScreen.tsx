@@ -1,4 +1,4 @@
-import { Image } from "expo-image";
+import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -19,8 +19,6 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { requireLogin } from "@/shared/navigation/require-login";
-
-const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 
 export default function BlacklistScreen() {
   const insets = useSafeAreaInsets();
@@ -64,7 +62,7 @@ export default function BlacklistScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Image source={backIcon} style={styles.backIcon} />
+          <ChevronLeft24Regular color="#0A0A0A" width={24} height={24} style={styles.backIcon} />
         </Pressable>
         <Text style={styles.headerTitle}>黑名单</Text>
         <View style={styles.headerSpace} />
@@ -153,7 +151,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#EBEBEB",
   },
   backButton: { width: 28, height: 28, justifyContent: "center" },
-  backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
+  backIcon: { width: 24, height: 24 },
   headerSpace: { width: 28 },
   headerTitle: {
     color: "#0A0A0A",

@@ -1,5 +1,5 @@
+import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { useAuthStore } from "@esports/auth";
-import { Image } from "expo-image";
 import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useState } from "react";
@@ -17,7 +17,6 @@ import { useQuickMatchSession } from "@/features/match/hooks/use-quick-match-ses
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 
-const backIcon = require("../../../../assets/svgs/icon-back.svg");
 const BG_GRADIENT = ["#0C0C2E", "#120D2B"] as const;
 
 type MatchMatchingScreenProps = {
@@ -135,7 +134,7 @@ export default function MatchMatchingScreen({
             onPress={leaveMatchFlow}
             style={styles.backButton}
           >
-            <Image source={backIcon} style={styles.backIcon} />
+            <ChevronLeft24Regular color="white" width={24} height={24} style={styles.backIcon} />
           </Pressable>
           <Text style={styles.navTitle}>
             {hasCandidates ? "选择陪玩" : "一键匹配"}

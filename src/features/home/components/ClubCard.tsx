@@ -11,17 +11,19 @@ const icons = {
   id: require("../../../../assets/home/h_id.svg"),
 };
 
-export function ClubCard({ club }: { club: Club }) {
+export function ClubCard({ club, onSelect }: { club: Club; onSelect?: (club: Club) => void }) {
   const colors = ["#24354b", "#4a2637", "#2e4650", "#493e2e"];
   const hue = colors[Number(club.id.match(/\d+$/)?.[0] ?? 0) % 4];
+  const handlePress = () => {
+    onSelect?.(club);
+    router.push({ pathname: "/club/[id]", params: { id: club.id } });
+  };
 
   return (
     <Pressable
       accessibilityLabel={`查看${club.name}详情`}
       style={styles.club}
-      onPress={() =>
-        router.push({ pathname: "/club/[id]", params: { id: club.id } })
-      }
+      onPress={handlePress}
     >
       <View style={[styles.cover, { backgroundColor: hue }]}>
         {club.coverUrl ? (

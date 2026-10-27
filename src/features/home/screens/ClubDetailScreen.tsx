@@ -1,3 +1,4 @@
+import { ChevronLeft24Regular, Search24Regular } from "@fluentui/react-native-icons";
 import { useAuthStore } from "@esports/auth";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
@@ -38,8 +39,6 @@ import {
 
 const tabLeftCorner = require("../../../../assets/home/h_tab_left.svg");
 const tabRightCorner = require("../../../../assets/home/h_tab_right.svg");
-const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
-const searchIcon = require("../../../../assets/home/club-detail/icon-search.svg");
 const maleIcon = require("../../../../assets/home/club-detail/male.svg");
 const femaleIcon = require("../../../../assets/home/club-detail/female.svg");
 const memberIcon = require("../../../../assets/coms/user.svg");
@@ -235,7 +234,7 @@ export default function ClubDetailScreen() {
             hitSlop={10}
             onPress={() => router.back()}
           >
-            <Image source={backIcon} style={styles.navIconImage} />
+            <ChevronLeft24Regular color="white" width={24} height={24} style={styles.navIconImage} />
           </Pressable>
           <View style={styles.navTitleSpacer} />
           <View style={styles.navActions}>
@@ -249,7 +248,7 @@ export default function ClubDetailScreen() {
                 })
               }
             >
-              <Image source={searchIcon} style={styles.navIconImage} />
+              <Search24Regular color="white" width={24} height={24} style={styles.navIconImage} />
             </Pressable>
           </View>
         </View>

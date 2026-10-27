@@ -1,3 +1,4 @@
+import { Dismiss16Regular } from "@fluentui/react-native-icons";
 import { useAuthStore } from '@esports/auth';
 import { useMutation } from '@tanstack/react-query';
 import { Image } from 'expo-image';
@@ -18,7 +19,6 @@ const defaultAvatar = require('../../../../assets/coms/avatar_default.webp');
 const femaleIcon = require('../../../../assets/voice-room/member-female.svg');
 const maleIcon = require('../../../../assets/home/club-detail/male.svg');
 const idIcon = require('../../../../assets/voice-room/member-id.svg');
-const closeIcon = require('../../../../assets/voice-room/member-close.svg');
 
 type Props = {
   visible: boolean;
@@ -118,7 +118,9 @@ export function VoiceRoomMemberSheet({ visible, member, room, roomId, onClose, o
             <Image source={avatarSource} contentFit="cover" style={styles.avatar} accessibilityLabel={`${nickname}的头像`} />
           </View>
           <Pressable accessibilityRole="button" accessibilityLabel="关闭用户资料" onPress={onClose} hitSlop={8} style={styles.close}>
-            <Image source={closeIcon} style={styles.closeIcon} />
+            <View style={styles.closeIcon}>
+              <Dismiss16Regular color="#161823" width={16} height={16} />
+            </View>
           </Pressable>
         </View>
 
@@ -194,7 +196,14 @@ const styles = StyleSheet.create({
   avatarShadow: { width: 88, height: 88, borderRadius: 44, borderWidth: 4, borderColor: '#FFFFFF', backgroundColor: '#ECEBEF', shadowColor: '#000000', shadowOffset: { width: -5, height: -3 }, shadowOpacity: 0.1, shadowRadius: 28, elevation: 5 },
   avatar: { width: 80, height: 80, borderRadius: 40 },
   close: { position: 'absolute', right: 13, top: 12 },
-  closeIcon: { width: 28, height: 28 },
+  closeIcon: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+  },
   body: { paddingHorizontal: 16, alignItems: 'center' },
   nickname: { color: '#161823', fontSize: 20, lineHeight: 28, fontWeight: '500', textAlign: 'center' },
   meta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 8, minHeight: 18 },

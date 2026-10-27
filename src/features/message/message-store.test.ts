@@ -8,6 +8,10 @@ vi.mock('@/features/auth/client-auth.api', () => ({
   clientAuthApi: { getUserOnlineStatus: vi.fn(async () => ({})) },
 }));
 vi.mock('@/core/storage/storage', () => ({ storage: { get: vi.fn(async () => null) } }));
+vi.mock('@/features/mine/api/blacklist.api', () => ({
+  addBlacklistedUser: vi.fn(),
+  removeBlacklistedUser: vi.fn(),
+}));
 vi.mock('./rongcloud-im', () => ({
   isRongCloudAvailable: vi.fn(),
   initializeRongCloud: vi.fn(),
@@ -46,6 +50,26 @@ function makeAdapter(overrides: Partial<MessageAdapter> = {}) {
 }
 
 describe('message store', () => {
+  it('keeps customer service identity through history refresh and incoming replies', async () => {
+    let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
+    const adapter = makeAdapter({
+      getConversations: vi.fn(async () => [conversation]),
+      subscribeMessages: (listener) => { receiveMessage = listener; return () => undefined; },
+    });
+    const store = createMessageStore(adapter);
+    await store.getState().initialize('token');
+    await store.getState().openConversation({
+      id: '42', title: '【官方客服】小盼', isCustomerService: true,
+    });
+    await store.getState().refreshConversations('token');
+    receiveMessage?.('42', { ...sentMessage, isMine: false }, conversation);
+    expect(store.getState().conversations[0]).toMatchObject({
+      id: '42', title: '【官方客服】小盼', isCustomerService: true,
+    });
+    await store.getState().reset();
+    expect(store.getState().conversations).toEqual([]);
+  });
+
   it('keeps IM ready and receives live messages when history synchronization fails', async () => {
     let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
     const adapter = makeAdapter({
