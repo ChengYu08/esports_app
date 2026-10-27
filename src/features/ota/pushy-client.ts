@@ -13,8 +13,8 @@ export const pushyClient =
         appKey: androidAppKey,
         // 关闭自动检查，等同意隐私后再手动 checkUpdate
         checkStrategy: null,
-        // SDK 默认弹窗；网络错误不打扰用户
-        updateStrategy: "alertUpdateAndIgnoreError",
+        // 静默下载，稍后切换；远端配置可覆盖
+        updateStrategy: "silentAndLater",
         // 同意隐私前禁止原生冷启动检查发网络请求
         disableNativeCheck: true,
       })
