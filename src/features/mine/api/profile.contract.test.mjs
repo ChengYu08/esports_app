@@ -159,6 +159,37 @@ test("derives route prerequisites before enabling profile requests", () => {
   assert.equal(getProfileRouteParams({ clubId: ["1000003"], userId: ["50100028"] }), null);
 });
 
+test("loads a regular user's own homepage without a club or explicit route ID", async () => {
+  const params = getProfileRouteParams({}, "50100029");
+  assert.deepEqual(params, { userId: "50100029" });
+  const requests = [];
+  const api = createProfileContract(async (path, options) => {
+    requests.push({ path, options });
+    return {
+      code: "SUCCESS",
+      data: { userId: 50100029, nickname: "普通用户", followCount: 7, fansCount: 3 },
+    };
+  });
+
+  const profile = await api.fetchProfileDetail(params);
+
+  assert.equal(profile.userId, 50100029);
+  assert.equal(profile.followCount, 7);
+  assert.equal(profile.fansCount, 3);
+  assert.equal(profile.clubId, 0);
+  assert.deepEqual(profile.games, []);
+  assert.deepEqual(requests, [{
+    path: "/client/v1/companion/public/detail",
+    options: { method: "POST", body: { userId: 50100029 } },
+  }]);
+});
+
+test("keeps the viewed user's ID ahead of the current user and requires login for a route-less homepage", () => {
+  assert.deepEqual(getProfileRouteParams({ userId: "50100030" }, "50100029"), { userId: "50100030" });
+  assert.equal(getProfileRouteParams({}), null);
+  assert.equal(getProfileRouteParams({ userId: ["50100030"] }, "50100029"), null);
+});
+
 test("selects the first supported game for initial profile content", () => {
   assert.equal(getFirstProfileGameId([{ gameId: 11, gameName: "三角洲行动手游", companionGameId: 30 }]), "11");
   assert.equal(getFirstProfileGameId([]), "");

@@ -1,3 +1,4 @@
+import { ChevronRight16Regular } from "@fluentui/react-native-icons";
 import { CourtSelectedReviewCard } from "@/features/court/components/CourtSelectedReviewCard";
 import { complaintStyles } from "@/features/court/complaint.styles";
 import { CachedImage } from "@/shared/ui/CachedImage";
@@ -317,10 +318,7 @@ export function TicketFormSection({
             >
               {target?.nickname || "请选择"}
             </Text>
-            <CachedImage
-              source={require("../../../../assets/court/ticket-arrow-right.svg")}
-              style={styles.targetArrow}
-            />
+            <ChevronRight16Regular color="#999999" width={18} height={18} style={styles.targetArrow} />
           </View>
         </Pressable>
       )}

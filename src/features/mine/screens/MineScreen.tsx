@@ -1,13 +1,16 @@
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
+  Apps24Regular,
   ChevronRight16Regular,
   Dismiss24Regular,
+  Headset24Regular,
+  Settings24Regular,
 } from "@fluentui/react-native-icons";
-import { Image, type ImageSource } from "expo-image";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useMemo, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -22,6 +25,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { fetchStarBalance } from "@/features/mine/api/companion-order.api";
 import { useUserFollowCount } from "@/features/mine/hooks/use-user-follow";
+import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
 import {
   resolveVoiceRoomId,
   voiceRoomApi,
@@ -31,19 +35,19 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const avatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const clubFlag = require("../../../../assets/mine/figma/mine-club-flag.svg");
-const settingsIcon = require("../../../../assets/mine/figma/mine-settings.svg");
 const maleIcon = require("../../../../assets/home/club-detail/male.svg");
 const femaleIcon = require("../../../../assets/home/club-detail/female.svg");
 const companionEntryQrCode = require("../../../../assets/coms/qrcode-pws.png");
 const menuRoomIcon = require("../../../../assets/mine/figma/mine-menu-room.svg");
 const menuCompanionIcon = require("../../../../assets/mine/figma/mine-menu-companion.svg");
-const menuSettingsIcon = require("../../../../assets/mine/figma/mine-menu-settings.svg");
 
 type MenuItem = {
   key: string;
-  icon: ImageSource;
+  icon: ReactNode;
   onPress: () => void;
   title: string;
+  disabled?: boolean;
+  busy?: boolean;
 };
 
 /** 由出生日期计算周岁；无法解析或年龄非法时返回 null。 */
@@ -88,6 +92,7 @@ export default function MineScreen() {
   );
   const [qrCodeVisible, setQrCodeVisible] = useState(false);
   const [openingVoiceRoom, setOpeningVoiceRoom] = useState(false);
+  const { entering: enteringCustomerService, openCustomerService } = useCustomerServiceEntry();
 
   const userId = user?.id;
 
@@ -210,13 +215,13 @@ export default function MineScreen() {
     {
       key: "room",
       title: openingVoiceRoom ? "正在进入房间" : "我的房间",
-      icon: menuRoomIcon,
+      icon: <Image source={menuRoomIcon} contentFit="contain" style={styles.menuIcon} />,
       onPress: () => void openMyRoom(),
     },
     {
       key: "companion",
       title: isCompanion ? "陪玩管理" : "成为陪玩师",
-      icon: menuCompanionIcon,
+      icon: <Image source={menuCompanionIcon} contentFit="contain" style={styles.menuIcon} />,
       onPress: () =>
         isCompanion
           ? router.push("/companion-dashboard")
@@ -225,8 +230,16 @@ export default function MineScreen() {
     {
       key: "settings",
       title: "基础设置",
-      icon: menuSettingsIcon,
+      icon: <Apps24Regular color="#1A1A1A" width={18} height={18} />,
       onPress: () => router.push("/basic-settings"),
+    },
+    {
+      key: "customer-service",
+      title: "在线客服",
+      icon: <Headset24Regular color="#1A1A1A" width={18} height={18} />,
+      onPress: openCustomerService,
+      disabled: enteringCustomerService,
+      busy: enteringCustomerService,
     },
   ] satisfies readonly MenuItem[];
 
@@ -259,7 +272,7 @@ export default function MineScreen() {
               onPress={() => router.push("/basic-settings")}
               style={styles.settingsButton}
             >
-              <Image source={settingsIcon} style={styles.settingsIcon} />
+              <Settings24Regular color="#333333" width={24} height={24} style={styles.settingsIcon} />
             </Pressable>
           </View>
           <View style={styles.profile}>
@@ -411,14 +424,16 @@ function CompanionQrModal({
   );
 }
 
-function MenuRow({ icon, title, onPress }: MenuItem) {
+function MenuRow({ icon, title, onPress, disabled, busy }: MenuItem) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={{ disabled, busy }}
+      disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [styles.menuRow, pressed && styles.menuPressed]}
     >
-      <Image source={icon} contentFit="contain" style={styles.menuIcon} />
+      {icon}
       <Text style={styles.menuTitle}>{title}</Text>
       <ChevronRight16Regular color="#B6B6B6" width={14} height={14} />
     </Pressable>
@@ -440,7 +455,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  settingsIcon: { width: 24, height: 24, tintColor: "#333333" },
+  settingsIcon: { width: 24, height: 24 },
   profile: {
     minHeight: 76,
     paddingHorizontal: 16,

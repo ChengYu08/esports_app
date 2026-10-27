@@ -11,6 +11,7 @@
     "@esports/sso-sdk": "*"
   },
   "peerDependencies": {
+    "@fluentui/react-native-icons": "^2.0.343",
     "expo-image": "~57.0.5",
     "react": "19.2.3",
     "react-native": "0.86.3",

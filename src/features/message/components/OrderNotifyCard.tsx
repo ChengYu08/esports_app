@@ -1,3 +1,4 @@
+import { ChevronRight16Regular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -6,7 +7,6 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 import type { OrderNotifyCardMessage } from "../chat-message";
 
 const orderAssistantCoin = require("../../../../assets/message/order-assistant-coin-3f6fcf.png");
-const chatArrowRight = require("../../../../assets/mine/figma/mine-arrow-right.svg");
 
 type OrderNotifyCardProps = {
   item: OrderNotifyCardMessage;
@@ -63,7 +63,7 @@ export const OrderNotifyCard = memo(function OrderNotifyCard({
               <Image source={orderAssistantCoin} style={styles.coin} />
             </>
           ) : null}
-          {canOpenOrder ? <Image source={chatArrowRight} style={styles.arrow} /> : null}
+          {canOpenOrder ? <ChevronRight16Regular color="#0A0A0A" width={16} height={16} style={styles.arrow} /> : null}
         </View>
       </View>
     </Pressable>

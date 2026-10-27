@@ -24,7 +24,7 @@ import { CompanionDashboardHeader } from "../components/CompanionDashboardHeader
 import { CompanionImagePreview } from "../components/CompanionImagePreview";
 import { useManagedGame } from "../hooks/use-companion-management";
 
-const MAX_IMAGES = 8;
+const MAX_IMAGES = 9;
 type PendingImage = { id: number; asset: ImagePicker.ImagePickerAsset };
 
 export default function CompanionGalleryScreen() {
@@ -53,7 +53,7 @@ export default function CompanionGalleryScreen() {
   const addImages = async () => {
     if (busyRef.current || !managed.enabled || !gameId) return;
     if (images.length >= MAX_IMAGES) {
-      Toast.show("最多上传8张截图", { position: Toast.positions.CENTER });
+      Toast.show(`最多上传${MAX_IMAGES}张截图`, { position: Toast.positions.CENTER });
       return;
     }
     busyRef.current = true;
@@ -205,7 +205,7 @@ export default function CompanionGalleryScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="添加技能截图"
-              accessibilityHint="最多8张，每张不超过2MB"
+              accessibilityHint={`最多${MAX_IMAGES}张，每张不超过2MB`}
               accessibilityState={{ disabled: busy }}
               disabled={busy}
               onPress={() => void addImages()}

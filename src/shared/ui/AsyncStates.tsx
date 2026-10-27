@@ -16,12 +16,12 @@ type EmptyStateProps = StateProps & {
 
 const emptyStateIllustration = require("../../../assets/coms/empty-state-illustration.svg");
 
-export function LoadingState({ message = "加载中…", style }: StateProps & { style?: StyleProp<ViewStyle> }) {
+export function LoadingState({ message = "加载中…", style, messageStyle }: StateProps & { style?: StyleProp<ViewStyle>; messageStyle?: StyleProp<TextStyle> }) {
   return (
     <View style={[styles.loadingState, style]}>
       <SkeletonList message={message} />
       <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        <Text style={styles.loadingMessage}>{message}</Text>
+        <Text style={[styles.loadingMessage, messageStyle]}>{message}</Text>
       </View>
     </View>
   );
@@ -37,12 +37,12 @@ export function EmptyState({ message = "这里空无一物～", hint, style, mes
   );
 }
 
-export function ErrorState({ message = "加载失败，请重试", onRetry }: StateProps & { onRetry: () => void }) {
+export function ErrorState({ message = "加载失败，请重试", onRetry, messageStyle, retryTextStyle }: StateProps & { onRetry: () => void; messageStyle?: StyleProp<TextStyle>; retryTextStyle?: StyleProp<TextStyle> }) {
   return (
     <View style={styles.errorWrap}>
-      <Text style={styles.message}>{message}</Text>
+      <Text style={[styles.message, messageStyle]}>{message}</Text>
       <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retry}>
-        <Text style={styles.retryText}>重试</Text>
+        <Text style={[styles.retryText, retryTextStyle]}>重试</Text>
       </Pressable>
     </View>
   );

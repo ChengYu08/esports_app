@@ -1,3 +1,4 @@
+import { ChevronLeft24Regular, Copy16Regular } from "@fluentui/react-native-icons";
 import {
   courtApi,
   formatTime,
@@ -111,10 +112,7 @@ export default function CourtTicketDetailScreen() {
           onPress={() => router.back()}
           style={styles.back}
         >
-          <CachedImage
-            source={require("../../../../assets/court/ticket-back.svg")}
-            style={styles.backIcon}
-          />
+          <ChevronLeft24Regular color="#0D0D0F" width={24} height={24} style={styles.backIcon} />
         </Pressable>
         <Text style={styles.title}>工单详情</Text>
         <View style={styles.back} />
@@ -164,11 +162,7 @@ export default function CourtTicketDetailScreen() {
                           <Text numberOfLines={1} style={styles.metadataValue}>
                             {ticketNumber || "-"}
                           </Text>
-                          <CachedImage
-                            source={require("../../../../assets/coms/copy.svg")}
-                            style={styles.copyIcon}
-                            tintColor="#ABABAD"
-                          />
+                          <Copy16Regular color="#ABABAD" width={12} height={12} style={styles.copyIcon} />
                         </Pressable>
                       </View>
                       <View style={styles.metadataCell}>

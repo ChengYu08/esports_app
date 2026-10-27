@@ -1,3 +1,4 @@
+import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -22,15 +23,13 @@ import {
   sanitizeCode,
   sanitizePhone,
 } from "./password-validation";
+import { PasswordVisibilityIcon } from "./PasswordVisibilityIcon";
 import { DOUYIN_SANS } from "./typography";
 
 const topArt = require("../assets/top-login.svg");
-const backIcon = require("../assets/back.svg");
 const phoneIcon = require("../assets/phone.svg");
 const lockIcon = require("../assets/lock.svg");
 const wechatIcon = require("../assets/wechat.svg");
-const eyeOpenIcon = require("../assets/eye-open.svg");
-const eyeClosedIcon = require("../assets/eye-closed.svg");
 
 export type LoginPayload = { phone: string; code: string };
 export type PasswordLoginPayload = { username: string; password: string };
@@ -178,11 +177,9 @@ export function LoginScreen({
               onPress={onBack}
               style={[styles.back, { top: insets.top + 8 }]}
             >
-              <Image
-                source={backIcon}
-                style={styles.backImage}
-                contentFit="contain"
-              />
+              <View style={styles.backImage}>
+                <ChevronLeft24Regular color="#333333" width={18} height={18} />
+              </View>
             </Pressable>
           </View>
           <View style={[styles.content, compact && styles.compactContent]}>
@@ -240,12 +237,7 @@ export function LoginScreen({
                       onPress={() => setPasswordVisible((visible) => !visible)}
                       style={styles.eyeButton}
                     >
-                      <Image
-                        accessible={false}
-                        source={passwordVisible ? eyeOpenIcon : eyeClosedIcon}
-                        style={styles.eyeIcon}
-                        contentFit="contain"
-                      />
+                      <PasswordVisibilityIcon visible={passwordVisible} size={20} />
                     </Pressable>
                     <View style={styles.divider} />
                     <Pressable
@@ -473,7 +465,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  backImage: { width: 24, height: 24 },
+  backImage: {
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   content: {
     marginTop: -12,
     width: "100%",
@@ -516,7 +513,6 @@ const styles = StyleSheet.create({
   sendDisabled: { color: "#bbb" },
   passwordActions: { flexDirection: "row", alignItems: "center", gap: 10 },
   eyeButton: { width: 24, height: 24, justifyContent: "center" },
-  eyeIcon: { width: 20, height: 20 },
   forgotPassword: {
     color: "#999",
     fontFamily: DOUYIN_SANS,

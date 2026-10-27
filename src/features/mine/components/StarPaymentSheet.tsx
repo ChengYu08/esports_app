@@ -1,3 +1,4 @@
+import { Dismiss16Regular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -14,7 +15,6 @@ import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 
 const starDiamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
-const paymentCloseIcon = require("../../../../assets/mine/payment-close.svg");
 const CONFIRM_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
 
 type StarPaymentSheetProps = {
@@ -101,7 +101,9 @@ export function StarPaymentSheet({
             onPress={() => void onClose()}
             style={styles.paymentClose}
           >
-            <Image source={paymentCloseIcon} style={styles.paymentCloseIcon} />
+            <View style={styles.paymentCloseIcon}>
+              <Dismiss16Regular color="#CCCCCC" width={15} height={15} />
+            </View>
           </Pressable>
         </View>
         <View style={styles.paymentRows}>
@@ -203,7 +205,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  paymentCloseIcon: { width: 24, height: 24 },
+  paymentCloseIcon: {
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   paymentRows: {
     paddingHorizontal: 16,
     paddingBottom: 12,

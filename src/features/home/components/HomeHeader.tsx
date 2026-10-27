@@ -1,3 +1,4 @@
+import { Search24Regular } from "@fluentui/react-native-icons";
 import type {
   Banner,
   Game,
@@ -12,7 +13,6 @@ import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 // const banner = require("../../../../assets/home/h_banner.png");
-const searchIcon = require("../../../../assets/home/h_search.svg");
 const filterIcon = require("../../../../assets/home/h_filter_list.svg");
 const tabLeftCorner = require("../../../../assets/home/h_tab_left.svg");
 const tabRightCorner = require("../../../../assets/home/h_tab_right.svg");
@@ -128,7 +128,9 @@ export function HomeTopBar({ tab, onTabChange }: Pick<HomeHeaderProps, "tab" | "
       </View>
       <View style={styles.actions}>
         <Pressable accessibilityLabel="搜索" style={styles.search} onPress={() => router.push({ pathname: "/search", params: { type: "club" } })}>
-          <Image source={searchIcon} style={styles.searchIcon} />
+          <View style={styles.searchIcon}>
+            <Search24Regular color="#1A1A1A" width={20} height={20} />
+          </View>
         </Pressable>
       </View>
     </View>
@@ -191,7 +193,12 @@ const styles = StyleSheet.create({
   },
   actions: { alignItems: "center", flexDirection: "row", gap: 10, height: "100%", paddingRight: 12 },
   search: { alignItems: "center", height: 44, justifyContent: "center", width: 40 },
-  searchIcon: { width: 48, height: 48 },
+  searchIcon: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   banner: {
     marginHorizontal: 12,
     alignSelf: "stretch",

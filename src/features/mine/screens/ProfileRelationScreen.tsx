@@ -1,6 +1,5 @@
 import { useAuthStore } from "@esports/auth";
-import { Person24Regular } from "@fluentui/react-native-icons";
-import { Image } from "expo-image";
+import { ChevronLeft24Regular, Person24Regular } from "@fluentui/react-native-icons";
 import { useLocalSearchParams, router } from "expo-router";
 import { useState } from "react";
 import {
@@ -28,7 +27,6 @@ import { CachedImage } from "@/shared/ui/CachedImage";
 import { EmptyState, ErrorState } from "@/shared/ui/AsyncStates";
 
 const fallbackAvatar = require("../../../../assets/coms/avatar_default.webp");
-const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 
 function isUnavailableUser(user: UserFollowUser) {
   return user.nickname === "账号被封禁" || user.nickname === "账号已注销";
@@ -130,7 +128,7 @@ export default function ProfileRelationScreen() {
             onPress={() => router.back()}
             style={styles.backButton}
           >
-            <Image source={backIcon} style={styles.backIcon} />
+            <ChevronLeft24Regular color="#0A0A0A" width={24} height={24} style={styles.backIcon} />
           </Pressable>
           <View style={styles.tabBar}>
             <Pressable
@@ -318,7 +316,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
+  backIcon: { width: 24, height: 24 },
   tabBar: {
     flex: 1,
     height: 44,

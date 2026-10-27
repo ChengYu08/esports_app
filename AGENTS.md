@@ -58,6 +58,8 @@ Docs: https://docs.expo.dev/eas/index.md
 - 还原figma 页面，需要自动切图，如何切图根据当前页面的功能进行分析，是否会有变化的地方，切图尽量大。
 - 需要查看当前项目package.json 已经存在的库，在执行策略。
 - figma 页面 顶部手机状态栏需要去掉，真实代码不需要这个，真机默认会有
+- 读取figma的时候 字体的样式 字号 字重 都要读取，不要只用douyinsans字体
+- 注释用中文写，不要用英文
 - 代码里面不要用void fn (){ } 这种写法
 - 如果是需要用if 不要用 if() return; 这种写法，都要用
 
@@ -80,3 +82,5 @@ onPress={void fn()}
 ```
 onPress={fn}
 ```
+
+- 优先复用我们现有的@fluentui/react-native-icons里面的图标不要一上来就下载figma里面的svg,这样会导致项目打包体积变大

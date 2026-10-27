@@ -1,13 +1,14 @@
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
+  ChevronLeft24Regular,
   Edit24Regular,
   MoreHorizontal24Regular,
 } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import {
   FlatList,
   Pressable,
@@ -50,6 +51,7 @@ import {
 } from "@/features/mine/hooks/use-profile-data";
 import {
   useToggleUserFollow,
+  useUserFollowCount,
   useUserFollowState,
 } from "@/features/mine/hooks/use-user-follow";
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
@@ -71,7 +73,6 @@ const background = require("../../../../assets/mine/figma/profile-bg.png");
 const maleIcon = require("../../../../assets/home/club-detail/male.svg");
 const femaleIcon = require("../../../../assets/mine/figma/mine-female.svg");
 const clubIcon = require("../../../../assets/mine/figma/mine-club-flag.svg");
-const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const diamondIcon = require("../../../../assets/home/club-detail/icon-diamond.svg");
 const idleStatusIcon = require("../../../../assets/home/club-detail/status-idle.svg");
 const playingStatusIcon = require("../../../../assets/home/club-detail/status-playing.svg");
@@ -85,7 +86,7 @@ export default function ProfileScreen() {
     clubId?: string | string[];
     userId?: string | string[];
   }>();
-  const routeParams = getProfileRouteParams(route);
+  const routeParams = getProfileRouteParams(route, user?.id);
   const isMine = !routeParams || String(user?.id ?? "") === routeParams.userId;
   const [tab, setTab] = useState<ProfileTab>("技能");
   const [selectedGameId, setSelectedGameId] = useState("");
@@ -109,6 +110,15 @@ export default function ProfileScreen() {
   const chatCheckPendingRef = useRef(false);
   const detailQuery = useProfileDetail(routeParams);
   const detail = detailQuery.data;
+  const profileUserId = routeParams?.userId;
+  const { data: followCount, refetch: refetchFollowCount } = useUserFollowCount(profileUserId);
+  useFocusEffect(
+    useCallback(() => {
+      if (profileUserId) {
+        refetchFollowCount().catch(() => undefined);
+      }
+    }, [profileUserId, refetchFollowCount]),
+  );
   const followStateQuery = useUserFollowState(
     !isMine && detail ? String(detail.userId) : undefined,
   );
@@ -246,8 +256,8 @@ export default function ProfileScreen() {
     try {
       if (await isUserBlacklisted(profile.userId)) {
         Toast.show("该用户已在黑名单中，无法发起聊天", {
-          duration: Toast.durations.SHORT,
-        });
+        duration: Toast.durations.SHORT,
+      });
         return;
       }
 
@@ -293,12 +303,12 @@ export default function ProfileScreen() {
     <View style={styles.scrollIntro}>
       <View style={styles.stats}>
         <Stat
-          value={profile.followCount}
+          value={followCount?.followCount ?? profile.followCount}
           label="关注"
           onPress={() => openProfileRelation("following")}
         />
         <Stat
-          value={profile.fansCount}
+          value={followCount?.fansCount ?? profile.fansCount}
           label="粉丝"
           onPress={() => openProfileRelation("fans")}
         />
@@ -529,7 +539,7 @@ export default function ProfileScreen() {
             onPress={() => router.back()}
             style={styles.navButton}
           >
-            <Image source={backIcon} style={styles.backIcon} />
+            <ChevronLeft24Regular color="#fff" width={24} height={24} style={styles.backIcon} />
           </Pressable>
           {!isMine ? (
             <Pressable
@@ -640,8 +650,8 @@ export default function ProfileScreen() {
             Toast.show(message, { duration: Toast.durations.SHORT });
           const failed = (error: unknown) =>
             Toast.show(error instanceof Error ? error.message : "操作失败", {
-              duration: Toast.durations.SHORT,
-            });
+        duration: Toast.durations.SHORT,
+      });
           if (isTargetBlacklisted) {
             void removeFromBlacklist(String(profile.userId), token)
               .then(() => done("已取消拉黑"))
@@ -754,8 +764,8 @@ export default function ProfileScreen() {
     try {
       if (await isUserBlacklisted(profile.userId)) {
         Toast.show("该用户已在黑名单中，无法下单", {
-          duration: Toast.durations.SHORT,
-        });
+        duration: Toast.durations.SHORT,
+      });
         return;
       }
       setOrderCard(card);
@@ -766,7 +776,6 @@ export default function ProfileScreen() {
     }
   }
 }
-
 
 function ProfileIdentity({
   profile,
@@ -841,7 +850,7 @@ function ProfileIdentity({
                 }
                 style={styles.onlineIcon}
               />
-              <Text style={[styles.onlineText, { color: status.color }]}>
+              <Text numberOfLines={1} style={[styles.onlineText, { color: status.color }]}>
                 {status.label}
               </Text>
             </View>
@@ -1012,7 +1021,6 @@ function ServiceCard({
   );
 }
 
-
 function ReviewCard({ review }: { review: ProfileReview }) {
   return (
     <View style={styles.reviewCard}>
@@ -1143,7 +1151,6 @@ function getStatus(onlineStatus: number, gameStatus: number) {
   return null;
 }
 
-
 function formatReviewDate(value?: string) {
   if (!value) return "";
   const date = new Date(value);
@@ -1188,7 +1195,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  backIcon: { width: 24, height: 24, tintColor: "#fff" },
+  backIcon: { width: 24, height: 24 },
   identity: {
     position: "absolute",
     left: 16,
@@ -1254,17 +1261,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 2,
-    minHeight: 18,
-    maxHeight: 18,
+    minHeight: 20,
     borderRadius: 3,
     paddingHorizontal: 4,
-    paddingVertical: 4,
+    paddingVertical: 2,
   },
   onlineIcon: { width: 12, height: 12 },
   onlineText: {
     fontFamily: DOUYIN_SANS,
     fontSize: 12,
-    lineHeight: 12,
+    lineHeight: 16,
+    includeFontPadding: false,
   },
   clubLine: { flexDirection: "row", alignItems: "center", gap: 6 },
   clubIcon: { width: 14, height: 14, tintColor: "#D7DCE2" },

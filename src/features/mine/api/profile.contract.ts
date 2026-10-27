@@ -202,11 +202,14 @@ function mapReviews(data: ApiProfileReviewPage): ProfileReviewPage {
 export function getProfileRouteParams(params: {
   clubId?: string | string[];
   userId?: string | string[];
-}): ProfileRouteParams | null {
-  if (typeof params.userId !== "string" || !params.userId.trim()) return null;
+}, currentUserId?: string): ProfileRouteParams | null {
+  const userId = params.userId ?? currentUserId;
+  if (typeof userId !== "string" || !userId.trim()) {
+    return null;
+  }
   if (params.clubId !== undefined && typeof params.clubId !== "string") return null;
   const clubId = typeof params.clubId === "string" && params.clubId.trim() ? params.clubId : undefined;
-  return { ...(clubId ? { clubId } : {}), userId: params.userId };
+  return { ...(clubId ? { clubId } : {}), userId };
 }
 
 export function getFirstProfileGameId(games: { gameId: number }[]): string {

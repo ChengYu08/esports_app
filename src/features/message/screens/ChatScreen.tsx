@@ -1,5 +1,9 @@
 import { useAuthStore } from "@esports/auth";
-import { HeadphonesRegular } from "@fluentui/react-native-icons";
+import {
+  ChevronLeft24Regular,
+  ChevronRight16Regular,
+  HeadphonesRegular,
+} from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
@@ -32,6 +36,7 @@ import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { CsInviteCard } from "../components/CsInviteCard";
 import { OrderNotifyCard } from "../components/OrderNotifyCard";
+import { touchCustomerServiceSession } from "../customer-service.api";
 import { resolveConversationAvatar } from "../message-avatar";
 import type { ManagedMessage } from "../message-state";
 import { useMessageStore } from "../message-store";
@@ -40,21 +45,19 @@ import {
   getSystemConversationTitle,
   isDispatchAssistantConversationId,
   isOrderAssistantConversationId,
-  isSystemConversationId,
   isSelfConversationId,
+  isSystemConversationId,
   normalizeSystemConversationId,
 } from "../system-conversations";
 
 const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
 const defaultMyAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
-const chatBack = require("../../../../assets/message/chat-back.svg");
 const chatMore = require("../../../../assets/message/chat-more.svg");
 const chatOnline = require("../../../../assets/message/chat-online.svg");
 const chatOffline = require("../../../../assets/message/chat-offline.svg");
 const chatEmoji = require("../../../../assets/message/chat-emoji.svg");
 const chatPhoto = require("../../../../assets/message/chat-photo.svg");
 const chatSend = require("../../../../assets/message/chat-send.svg");
-const chatArrowRight = require("../../../../assets/mine/figma/mine-arrow-right.svg");
 const systemNotificationAvatar = require("../../../../assets/message/message-system-notice.svg");
 const EMPTY_MESSAGES: ManagedMessage[] = [];
 
@@ -75,14 +78,17 @@ function buildChatListRows(messages: ManagedMessage[]): ChatListRow[] {
   return messages.flatMap((message, index) => {
     const previousMessage = messages[index - 1];
     const showTime =
-      !previousMessage || message.sentAt - previousMessage.sentAt > 5 * 60 * 1000;
+      !previousMessage ||
+      message.sentAt - previousMessage.sentAt > 5 * 60 * 1000;
     return [
       ...(showTime
-        ? [{
-            key: `time-${message.id}`,
-            kind: "time" as const,
-            label: formatMessageTimeSeparator(message.sentAt),
-          }]
+        ? [
+            {
+              key: `time-${message.id}`,
+              kind: "time" as const,
+              label: formatMessageTimeSeparator(message.sentAt),
+            },
+          ]
         : []),
       { key: message.id, kind: "message" as const, message },
     ];
@@ -91,13 +97,15 @@ function buildChatListRows(messages: ManagedMessage[]): ChatListRow[] {
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
-  const { id, title, avatar, clubId, afterSale } = useLocalSearchParams<{
-    id?: string;
-    title?: string;
-    avatar?: string;
-    clubId?: string;
-    afterSale?: string;
-  }>();
+  const { id, title, avatar, clubId, afterSale, customerService } =
+    useLocalSearchParams<{
+      id?: string;
+      title?: string;
+      avatar?: string;
+      clubId?: string;
+      afterSale?: string;
+      customerService?: string;
+    }>();
   const accessToken = useAuthStore((state) => state.accessToken);
   const userId = useAuthStore((state) => state.user?.id);
   const myAvatarUrl = useAuthStore((state) => state.user?.headImage);
@@ -122,7 +130,10 @@ export default function ChatScreen() {
     state.blacklistedUserIds.includes(conversationId),
   );
   const visibleMessages = useMemo(
-    () => isPeerBlacklisted ? messages.filter((message) => message.isMine) : messages,
+    () =>
+      isPeerBlacklisted
+        ? messages.filter((message) => message.isMine)
+        : messages,
     [isPeerBlacklisted, messages],
   );
   const chatRows = useMemo(
@@ -131,12 +142,16 @@ export default function ChatScreen() {
   );
   const connectionState = useMessageStore((state) => state.connectionState);
   const lastError = useMessageStore((state) => state.lastError);
-  const refreshOnlineStatuses = useMessageStore((state) => state.refreshOnlineStatuses);
+  const refreshOnlineStatuses = useMessageStore(
+    (state) => state.refreshOnlineStatuses,
+  );
   const openConversation = useMessageStore((state) => state.openConversation);
   const closeConversation = useMessageStore((state) => state.closeConversation);
   const sendText = useMessageStore((state) => state.sendText);
   const sendImage = useMessageStore((state) => state.sendImage);
-  const resolveImagePreview = useMessageStore((state) => state.resolveImagePreview);
+  const resolveImagePreview = useMessageStore(
+    (state) => state.resolveImagePreview,
+  );
   const sendAfterSaleCard = useMessageStore((state) => state.sendAfterSaleCard);
   const setConversationNote = useMessageStore(
     (state) => state.setConversationNote,
@@ -161,8 +176,12 @@ export default function ChatScreen() {
   const historyLoading = historyState?.loading || false;
   const conversationBaseTitle = getSystemConversationTitle(
     conversationId,
-    conversation?.title || title || "用户聊天",
+    (customerService === "1" ? title : conversation?.title) ||
+      title ||
+      "用户聊天",
   );
+  const isCustomerService =
+    customerService === "1" || conversation?.isCustomerService === true;
   const conversationTitle = getConversationDisplayTitle(
     conversationId,
     conversationBaseTitle,
@@ -170,11 +189,13 @@ export default function ChatScreen() {
   );
   const conversationAvatar = resolveConversationAvatar(
     avatar || conversation?.avatar,
-    isSystemConversationId(conversationId) ? systemNotificationAvatar : defaultAvatar,
+    isSystemConversationId(conversationId)
+      ? systemNotificationAvatar
+      : defaultAvatar,
     conversationId,
   );
   const myAvatar = useMemo(
-    () => myAvatarUrl ? { uri: myAvatarUrl } : defaultMyAvatar,
+    () => (myAvatarUrl ? { uri: myAvatarUrl } : defaultMyAvatar),
     [myAvatarUrl],
   );
   const peerOnline = conversation?.isOnline;
@@ -196,11 +217,26 @@ export default function ChatScreen() {
       scrollFrame.current = null;
     });
   }, []);
-  const handleSendText = useCallback(async (text: string) => {
-    if (isSelfConversation) return;
-    scrollToLatest();
-    await sendText(conversationId, text);
-  }, [conversationId, isSelfConversation, scrollToLatest, sendText]);
+  const handleSendText = useCallback(
+    async (text: string) => {
+      if (isSelfConversation) {
+        return;
+      }
+      scrollToLatest();
+      await sendText(conversationId, text);
+      if (isCustomerService && accessToken) {
+        await touchCustomerServiceSession(accessToken).catch(() => undefined);
+      }
+    },
+    [
+      accessToken,
+      conversationId,
+      isCustomerService,
+      isSelfConversation,
+      scrollToLatest,
+      sendText,
+    ],
+  );
   const handleSendImage = useCallback(
     (imageUri: string) => {
       scrollToLatest();
@@ -218,17 +254,23 @@ export default function ChatScreen() {
   const openOrderDetail = useCallback((orderId: string) => {
     router.push({ pathname: "/order/[id]", params: { id: orderId } });
   }, []);
-  const openImagePreview = useCallback(async (message: ManagedMessage) => {
-    try {
-      const uri = await resolveImagePreview(conversationId, message);
-      router.push({ pathname: "/image-preview", params: createImagePreviewParams([uri], 0) });
-    } catch (error) {
-      void useAppConfirm.getState().confirm({
+  const openImagePreview = useCallback(
+    async (message: ManagedMessage) => {
+      try {
+        const uri = await resolveImagePreview(conversationId, message);
+        router.push({
+          pathname: "/image-preview",
+          params: createImagePreviewParams([uri], 0),
+        });
+      } catch (error) {
+        void useAppConfirm.getState().confirm({
         title: "图片预览失败",
         message: error instanceof Error ? error.message : "融云图片下载失败",
       });
-    }
-  }, [conversationId, resolveImagePreview]);
+      }
+    },
+    [conversationId, resolveImagePreview],
+  );
   const openProfile = useCallback(() => {
     setSettingsVisible(false);
     if (!/^\d+$/.test(conversationId)) {
@@ -249,41 +291,52 @@ export default function ChatScreen() {
         userId: conversationId,
       },
     });
-  }, [
-    afterSalePayload,
-    clubId,
-    conversation?.clubId,
-    conversationId,
-  ]);
+  }, [afterSalePayload, clubId, conversation?.clubId, conversationId]);
   const renderChatRow = useCallback(
-    ({ item }: { item: ChatListRow }) => item.kind === "time" ? (
-      <View style={styles.timeSeparator}>
-        <Text style={styles.timeSeparatorText}>{item.label}</Text>
-      </View>
-    ) : (
-      <ChatBubble
-        item={item.message}
-        peerAvatar={conversationAvatar}
-        myAvatar={myAvatar}
-        peerName={conversation?.title || title || "用户"}
-        myName={myNickname || "我"}
-        onEnterRoomInvite={(roomId, roomVersion) => router.push({
+    ({ item }: { item: ChatListRow }) =>
+      item.kind === "time" ? (
+        <View style={styles.timeSeparator}>
+          <Text style={styles.timeSeparatorText}>{item.label}</Text>
+        </View>
+      ) : (
+        <ChatBubble
+          item={item.message}
+          peerAvatar={conversationAvatar}
+          myAvatar={myAvatar}
+          peerName={conversation?.title || title || "用户"}
+          myName={myNickname || "我"}
+          onEnterRoomInvite={(roomId, roomVersion) =>
+            router.push({
           pathname: "/voice-room/[id]",
           params: { id: roomId, v: roomVersion },
-        })}
-        onRetry={handleRetryMessage}
-        onOpenProfile={canViewProfile ? openProfile : undefined}
-        onOpenOrder={isOrderAssistant ? openOrderDetail : undefined}
-        onPreviewImage={openImagePreview}
-      />
-    ),
-    [canViewProfile, conversation?.title, conversationAvatar, handleRetryMessage, isOrderAssistant, myAvatar, myNickname, openImagePreview, openOrderDetail, openProfile, title],
+        })
+          }
+          onRetry={handleRetryMessage}
+          onOpenProfile={canViewProfile ? openProfile : undefined}
+          onOpenOrder={isOrderAssistant ? openOrderDetail : undefined}
+          onPreviewImage={openImagePreview}
+        />
+      ),
+    [
+      canViewProfile,
+      conversation?.title,
+      conversationAvatar,
+      handleRetryMessage,
+      isOrderAssistant,
+      myAvatar,
+      myNickname,
+      openImagePreview,
+      openOrderDetail,
+      openProfile,
+      title,
+    ],
   );
 
   useEffect(() => {
     isNearBottom.current = true;
     return () => {
-      if (scrollFrame.current !== null) cancelAnimationFrame(scrollFrame.current);
+      if (scrollFrame.current !== null)
+        cancelAnimationFrame(scrollFrame.current);
       scrollFrame.current = null;
     };
   }, [conversationId]);
@@ -302,6 +355,7 @@ export default function ChatScreen() {
             ? conversationAvatar
             : undefined,
         clubId: clubId || conversation?.clubId,
+        ...(isCustomerService ? { isCustomerService: true } : {}),
       });
     return () => closeConversation(conversationId);
   }, [
@@ -313,25 +367,33 @@ export default function ChatScreen() {
     conversationAvatar,
     conversationBaseTitle,
     conversationId,
+    isCustomerService,
     isSelfConversation,
     openConversation,
   ]);
 
-  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    // Native content anchoring can emit a scroll before our requested scroll runs.
-    if (scrollFrame.current !== null) return;
-    isNearBottom.current = event.nativeEvent.contentOffset.y <= 48;
-  }, []);
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      // Native content anchoring can emit a scroll before our requested scroll runs.
+      if (scrollFrame.current !== null) return;
+      isNearBottom.current = event.nativeEvent.contentOffset.y <= 48;
+    },
+    [],
+  );
 
   const handleLoadOlder = useCallback(() => {
     if (!historyLoading) void loadOlder(conversationId);
   }, [conversationId, historyLoading, loadOlder]);
 
-  const handleScrollBeginDrag = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (scrollFrame.current !== null) cancelAnimationFrame(scrollFrame.current);
-    scrollFrame.current = null;
-    isNearBottom.current = event.nativeEvent.contentOffset.y <= 48;
-  }, []);
+  const handleScrollBeginDrag = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (scrollFrame.current !== null)
+        cancelAnimationFrame(scrollFrame.current);
+      scrollFrame.current = null;
+      isNearBottom.current = event.nativeEvent.contentOffset.y <= 48;
+    },
+    [],
+  );
 
   const keepLatestVisible = useCallback(() => {
     if (isNearBottom.current) scrollToLatest();
@@ -365,7 +427,12 @@ export default function ChatScreen() {
             onPress={() => router.back()}
             style={styles.headerButton}
           >
-            <Image source={chatBack} style={styles.headerIcon} />
+            <ChevronLeft24Regular
+              color="#1A1A1A"
+              width={24}
+              height={24}
+              style={styles.headerIcon}
+            />
           </Pressable>
           <View style={styles.identity}>
             <Pressable
@@ -384,7 +451,8 @@ export default function ChatScreen() {
             <Text numberOfLines={1} style={styles.name}>
               {conversationTitle}
             </Text>
-            {!isSystemConversationId(conversationId) && typeof peerOnline === "boolean" ? (
+            {!isSystemConversationId(conversationId) &&
+            typeof peerOnline === "boolean" ? (
               <>
                 <Image
                   source={peerOnline ? chatOnline : chatOffline}
@@ -417,14 +485,22 @@ export default function ChatScreen() {
         contentContainerStyle={styles.messageList}
         data={chatRows}
         keyExtractor={(item) => item.key}
-        ListEmptyComponent={isOrderAssistant ? (
-          <EmptyState message="暂无订单消息" style={styles.orderAssistantEmpty} />
-        ) : null}
+        ListEmptyComponent={
+          isOrderAssistant ? (
+            <EmptyState
+              message="暂无订单消息"
+              style={styles.orderAssistantEmpty}
+            />
+          ) : null
+        }
         renderItem={renderChatRow}
         showsVerticalScrollIndicator={false}
         onContentSizeChange={keepLatestVisible}
         onLayout={keepLatestVisible}
-        maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 48 }}
+        maintainVisibleContentPosition={{
+          minIndexForVisible: 0,
+          autoscrollToTopThreshold: 48,
+        }}
         onEndReached={handleLoadOlder}
         onEndReachedThreshold={0.2}
         onScroll={handleScroll}
@@ -541,7 +617,12 @@ export default function ChatScreen() {
                     {conversation.note}
                   </Text>
                 ) : null}
-                <Image source={chatArrowRight} style={styles.sheetArrow} />
+                <ChevronRight16Regular
+                  color="#0A0A0A"
+                  width={16}
+                  height={16}
+                  style={styles.sheetArrow}
+                />
               </View>
             </Pressable>
             {canViewProfile ? (
@@ -551,7 +632,12 @@ export default function ChatScreen() {
                 style={styles.sheetOption}
               >
                 <Text style={styles.sheetOptionText}>查看个人主页</Text>
-                <Image source={chatArrowRight} style={styles.sheetArrow} />
+                <ChevronRight16Regular
+                  color="#0A0A0A"
+                  width={16}
+                  height={16}
+                  style={styles.sheetArrow}
+                />
               </Pressable>
             ) : null}
           </View>
@@ -570,7 +656,10 @@ export default function ChatScreen() {
           <Pressable
             style={[
               styles.noteBackdrop,
-              { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 },
+              {
+                paddingTop: insets.top + 24,
+                paddingBottom: insets.bottom + 24,
+              },
             ]}
             onPress={() => setNoteVisible(false)}
           >
@@ -664,10 +753,7 @@ const ChatComposer = memo(function ChatComposer({
   return (
     <>
       <View
-        style={[
-          styles.composer,
-          { paddingBottom: Math.max(bottomInset, 16) },
-        ]}
+        style={[styles.composer, { paddingBottom: Math.max(bottomInset, 16) }]}
       >
         <TextInput
           accessibilityLabel="输入消息"
@@ -774,7 +860,9 @@ const ChatBubble = memo(function ChatBubble({
       style={[
         styles.bubbleRow,
         item.isMine && styles.mineRow,
-        (item.kind === "orderNotify" || item.kind === "csInvite") && !item.isMine && styles.orderNotifyMessageRow,
+        (item.kind === "orderNotify" || item.kind === "csInvite") &&
+          !item.isMine &&
+          styles.orderNotifyMessageRow,
       ]}
     >
       {!item.isMine && (
@@ -798,8 +886,11 @@ const ChatBubble = memo(function ChatBubble({
           item.isMine ? styles.mineBubble : styles.theirBubble,
           item.kind === "image" && styles.imageBubble,
           item.kind === "roomInvite" && styles.roomInviteBubble,
-          (item.kind === "orderNotify" || item.kind === "csInvite") && styles.orderNotifyBubble,
-          item.kind === "csInvite" && { maxWidth: Math.round(windowWidth * 0.68) },
+          (item.kind === "orderNotify" || item.kind === "csInvite") &&
+            styles.orderNotifyBubble,
+          item.kind === "csInvite" && {
+            maxWidth: Math.round(windowWidth * 0.68),
+          },
         ]}
       >
         {item.kind === "image" ? (
@@ -829,20 +920,29 @@ const ChatBubble = memo(function ChatBubble({
             style={styles.roomInviteCard}
           >
             <View style={styles.roomInviteIconWrap}>
-              <Image source={require("../../../../assets/message/room-invite.svg")} style={styles.roomInviteIcon} />
+              <Image
+                source={require("../../../../assets/message/room-invite.svg")}
+                style={styles.roomInviteIcon}
+              />
             </View>
             <View style={styles.roomInviteBody}>
-              <Text numberOfLines={1} style={styles.roomInviteTitle}>语聊房邀请</Text>
+              <Text numberOfLines={1} style={styles.roomInviteTitle}>
+                语聊房邀请
+              </Text>
               <View style={styles.roomInviteSender}>
                 <CachedImage
                   contentFit="cover"
                   source={item.isMine ? myAvatar : peerAvatar}
                   style={styles.roomInviteAvatar}
                 />
-                <Text numberOfLines={1} style={styles.roomInviteName}>{item.isMine ? myName : peerName}</Text>
+                <Text numberOfLines={1} style={styles.roomInviteName}>
+                  {item.isMine ? myName : peerName}
+                </Text>
               </View>
             </View>
-            <View style={styles.roomInviteButton}><Text style={styles.roomInviteButtonText}>进入</Text></View>
+            <View style={styles.roomInviteButton}>
+              <Text style={styles.roomInviteButtonText}>进入</Text>
+            </View>
           </Pressable>
         ) : item.kind === "afterSale" ? (
           <View style={styles.afterSaleCard}>

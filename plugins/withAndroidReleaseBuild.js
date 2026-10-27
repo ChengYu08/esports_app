@@ -11,6 +11,8 @@ function withAndroidReleaseBuild(config) {
       else properties.push({ type: 'property', key, value });
     };
     set('reactNativeArchitectures', 'arm64-v8a');
+    // Compress native libraries in APK downloads; Android extracts them on install.
+    set('expo.useLegacyPackaging', 'true');
     set('android.enableMinifyInReleaseBuilds', 'true');
     set('android.enableShrinkResourcesInReleaseBuilds', 'true');
     set('android.enablePngCrunchInReleaseBuilds', 'false');
@@ -64,4 +66,4 @@ tasks.matching { it.name ==~ /validateSigning(Debug|Release)/ }.configureEach {
   });
 }
 
-module.exports = createRunOncePlugin(withAndroidReleaseBuild, TAG, '2.2.0');
+module.exports = createRunOncePlugin(withAndroidReleaseBuild, TAG, '2.3.0');
