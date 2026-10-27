@@ -6,7 +6,7 @@ type HomeSkeletonProps = {
   bottomPadding?: number;
 };
 
-/** Matches the home layout while games and clubs are being fetched. */
+/** 首页品类、游戏和俱乐部加载时保持布局稳定。 */
 export function HomeSkeleton({ bottomPadding = 0 }: HomeSkeletonProps) {
   return (
     <ScrollView
@@ -16,6 +16,13 @@ export function HomeSkeleton({ bottomPadding = 0 }: HomeSkeletonProps) {
       contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
       showsVerticalScrollIndicator={false}
     >
+      <View style={styles.categories}>
+        {[0, 1, 2].map((index) => (
+          <View key={index} style={styles.category}>
+            <Skeleton width="100%" height={56} radius={radius.md} />
+          </View>
+        ))}
+      </View>
       <View style={styles.gameTabs}>
         {[72, 82, 72, 82].map((width, index) => (
           <View key={index} style={styles.gameTab}>
@@ -47,6 +54,8 @@ export function HomeSkeleton({ bottomPadding = 0 }: HomeSkeletonProps) {
 
 const styles = StyleSheet.create({
   content: { flexGrow: 1, backgroundColor: colors.surface },
+  categories: { flexDirection: "row", paddingHorizontal: spacing.lg, paddingTop: spacing.xs, paddingBottom: spacing.sm, gap: spacing.sm },
+  category: { flex: 1 },
   gameTabs: {
     height: 55,
     paddingHorizontal: spacing.lg,

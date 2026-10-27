@@ -2,10 +2,12 @@ import { Search24Regular } from "@fluentui/react-native-icons";
 import type {
   Banner,
   Game,
+  GameCategory,
   GameKey,
   HomeTab,
 } from "@/features/home/api/home.types";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { DOUYIN_SANS, SYSTEM_FONT } from "@/shared/theme/typography";
+import { GameCategoryTabs } from "./GameCategoryTabs";
 import { COURT_FONT_FAMILY } from "@/features/court/court.theme";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { Image } from "expo-image";
@@ -13,13 +15,17 @@ import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 // const banner = require("../../../../assets/home/h_banner.png");
-const filterIcon = require("../../../../assets/home/h_filter_list.svg");
 const tabLeftCorner = require("../../../../assets/home/h_tab_left.svg");
 const tabRightCorner = require("../../../../assets/home/h_tab_right.svg");
 type HomeHeaderProps = {
   tab: HomeTab;
   game: GameKey;
   games: Game[];
+  categories: GameCategory[];
+  category: string;
+  onCategoryChange: (category: string) => void;
+  filterError?: boolean;
+  onRetryFilters: () => void;
   bannerIndex: number;
   banners: Banner[];
   onTabChange: (tab: HomeTab) => void;
@@ -30,6 +36,11 @@ export function HomeHeader({
   tab,
   game,
   games,
+  categories,
+  category,
+  onCategoryChange,
+  filterError,
+  onRetryFilters,
   bannerIndex,
   banners,
   onTabChange,
@@ -50,15 +61,39 @@ export function HomeHeader({
       </View> */}
       {tab === "home" && (
         <>
+          <GameCategoryTabs categories={categories} selectedId={category} onChange={onCategoryChange} />
+          {filterError && (
+            <Pressable accessibilityRole="button" onPress={onRetryFilters} style={styles.filterRetry}>
+              <Text style={styles.filterRetryText}>筛选项加载失败，点击重试</Text>
+            </Pressable>
+          )}
           <ScrollView
+            key={category}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.gameTabsContent}
             style={styles.gameTabs}
           >
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityState={{ selected: game === "" }}
+              onPress={() => onGameChange("")}
+              style={[styles.gameTab, game === "" && styles.gameTabSelected]}
+            >
+              <Text style={[styles.gameLabel, game === "" && styles.gameLabelSelected]}>全部</Text>
+              {game === "" && (
+                <>
+                  <View style={styles.gameIndicator} />
+                  <Image source={tabLeftCorner} style={[styles.tabCorner, styles.tabCornerLeft]} pointerEvents="none" />
+                  <Image source={tabRightCorner} style={[styles.tabCorner, styles.tabCornerRight]} pointerEvents="none" />
+                </>
+              )}
+            </Pressable>
             {games.map((item) => (
               <Pressable
                 key={item.id}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: game === String(item.id) }}
                 onPress={() => onGameChange(String(item.id))}
                 style={[
                   styles.gameTab,
@@ -111,7 +146,6 @@ export function HomeHeader({
           </ScrollView>
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>热门俱乐部</Text>
-            {/* <Image source={filterIcon} style={styles.filter} /> */}
           </View>
         </>
       )}
@@ -247,12 +281,16 @@ const styles = StyleSheet.create({
   },
   gameIcon: { width: 16, height: 16, borderRadius: 4 },
   gameLabel: {
-    fontFamily: DOUYIN_SANS,
+    fontFamily: SYSTEM_FONT,
     color: "#999",
-    fontSize: 13,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "500",
     flexShrink: 0,
   },
-  gameLabelSelected: { fontFamily: DOUYIN_SANS, color: "#333" },
+  gameLabelSelected: { color: "#0A0A0A" },
+  filterRetry: { alignSelf: "flex-start", paddingHorizontal: 16, paddingVertical: 8 },
+  filterRetryText: { fontFamily: SYSTEM_FONT, fontSize: 12, lineHeight: 18, color: "#979799" },
   gameIndicator: {
     position: "absolute",
     left: 0,
