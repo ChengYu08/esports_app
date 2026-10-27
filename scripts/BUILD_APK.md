@@ -77,5 +77,13 @@ node scripts/build_apk.cjs --init-signing
 
 未传 `--abi` 时仍兼容环境变量 `REACT_NATIVE_ARCHITECTURES`；都不设则默认 arm64。
 
+## 包体积
+
+手机 64 位包使用 `arm64-v8a`，不是 `x86_64`。本地默认打包命令和 Drone CI 默认都只生成 ARM64 包；CI 未设置 `DRONE_ABI` 时使用 `arm64`。
+
+Expo config plugin 会设置 `expo.useLegacyPackaging=true`，将原生 `.so` 库压缩进 APK，clean prebuild 后也会保留。安装时 Android 会解压这些库，因此下载包会更小，但安装后的占用不一定减少。JS bundle 保持默认不压缩，以保留 Hermes 的启动性能。
+
+正式环境已启用 R8 混淆和资源裁剪；`build_apk.cjs --env test` 为加快构建关闭了这两项，因此测试包可能更大。比较包体积时应使用相同环境、架构和版本。实际缩减量需要重新构建后比较 `archive-apk.cjs` 打印的 `Size`。
+
 universal / all 中的双架构包体积更大。当前 R8 规则只忽略融云可选、未安装的厂商推送 SDK 缺失类；
 这些规则不会提供离线推送能力，启用对应通道时仍需添加 SDK 和配置。
