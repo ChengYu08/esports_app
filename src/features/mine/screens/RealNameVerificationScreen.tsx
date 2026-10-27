@@ -10,6 +10,7 @@ import {
   normalizeIdCard,
   realNameFailureMessage,
 } from "@/features/mine/real-name";
+import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
 import { submitRealNameVerification } from "@/features/mine/real-name-session";
 import { colors } from "@/shared/theme/tokens";
 
@@ -32,14 +33,16 @@ export function RealNameVerificationScreen() {
   const [idCard, setIdCard] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [failureMessage, setFailureMessage] = useState("");
+  const {
+    entering: enteringCustomerService,
+    openCustomerService,
+  } = useCustomerServiceEntry();
 
   const canSubmit = canSubmitRealName(name, idCard) && !submitting;
 
   const goBack = () => {
     router.back();
   };
-
-  const openCustomerService = () => {};
 
   const refill = () => {
     setFailureMessage("");
@@ -197,6 +200,7 @@ export function RealNameVerificationScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="联系客服"
+              disabled={enteringCustomerService}
               onPress={openCustomerService}
               style={styles.customerServiceLink}
             >
