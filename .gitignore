@@ -9,6 +9,9 @@ dist/
 web-build/
 expo-env.d.ts
 
+# Pushy / react-native-update local credentials
+.update
+
 # Native
 .kotlin/
 *.orig.*
