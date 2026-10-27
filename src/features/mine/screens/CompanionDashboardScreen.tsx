@@ -34,6 +34,7 @@ import {
   type ManagedService,
 } from "../api/companion-management.contract";
 import { newestCompanionImages } from "../companion-image-order";
+import { MAX_COMPANION_VOICE_SECONDS } from "../companion-voice-file";
 import { CompanionAgreementSheet } from "../components/CompanionAgreementSheet";
 import { CompanionDashboardHeader } from "../components/CompanionDashboardHeader";
 import { CompanionImagePreview } from "../components/CompanionImagePreview";
@@ -193,9 +194,7 @@ export default function CompanionDashboardScreen() {
               </Text>
               <Text style={styles.statCaption}>
                 好评
-                <Text style={styles.captionValue}>
-                  {rate}%
-                </Text>
+                <Text style={styles.captionValue}>{rate}%</Text>
               </Text>
             </View>
             {orders.isError ? (
@@ -293,7 +292,7 @@ export default function CompanionDashboardScreen() {
                           : "上传"
                     }
                     disabled={voiceUpload.uploading}
-                    onPress={() => void voiceUpload.upload()}
+                    onPress={voiceUpload.upload}
                   />
                   <View style={styles.voiceContent}>
                     {detail.voiceUrl ? (
@@ -308,6 +307,9 @@ export default function CompanionDashboardScreen() {
                     ) : (
                       <Text style={styles.noImages}>暂未上传语音介绍</Text>
                     )}
+                    <Text style={styles.voiceHint}>
+                      仅支持{MAX_COMPANION_VOICE_SECONDS}秒以内的音频
+                    </Text>
                   </View>
                 </View>
                 <View>
@@ -629,6 +631,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     justifyContent: "center",
   },
+  voiceHint: { marginTop: 4, color: "#999", fontSize: 12, lineHeight: 18 },
   imageGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
