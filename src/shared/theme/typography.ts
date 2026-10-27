@@ -1,2 +1,5 @@
-export const DOUYIN_SANS = 'DouyinSans';
+// 设计稿正文字体为系统字体（iOS 为 PingFang SC）。项目仅有单一字重的
+// DouyinSans.ttf，设置 fontWeight 会被系统伪加粗；置为 undefined 全局
+// 回落到系统字体，各处 fontFamily: DOUYIN_SANS 无需改动，换回自定义字体时只改这里。
+export const DOUYIN_SANS = undefined;
 

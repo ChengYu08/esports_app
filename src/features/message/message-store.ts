@@ -39,6 +39,10 @@ import {
   type BlacklistEntry,
 } from '@/features/mine/blacklist';
 import {
+  ensureNotificationSettingsLoaded,
+  isMessageNotificationMuted,
+} from '@/features/mine/notification-settings';
+import {
   getSystemConversationTitle,
   isSystemConversationId,
   normalizeSystemConversationId,
@@ -210,7 +214,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         return;
       }
       const normalizedConversation = { ...conversation, id: normalizedPeerId, title: normalizedConversationTitle };
-      if (!isActive && !message.isMine) {
+      if (!isActive && !message.isMine && !isMessageNotificationMuted()) {
         dispatchInAppNotification({
           peerId: normalizedPeerId,
           title: getSystemConversationTitle(normalizedPeerId, normalizedConversation.title),
@@ -401,6 +405,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       initialize: async (token) => {
         const initializationRevision = lifecycleRevision;
         onlineStatusToken = token || null;
+        ensureNotificationSettingsLoaded().catch(() => undefined);
         if (!stopBlacklistSubscription) {
           stopBlacklistSubscription = subscribeBlacklist((entries) => {
             blacklistRevision += 1;

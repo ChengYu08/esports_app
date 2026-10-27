@@ -1,6 +1,5 @@
 import { useAuthStore } from "@esports/auth";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { useFonts } from "expo-font";
 import { router, Stack, usePathname } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -34,7 +33,6 @@ import { leaveVoiceChatRoom } from "@/features/voice-room/voice-room-rongcloud";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
 import { PrivacyConsentGate } from "@/features/privacy/components/PrivacyConsentGate";
 import { readPrivacyConsent } from "@/features/privacy/privacy-consent";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { ActionNoticeHost } from "@/shared/ui/action-notice";
 import { AppConfirmHost } from "@/shared/ui/AppConfirmHost";
 import { StartupSplash } from "@/shared/ui/StartupSplash";
@@ -59,13 +57,8 @@ function withStartupTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
   });
 }
 
-const fonts = {
-  [DOUYIN_SANS]: require("../../assets/fonts/DouyinSans.ttf"),
-};
-
 export default function RootLayout() {
   const pathname = usePathname();
-  const [loaded, error] = useFonts(fonts);
   const [splashReady, setSplashReady] = useState(false);
   const finishSplash = useCallback(() => setSplashReady(true), []);
   const [sessionReady, setSessionReady] = useState(false);
@@ -198,7 +191,7 @@ export default function RootLayout() {
     [],
   );
 
-  if (!splashReady || (!loaded && !error) || !sessionReady || !privacyReady) {
+  if (!splashReady || !sessionReady || !privacyReady) {
     return <StartupSplash onFinished={finishSplash} />;
   }
 

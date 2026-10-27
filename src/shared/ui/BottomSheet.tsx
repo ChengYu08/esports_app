@@ -166,6 +166,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,.35)",
   },
   keyboardAvoiding: { flex: 1 },
-  sheet: { maxHeight: "100%", flexShrink: 1 },
+  sheet: { maxHeight: "100%", flexShrink: 1, backgroundColor: "#FFF" },
   scroll: { flexGrow: 0, flexShrink: 1 },
 });

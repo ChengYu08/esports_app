@@ -1,6 +1,17 @@
 import { env } from "@/core/config/env";
 import { APP_LINKS } from "@/core/config/links";
+import {
+  CancellationCoolingDialog,
+} from "@/features/auth/CancellationCoolingDialog";
 import { completeClientLogin } from "@/features/auth/client-auth-flow";
+import {
+  clearCoolingRecord,
+  readCoolingRecord,
+} from "@/features/auth/cancellation-cooling-store";
+import {
+  isCoolingActive,
+  type CoolingRecord,
+} from "@/features/auth/cancellation-cooling";
 import { getPasswordLoginErrorMessage } from "@/features/auth/password-login-error";
 import { openExternalLink } from "@/shared/navigation/open-external-link";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
@@ -25,6 +36,10 @@ export default function LoginRoute() {
   const [passwordLoginError, setPasswordLoginError] = useState<string | null>(
     null,
   );
+  const [coolingRecord, setCoolingRecord] = useState<CoolingRecord | null>(
+    null,
+  );
+  const [coolingDialogVisible, setCoolingDialogVisible] = useState(false);
   const sso = useMemo(
     () =>
       env.ssoClientSecret
@@ -62,6 +77,31 @@ export default function LoginRoute() {
       return () => subscription.remove();
     }, []),
   );
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      readCoolingRecord().then((record) => {
+        if (!active) return;
+        if (isCoolingActive(record)) {
+          setCoolingRecord(record);
+          setCoolingDialogVisible(true);
+        } else {
+          setCoolingRecord(null);
+        }
+      });
+      return () => {
+        active = false;
+      };
+    }, []),
+  );
+
+  const ensureNotCooling = () => {
+    if (coolingRecord) {
+      setCoolingDialogVisible(true);
+      return false;
+    }
+    return true;
+  };
 
   return (
     <>
@@ -72,6 +112,7 @@ export default function LoginRoute() {
         onBack={() => router.replace("/")}
         onSkip={() => router.replace("/")}
         onSendCode={async (phone) => {
+          if (!ensureNotCooling()) return;
           if (!adapter) {
             Toast.show("验证码发送失败，请先配置 SSO client secret。", {
               duration: Toast.durations.SHORT,
@@ -117,6 +158,7 @@ export default function LoginRoute() {
           void openExternalLink(APP_LINKS.privacyPolicy)
         }
         onQuickLogin={async () => {
+          if (!ensureNotCooling()) return;
           console.info("[DEBUG-QUICK-LOGIN] button pressed", {
             platform: Platform.OS,
             ssoConfigured: Boolean(env.ssoClientSecret),
@@ -152,6 +194,7 @@ export default function LoginRoute() {
           }
         }}
         onLogin={async (payload) => {
+          if (!ensureNotCooling()) return;
           if (!adapter) {
             Toast.show("登录失败，请先配置 SSO client secret。", {
               duration: Toast.durations.SHORT,
@@ -182,6 +225,18 @@ export default function LoginRoute() {
         message={passwordLoginError ?? ""}
         onConfirm={() => setPasswordLoginError(null)}
       />
+      {coolingRecord ? (
+        <CancellationCoolingDialog
+          record={coolingRecord}
+          visible={coolingDialogVisible}
+          onCancel={() => setCoolingDialogVisible(false)}
+          onAbandon={() => {
+            void clearCoolingRecord();
+            setCoolingRecord(null);
+            setCoolingDialogVisible(false);
+          }}
+        />
+      ) : null}
     </>
   );
 }

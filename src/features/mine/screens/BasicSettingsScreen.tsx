@@ -2,8 +2,8 @@ import { useAuthStore } from "@esports/auth";
 import { Delete24Regular } from "@fluentui/react-native-icons";
 import { Paths } from "expo-file-system";
 import { Image } from "expo-image";
-import { router } from "expo-router";
-import { useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -22,6 +22,7 @@ import { queryClient } from "@/core/query/query-client";
 import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { clearAuthSession } from "@/features/auth/session-persistence";
 import { messageStore } from "@/features/message/message-store";
+import { readTeenMode } from "@/features/mine/teen-mode-store";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
@@ -55,6 +56,15 @@ export default function BasicSettingsScreen() {
     readCacheSize(),
   );
   const [loggingOut, setLoggingOut] = useState(false);
+  const [teenModeEnabled, setTeenModeEnabled] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      readTeenMode().then((record) =>
+        setTeenModeEnabled(record?.enabled ?? false),
+      );
+    }, []),
+  );
 
   const clearCache = () => setCacheModalVisible(true);
 
@@ -142,18 +152,18 @@ export default function BasicSettingsScreen() {
       >
         <View style={styles.settingsGroup}>
           <SettingsRow
-            label="账号设置"
-            onPress={() => router.push("/account-settings")}
-          />
-          <SettingsRow
             label="账号与安全"
             onPress={() => router.push("/account-security")}
           />
-          {/* <SettingsRow label="青少年模式" value="未开启" onPress={() => Alert.alert("青少年模式", "青少年模式设置暂未开放")} /> */}
-          {/* <SettingsRow
+          <SettingsRow
+            label="青少年模式"
+            value={teenModeEnabled ? "已开启" : "未开启"}
+            onPress={() => router.push("/teen-mode")}
+          />
+          <SettingsRow
             label="消息通知"
-            onPress={() => Alert.alert("消息通知", "消息通知设置暂未开放")}
-          /> */}
+            onPress={() => router.push("/message-notification")}
+          />
           <SettingsRow
             label={clearing ? "正在清理缓存" : "清除缓存"}
             value={formatBytes(cacheSize)}
@@ -162,7 +172,6 @@ export default function BasicSettingsScreen() {
           />
           <SettingsRow
             label="关于盼之电竞"
-            last
             onPress={() => router.push("/about")}
           />
         </View>
@@ -242,33 +251,30 @@ function SettingsRow({
   label,
   value,
   onPress,
-  last,
   disabled,
 }: {
   label: string;
   value?: string;
   onPress: () => void;
-  last?: boolean;
   disabled?: boolean;
 }) {
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.row,
-        !last && styles.rowDivider,
-        pressed && styles.pressed,
-      ]}
-    >
-      <Text style={styles.rowLabel}>{label}</Text>
-      <View style={styles.rowRight}>
-        {value ? <Text style={styles.rowValue}>{value}</Text> : null}
-        <Image source={arrowIcon} style={styles.arrow} />
-      </View>
-    </Pressable>
+    <View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        disabled={disabled}
+        onPress={onPress}
+        style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+      >
+        <Text style={styles.rowLabel}>{label}</Text>
+        <View style={styles.rowRight}>
+          {value ? <Text style={styles.rowValue}>{value}</Text> : null}
+          <Image source={arrowIcon} style={styles.arrow} />
+        </View>
+      </Pressable>
+      <View style={styles.rowDivider} />
+    </View>
   );
 }
 
@@ -279,42 +285,46 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
   },
-  backButton: { width: 44, height: 44, justifyContent: "center" },
+  backButton: {
+    width: 48,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
   headerTitle: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
-    fontWeight: "600",
-    fontSize: 17,
+    fontWeight: "500",
+    fontSize: 16,
     lineHeight: 24,
   },
-  headerEnd: { width: 44 },
+  headerEnd: { width: 16 },
   settingsGroup: { marginTop: 8, backgroundColor: "#FFF" },
   row: {
     minHeight: 54,
-    paddingHorizontal: 16,
+    paddingLeft: 16,
+    paddingRight: 12,
+    paddingVertical: 16,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
   rowDivider: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#E8E8E8",
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "#EBEBEB",
+    marginLeft: 16,
   },
   rowLabel: {
-    color: "#222",
-    fontFamily: DOUYIN_SANS,
+    color: "#333333",
     fontSize: 14,
     lineHeight: 22,
   },
-  rowRight: { flexDirection: "row", alignItems: "center", gap: 6 },
+  rowRight: { flexDirection: "row", alignItems: "center", gap: 4 },
   rowValue: {
-    color: "#999",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 13,
-    lineHeight: 20,
+    color: "#666666",
+    fontSize: 14,
+    lineHeight: 22,
   },
   arrow: { width: 18, height: 18 },
   logout: {
@@ -325,10 +335,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   logoutText: {
-    color: "#E11D2A",
-    fontFamily: DOUYIN_SANS,
+    color: "#FF1F4C",
     fontSize: 14,
     lineHeight: 22,
+    fontWeight: "600",
   },
   pressed: { backgroundColor: "#F5F5F5" },
   modalBackdrop: {

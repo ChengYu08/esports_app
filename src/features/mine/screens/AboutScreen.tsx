@@ -1,6 +1,8 @@
+import Constants from "expo-constants";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import {
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,18 +11,22 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { APP_LINKS } from "@/core/config/links";
+import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { openExternalLink } from "@/shared/navigation/open-external-link";
 
 const appIcon = require("../../../../assets/images/icon.png");
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const arrowIcon = require("../../../../assets/mine/figma/mine-arrow-right.svg");
 
-const VERSION = "v1.0.0";
+const VERSION = `v${Constants.expoConfig?.version ?? "1.0.0"}`;
 
 export default function AboutScreen() {
   const insets = useSafeAreaInsets();
+
+  const checkForUpdate = () => {
+    Alert.alert("检测更新", "请前往应用商店查看是否有新版本");
+  };
 
   return (
     <View style={styles.screen}>
@@ -63,15 +69,18 @@ export default function AboutScreen() {
         </View>
 
         <View style={styles.list}>
-          {/* <AboutRow label="检测更新" onPress={() => Alert.alert("检查更新", "请前往应用商店查看是否有新版本")} /> */}
+          <AboutRow label="检测更新" onPress={checkForUpdate} />
+          <View style={styles.divider} />
           <AboutRow
             label="用户协议"
             onPress={() => void openExternalLink(APP_LINKS.userAgreement)}
           />
+          <View style={styles.divider} />
           <AboutRow
             label="隐私政策"
             onPress={() => void openExternalLink(APP_LINKS.privacyPolicy)}
           />
+          <View style={styles.divider} />
         </View>
       </ScrollView>
     </View>
@@ -135,8 +144,11 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     flexDirection: "row",
     alignItems: "center",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#EBEBEB",
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "#EBEBEB",
+    marginHorizontal: 16,
   },
   rowLabel: {
     flex: 1,

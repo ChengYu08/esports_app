@@ -2,11 +2,10 @@ import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import Toast from "react-native-root-toast";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,25 +15,25 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { APP_LINKS } from "@/core/config/links";
 import { clientAuthApi } from "@/features/auth/client-auth.api";
+import {
+  buildCoolingRecord,
+  formatCoolEndTime,
+} from "@/features/auth/cancellation-cooling";
+import { saveCoolingRecord } from "@/features/auth/cancellation-cooling-store";
 import { clearAuthSession } from "@/features/auth/session-persistence";
 import { messageStore } from "@/features/message/message-store";
+import { colors } from "@/shared/theme/tokens";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { openExternalLink } from "@/shared/navigation/open-external-link";
+import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
-const impacts = [
-  ["账号完成注销后无法恢复", "注销完成后，当前账号不能再登录，原账号及关联资料也不能恢复。"],
-  ["历史信息会被删除或匿名化", "个人资料、绑定资料、聊天和核验记录会按规则删除或匿名化。"],
-  ["相关服务和协议将一并结束", "账号关联的服务、权限和协议关系会同步结束，请提前保存需要的资料。"],
-] as const;
-const requirements = [
-  "账号由本人合法持有并正在使用",
-  "账号当前安全且状态正常，不存在封禁、禁用或盗用风险",
-  "不存在在售商品、未完成订单或待处理事项",
-  "账号相关收益和财产权益已处理完毕",
-  "未涉及投诉举报、调查仲裁或其他争议",
-];
+const closeIcon = require("../../../../assets/svgs/icon-close.svg");
+
+const DEFAULT_COOLING_DAYS = 15;
 
 export default function AccountCancellationScreen() {
   const insets = useSafeAreaInsets();
@@ -42,24 +41,40 @@ export default function AccountCancellationScreen() {
   const token = useAuthStore((state) => state.accessToken);
   const clearSession = useAuthStore((state) => state.clearSession);
   const [agreed, setAgreed] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [blockedReasons, setBlockedReasons] = useState<string[] | null>(null);
-  const [checkFailureMessage, setCheckFailureMessage] = useState<string | null>(null);
-  const [cancellationConfirmVisible, setCancellationConfirmVisible] = useState(false);
-  const [verifyVisible, setVerifyVisible] = useState(false);
-  const [smsSentVisible, setSmsSentVisible] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [sheetVisible, setSheetVisible] = useState(false);
   const [code, setCode] = useState("");
-  const [countdown, setCountdown] = useState(0);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const [sendingCode, setSendingCode] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
+  const [coolingDays, setCoolingDays] = useState(DEFAULT_COOLING_DAYS);
 
   useEffect(() => {
     if (countdown <= 0) return;
-    const timer = setInterval(() => setCountdown((value) => Math.max(value - 1, 0)), 1000);
+    const timer = setInterval(
+      () => setCountdown((value) => Math.max(value - 1, 0)),
+      1000,
+    );
     return () => clearInterval(timer);
   }, [countdown]);
 
-  const displayPhone = useMemo(() => maskPhone(user?.phone), [user?.phone]);
-  const handleSubmit = () => {
+  useEffect(() => {
+    if (!token) return;
+    clientAuthApi
+      .queryCancellationStatus(token)
+      .then((status) => {
+        if (status.coolingDays && status.coolingDays > 0) {
+          setCoolingDays(status.coolingDays);
+        }
+      })
+      .catch(() => undefined);
+  }, [token]);
+
+  const maskedPhone = maskPhone(user?.phone);
+
+  const openVerifySheet = () => {
     if (!token) {
       Alert.alert("请先登录", "登录后才能申请注销账号。", [
         { text: "取消", style: "cancel" },
@@ -67,32 +82,34 @@ export default function AccountCancellationScreen() {
       ]);
       return;
     }
-    setCancellationConfirmVisible(true);
+    setVerifyError(null);
+    setCode("");
+    setSheetVisible(true);
   };
-  const checkCancellation = async () => {
-    if (!token || submitting) return;
-    setSubmitting(true);
+
+  const applyCancellation = async () => {
+    if (!token || applying) return;
+    setApplying(true);
     try {
-      const reasons = await clientAuthApi.checkAccountCancellation(token);
-      if (reasons.length > 0) {
-        setBlockedReasons(reasons);
-        return;
-      }
-      setCode("");
-      setVerifyVisible(true);
+      await clientAuthApi.applyCancellation(token);
+      openVerifySheet();
     } catch (error) {
-      setCheckFailureMessage(error instanceof Error ? error.message : "注销状态检查失败，请稍后重试");
+      setBlockedMessage(
+        error instanceof Error && error.message
+          ? error.message
+          : "暂时无法注销，请稍后重试",
+      );
     } finally {
-      setSubmitting(false);
+      setApplying(false);
     }
   };
+
   const sendCode = async () => {
     if (!token || sendingCode || countdown > 0) return;
     setSendingCode(true);
     try {
       await clientAuthApi.sendAccountCancellationSms(token);
       setCountdown(60);
-      setSmsSentVisible(true);
     } catch (error) {
       Toast.show(
         `验证码发送失败，${error instanceof Error ? error.message : "请稍后重试"}`,
@@ -102,108 +119,369 @@ export default function AccountCancellationScreen() {
       setSendingCode(false);
     }
   };
+
   const confirmCancellation = async () => {
     const smsCode = code.trim();
-    if (!token || smsCode.length === 0 || submitting) return;
-    setSubmitting(true);
+    if (!token || confirming || smsCode.length === 0) return;
+    setConfirming(true);
     try {
       await clientAuthApi.cancelAccount(token, smsCode);
-      setVerifyVisible(false);
+      setSheetVisible(false);
+      const record = buildCoolingRecord(
+        user?.phone ?? "",
+        Date.now(),
+        coolingDays,
+      );
+      await saveCoolingRecord(record);
       await clearAuthSession().catch(() => undefined);
       clearSession();
       await messageStore.getState().reset().catch(() => undefined);
-      Toast.show("注销申请已提交，账号将在办理期内完成注销，请勿再次登录。", { duration: Toast.durations.SHORT });
+      Toast.show(
+        `已进入${coolingDays}天冷静期，账号将于 ${formatCoolEndTime(record.coolEndTime)} 完成注销`,
+        { duration: Toast.durations.LONG },
+      );
       router.replace("/");
     } catch (error) {
-      Toast.show(
-        `注销申请失败，${error instanceof Error ? error.message : "请检查验证码后重试"}`,
-        { duration: Toast.durations.SHORT },
+      setVerifyError(
+        error instanceof Error && error.message ? error.message : "验证码错误",
       );
     } finally {
-      setSubmitting(false);
+      setConfirming(false);
     }
   };
 
   return (
     <View style={styles.screen}>
-      <View style={[styles.header, { height: 44 + insets.top, paddingTop: insets.top }]}>
-        <Pressable accessibilityLabel="返回" hitSlop={12} onPress={() => router.back()} style={styles.backButton}><Image source={backIcon} style={styles.backIcon} /></Pressable>
-        <Text style={styles.headerTitle}>注销账号</Text><View style={styles.headerSpace} />
+      <View
+        style={[
+          styles.header,
+          { height: 44 + insets.top, paddingTop: insets.top },
+        ]}
+      >
+        <Pressable
+          accessibilityLabel="返回"
+          accessibilityRole="button"
+          onPress={() => router.back()}
+          style={styles.backButton}
+        >
+          <Image source={backIcon} style={styles.backIcon} />
+        </Pressable>
+        <Text style={styles.headerTitle}>注销</Text>
+        <View style={styles.headerEnd} />
       </View>
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 32 + insets.bottom }]} showsVerticalScrollIndicator={false}>
-        <View style={styles.card}><Text style={styles.title}>提交前请完整核对</Text><Text style={styles.body}>账号注销不可撤销。平台会结合账号资料、设备状态和使用情况完成核验，符合条件后进入 15 个工作日办理流程。</Text><View style={styles.accountHint}><Text style={styles.accountHintIcon}>{user ? "●" : "○"}</Text><Text style={styles.accountHintText}>{user ? `当前登录账号：${displayPhone}` : "尚未登录，请先登录后再提交注销申请。"}</Text></View></View>
-        <Text style={styles.sectionTitle}>注销完成后的影响</Text>
-        <View style={styles.card}>{impacts.map(([title, body], index) => <View key={title} style={[styles.infoRow, index > 0 && styles.rowBorder]}><Text style={styles.infoMark}>!</Text><View style={styles.infoCopy}><Text style={styles.infoTitle}>{title}</Text><Text style={styles.infoBody}>{body}</Text></View></View>)}</View>
-        <Text style={styles.sectionTitle}>提交前请核对</Text>
-        <View style={styles.card}>{requirements.map((item, index) => <View key={item} style={[styles.requirementRow, index > 0 && styles.rowBorder]}><Text style={styles.checkMark}>✓</Text><Text style={styles.requirementText}>{item}</Text></View>)}</View>
-        <View style={styles.card}><Text style={styles.sectionTitleInCard}>办理流程</Text>{["阅读说明并核对账号状态", "提交资料并通过短信身份核验", "进入 15 个工作日办理期，期间请勿再次登录", "办理完成，账号及关联资料被删除或匿名化"].map((step, index) => <View key={step} style={styles.stepRow}><Text style={styles.stepIndex}>{String(index + 1).padStart(2, "0")}</Text><Text style={styles.stepText}>{step}</Text></View>)}</View>
-        <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: agreed }} onPress={() => setAgreed((value) => !value)} style={styles.agreementRow}><View style={[styles.checkbox, agreed && styles.checkboxChecked]}>{agreed ? <Text style={styles.checkboxText}>✓</Text> : null}</View><Text style={styles.agreementText}>我已阅读并同意《账号注销说明》，并确认当前账号满足注销条件。</Text></Pressable>
-        <Text style={styles.notice}>提交后请在办理期间避免再次登录，重新登录将视为撤回申请。</Text>
-        <Pressable accessibilityRole="button" disabled={!agreed || submitting} onPress={handleSubmit} style={[styles.button, (!agreed || submitting) && styles.buttonDisabled]}>{submitting ? <ActivityIndicator color="#FFF" /> : <Text style={styles.buttonText}>立即注销</Text>}</Pressable>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.paragraph}>
+          账号注销成功后是不可撤销、不可逆转的。注销账户之后，您的账户及其所有内容均无法予以恢复，我们将停止为您提供产品或服务，并根据您的要求删除您的个人信息。
+        </Text>
+        <Text style={styles.paragraph}>
+          账号注销的处理期限为{coolingDays}日，即在您已成功向我们提交了账号注销申请后的{coolingDays}日内（从成功提交申请之时起算），账号将被注销（本协议另有约定的除外）。
+        </Text>
+        <Text style={[styles.paragraph, styles.paragraphStrong]}>
+          为确保注销的顺利完成，请您在注销申请成果提交后，不要使用该账号登录和使用相关服务和产品。若您在申请账号注销后{coolingDays}日内重新登录并使用账号的，视为放弃注销账号，该账号将恢复正常使用，本次注销申请自动失效。
+        </Text>
       </ScrollView>
-      <Modal transparent visible={cancellationConfirmVisible} animationType="fade" onRequestClose={() => setCancellationConfirmVisible(false)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.confirmCard}>
-            <View style={styles.confirmIcon}><Text style={styles.confirmIconText}>!</Text></View>
-            <Text style={styles.confirmTitle}>确认申请注销账号吗？</Text>
-            <Text style={styles.confirmMessage}>账号注销后将无法恢复，办理周期为 15 个工作日。请确认你已完成相关订单和权益处理。</Text>
-            <View style={styles.confirmActions}>
-              <Pressable accessibilityRole="button" onPress={() => setCancellationConfirmVisible(false)} style={styles.confirmCancelButton}>
-                <Text style={styles.confirmCancelText}>暂不注销</Text>
-              </Pressable>
-              <Pressable accessibilityRole="button" onPress={() => { setCancellationConfirmVisible(false); void checkCancellation(); }} style={styles.confirmSubmitButton}>
-                <Text style={styles.confirmSubmitText}>继续申请</Text>
-              </Pressable>
-            </View>
+      <View style={[styles.bottomBar, { paddingBottom: 12 + insets.bottom }]}>
+        <Pressable
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: agreed }}
+          onPress={() => setAgreed((value) => !value)}
+          style={styles.agreementRow}
+        >
+          <View style={[styles.checkbox, agreed && styles.checkboxChecked]}>
+            {agreed ? <Text style={styles.checkboxMark}>✓</Text> : null}
           </View>
+          <Text style={styles.agreementText}>
+            我已阅读并同意
+            <Text
+              style={styles.agreementLink}
+              onPress={() => void openExternalLink(APP_LINKS.userAgreement)}
+            >
+              《注销协议》
+            </Text>
+          </Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="立即注销"
+          disabled={!agreed || applying}
+          onPress={() => void applyCancellation()}
+          style={[
+            styles.submitButton,
+            (!agreed || applying) && styles.submitDisabled,
+          ]}
+        >
+          {applying ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={styles.submitText}>立即注销</Text>
+          )}
+        </Pressable>
+      </View>
+      <BottomSheet
+        keyboardAvoiding
+        scrollable
+        visible={sheetVisible}
+        onClose={() => setSheetVisible(false)}
+        contentStyle={[styles.sheet, { paddingBottom: 16 + insets.bottom }]}
+      >
+        <View style={styles.sheetHeader}>
+          <Text style={styles.sheetTitle}>身份验证</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="关闭"
+            onPress={() => setSheetVisible(false)}
+            style={styles.sheetClose}
+          >
+            <Image source={closeIcon} style={styles.sheetCloseIcon} />
+          </Pressable>
         </View>
-      </Modal>
-      <Modal transparent visible={checkFailureMessage !== null} animationType="fade" onRequestClose={() => setCheckFailureMessage(null)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.failureCard}>
-            <View style={styles.failureIcon}><Text style={styles.failureIconText}>!</Text></View>
-            <Text style={styles.failureTitle}>检查失败</Text>
-            <Text style={styles.failureMessage}>{checkFailureMessage}</Text>
-            <View style={styles.failureNotice}>
-              <Text style={styles.failureNoticeText}>注销申请尚未提交，你可以稍后重新检查。</Text>
-            </View>
-            <View style={styles.failureActions}>
-              <Pressable accessibilityRole="button" onPress={() => setCheckFailureMessage(null)} style={styles.failureDismissButton}>
-                <Text style={styles.failureDismissText}>知道了</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => { setCheckFailureMessage(null); void checkCancellation(); }}
-                style={styles.failureRetryButton}
+        <View style={styles.fieldRow}>
+          <Text style={styles.fieldLabel}>手机号</Text>
+          <Text style={styles.fieldValue}>{maskedPhone}</Text>
+        </View>
+        <View style={styles.divider} />
+        <View style={styles.codeGroup}>
+          <Text style={styles.codeGroupLabel}>验证码</Text>
+          <View style={styles.codeRow}>
+            <TextInput
+              accessibilityLabel="验证码"
+              value={code}
+              onChangeText={(value) => {
+                setCode(value);
+                setVerifyError(null);
+              }}
+              keyboardType="number-pad"
+              maxLength={6}
+              placeholder="请输入验证码"
+              placeholderTextColor="#CCCCCC"
+              style={styles.codeInput}
+            />
+            <View style={styles.codeSeparator} />
+            <Pressable
+              accessibilityRole="button"
+              disabled={sendingCode || countdown > 0}
+              onPress={() => void sendCode()}
+              style={styles.sendCodeButton}
+            >
+              <Text
+                style={[
+                  styles.sendCodeText,
+                  countdown > 0 && styles.sendCodeCounting,
+                ]}
               >
-                <Text style={styles.failureRetryText}>重新检查</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
-      <Modal transparent visible={smsSentVisible} animationType="fade" onRequestClose={() => setSmsSentVisible(false)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.smsSentCard}>
-            <View style={styles.smsSentIcon}><Text style={styles.smsSentIconText}>✓</Text></View>
-            <Text style={styles.smsSentTitle}>验证码已发送</Text>
-            <Text style={styles.smsSentMessage}>短信已发送至绑定手机号</Text>
-            <Text style={styles.smsSentPhone}>{displayPhone}</Text>
-            <Pressable accessibilityRole="button" onPress={() => setSmsSentVisible(false)} style={styles.smsSentButton}>
-              <Text style={styles.smsSentButtonText}>知道了</Text>
+                {sendingCode
+                  ? "发送中"
+                  : countdown > 0
+                    ? `${countdown}s`
+                    : "获取验证码"}
+              </Text>
             </Pressable>
           </View>
+          {verifyError ? (
+            <>
+              <View style={[styles.divider, styles.dividerError]} />
+              <Text style={styles.errorText}>{verifyError}</Text>
+            </>
+          ) : null}
         </View>
-      </Modal>
-      <Modal transparent visible={blockedReasons !== null} animationType="fade" onRequestClose={() => setBlockedReasons(null)}><View style={styles.modalBackdrop}><View style={styles.dialogCard}><Text style={styles.dialogTitle}>暂时无法注销账号</Text><Text style={styles.dialogMessage}>你的账号存在以下待处理事项：</Text>{blockedReasons?.map((reason) => <Text key={reason} style={styles.reason}>• {reason}</Text>)}<Pressable onPress={() => setBlockedReasons(null)} style={styles.dialogButton}><Text style={styles.dialogButtonText}>知道了</Text></Pressable></View></View></Modal>
-      <BottomSheet keyboardAvoiding scrollable visible={verifyVisible} onClose={() => !submitting && setVerifyVisible(false)} contentStyle={[styles.sheet, { paddingBottom: 16 + insets.bottom }]}><View><View style={styles.sheetHeader}><Text style={styles.sheetTitle}>身份验证</Text><Pressable disabled={submitting} onPress={() => setVerifyVisible(false)}><Text style={styles.closeText}>×</Text></Pressable></View><Text style={styles.verifyPhone}>手机号　{displayPhone}</Text><View style={styles.codeRow}><TextInput autoFocus value={code} onChangeText={setCode} keyboardType="number-pad" maxLength={6} placeholder="请输入验证码" placeholderTextColor="#AAA" style={styles.codeInput} /><Pressable disabled={sendingCode || countdown > 0} onPress={() => void sendCode()}><Text style={styles.sendCode}>{sendingCode ? "发送中" : countdown > 0 ? `${countdown}s 后重发` : "获取验证码"}</Text></Pressable></View><Pressable disabled={!code.trim() || submitting} onPress={() => void confirmCancellation()} style={[styles.button, (!code.trim() || submitting) && styles.buttonDisabled]}>{submitting ? <ActivityIndicator color="#FFF" /> : <Text style={styles.buttonText}>确定注销</Text>}</Pressable></View></BottomSheet>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="确认注销"
+          disabled={!code.trim() || confirming}
+          onPress={() => void confirmCancellation()}
+          style={[
+            styles.confirmButton,
+            (!code.trim() || confirming) && styles.confirmDisabled,
+          ]}
+        >
+          {confirming ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={styles.submitText}>确认注销</Text>
+          )}
+        </Pressable>
+      </BottomSheet>
+      <AppPrompt
+        visible={blockedMessage !== null}
+        title="您的账户由于以下原因,暂时无法注销"
+        message={blockedMessage ?? ""}
+        confirmText="确定"
+        onConfirm={() => setBlockedMessage(null)}
+      />
     </View>
   );
 }
 
-function maskPhone(phone?: string) { if (!phone) return "--"; if (phone.length < 7) return phone; return `${phone.slice(0, 3)}****${phone.slice(-4)}`; }
+function maskPhone(phone?: string) {
+  if (!phone) return "--";
+  if (phone.length < 7) return phone;
+  return `${phone.slice(0, 3)}****${phone.slice(-4)}`;
+}
+
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#F7F7F7" }, header: { backgroundColor: "#FFF", flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#EBEBEB" }, backButton: { width: 28, height: 28, justifyContent: "center" }, backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" }, headerSpace: { width: 28 }, headerTitle: { color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 17, lineHeight: 24, fontWeight: "600" }, content: { padding: 16 }, card: { backgroundColor: "#FFF", borderRadius: 10, padding: 16, marginBottom: 18 }, title: { color: "#111", fontFamily: DOUYIN_SANS, fontSize: 18, lineHeight: 25, fontWeight: "700" }, body: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 14, lineHeight: 23, marginTop: 10 }, accountHint: { flexDirection: "row", alignItems: "center", backgroundColor: "#F7F7F7", borderRadius: 8, marginTop: 14, padding: 12 }, accountHintIcon: { color: "#111", fontSize: 15, marginRight: 8 }, accountHintText: { flex: 1, color: "#666", fontFamily: DOUYIN_SANS, fontSize: 13, lineHeight: 20 }, sectionTitle: { color: "#222", fontFamily: DOUYIN_SANS, fontSize: 15, fontWeight: "700", marginBottom: 10 }, infoRow: { flexDirection: "row", paddingVertical: 4 }, rowBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "#EEE", paddingTop: 14, marginTop: 12 }, infoMark: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#FFF0F2", color: "#FF1F4C", textAlign: "center", lineHeight: 22, fontWeight: "700", marginRight: 10 }, infoCopy: { flex: 1 }, infoTitle: { color: "#222", fontFamily: DOUYIN_SANS, fontSize: 14, fontWeight: "600" }, infoBody: { color: "#777", fontFamily: DOUYIN_SANS, fontSize: 12, lineHeight: 20, marginTop: 3 }, requirementRow: { flexDirection: "row", alignItems: "center", minHeight: 34 }, checkMark: { color: "#18A058", fontSize: 17, fontWeight: "700", marginRight: 10 }, requirementText: { flex: 1, color: "#555", fontFamily: DOUYIN_SANS, fontSize: 13, lineHeight: 20 }, sectionTitleInCard: { color: "#222", fontFamily: DOUYIN_SANS, fontSize: 15, fontWeight: "700", marginBottom: 12 }, stepRow: { flexDirection: "row", alignItems: "center", marginBottom: 12 }, stepIndex: { color: "#FF1F4C", fontFamily: DOUYIN_SANS, fontSize: 12, fontWeight: "700", width: 30 }, stepText: { flex: 1, color: "#555", fontFamily: DOUYIN_SANS, fontSize: 13, lineHeight: 20 }, agreementRow: { flexDirection: "row", alignItems: "flex-start", marginHorizontal: 2 }, checkbox: { width: 21, height: 21, borderWidth: 1, borderColor: "#CCC", borderRadius: 4, alignItems: "center", justifyContent: "center", marginRight: 8, marginTop: 1 }, checkboxChecked: { backgroundColor: "#FF1F4C", borderColor: "#FF1F4C" }, checkboxText: { color: "#FFF", fontSize: 14, fontWeight: "700" }, agreementText: { flex: 1, color: "#666", fontFamily: DOUYIN_SANS, fontSize: 13, lineHeight: 20 }, notice: { color: "#999", fontFamily: DOUYIN_SANS, fontSize: 12, lineHeight: 19, marginTop: 10, marginHorizontal: 2 }, button: { height: 46, borderRadius: 8, backgroundColor: "#FF1F4C", alignItems: "center", justifyContent: "center", marginTop: 18 }, buttonDisabled: { opacity: 0.4 }, buttonText: { color: "#FFF", fontFamily: DOUYIN_SANS, fontSize: 15, fontWeight: "600" }, modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "center", padding: 24 }, confirmCard: { backgroundColor: "#FFF", borderRadius: 16, padding: 24, alignItems: "center" }, confirmIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: "#FFF0F2", alignItems: "center", justifyContent: "center", marginBottom: 14 }, confirmIconText: { color: "#FF1F4C", fontSize: 25, lineHeight: 28, fontWeight: "700" }, confirmTitle: { color: "#111", fontFamily: DOUYIN_SANS, fontSize: 18, lineHeight: 25, fontWeight: "700", textAlign: "center" }, confirmMessage: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 13, lineHeight: 21, marginTop: 10, textAlign: "center" }, confirmActions: { flexDirection: "row", width: "100%", gap: 10, marginTop: 22 }, confirmCancelButton: { flex: 1, height: 44, borderRadius: 8, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center" }, confirmCancelText: { color: "#555", fontFamily: DOUYIN_SANS, fontSize: 14, fontWeight: "600" }, confirmSubmitButton: { flex: 1, height: 44, borderRadius: 8, backgroundColor: "#FF1F4C", alignItems: "center", justifyContent: "center" }, confirmSubmitText: { color: "#FFF", fontFamily: DOUYIN_SANS, fontSize: 14, fontWeight: "600" }, dialogCard: { backgroundColor: "#FFF", borderRadius: 12, padding: 22 }, dialogTitle: { color: "#111", fontFamily: DOUYIN_SANS, fontSize: 17, fontWeight: "700" }, dialogMessage: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 13, marginTop: 10, marginBottom: 8 }, reason: { color: "#555", fontFamily: DOUYIN_SANS, fontSize: 13, lineHeight: 22 }, dialogButton: { height: 44, backgroundColor: "#FF1F4C", borderRadius: 8, alignItems: "center", justifyContent: "center", marginTop: 18 }, dialogButtonText: { color: "#FFF", fontFamily: DOUYIN_SANS, fontSize: 15, fontWeight: "600" }, sheetBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" }, sheet: { backgroundColor: "#FFF", borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20 }, sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, sheetTitle: { color: "#111", fontFamily: DOUYIN_SANS, fontSize: 18, fontWeight: "700" }, closeText: { color: "#888", fontSize: 28, lineHeight: 28 }, verifyPhone: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 14, marginTop: 18 }, codeRow: { height: 48, flexDirection: "row", alignItems: "center", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#DDD", marginTop: 12 }, codeInput: { flex: 1, color: "#111", fontFamily: DOUYIN_SANS, fontSize: 15 }, sendCode: { color: "#FF1F4C", fontFamily: DOUYIN_SANS, fontSize: 13 },
-  failureCard: { width: "100%", maxWidth: 360, borderRadius: 16, padding: 24, alignItems: "center", backgroundColor: "#FFF" }, failureIcon: { width: 52, height: 52, borderRadius: 26, alignItems: "center", justifyContent: "center", backgroundColor: "#FFF0F2", marginBottom: 14 }, failureIconText: { color: "#FF1F4C", fontFamily: DOUYIN_SANS, fontSize: 26, lineHeight: 30, fontWeight: "700" }, failureTitle: { color: "#111216", fontFamily: DOUYIN_SANS, fontSize: 18, lineHeight: 25, fontWeight: "700" }, failureMessage: { alignSelf: "stretch", color: "#666", fontFamily: DOUYIN_SANS, fontSize: 13, lineHeight: 21, textAlign: "center", marginTop: 10 }, failureNotice: { alignSelf: "stretch", borderRadius: 8, backgroundColor: "#F7F7F7", paddingHorizontal: 12, paddingVertical: 10, marginTop: 16 }, failureNoticeText: { color: "#888", fontFamily: DOUYIN_SANS, fontSize: 12, lineHeight: 18, textAlign: "center" }, failureActions: { alignSelf: "stretch", flexDirection: "row", gap: 10, marginTop: 20 }, failureDismissButton: { flex: 1, height: 44, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#F2F2F2" }, failureDismissText: { color: "#555", fontFamily: DOUYIN_SANS, fontSize: 14, fontWeight: "600" }, failureRetryButton: { flex: 1, height: 44, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#FF1F4C" }, failureRetryText: { color: "#FFF", fontFamily: DOUYIN_SANS, fontSize: 14, fontWeight: "600" },
-  smsSentCard: { width: "100%", maxWidth: 360, borderRadius: 16, padding: 24, alignItems: "center", backgroundColor: "#FFF" }, smsSentIcon: { width: 52, height: 52, borderRadius: 26, alignItems: "center", justifyContent: "center", backgroundColor: "#EAF8F0", marginBottom: 14 }, smsSentIconText: { color: "#18A058", fontFamily: DOUYIN_SANS, fontSize: 24, lineHeight: 29, fontWeight: "700" }, smsSentTitle: { color: "#111216", fontFamily: DOUYIN_SANS, fontSize: 18, lineHeight: 25, fontWeight: "700" }, smsSentMessage: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 13, lineHeight: 20, marginTop: 10 }, smsSentPhone: { color: "#222", fontFamily: DOUYIN_SANS, fontSize: 15, lineHeight: 22, fontWeight: "600", marginTop: 4 }, smsSentButton: { alignSelf: "stretch", height: 44, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#FF1F4C", marginTop: 22 }, smsSentButtonText: { color: "#FFF", fontFamily: DOUYIN_SANS, fontSize: 14, fontWeight: "600" },
+  screen: { flex: 1, backgroundColor: "#FFF" },
+  header: {
+    backgroundColor: "#FFF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  backButton: {
+    width: 48,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
+  headerEnd: { width: 16 },
+  headerTitle: {
+    color: "#0A0A0A",
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: "500",
+  },
+  content: { padding: 16, gap: 12, paddingBottom: 24 },
+  paragraph: {
+    color: "#0A0A0A",
+    fontSize: 14,
+    lineHeight: 24,
+    fontWeight: "300",
+  },
+  paragraphStrong: { fontWeight: "500" },
+  bottomBar: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  agreementRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 4,
+  },
+  checkbox: {
+    width: 16,
+    height: 16,
+    borderWidth: 1,
+    borderColor: "#CCCCCC",
+    borderRadius: 4,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkboxChecked: {
+    backgroundColor: colors.brand,
+    borderColor: colors.brand,
+  },
+  checkboxMark: { color: "#FFF", fontSize: 11, lineHeight: 13, fontWeight: "700" },
+  agreementText: { color: "#808080", fontSize: 12, lineHeight: 18 },
+  agreementLink: { color: "#3DA5FF" },
+  submitButton: {
+    height: 42,
+    marginTop: 8,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.brand,
+  },
+  submitDisabled: { backgroundColor: "#FF99A0" },
+  submitText: { color: "#FFF", fontSize: 14, lineHeight: 22, fontWeight: "500" },
+  sheet: {
+    backgroundColor: "#FFF",
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  sheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingRight: 8,
+  },
+  sheetTitle: {
+    color: "#0A0A0A",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: "500",
+    padding: 16,
+  },
+  sheetClose: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
+  sheetCloseIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
+  fieldRow: {
+    minHeight: 54,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    paddingHorizontal: 16,
+  },
+  fieldLabel: {
+    width: 108,
+    color: "#0A0A0A",
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: "500",
+  },
+  fieldValue: {
+    flex: 1,
+    color: "#0A0A0A",
+    fontSize: 14,
+    lineHeight: 22,
+    textAlign: "right",
+  },
+  codeGroup: { paddingBottom: 4 },
+  codeGroupLabel: {
+    color: "#0A0A0A",
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: "500",
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 4,
+  },
+  codeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+  },
+  codeInput: {
+    flex: 1,
+    paddingVertical: 16,
+    textAlign: "right",
+    color: "#0A0A0A",
+    fontSize: 14,
+  },
+  codeSeparator: {
+    width: 1,
+    height: 16,
+    backgroundColor: "#E0E0E0",
+    marginLeft: 12,
+  },
+  sendCodeButton: { marginLeft: 12 },
+  sendCodeText: { color: "#0A0A0A", fontSize: 14, lineHeight: 22 },
+  sendCodeCounting: { color: "#CCCCCC" },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "#EBEBEB",
+    marginHorizontal: 16,
+  },
+  dividerError: { backgroundColor: "#FF4754" },
+  errorText: {
+    color: "#FF4754",
+    fontSize: 12,
+    lineHeight: 18,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+  },
+  confirmButton: {
+    height: 42,
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.brand,
+  },
+  confirmDisabled: { backgroundColor: "#FF708D" },
 });

@@ -13,9 +13,12 @@ import {
 import Toast from "react-native-root-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { toAuthUser } from "@/features/auth/client-auth-flow";
-import { clientAuthApi } from "@/features/auth/client-auth.api";
-import { saveAuthSession } from "@/features/auth/session-persistence";
+import {
+  canSubmitRealName,
+  normalizeIdCard,
+  realNameFailureMessage,
+} from "@/features/mine/real-name";
+import { submitRealNameVerification } from "@/features/mine/real-name-session";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 
@@ -34,7 +37,6 @@ export function RealNameVerificationSheet({
   const insets = useSafeAreaInsets();
   const token = useAuthStore((state) => state.accessToken);
   const user = useAuthStore((state) => state.user);
-  const setSession = useAuthStore((state) => state.setSession);
   const [name, setName] = useState("");
   const [idCard, setIdCard] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -56,25 +58,20 @@ export function RealNameVerificationSheet({
 
   const submit = async () => {
     const normalizedName = name.trim();
-    const normalizedIdCard = idCard.trim().toUpperCase();
-    if (!token || !normalizedName || !isValidIdCard(normalizedIdCard)) {
+    const normalizedIdCard = normalizeIdCard(idCard);
+    if (!token || !canSubmitRealName(normalizedName, normalizedIdCard)) {
       setValidationPromptVisible(true);
       return;
     }
 
     setSubmitting(true);
     try {
-      await clientAuthApi.realNameVerify(token, {
+      await submitRealNameVerification({
+        token,
         name: normalizedName,
-        num: normalizedIdCard,
+        idCard: normalizedIdCard,
+        phone: user?.phone,
       });
-      const profile = await clientAuthApi.fetchCurrentUser(token);
-      const session = {
-        accessToken: token,
-        user: toAuthUser(profile, user?.phone),
-      };
-      await saveAuthSession(session);
-      setSession(session);
       Keyboard.dismiss();
       setFocusedField(null);
       setName("");
@@ -84,7 +81,7 @@ export function RealNameVerificationSheet({
       Toast.show("认证成功", { duration: Toast.durations.SHORT });
     } catch (error) {
       Toast.show(
-        `认证失败，${error instanceof Error ? error.message : "请稍后重试"}`,
+        `认证失败，${realNameFailureMessage(error)}`,
         { duration: Toast.durations.SHORT },
       );
     } finally {
@@ -187,20 +184,6 @@ export function RealNameVerificationSheet({
         onConfirm={() => setValidationPromptVisible(false)}
       />
     </>
-  );
-}
-
-function isValidIdCard(value: string) {
-  if (!/^\d{17}[\dX]$/.test(value)) return false;
-  const birth = `${value.slice(6, 10)}-${value.slice(10, 12)}-${value.slice(12, 14)}`;
-  const [year, month, day] = birth.split("-").map(Number);
-  const date = new Date(year, month - 1, day);
-  return (
-    year >= 1900 &&
-    date.getFullYear() === year &&
-    date.getMonth() === month - 1 &&
-    date.getDate() === day &&
-    date <= new Date()
   );
 }
 

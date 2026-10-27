@@ -1,3 +1,4 @@
+import { COURT_FONT_FAMILY } from "@/features/court/court.theme";
 import type {
   Banner,
   Game,
@@ -5,7 +6,6 @@ import type {
   HomeTab,
 } from "@/features/home/api/home.types";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
-import { COURT_FONT_FAMILY } from "@/features/court/court.theme";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { Image } from "expo-image";
 import { router } from "expo-router";
