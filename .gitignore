@@ -62,3 +62,6 @@ modules/*/android/.gradle/
 .workbuddy/
 .claude/
 .codex/
+
+# react-native-update
+.pushy
