@@ -30,5 +30,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // *.test.mjs / *.test.cjs 走 node --test，不属于 vitest。
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
   },
 });
