@@ -1,3 +1,4 @@
+import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
@@ -10,7 +11,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { fetchStarBalance } from "@/features/mine/api/companion-order.api";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 
-const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
 
 // The Figma frame shows six cards using the same 300-star / ¥30 option.
@@ -83,7 +83,7 @@ export default function StarRechargeScreen() {
           onPress={() => router.back()}
           style={styles.headerSide}
         >
-          <Image source={backIcon} style={styles.backIcon} />
+          <ChevronLeft24Regular color="white" width={24} height={24} style={styles.backIcon} />
         </Pressable>
         <Text style={styles.headerTitle}>星钻充值</Text>
         <View style={styles.headerSide} />

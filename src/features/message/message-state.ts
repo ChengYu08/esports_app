@@ -6,7 +6,9 @@ export type ManagedMessage = ChatMessage & {
   status: MessageDeliveryStatus;
   clientId?: string;
   sentAt: number;
-  retryPayload?: { kind: "text"; text: string } | { kind: "image"; path: string };
+  retryPayload?:
+    | { kind: "text"; text: string }
+    | { kind: "image"; path: string };
   mediaSource?: unknown;
 };
 
@@ -22,6 +24,7 @@ export type MessageConversation = {
   clubId?: string;
   note?: string;
   isPinned?: boolean;
+  isCustomerService?: boolean;
 };
 
 export type MessageHistoryPage = {
@@ -30,30 +33,52 @@ export type MessageHistoryPage = {
   hasMore: boolean;
 };
 
-export function mergeConversations(items: MessageConversation[], updated: MessageConversation) {
+export function mergeConversations(
+  items: MessageConversation[],
+  updated: MessageConversation,
+) {
   const current = items.find((item) => item.id === updated.id);
-  const hasNewerMessage = !current
-    || updated.updatedAt > current.updatedAt
-    || (updated.updatedAt === current.updatedAt && Boolean(updated.preview || updated.time));
+  const hasNewerMessage =
+    !current ||
+    updated.updatedAt > current.updatedAt ||
+    (updated.updatedAt === current.updatedAt &&
+      Boolean(updated.preview || updated.time));
   const merged = {
     ...current,
     ...updated,
+    title:
+      current?.isCustomerService && updated.isCustomerService === undefined
+        ? current.title
+        : updated.title,
     preview: hasNewerMessage ? updated.preview : current.preview,
     time: hasNewerMessage ? updated.time : current.time,
     updatedAt: Math.max(current?.updatedAt || 0, updated.updatedAt),
     clubId: updated.clubId ?? current?.clubId,
     note: updated.note ?? current?.note,
     isPinned: updated.isPinned ?? current?.isPinned,
+    ...(updated.isCustomerService !== undefined ||
+    current?.isCustomerService !== undefined
+      ? {
+          isCustomerService:
+            updated.isCustomerService ?? current?.isCustomerService,
+        }
+      : {}),
   };
-  return [...items.filter((item) => item.id !== updated.id), merged]
-    .sort((left, right) => Number(Boolean(right.isPinned)) - Number(Boolean(left.isPinned)) || right.updatedAt - left.updatedAt);
+  return [...items.filter((item) => item.id !== updated.id), merged].sort(
+    (left, right) =>
+      Number(Boolean(right.isPinned)) - Number(Boolean(left.isPinned)) ||
+      right.updatedAt - left.updatedAt,
+  );
 }
 
 function messageKey(item: ManagedMessage) {
   return item.id || item.clientId;
 }
 
-function insertSortedMessage(items: ManagedMessage[], incoming: ManagedMessage) {
+function insertSortedMessage(
+  items: ManagedMessage[],
+  incoming: ManagedMessage,
+) {
   const key = messageKey(incoming);
   if (!key) return items;
 
@@ -64,9 +89,10 @@ function insertSortedMessage(items: ManagedMessage[], incoming: ManagedMessage) 
     return next;
   }
 
-  const remaining = existingIndex >= 0
-    ? items.filter((_, index) => index !== existingIndex)
-    : items;
+  const remaining =
+    existingIndex >= 0
+      ? items.filter((_, index) => index !== existingIndex)
+      : items;
   let low = 0;
   let high = remaining.length;
   while (low < high) {
@@ -78,12 +104,20 @@ function insertSortedMessage(items: ManagedMessage[], incoming: ManagedMessage) 
   return [...remaining.slice(0, low), incoming, ...remaining.slice(low)];
 }
 
-export function mergeMessages(items: ManagedMessage[], incoming: ManagedMessage) {
+export function mergeMessages(
+  items: ManagedMessage[],
+  incoming: ManagedMessage,
+) {
   return insertSortedMessage(items, incoming);
 }
 
-export function prependHistory(items: ManagedMessage[], history: ManagedMessage[]) {
-  const existingKeys = new Set(items.map(messageKey).filter((key): key is string => Boolean(key)));
+export function prependHistory(
+  items: ManagedMessage[],
+  history: ManagedMessage[],
+) {
+  const existingKeys = new Set(
+    items.map(messageKey).filter((key): key is string => Boolean(key)),
+  );
   const uniqueHistory: ManagedMessage[] = [];
   for (const item of history) {
     const key = messageKey(item);
@@ -108,17 +142,23 @@ export function prependHistory(items: ManagedMessage[], history: ManagedMessage[
   return merged;
 }
 
-export function replacePendingMessage(items: ManagedMessage[], clientId: string, sent: ManagedMessage) {
+export function replacePendingMessage(
+  items: ManagedMessage[],
+  clientId: string,
+  sent: ManagedMessage,
+) {
   if (!items.some((item) => item.clientId === clientId)) return items;
   const sentKey = messageKey(sent);
-  const remaining = items.filter((item) =>
-    item.clientId !== clientId && messageKey(item) !== sentKey,
+  const remaining = items.filter(
+    (item) => item.clientId !== clientId && messageKey(item) !== sentKey,
   );
   return insertSortedMessage(remaining, sent);
 }
 
 export function markMessageFailed(items: ManagedMessage[], clientId: string) {
-  return items.map((item) => item.clientId === clientId && item.status === "pending"
-    ? { ...item, status: "failed" as const }
-    : item);
+  return items.map((item) =>
+    item.clientId === clientId && item.status === "pending"
+      ? { ...item, status: "failed" as const }
+      : item,
+  );
 }

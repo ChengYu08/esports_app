@@ -87,7 +87,7 @@ export type MessageStoreState = {
   refreshOnlineStatuses: (token: string) => Promise<void>;
   refreshConversations: (token: string) => Promise<void>;
   initialize: (token: string) => Promise<void>;
-  openConversation: (conversation: Pick<MessageConversation, 'id' | 'title' | 'avatar' | 'clubId'>) => Promise<void>;
+  openConversation: (conversation: Pick<MessageConversation, 'id' | 'title' | 'avatar' | 'clubId' | 'isCustomerService'>) => Promise<void>;
   closeConversation: (peerId?: string) => void;
   loadOlder: (peerId: string) => Promise<void>;
   sendText: (peerId: string, text: string) => Promise<void>;
@@ -130,7 +130,7 @@ function createPendingImage(path: string): ManagedMessage {
   return { id: clientId, clientId, kind: 'image', imageUrl: path, time: formatTime(sentAt), isMine: true, status: 'pending', sentAt, retryPayload: { kind: 'image', path } };
 }
 
-function toConversationShell(conversation: Pick<MessageConversation, 'id' | 'title' | 'avatar'>): MessageConversation {
+function toConversationShell(conversation: Pick<MessageConversation, 'id' | 'title' | 'avatar' | 'isCustomerService'>): MessageConversation {
   const id = normalizeSystemConversationId(conversation.id);
   return { ...conversation, id, title: getSystemConversationTitle(id, conversation.title), preview: '', time: '', unreadCount: 0, updatedAt: 0 };
 }

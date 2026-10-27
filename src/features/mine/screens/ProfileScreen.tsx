@@ -69,7 +69,7 @@ const background = require("../../../../assets/mine/figma/profile-bg.png");
 const maleIcon = require("../../../../assets/home/club-detail/male.svg");
 const femaleIcon = require("../../../../assets/mine/figma/mine-female.svg");
 const clubIcon = require("../../../../assets/mine/figma/mine-club-flag.svg");
-const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
+const backIcon = require("../../../../assets/mine/figma/profile-back.svg");
 const diamondIcon = require("../../../../assets/home/club-detail/icon-diamond.svg");
 const idleStatusIcon = require("../../../../assets/home/club-detail/status-idle.svg");
 const playingStatusIcon = require("../../../../assets/home/club-detail/status-playing.svg");
@@ -589,6 +589,11 @@ export default function ProfileScreen() {
         <ProfileActionsSheet
           visible={profileActionsVisible}
           bottomInset={insets.bottom}
+          isBlacklisted={
+            !isMine &&
+            blacklistStatus.userId === String(profile.userId) &&
+            blacklistStatus.isBlacklisted
+          }
           onClose={() => setProfileActionsVisible(false)}
           onReportRequest={() =>
             router.push({
@@ -611,13 +616,16 @@ export default function ProfileScreen() {
         onCancel={() => setBlacklistPromptVisible(false)}
         onConfirm={() => {
           setBlacklistPromptVisible(false);
-          void addToBlacklist({
-            userId: String(profile.userId),
-            nickname: profile.nickname,
-            headImage: profile.headImage,
-            clubName: profile.clubName,
-            clubId: String(profile.clubId),
-          }).then(() => {
+          void addToBlacklist(
+            {
+              userId: String(profile.userId),
+              nickname: profile.nickname,
+              headImage: profile.headImage,
+              clubName: profile.clubName,
+              clubId: String(profile.clubId),
+            },
+            useAuthStore.getState().accessToken ?? "",
+          ).then(() => {
             Toast.show("加入黑名单成功", {
               duration: Toast.durations.SHORT,
             });

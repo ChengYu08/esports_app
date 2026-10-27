@@ -13,6 +13,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import type { ReactNode } from "react";
+import { RootSiblingParent } from "react-native-root-siblings";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type BottomSheetProps = {
@@ -145,16 +146,21 @@ export function BottomSheet({
       visible
       onRequestClose={onClose}
     >
-      {keyboardAvoiding ? (
-        <KeyboardAvoidingView
-          // Prefer padding over Android "height": height + adjustResize inside Modal
-          // can reflow the sheet and steal TextInput focus (keyboard flicker).
-          behavior="padding"
-          style={styles.keyboardAvoiding}
-        >
-          {backdrop}
-        </KeyboardAvoidingView>
-      ) : backdrop}
+      {/* Toast 需挂到 Modal 窗口内，否则会被原生 Modal 挡住 */}
+      <RootSiblingParent>
+        {keyboardAvoiding ? (
+          <KeyboardAvoidingView
+            // Prefer padding over Android "height": height + adjustResize inside Modal
+            // can reflow the sheet and steal TextInput focus (keyboard flicker).
+            behavior="padding"
+            style={styles.keyboardAvoiding}
+          >
+            {backdrop}
+          </KeyboardAvoidingView>
+        ) : (
+          backdrop
+        )}
+      </RootSiblingParent>
     </Modal>
   );
 }

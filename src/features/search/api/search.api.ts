@@ -4,7 +4,19 @@ import type { Club, ClubPage } from "@/features/home/api/home.types";
 type ApiEnvelope<T> = { code?: string; info?: string; data?: T };
 type ApiClubPage = { page?: number; totalPages?: number; records?: ApiClub[] };
 type ApiClub = { id: number | string; clubName?: string; logoUrl?: string; intro?: string; followCount?: number; memberCount?: number };
-export type SearchUser = { profileId: number; clubId: number; userId: number; clubName?: string; nickname: string; headImage?: string; signature?: string; sex?: number };
+export type SearchUser = {
+  profileId: number;
+  clubId: number;
+  userId: number;
+  clubName?: string;
+  nickname: string;
+  headImage?: string;
+  signature?: string;
+  sex?: number;
+  birth?: string;
+  onlineStatus?: number;
+  gameStatus?: number;
+};
 type ApiUser = Partial<SearchUser> & { profileId: number; userId?: number; nickname?: string };
 
 export async function searchClubs(keyword: string, page = 1, pageSize = 20, signal?: AbortSignal): Promise<ClubPage> {
@@ -45,6 +57,9 @@ export async function searchUsers(keyword: string, page = 1, pageSize = 20, sign
       headImage: user.headImage,
       signature: user.signature,
       sex: user.sex,
+      birth: user.birth,
+      onlineStatus: user.onlineStatus,
+      gameStatus: user.gameStatus,
     })),
     hasMore: (response.data.page ?? page) < (response.data.totalPages ?? page),
     nextPage: page + 1,

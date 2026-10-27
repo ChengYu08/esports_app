@@ -1,24 +1,31 @@
 import { useAuthStore } from "@esports/auth";
+import {
+  ChevronLeft24Regular,
+  Copy16Regular,
+} from "@fluentui/react-native-icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
-import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Toast from "react-native-root-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { buildAfterSalePayload } from "@/features/order/after-sale-card";
 import { OrderAfterSaleSheet } from "@/features/order/components/OrderAfterSaleSheet";
 import { OrderCompleteConfirmSheet } from "@/features/order/components/OrderCompleteConfirmSheet";
 import { OrderReviewSheet } from "@/features/order/components/OrderReviewSheet";
 import { getOrderDetailAction } from "@/features/order/order-detail-actions";
-import { invalidateOrderQueries, orderDetailQueryKey } from "@/features/order/order-query";
-import { buildAfterSalePayload } from "@/features/order/after-sale-card";
 import {
+  invalidateOrderQueries,
+  orderDetailQueryKey,
+} from "@/features/order/order-query";
+import {
+  acceptOrder,
   cancelOrder,
   completeOrder,
-  acceptOrder,
   fetchAfterSaleMembers,
   fetchOrderDetail,
   fetchOrderReview,
@@ -30,21 +37,28 @@ import {
   type AfterSaleMember,
   type OrderReview,
 } from "@/features/order/order.api";
-import type { OrderAction, OrderActionKey, OrderItemModel, OrderScope } from "@/features/order/order.types";
+import type {
+  OrderAction,
+  OrderActionKey,
+  OrderItemModel,
+  OrderScope,
+} from "@/features/order/order.types";
 import { requireLogin } from "@/shared/navigation/require-login";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { CachedImage } from "@/shared/ui/CachedImage";
 
-const copyIcon = require("../../../assets/coms/copy.svg");
-const backIcon = require("../../../assets/message/chat-back.svg");
 const orderStepCheck = require("../../../assets/order/order-step-check.svg");
 const orderStepActive = require("../../../assets/order/order-step-active.svg");
 const orderStepPending = require("../../../assets/order/order-step-pending.svg");
 const ACTION_GRADIENT = ["#FF2145", "#FF3158"] as const;
 
 export default function OrderDetailRoute() {
-  const { id, scope: scopeParam } = useLocalSearchParams<{ id: string; scope?: string }>();
+  const { id, scope: scopeParam } = useLocalSearchParams<{
+    id: string;
+    scope?: string;
+  }>();
   const scope: OrderScope = scopeParam === "accept" ? "accept" : "place";
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -59,7 +73,9 @@ export default function OrderDetailRoute() {
   const [afterSaleLoading, setAfterSaleLoading] = useState(false);
   const [reviewVisible, setReviewVisible] = useState(false);
   const [reviewDetail, setReviewDetail] = useState<OrderReview | null>(null);
-  const [actionPrompt, setActionPrompt] = useState<"reject" | "free" | null>(null);
+  const [actionPrompt, setActionPrompt] = useState<"reject" | "free" | null>(
+    null,
+  );
   const [actionPending, setActionPending] = useState(false);
   const [prompt, setPrompt] = useState<{
     title: string;
@@ -67,7 +83,8 @@ export default function OrderDetailRoute() {
   } | null>(null);
   const detail = useQuery({
     queryKey: orderDetailQueryKey(id, scope),
-    queryFn: async ({ signal }) => mapOrder(await fetchOrderDetail(id, token as string, signal), 0, scope),
+    queryFn: async ({ signal }) =>
+      mapOrder(await fetchOrderDetail(id, token as string, signal), 0, scope),
     enabled: Boolean(id && token),
   });
   const [clock, setClock] = useState(() => Date.now());
@@ -94,38 +111,49 @@ export default function OrderDetailRoute() {
     );
   const order = detail.data;
   const detailAction = getOrderDetailAction(order.actions);
-  const detailActions = scope === "accept"
-    ? order.actions
-    : order.status === "completed"
-      ? order.actions.filter((item) =>
-          ["afterSales", "review", "reorder"].includes(item.key),
-        )
-      : detailAction
-        ? order.actions.filter((item) => item.key === detailAction)
-        : [];
+  const detailActions =
+    scope === "accept"
+      ? order.actions
+      : order.status === "completed"
+        ? order.actions.filter((item) =>
+            ["afterSales", "review", "reorder"].includes(item.key),
+          )
+        : detailAction
+          ? order.actions.filter((item) => item.key === detailAction)
+          : [];
   const isPending = order.status === "pendingPayment";
   const isCompleted = order.status === "completed";
   const isCancelled =
     order.status === "cancelled" || order.status === "refunded";
-  const statusTitle = scope === "accept"
-    ? order.status === "paid" ? "待陪玩师抢单"
-      : order.status === "waitingService" ? "待服务"
-        : order.status === "inService" ? "服务中"
-          : order.status === "completed" ? "服务结束"
-            : order.statusLabel
-    : isPending ? "待支付"
-      : order.statusLabel === "已支付" ? "进行中" : order.statusLabel;
+  const statusTitle =
+    scope === "accept"
+      ? order.status === "paid"
+        ? "待陪玩师抢单"
+        : order.status === "waitingService"
+          ? "待服务"
+          : order.status === "inService"
+            ? "服务中"
+            : order.status === "completed"
+              ? "服务结束"
+              : order.statusLabel
+      : isPending
+        ? "待支付"
+        : order.statusLabel === "已支付"
+          ? "进行中"
+          : order.statusLabel;
   const deadlineTime = dispatchDeadline ? Date.parse(dispatchDeadline) : NaN;
   const dispatchCountdown = Number.isFinite(deadlineTime)
     ? Math.max(0, Math.ceil((deadlineTime - clock) / 1000))
     : undefined;
-  const showDispatchCountdown = scope === "accept"
-    && (order.status === "paid" || order.status === "waitingService")
-    && dispatchCountdown !== undefined;
+  const showDispatchCountdown =
+    scope === "accept" &&
+    (order.status === "paid" || order.status === "waitingService") &&
+    dispatchCountdown !== undefined;
   const orderNumber = order.orderNo ?? order.id;
   const handleChat = () => {
     if (!requireLogin()) return;
-    const chatUserId = scope === "accept" ? order.buyerUserId : order.receiverUserId;
+    const chatUserId =
+      scope === "accept" ? order.buyerUserId : order.receiverUserId;
     if (!chatUserId || chatUserId === "0") {
       setPrompt({
         title: "暂时无法聊天",
@@ -143,21 +171,28 @@ export default function OrderDetailRoute() {
       },
     });
   };
-  const statusHint = scope === "accept"
-    ? order.status === "paid" ? "老板已支付，请及时处理订单"
-      : order.status === "waitingService" ? "请按约定时间开始服务"
-        : order.status === "inService" ? "服务进行中"
-          : isCompleted ? ""
-            : isCancelled ? "订单已取消" : "订单状态已更新"
-    : isPending
-      ? "请在剩余时间内完成支付"
-      : isCompleted
-        ? "感谢你的支持"
-        : isCancelled
-          ? "订单已取消"
+  const statusHint =
+    scope === "accept"
+      ? order.status === "paid"
+        ? "老板已支付，请及时处理订单"
+        : order.status === "waitingService"
+          ? "请按约定时间开始服务"
           : order.status === "inService"
             ? "服务进行中"
-            : "陪玩确认后开始服务";
+            : isCompleted
+              ? ""
+              : isCancelled
+                ? "订单已取消"
+                : "订单状态已更新"
+      : isPending
+        ? "请在剩余时间内完成支付"
+        : isCompleted
+          ? "感谢你的支持"
+          : isCancelled
+            ? "订单已取消"
+            : order.status === "inService"
+              ? "服务进行中"
+              : "陪玩确认后开始服务";
   const copyOrderNumber = async () => {
     try {
       await Clipboard.setStringAsync(orderNumber);
@@ -186,7 +221,10 @@ export default function OrderDetailRoute() {
       await detail.refetch();
       Toast.show("操作成功", { duration: Toast.durations.SHORT });
     } catch (error) {
-      setPrompt({ title: "订单操作失败", message: error instanceof Error ? error.message : "请稍后重试" });
+      setPrompt({
+        title: "订单操作失败",
+        message: error instanceof Error ? error.message : "请稍后重试",
+      });
     } finally {
       setActionPending(false);
     }
@@ -201,7 +239,10 @@ export default function OrderDetailRoute() {
     else if (action.key === "complete") setCompletePromptVisible(true);
     else if (action.key === "afterSales") {
       if (order.clubId == null) {
-        Alert.alert("暂无法申请售后", "缺少俱乐部信息，无法申请售后");
+        void useAppConfirm.getState().confirm({
+          title: "暂无法申请售后",
+          message: "缺少俱乐部信息，无法申请售后",
+        });
         return;
       }
       setAfterSaleVisible(true);
@@ -216,11 +257,16 @@ export default function OrderDetailRoute() {
       setReviewVisible(true);
       setReviewDetail(null);
       if (order.reviewId && token)
-        void fetchOrderReview(order.reviewId, token).then(setReviewDetail).catch(() => undefined);
+        void fetchOrderReview(order.reviewId, token)
+          .then(setReviewDetail)
+          .catch(() => undefined);
     } else if (action.key === "reorder") {
       router.push({
         pathname: "/profile",
-        params: { clubId: String(order.clubId || ""), userId: String(order.receiverUserId || "") },
+        params: {
+          clubId: String(order.clubId || ""),
+          userId: String(order.receiverUserId || ""),
+        },
       });
     }
   };
@@ -234,7 +280,12 @@ export default function OrderDetailRoute() {
           onPress={() => router.back()}
           style={styles.back}
         >
-          <Image source={backIcon} style={styles.backIcon} />
+          <ChevronLeft24Regular
+            color="#1A1A1A"
+            width={24}
+            height={24}
+            style={styles.backIcon}
+          />
         </Pressable>
         <View style={styles.headerTitle} />
         <View style={styles.headerSlot} />
@@ -246,20 +297,54 @@ export default function OrderDetailRoute() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.statusBlock, { height: 84, paddingTop: 12 }, scope === "accept" && styles.acceptStatusBlock]}>
-          <Text style={[styles.statusTitle, scope === "accept" && styles.acceptStatusTitle]}>{statusTitle}</Text>
+        <View
+          style={[
+            styles.statusBlock,
+            { height: 84, paddingTop: 12 },
+            scope === "accept" && styles.acceptStatusBlock,
+          ]}
+        >
+          <Text
+            style={[
+              styles.statusTitle,
+              scope === "accept" && styles.acceptStatusTitle,
+            ]}
+          >
+            {statusTitle}
+          </Text>
           {statusHint ? (
-            <Text style={[styles.statusHint, { marginTop: 8, lineHeight: 22 }, scope === "accept" && styles.acceptStatusHint]}>
-              {showDispatchCountdown
-                ? dispatchCountdown === 0
-                  ? "抢单已截止"
-                  : <>剩余 <Text style={styles.countdownAccent}>{formatCountdown(dispatchCountdown ?? 0)}</Text> 停止抢单</>
-                : statusHint}
+            <Text
+              style={[
+                styles.statusHint,
+                { marginTop: 8, lineHeight: 22 },
+                scope === "accept" && styles.acceptStatusHint,
+              ]}
+            >
+              {showDispatchCountdown ? (
+                dispatchCountdown === 0 ? (
+                  "抢单已截止"
+                ) : (
+                  <>
+                    剩余{" "}
+                    <Text style={styles.countdownAccent}>
+                      {formatCountdown(dispatchCountdown ?? 0)}
+                    </Text>{" "}
+                    停止抢单
+                  </>
+                )
+              ) : (
+                statusHint
+              )}
             </Text>
           ) : null}
         </View>
         {!isCancelled && <ProgressSteps status={order.status} scope={scope} />}
-        <View style={[styles.infoBlock, scope === "accept" && styles.acceptInfoBlock]}>
+        <View
+          style={[
+            styles.infoBlock,
+            scope === "accept" && styles.acceptInfoBlock,
+          ]}
+        >
           <View style={styles.sellerRow}>
             <CachedImage
               contentFit="cover"
@@ -267,36 +352,114 @@ export default function OrderDetailRoute() {
               style={styles.avatar}
             />
             <View style={styles.sellerCopy}>
-              <Text style={[styles.sellerName, scope === "accept" && styles.acceptSellerName]}>{order.sellerName}</Text>
-              {scope !== "accept" && <Text style={styles.muted}>盼之电竞自营俱乐部</Text>}
+              <Text
+                style={[
+                  styles.sellerName,
+                  scope === "accept" && styles.acceptSellerName,
+                ]}
+              >
+                {order.sellerName}
+              </Text>
+              {scope !== "accept" && (
+                <Text style={styles.muted}>盼之电竞自营俱乐部</Text>
+              )}
             </View>
             <Pressable
               accessibilityRole="button"
               onPress={handleChat}
-              style={[styles.chatButton, scope === "accept" && styles.acceptChatButton]}
+              style={[
+                styles.chatButton,
+                scope === "accept" && styles.acceptChatButton,
+              ]}
             >
-              <Text style={[styles.chatText, scope === "accept" && styles.acceptChatText]}>聊一聊</Text>
+              <Text
+                style={[
+                  styles.chatText,
+                  scope === "accept" && styles.acceptChatText,
+                ]}
+              >
+                聊一聊
+              </Text>
             </Pressable>
           </View>
           <View style={styles.divider} />
-          <InfoRow acceptStyle={scope === "accept"} label="游戏" value={order.gameName} />
-          <InfoRow acceptStyle={scope === "accept"} label="服务" value={order.serviceName.replace("服务", "")} />
-          <InfoRow acceptStyle={scope === "accept"} label="备注" value={order.remark || "-"} multiline={scope === "accept"} />
-          <InfoRow acceptStyle={scope === "accept"} label="单价" value={`${order.unitPrice}星钻/${order.billingUnitName ?? "小时"}`} />
-          <InfoRow acceptStyle={scope === "accept"} label="个数" value={`x ${order.quantity}`} />
-          <InfoRow acceptStyle={scope === "accept"} label={scope === "accept" ? "合计" : "实付款"} value={`${order.totalPrice}星钻`} />
+          <InfoRow
+            acceptStyle={scope === "accept"}
+            label="游戏"
+            value={order.gameName}
+          />
+          <InfoRow
+            acceptStyle={scope === "accept"}
+            label="服务"
+            value={order.serviceName.replace("服务", "")}
+          />
+          <InfoRow
+            acceptStyle={scope === "accept"}
+            label="备注"
+            value={order.remark || "-"}
+            multiline={scope === "accept"}
+          />
+          <InfoRow
+            acceptStyle={scope === "accept"}
+            label="单价"
+            value={`${order.unitPrice}星钻/${order.billingUnitName ?? "小时"}`}
+          />
+          <InfoRow
+            acceptStyle={scope === "accept"}
+            label="个数"
+            value={`x ${order.quantity}`}
+          />
+          <InfoRow
+            acceptStyle={scope === "accept"}
+            label={scope === "accept" ? "合计" : "实付款"}
+            value={`${order.totalPrice}星钻`}
+          />
         </View>
-        <View style={[styles.infoBlock, scope === "accept" && styles.acceptDetailsBlock]}>
-          <InfoRow acceptStyle={scope === "accept"} label="订单编号" value={orderNumber} copy onCopy={() => void copyOrderNumber()} />
-          <InfoRow acceptStyle={scope === "accept"} label="创建时间" value={formatOrderTime(order.createTime)} />
+        <View
+          style={[
+            styles.infoBlock,
+            scope === "accept" && styles.acceptDetailsBlock,
+          ]}
+        >
+          <InfoRow
+            acceptStyle={scope === "accept"}
+            label="订单编号"
+            value={orderNumber}
+            copy
+            onCopy={() => void copyOrderNumber()}
+          />
+          <InfoRow
+            acceptStyle={scope === "accept"}
+            label="创建时间"
+            value={formatOrderTime(order.createTime)}
+          />
           {scope === "accept" ? (
-            <InfoRow acceptStyle label="派单时间" value={formatOrderTime(order.dispatchTime ?? order.acceptedTime)} />
+            <InfoRow
+              acceptStyle
+              label="派单时间"
+              value={formatOrderTime(order.dispatchTime ?? order.acceptedTime)}
+            />
           ) : (
             <>
-              <InfoRow label="支付时间" value={formatOrderTime(order.paidTime)} />
-              <InfoRow label="接单时间" value={formatOrderTime(order.acceptedTime)} />
-              <InfoRow label="服务时间" value={formatServiceTime(order.serviceStartTime, order.serviceEndTime)} />
-              <InfoRow label="完成时间" value={formatOrderTime(order.completedTime)} />
+              <InfoRow
+                label="支付时间"
+                value={formatOrderTime(order.paidTime)}
+              />
+              <InfoRow
+                label="接单时间"
+                value={formatOrderTime(order.acceptedTime)}
+              />
+              <InfoRow
+                label="服务时间"
+                value={formatServiceTime(
+                  order.serviceStartTime,
+                  order.serviceEndTime,
+                )}
+              />
+              <InfoRow
+                label="完成时间"
+                value={formatOrderTime(order.completedTime)}
+              />
             </>
           )}
         </View>
@@ -314,14 +477,41 @@ export default function OrderDetailRoute() {
               key={action.key}
               disabled={actionPending}
               onPress={() => void handleDetailAction(action)}
-              style={[styles.outlineButton, scope === "accept" && styles.acceptOutlineButton, detailActions.length > 1 && styles.bottomAction, action.variant === "primary" && styles.primaryButton, action.variant === "primary" && scope === "accept" && styles.acceptPrimaryButton]}
+              style={[
+                styles.outlineButton,
+                scope === "accept" && styles.acceptOutlineButton,
+                detailActions.length > 1 && styles.bottomAction,
+                action.variant === "primary" && styles.primaryButton,
+                action.variant === "primary" &&
+                  scope === "accept" &&
+                  styles.acceptPrimaryButton,
+              ]}
             >
               {action.variant === "primary" ? (
-                <LinearGradient colors={ACTION_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.primaryGradient}>
-                  <Text style={[styles.primaryText, scope === "accept" && styles.acceptActionText]}>{actionPending ? "处理中..." : action.label}</Text>
+                <LinearGradient
+                  colors={ACTION_GRADIENT}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.primaryGradient}
+                >
+                  <Text
+                    style={[
+                      styles.primaryText,
+                      scope === "accept" && styles.acceptActionText,
+                    ]}
+                  >
+                    {actionPending ? "处理中..." : action.label}
+                  </Text>
                 </LinearGradient>
               ) : (
-                <Text style={[styles.outlineText, scope === "accept" && styles.acceptActionText]}>{actionPending ? "处理中..." : action.label}</Text>
+                <Text
+                  style={[
+                    styles.outlineText,
+                    scope === "accept" && styles.acceptActionText,
+                  ]}
+                >
+                  {actionPending ? "处理中..." : action.label}
+                </Text>
               )}
             </Pressable>
           ))}
@@ -414,8 +604,13 @@ export default function OrderDetailRoute() {
         visible={completePromptVisible && scope === "accept"}
         order={order}
         companionName={order.receiverName || currentUser?.nickname || "陪玩师"}
-        companionAvatar={order.receiverAvatar ?? (currentUser?.headImage ? { uri: currentUser.headImage } : undefined)}
-        serviceTime={formatOrderTime(order.serviceStartTime || order.serviceEndTime || order.createTime)}
+        companionAvatar={
+          order.receiverAvatar ??
+          (currentUser?.headImage ? { uri: currentUser.headImage } : undefined)
+        }
+        serviceTime={formatOrderTime(
+          order.serviceStartTime || order.serviceEndTime || order.createTime,
+        )}
         loading={actionPending}
         onClose={() => {
           if (!actionPending) setCompletePromptVisible(false);
@@ -427,7 +622,9 @@ export default function OrderDetailRoute() {
             await completeOrder(order.id, token);
             setCompletePromptVisible(false);
             await invalidateOrderQueries(order.id);
-            await queryClient.invalidateQueries({ queryKey: ["orders", "accept"] });
+            await queryClient.invalidateQueries({
+              queryKey: ["orders", "accept"],
+            });
             await detail.refetch();
             Toast.show("服务已完成", { duration: Toast.durations.SHORT });
           } catch (error) {
@@ -443,7 +640,11 @@ export default function OrderDetailRoute() {
       <AppPrompt
         visible={actionPrompt !== null}
         title={actionPrompt === "free" ? "确认免单" : "确认拒绝接单"}
-        message={actionPrompt === "free" ? `确认免单 ${order.totalPrice} 星钻吗？` : "确认拒绝这笔订单吗？"}
+        message={
+          actionPrompt === "free"
+            ? `确认免单 ${order.totalPrice} 星钻吗？`
+            : "确认拒绝这笔订单吗？"
+        }
         cancelText="取消"
         confirmText="确认"
         onCancel={() => setActionPrompt(null)}
@@ -452,16 +653,22 @@ export default function OrderDetailRoute() {
           setActionPrompt(null);
           if (!token || !action) return;
           setActionPending(true);
-          const operation = action === "free"
-            ? freeOrderService(order.id, Number(order.totalPrice) || 0, token)
-            : rejectOrder(order.id, token);
+          const operation =
+            action === "free"
+              ? freeOrderService(order.id, Number(order.totalPrice) || 0, token)
+              : rejectOrder(order.id, token);
           void operation
             .then(async () => {
               await invalidateOrderQueries(order.id);
               await detail.refetch();
               Toast.show("操作成功", { duration: Toast.durations.SHORT });
             })
-            .catch((error) => setPrompt({ title: action === "free" ? "免单失败" : "拒绝失败", message: error instanceof Error ? error.message : "请稍后重试" }))
+            .catch((error) =>
+              setPrompt({
+                title: action === "free" ? "免单失败" : "拒绝失败",
+                message: error instanceof Error ? error.message : "请稍后重试",
+              }),
+            )
             .finally(() => setActionPending(false));
         }}
       />
@@ -477,12 +684,24 @@ export default function OrderDetailRoute() {
 
 function imageSourceUri(source: OrderItemModel["sellerAvatar"]) {
   if (typeof source === "string") return source;
-  if (typeof source !== "object" || source === null || !("uri" in source)) return "";
+  if (typeof source !== "object" || source === null || !("uri" in source))
+    return "";
   return typeof source.uri === "string" ? source.uri : "";
 }
 
-function ProgressSteps({ status, scope }: { status: OrderItemModel["status"]; scope: OrderScope }) {
-  const labels = ["支付订单", scope === "accept" ? "陪玩抢单" : "陪玩确认", "陪玩服务", "服务完成"];
+function ProgressSteps({
+  status,
+  scope,
+}: {
+  status: OrderItemModel["status"];
+  scope: OrderScope;
+}) {
+  const labels = [
+    "支付订单",
+    scope === "accept" ? "陪玩抢单" : "陪玩确认",
+    "陪玩服务",
+    "服务完成",
+  ];
   const activeStep =
     status === "pendingPayment"
       ? 0
@@ -508,16 +727,29 @@ function ProgressSteps({ status, scope }: { status: OrderItemModel["status"]; sc
               ]}
             >
               {done ? (
-                scope === "accept"
-                  ? <Image source={orderStepCheck} style={styles.acceptFlowIcon} />
-                  : <Text style={styles.flowCheck}>✓</Text>
+                scope === "accept" ? (
+                  <Image
+                    source={orderStepCheck}
+                    style={styles.acceptFlowIcon}
+                  />
+                ) : (
+                  <Text style={styles.flowCheck}>✓</Text>
+                )
               ) : active ? (
-                scope === "accept"
-                  ? <Image source={orderStepActive} style={styles.acceptFlowIcon} />
-                  : <View style={styles.flowActiveDot} />
+                scope === "accept" ? (
+                  <Image
+                    source={orderStepActive}
+                    style={styles.acceptFlowIcon}
+                  />
+                ) : (
+                  <View style={styles.flowActiveDot} />
+                )
               ) : scope === "accept" ? (
                 <View style={styles.acceptPendingMarker}>
-                  <Image source={orderStepPending} style={styles.acceptPendingIcon} />
+                  <Image
+                    source={orderStepPending}
+                    style={styles.acceptPendingIcon}
+                  />
                   <Text style={styles.acceptFlowNumber}>{index + 1}</Text>
                 </View>
               ) : (
@@ -557,9 +789,18 @@ function InfoRow({
 }) {
   return (
     <View style={[styles.infoRow, multiline && styles.multilineInfoRow]}>
-      <Text style={[styles.label, acceptStyle && styles.acceptLabel]}>{label}</Text>
+      <Text style={[styles.label, acceptStyle && styles.acceptLabel]}>
+        {label}
+      </Text>
       <View style={styles.infoValue}>
-        <Text style={[styles.value, (label === "实付款" || label === "合计") && styles.amount, acceptStyle && styles.acceptValue, multiline && styles.multilineValue]}>
+        <Text
+          style={[
+            styles.value,
+            (label === "实付款" || label === "合计") && styles.amount,
+            acceptStyle && styles.acceptValue,
+            multiline && styles.multilineValue,
+          ]}
+        >
           {value}
         </Text>
         {copy && (
@@ -569,7 +810,12 @@ function InfoRow({
             hitSlop={8}
             onPress={onCopy}
           >
-            <Image source={copyIcon} style={styles.copy} />
+            <Copy16Regular
+              color="#808080"
+              width={16}
+              height={16}
+              style={styles.copy}
+            />
           </Pressable>
         )}
       </View>
@@ -604,9 +850,19 @@ const styles = StyleSheet.create({
   },
   acceptFlow: { height: 74 },
   acceptFlowIcon: { width: 24, height: 24 },
-  acceptPendingMarker: { width: 24, height: 24, alignItems: "center", justifyContent: "center" },
+  acceptPendingMarker: {
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   acceptPendingIcon: { position: "absolute", width: 20, height: 20 },
-  acceptFlowNumber: { color: "#FFF", fontFamily: DOUYIN_SANS, fontSize: 12, fontWeight: "500" },
+  acceptFlowNumber: {
+    color: "#FFF",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 12,
+    fontWeight: "500",
+  },
   flowLine: {
     position: "absolute",
     height: StyleSheet.hairlineWidth,
@@ -823,8 +1079,22 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "600",
   },
-  primaryButton: { paddingHorizontal: 0, borderWidth: 0, backgroundColor: "transparent" },
-  primaryGradient: { width: "100%", height: "100%", alignItems: "center", justifyContent: "center" },
-  primaryText: { color: "#FFF", fontFamily: DOUYIN_SANS, fontSize: 17, fontWeight: "600" },
+  primaryButton: {
+    paddingHorizontal: 0,
+    borderWidth: 0,
+    backgroundColor: "transparent",
+  },
+  primaryGradient: {
+    width: "100%",
+    height: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  primaryText: {
+    color: "#FFF",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 17,
+    fontWeight: "600",
+  },
   acceptActionText: { fontSize: 14 },
 });

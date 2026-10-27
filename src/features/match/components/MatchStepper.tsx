@@ -1,10 +1,7 @@
-import { Image } from "expo-image";
+import { Add16Regular, Subtract16Regular } from "@fluentui/react-native-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { DOUYIN_SANS } from "@/shared/theme/typography";
-
-const decreaseIcon = require("../../../../assets/svgs/icon-decrease.svg");
-const increaseIcon = require("../../../../assets/svgs/icon-increase.svg");
 
 type MatchStepperProps = {
   value: number;
@@ -23,11 +20,18 @@ export function MatchStepper({ value, min = 1, onChange }: MatchStepperProps) {
         disabled={!canDecrease}
         hitSlop={8}
         onPress={() => {
-          if (canDecrease) onChange(value - 1);
+          if (canDecrease) {
+            onChange(value - 1);
+          }
         }}
         style={styles.side}
       >
-        <Image source={decreaseIcon} style={[styles.icon, !canDecrease && styles.iconDisabled]} />
+        <Subtract16Regular
+          color="rgba(255, 255, 255, 0.6)"
+          width={16}
+          height={16}
+          style={[styles.icon, !canDecrease && styles.iconDisabled]}
+        />
       </Pressable>
       <View style={styles.divider} />
       <View style={styles.number}>
@@ -41,7 +45,7 @@ export function MatchStepper({ value, min = 1, onChange }: MatchStepperProps) {
         onPress={() => onChange(value + 1)}
         style={styles.side}
       >
-        <Image source={increaseIcon} style={styles.icon} />
+        <Add16Regular color="white" width={16} height={16} style={styles.icon} />
       </Pressable>
     </View>
   );

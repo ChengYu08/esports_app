@@ -1,3 +1,4 @@
+import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { clientAuthApi } from "@/features/auth/client-auth.api";
 import {
   cancelQuickMatch,
@@ -23,7 +24,6 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
@@ -72,7 +72,6 @@ import type {
 /** 呼叫接待超时（秒），对齐 PC CS_CALL_TIMEOUT_SECONDS */
 const CS_CALL_TIMEOUT_SECONDS = 60;
 
-const backIcon = require("../../../../assets/svgs/icon-back.svg");
 const BG_GRADIENT = ["#0C0C2E", "#120D2B"] as const;
 const closeIcon = require("../../../../assets/voice-room/navbar-exit.svg");
 const inviteIcon = require("../../../../assets/voice-room/invite.svg");
@@ -321,14 +320,14 @@ export default function VoiceRoomScreen() {
       return;
     }
     useVoiceRoomSessionStore.getState().setActiveRoom({
-      roomId: current.roomId,
-      roomVersion: current.roomVersion,
-      rongChatroomId: current.rongChatroomId,
-      roomName: current.roomName,
-      creatorUserId: current.creatorUserId,
-      ownerName: current.ownerName,
-      ownerAvatar: current.ownerAvatar,
-    });
+        roomId: current.roomId,
+        roomVersion: current.roomVersion,
+        rongChatroomId: current.rongChatroomId,
+        roomName: current.roomName,
+        creatorUserId: current.creatorUserId,
+        ownerName: current.ownerName,
+        ownerAvatar: current.ownerAvatar,
+      });
   }, []);
 
   /** 仅清除 quickMatchCreated 场景标记，不影响 audition */
@@ -849,8 +848,8 @@ export default function VoiceRoomScreen() {
         setError(null);
         if (staleInvite) {
           Toast.show("语聊房已重新开启，已为你进入最新房间", {
-            duration: Toast.durations.SHORT,
-          });
+        duration: Toast.durations.SHORT,
+      });
         }
       } catch (cause) {
         await cleanupCancelledJoin();
@@ -888,8 +887,8 @@ export default function VoiceRoomScreen() {
       setServiceCalling((calling) => {
         if (calling) {
           Toast.show("当前无空闲接待，请稍后再试", {
-            duration: Toast.durations.SHORT,
-          });
+        duration: Toast.durations.SHORT,
+      });
         }
         return false;
       });
@@ -1030,8 +1029,8 @@ export default function VoiceRoomScreen() {
           try {
             await cancelQuickMatch(active.requestNo, accessToken);
             Toast.show("已取消派单", {
-              duration: Toast.durations.SHORT,
-            });
+        duration: Toast.durations.SHORT,
+      });
           } catch (error) {
             Toast.show(
               error instanceof Error
@@ -1054,8 +1053,8 @@ export default function VoiceRoomScreen() {
       if (!valid()) return;
       if (!detail) {
         Toast.show("俱乐部信息获取失败，请稍后重试", {
-          duration: Toast.durations.SHORT,
-        });
+        duration: Toast.durations.SHORT,
+      });
         return;
       }
       setReceptionBuyerId(String(ownerId));
@@ -1186,9 +1185,12 @@ export default function VoiceRoomScreen() {
     };
     setMessages((items) => [...items, local].slice(-80));
     if (chatroomId)
-      await sendVoiceChatMessage(chatroomId, text).catch(() =>
-        Alert.alert("发送失败", "请稍后重试"),
-      );
+      await sendVoiceChatMessage(chatroomId, text).catch(() => {
+        void useAppConfirm.getState().confirm({
+          title: "发送失败",
+          message: "请稍后重试",
+        });
+      });
   };
 
   const ensureMicrophonePermission = async () => {
@@ -1204,56 +1206,40 @@ export default function VoiceRoomScreen() {
     if (currentPermission?.granted) return true;
 
     if (currentPermission && !currentPermission.canAskAgain) {
-      Alert.alert(
-        "需要麦克风权限",
-        "请在系统设置中允许盼之电竞使用麦克风后再开麦。",
-        [
-          { text: "取消", style: "cancel" },
-          { text: "去设置", onPress: () => void Linking.openSettings() },
-        ],
-      );
+      const goSettings = await useAppConfirm.getState().confirm({
+        title: "需要麦克风权限",
+        message: "请在系统设置中允许盼之电竞使用麦克风后再开麦。",
+        cancelText: "取消",
+        confirmText: "去设置",
+      });
+      if (goSettings) void Linking.openSettings();
       return false;
     }
 
-    return await new Promise<boolean>((resolve) => {
-      Alert.alert(
-        "需要麦克风权限",
-        "开麦需要使用麦克风，请允许盼之电竞访问麦克风。",
-        [
-          { text: "取消", style: "cancel", onPress: () => resolve(false) },
-          {
-            text: "去授权",
-            onPress: () => {
-              void (async () => {
-                try {
-                  const permission = await requestRecordingPermissionsAsync();
-                  if (permission.granted) {
-                    resolve(true);
-                    return;
-                  }
-                  if (!permission.canAskAgain) {
-                    Alert.alert(
-                      "麦克风权限已关闭",
-                      "请在系统设置中允许盼之电竞使用麦克风后再开麦。",
-                      [
-                        { text: "取消", style: "cancel" },
-                        {
-                          text: "去设置",
-                          onPress: () => void Linking.openSettings(),
-                        },
-                      ],
-                    );
-                  }
-                } catch {
-                  // The caller keeps the room in listen-only mode when permission cannot be requested.
-                }
-                resolve(false);
-              })();
-            },
-          },
-        ],
-      );
+    const goAuthorize = await useAppConfirm.getState().confirm({
+      title: "需要麦克风权限",
+      message: "开麦需要使用麦克风，请允许盼之电竞访问麦克风。",
+      cancelText: "取消",
+      confirmText: "去授权",
     });
+    if (!goAuthorize) return false;
+
+    try {
+      const permission = await requestRecordingPermissionsAsync();
+      if (permission.granted) return true;
+      if (!permission.canAskAgain) {
+        const goSettings = await useAppConfirm.getState().confirm({
+          title: "麦克风权限已关闭",
+          message: "请在系统设置中允许盼之电竞使用麦克风后再开麦。",
+          cancelText: "取消",
+          confirmText: "去设置",
+        });
+        if (goSettings) void Linking.openSettings();
+      }
+    } catch {
+      // The caller keeps the room in listen-only mode when permission cannot be requested.
+    }
+    return false;
   };
 
   const toggleMute = async () => {
@@ -1306,8 +1292,8 @@ export default function VoiceRoomScreen() {
       const state = messageStore.getState();
       if (state.connectionState !== "ready") {
         Toast.show("消息服务未连接，请稍后再试", {
-          duration: Toast.durations.SHORT,
-        });
+        duration: Toast.durations.SHORT,
+      });
         return;
       }
       await state.sendText(peerId, inviteLink);
@@ -1348,7 +1334,7 @@ export default function VoiceRoomScreen() {
             hitSlop={12}
             style={styles.headerButton}
           >
-            <Image source={backIcon} style={styles.headerIcon} />
+            <ChevronLeft24Regular color="white" width={24} height={24} style={styles.headerIcon} />
           </Pressable>
           <Text style={styles.title}>{roomTitle}</Text>
           <Pressable

@@ -7,8 +7,9 @@
 import { useAuthStore } from "@esports/auth";
 import { router } from "expo-router";
 import { useCallback, useRef } from "react";
-import { Alert } from "react-native";
 import Toast from "react-native-root-toast";
+
+import { useAppConfirm } from "@/shared/ui/app-confirm";
 
 import { exitVoiceRoom } from "./exit-voice-room";
 import { resolveVoiceRoomId, voiceRoomApi } from "./voice-room.api";
@@ -76,15 +77,10 @@ export function useCustomerDispatch() {
 }
 
 function confirmExitRoomForDispatch(): Promise<boolean> {
-  return new Promise((resolve) => {
-    Alert.alert(
-      "提示",
-      "已在语聊房中，客服派单需先退出或解散当前房间，是否继续",
-      [
-        { text: "取消", style: "cancel", onPress: () => resolve(false) },
-        { text: "继续", onPress: () => resolve(true) },
-      ],
-      { cancelable: true, onDismiss: () => resolve(false) },
-    );
+  return useAppConfirm.getState().confirm({
+    title: "提示",
+    message: "已在语聊房中，客服派单需先退出或解散当前房间，是否继续",
+    cancelText: "取消",
+    confirmText: "继续",
   });
 }

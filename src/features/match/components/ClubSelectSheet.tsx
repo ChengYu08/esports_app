@@ -1,3 +1,4 @@
+import { Dismiss16Regular, Search24Regular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -18,9 +19,6 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 
 const CONFIRM_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
-
-const closeIcon = require("../../../../assets/svgs/icon-close.svg");
-const searchIcon = require("../../../../assets/svgs/icon-search.svg");
 
 type ClubSelectSheetProps = {
   visible: boolean;
@@ -85,13 +83,15 @@ export function ClubSelectSheet({
             onPress={onClose}
             style={styles.closeButton}
           >
-            <Image source={closeIcon} style={styles.closeIcon} />
+            <View style={styles.closeIcon}>
+              <Dismiss16Regular color="rgba(0, 0, 0, 0.2)" width={20} height={20} />
+            </View>
           </Pressable>
         </View>
 
         <View style={styles.searchRow}>
           <View style={styles.searchBox}>
-            <Image source={searchIcon} style={styles.searchIcon} />
+            <Search24Regular color="#0A0A0A" width={20} height={20} style={styles.searchIcon} />
             <TextInput
               value={keyword}
               onChangeText={setKeyword}
@@ -109,7 +109,9 @@ export function ClubSelectSheet({
                 hitSlop={8}
                 onPress={() => setKeyword("")}
               >
-                <Image source={closeIcon} style={styles.clearIcon} />
+                <View style={styles.clearIcon}>
+                  <Dismiss16Regular color="rgba(0, 0, 0, 0.2)" width={11} height={11} />
+                </View>
               </Pressable>
             ) : null}
           </View>
@@ -227,6 +229,8 @@ const styles = StyleSheet.create({
   closeIcon: {
     width: 32,
     height: 32,
+    alignItems: "center",
+    justifyContent: "center",
   },
   searchRow: {
     paddingHorizontal: 16,
@@ -256,6 +260,8 @@ const styles = StyleSheet.create({
   clearIcon: {
     width: 18,
     height: 18,
+    alignItems: "center",
+    justifyContent: "center",
   },
   list: {
     flexGrow: 1,

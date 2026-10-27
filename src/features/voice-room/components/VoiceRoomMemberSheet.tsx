@@ -1,13 +1,15 @@
+import { Dismiss16Regular } from "@fluentui/react-native-icons";
 import { useAuthStore } from '@esports/auth';
 import { useMutation } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useProfileDetail } from '@/features/mine/hooks/use-profile-data';
 import { useToggleUserFollow, useUserFollowState } from '@/features/mine/hooks/use-user-follow';
+import { useAppConfirm } from '@/shared/ui/app-confirm';
 import { BottomSheet } from '@/shared/ui/BottomSheet';
 import { canKickVoiceRoomMember, getMemberAge } from '../member-profile';
 import { voiceRoomApi } from '../voice-room.api';
@@ -17,7 +19,6 @@ const defaultAvatar = require('../../../../assets/coms/avatar_default.webp');
 const femaleIcon = require('../../../../assets/voice-room/member-female.svg');
 const maleIcon = require('../../../../assets/home/club-detail/male.svg');
 const idIcon = require('../../../../assets/voice-room/member-id.svg');
-const closeIcon = require('../../../../assets/voice-room/member-close.svg');
 
 type Props = {
   visible: boolean;
@@ -42,7 +43,12 @@ export function VoiceRoomMemberSheet({ visible, member, room, roomId, onClose, o
     mutationFn: (params: { roomId: string; roomVersion: string | number; userId: string; token: string }) =>
       voiceRoomApi.kickMember(params.roomId, params.roomVersion, params.userId, params.token),
     onSuccess: (_, params) => onMemberKicked(params.userId),
-    onError: (error) => Alert.alert('踢出失败', error.message || '请稍后重试'),
+    onError: (error) => {
+      void useAppConfirm.getState().confirm({
+        title: '踢出失败',
+        message: error.message || '请稍后重试',
+      });
+    },
   });
 
   if (!member) return null;
@@ -61,10 +67,15 @@ export function VoiceRoomMemberSheet({ visible, member, room, roomId, onClose, o
   function confirmKick() {
     if (!canKick || !member || !room || !roomId || !token || busy) return;
     const params = { roomId, roomVersion: room.roomVersion, userId: member.userId, token };
-    Alert.alert('踢出用户', `确定将“${nickname}”踢出语聊房？`, [
-      { text: '取消', style: 'cancel' },
-      { text: '踢出', style: 'destructive', onPress: () => kickMember.mutate(params) },
-    ]);
+    void (async () => {
+      const confirmed = await useAppConfirm.getState().confirm({
+        title: '踢出用户',
+        message: `确定将“${nickname}”踢出语聊房？`,
+        cancelText: '取消',
+        confirmText: '踢出',
+      });
+      if (confirmed) kickMember.mutate(params);
+    })();
   }
 
   async function handleFollow() {
@@ -81,7 +92,10 @@ export function VoiceRoomMemberSheet({ visible, member, room, roomId, onClose, o
         viewerUserId: viewerId,
       });
     } catch (error) {
-      Alert.alert('操作失败', error instanceof Error ? error.message : '请稍后重试');
+      void useAppConfirm.getState().confirm({
+        title: '操作失败',
+        message: error instanceof Error ? error.message : '请稍后重试',
+      });
     }
   }
 
@@ -104,7 +118,9 @@ export function VoiceRoomMemberSheet({ visible, member, room, roomId, onClose, o
             <Image source={avatarSource} contentFit="cover" style={styles.avatar} accessibilityLabel={`${nickname}的头像`} />
           </View>
           <Pressable accessibilityRole="button" accessibilityLabel="关闭用户资料" onPress={onClose} hitSlop={8} style={styles.close}>
-            <Image source={closeIcon} style={styles.closeIcon} />
+            <View style={styles.closeIcon}>
+              <Dismiss16Regular color="#161823" width={16} height={16} />
+            </View>
           </Pressable>
         </View>
 
@@ -180,7 +196,14 @@ const styles = StyleSheet.create({
   avatarShadow: { width: 88, height: 88, borderRadius: 44, borderWidth: 4, borderColor: '#FFFFFF', backgroundColor: '#ECEBEF', shadowColor: '#000000', shadowOffset: { width: -5, height: -3 }, shadowOpacity: 0.1, shadowRadius: 28, elevation: 5 },
   avatar: { width: 80, height: 80, borderRadius: 40 },
   close: { position: 'absolute', right: 13, top: 12 },
-  closeIcon: { width: 28, height: 28 },
+  closeIcon: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+  },
   body: { paddingHorizontal: 16, alignItems: 'center' },
   nickname: { color: '#161823', fontSize: 20, lineHeight: 28, fontWeight: '500', textAlign: 'center' },
   meta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 8, minHeight: 18 },

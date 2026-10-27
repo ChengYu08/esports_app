@@ -1,3 +1,5 @@
+import { useAuthStore } from "@esports/auth";
+import { router } from "expo-router";
 import Toast from "react-native-root-toast";
 
 import type { RongCommand } from "@/features/message/rongcloud-command";
@@ -8,16 +10,15 @@ import {
   PLATFORM_NOTICE_USER_ID,
 } from "@/features/message/rongcloud-commands";
 import { grabQuickMatchAndEnterAudition } from "@/features/match/grab-quick-match-flow";
+import { acceptOrder } from "@/features/order/order.api";
 import { actionNotice } from "@/shared/ui/action-notice/action-notice-store";
 import { TRADE_NOTICE_ICON } from "@/shared/ui/action-notice/trade-notice-icon";
-
-import type { OrderPayDialogData } from "./action-command-store";
 
 const QUICK_MATCH_NOTICE = "QUICK_MATCH_NOTICE";
 const QUICK_MATCH_EXPIRED = "QUICK_MATCH_EXPIRED";
 const QUICK_MATCH_CANCELLED = "QUICK_MATCH_CANCELLED";
 const ORDER_NOTIFY = "ORDER_NOTIFY";
-const MAX_QUICK_MATCH_DURATION_MS = 30_000;
+const MAX_ACTION_NOTICE_DURATION_MS = 15_000;
 
 type QuickMatchEndReason = "expired" | "cancelled";
 
@@ -51,9 +52,9 @@ export function handleQuickMatchExpired(
   actions.dismissQuickMatchBar(payload.requestNo);
 }
 
-/** 抢单通知去重：requestNo（弹窗消失时释放，允许同需求极端重推再提示） */
+/** 抢单通知去重：requestNo（条消失时释放，允许同需求极端重推再提示） */
 const quickMatchNoticeKeys = new Set<string>();
-/** 支付催单弹窗去重：orderNo（仅手动关闭/接单成功时释放，防止关了又弹） */
+/** 支付催单去重：orderNo（条消失时释放，防止关了又弹） */
 const orderPayKeys = new Set<string>();
 
 function buildQuickMatchMessage(payload: {
@@ -66,6 +67,10 @@ function buildQuickMatchMessage(payload: {
   return `「${buyer}」发布了${game}需求`;
 }
 
+function buildOrderPayMessage(buyerNickname: string) {
+  return `「${buyerNickname || "老板"}」已支付订单，请尽快接单`;
+}
+
 export function handleQuickMatchNotice(command: RongCommand, now = Date.now()) {
   if (command.name !== QUICK_MATCH_NOTICE) return;
   if (command.senderId !== PLATFORM_NOTICE_USER_ID) return;
@@ -76,7 +81,7 @@ export function handleQuickMatchNotice(command: RongCommand, now = Date.now()) {
 
   const expireAt = Number.isFinite(payload.expireAtMs)
     ? payload.expireAtMs
-    : now + MAX_QUICK_MATCH_DURATION_MS;
+    : now + MAX_ACTION_NOTICE_DURATION_MS;
   if (expireAt - now <= 0) return;
 
   const noticeId = `qm:${payload.requestNo}`;
@@ -88,7 +93,7 @@ export function handleQuickMatchNotice(command: RongCommand, now = Date.now()) {
       actionText: "去抢单",
       icon: TRADE_NOTICE_ICON,
       expireAt,
-      maxDurationMs: MAX_QUICK_MATCH_DURATION_MS,
+      maxDurationMs: MAX_ACTION_NOTICE_DURATION_MS,
     },
     {
       onAction: async () => {
@@ -104,10 +109,7 @@ export function handleQuickMatchNotice(command: RongCommand, now = Date.now()) {
   );
 }
 
-export function handleOrderNotifyPopup(
-  command: RongCommand,
-  show: (data: OrderPayDialogData) => void,
-) {
+export function handleOrderNotifyPopup(command: RongCommand, now = Date.now()) {
   if (command.name !== ORDER_NOTIFY) return;
   if (command.senderId !== PLATFORM_NOTICE_USER_ID) return;
 
@@ -115,23 +117,47 @@ export function handleOrderNotifyPopup(
   if (!payload) return;
   if (orderPayKeys.has(payload.orderNo)) return;
 
+  const noticeId = `pay:${payload.orderNo}`;
   orderPayKeys.add(payload.orderNo);
-  show({
-    key: `pay:${payload.orderNo}`,
-    orderId: payload.orderId,
-    orderNo: payload.orderNo,
-    title: payload.title,
-    buyerNickname: payload.buyerNickname,
-    ...(payload.buyerHeadImage ? { buyerHeadImage: payload.buyerHeadImage } : {}),
-  });
+  actionNotice.push(
+    {
+      id: noticeId,
+      text: buildOrderPayMessage(payload.buyerNickname),
+      actionText: "接单",
+      icon: TRADE_NOTICE_ICON,
+      expireAt: now + MAX_ACTION_NOTICE_DURATION_MS,
+      maxDurationMs: MAX_ACTION_NOTICE_DURATION_MS,
+    },
+    {
+      onAction: async () => {
+        const { accessToken } = useAuthStore.getState();
+        if (!accessToken) {
+          Toast.show("请先登录", { duration: Toast.durations.SHORT });
+          return;
+        }
+        try {
+          await acceptOrder(payload.orderId, accessToken);
+          actionNotice.dismiss(noticeId);
+          Toast.show("接单成功", { duration: Toast.durations.SHORT });
+          router.push({ pathname: "/order/[id]", params: { id: payload.orderId } });
+        } catch (error) {
+          Toast.show(
+            error instanceof Error && error.message ? error.message : "接单失败，请稍后重试",
+            { duration: Toast.durations.SHORT },
+          );
+        }
+      },
+      onDisappear: () => releaseOrderPayKey(payload.orderNo),
+    },
+  );
 }
 
-/** 抢单弹窗消失（到期/忽略/抢单成功）时释放去重键 */
+/** 抢单条消失（到期/忽略/抢单成功）时释放去重键 */
 export function releaseQuickMatchNoticeKey(requestNo: string) {
   quickMatchNoticeKeys.delete(requestNo);
 }
 
-/** 支付催单弹窗仅手动关闭/接单成功时释放 */
+/** 支付催单条消失（到期/接单成功/挤出）时释放去重键 */
 export function releaseOrderPayKey(orderNo: string) {
   orderPayKeys.delete(orderNo);
 }

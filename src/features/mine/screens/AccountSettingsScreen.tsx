@@ -1,11 +1,10 @@
+import { ChevronLeft24Regular, ChevronRight16Regular } from "@fluentui/react-native-icons";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
-import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -28,10 +27,9 @@ import {
 import { messageStore } from "@/features/message/message-store";
 import { RealNameVerificationSheet } from "@/features/mine/components/RealNameVerificationSheet";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 
-const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
-const arrowIcon = require("../../../../assets/mine/figma/mine-arrow-right.svg");
 const avatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const SMS_NOTIFY_KEY_PREFIX = "pzdj:sms-notify:";
 
@@ -48,7 +46,6 @@ export default function AccountSettingsScreen() {
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [realNameVisible, setRealNameVisible] = useState(false);
-  const [logoutVisible, setLogoutVisible] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [feedback, setFeedback] = useState<{
     title: string;
@@ -96,11 +93,17 @@ export default function AccountSettingsScreen() {
     const value =
       editing === "nickname" || editing === "signature" ? draft.trim() : draft;
     if (editing === "nickname" && !value) {
-      Alert.alert("提示", "昵称不能为空");
+      void useAppConfirm.getState().confirm({
+        title: "提示",
+        message: "昵称不能为空",
+      });
       return;
     }
     if (editing === "birth" && value && !isValidBirth(value)) {
-      Alert.alert("提示", "请输入有效的出生日期，格式为 YYYY-MM-DD");
+      void useAppConfirm.getState().confirm({
+        title: "提示",
+        message: "请输入有效的出生日期，格式为 YYYY-MM-DD",
+      });
       return;
     }
     setSaving(true);
@@ -122,10 +125,10 @@ export default function AccountSettingsScreen() {
       setSession(session);
       setEditing(null);
     } catch (error) {
-      Alert.alert(
-        "保存失败",
-        error instanceof Error ? error.message : "请稍后重试",
-      );
+      void useAppConfirm.getState().confirm({
+        title: "保存失败",
+        message: error instanceof Error ? error.message : "请稍后重试",
+      });
     } finally {
       setSaving(false);
     }
@@ -211,23 +214,27 @@ export default function AccountSettingsScreen() {
   };
 
   const logout = () => {
-    setLogoutVisible(true);
-  };
-
-  const confirmLogout = async () => {
-    setLogoutVisible(false);
-    if (token) void clientAuthApi.logout(token).catch(() => undefined);
-    try {
-      await clearAuthSession();
-    } catch {
-      /* Keep the UI signed out. */
-    }
-    clearSession();
-    void messageStore
-      .getState()
-      .reset()
-      .catch(() => undefined);
-    router.replace("/");
+    void (async () => {
+      const confirmed = await useAppConfirm.getState().confirm({
+        title: "退出登录",
+        message: "确认退出当前账号吗？您的数据将被清除！",
+        cancelText: "取消",
+        confirmText: "退出登录",
+      });
+      if (!confirmed) return;
+      if (token) void clientAuthApi.logout(token).catch(() => undefined);
+      try {
+        await clearAuthSession();
+      } catch {
+        /* Keep the UI signed out. */
+      }
+      clearSession();
+      void messageStore
+        .getState()
+        .reset()
+        .catch(() => undefined);
+      router.replace("/");
+    })();
   };
 
   return (
@@ -244,7 +251,7 @@ export default function AccountSettingsScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Image source={backIcon} style={styles.backIcon} />
+          <ChevronLeft24Regular color="#0A0A0A" width={24} height={24} style={styles.backIcon} />
         </Pressable>
         <Text style={styles.headerTitle}>账号设置</Text>
         <View style={styles.headerSpace} />
@@ -398,38 +405,6 @@ export default function AccountSettingsScreen() {
       />
       <Modal
         transparent
-        visible={logoutVisible}
-        animationType="fade"
-        onRequestClose={() => setLogoutVisible(false)}
-      >
-        <View style={styles.dialogBackdrop}>
-          <View style={styles.logoutDialog}>
-            <View style={styles.logoutMark}>
-              <Text style={styles.logoutMarkText}>!</Text>
-            </View>
-            <Text style={styles.logoutTitle}>退出登录</Text>
-            <Text style={styles.logoutMessage}>
-              确认退出当前账号吗？您的数据将被清除！
-            </Text>
-            <View style={styles.logoutActions}>
-              <Pressable
-                onPress={() => setLogoutVisible(false)}
-                style={styles.logoutCancel}
-              >
-                <Text style={styles.logoutCancelText}>取消</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => void confirmLogout()}
-                style={styles.logoutConfirm}
-              >
-                <Text style={styles.logoutConfirmText}>退出登录</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
-      <Modal
-        transparent
         visible={feedback !== null}
         animationType="fade"
         onRequestClose={() => setFeedback(null)}
@@ -441,9 +416,9 @@ export default function AccountSettingsScreen() {
                 {feedback?.title === "头像更新成功" ? "✓" : "!"}
               </Text>
             </View>
-            <Text style={styles.logoutTitle}>{feedback?.title}</Text>
+            <Text style={styles.feedbackTitle}>{feedback?.title}</Text>
             {feedback?.message ? (
-              <Text style={styles.logoutMessage}>{feedback.message}</Text>
+              <Text style={styles.feedbackMessage}>{feedback.message}</Text>
             ) : null}
             <Pressable
               onPress={() => setFeedback(null)}
@@ -494,7 +469,7 @@ function SettingRow({
             {value}
           </Text>
         )}
-        {onPress ? <Image source={arrowIcon} style={styles.arrow} /> : null}
+        {onPress ? <ChevronRight16Regular color="#0A0A0A" width={16} height={16} style={styles.arrow} /> : null}
       </View>
     </Pressable>
   );
@@ -551,7 +526,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   backButton: { width: 28, height: 28, justifyContent: "center" },
-  backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
+  backIcon: { width: 24, height: 24 },
   headerSpace: { width: 28 },
   headerTitle: {
     color: "#0A0A0A",
@@ -618,13 +593,6 @@ const styles = StyleSheet.create({
     padding: 28,
     backgroundColor: "rgba(0,0,0,0.45)",
   },
-  logoutDialog: {
-    width: "100%",
-    borderRadius: 12,
-    backgroundColor: "#FFF",
-    padding: 24,
-    alignItems: "center",
-  },
   feedbackDialog: {
     width: "100%",
     borderRadius: 12,
@@ -632,16 +600,6 @@ const styles = StyleSheet.create({
     padding: 24,
     alignItems: "center",
   },
-  logoutMark: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#FFF1F3",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-  logoutMarkText: { color: "#FF1F4C", fontSize: 22, fontWeight: "700" },
   feedbackMark: {
     width: 36,
     height: 36,
@@ -652,13 +610,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   feedbackMarkText: { color: "#FF1F4C", fontSize: 22, fontWeight: "700" },
-  logoutTitle: {
+  feedbackTitle: {
     color: "#0A0A0A",
     fontFamily: DOUYIN_SANS,
     fontSize: 17,
     fontWeight: "600",
   },
-  logoutMessage: {
+  feedbackMessage: {
     color: "#666",
     fontFamily: DOUYIN_SANS,
     fontSize: 13,
@@ -676,30 +634,6 @@ const styles = StyleSheet.create({
     marginTop: 22,
   },
   feedbackButtonText: { color: "#FFF", fontFamily: DOUYIN_SANS, fontSize: 15 },
-  logoutActions: {
-    width: "100%",
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 22,
-  },
-  logoutCancel: {
-    flex: 1,
-    height: 44,
-    borderRadius: 8,
-    backgroundColor: "#F7F7F7",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoutCancelText: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 15 },
-  logoutConfirm: {
-    flex: 1,
-    height: 44,
-    borderRadius: 8,
-    backgroundColor: "#FF1F4C",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoutConfirmText: { color: "#FFF", fontFamily: DOUYIN_SANS, fontSize: 15 },
   modalCard: {
     backgroundColor: "#FFF",
     borderTopLeftRadius: 16,

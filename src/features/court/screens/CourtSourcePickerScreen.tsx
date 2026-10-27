@@ -1,6 +1,6 @@
+import { ChevronLeft24Regular, Search24Regular } from "@fluentui/react-native-icons";
 import { useHomeGames } from "@/features/home/hooks/use-home-data";
 import { EmptyState } from "@/shared/ui/AsyncStates";
-import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import { useQuery } from "@tanstack/react-query";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
@@ -184,11 +184,7 @@ function CourtSourcePickerScreen({ step }: { step: "orders" | "reviews" }) {
           onPress={back}
           style={styles.back}
         >
-          <CachedImage
-            source={require("../../../../assets/home/club-detail/icon-back.svg")}
-            tintColor="#0D0D0F"
-            style={styles.backIcon}
-          />
+          <ChevronLeft24Regular color="#0D0D0F" width={24} height={24} style={styles.backIcon} />
         </Pressable>
         <Text style={styles.title}>{title}</Text>
         <View style={styles.back} />
@@ -196,11 +192,7 @@ function CourtSourcePickerScreen({ step }: { step: "orders" | "reviews" }) {
       {!isReview && (
         <View style={styles.searchSection}>
           <View style={styles.searchBox}>
-            <CachedImage
-              source={require("../../../../assets/home/club-detail/icon-search.svg")}
-              tintColor="#0D0D0F"
-              style={styles.searchIcon}
-            />
+            <Search24Regular color="#0D0D0F" width={16} height={16} style={styles.searchIcon} />
             <TextInput
               accessibilityLabel="搜索订单ID"
               value={keyword}

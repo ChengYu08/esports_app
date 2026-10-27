@@ -1,3 +1,4 @@
+import { Dismiss16Regular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
@@ -15,7 +16,6 @@ import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 
 const CONFIRM_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
-const closeIcon = require("../../../../assets/svgs/icon-close.svg");
 const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
 
 type MatchPaySheetProps = {
@@ -105,7 +105,9 @@ export function MatchPaySheet({
             onPress={onClose}
             style={styles.closeButton}
           >
-            <Image source={closeIcon} style={styles.closeIcon} />
+            <View style={styles.closeIcon}>
+              <Dismiss16Regular color="rgba(0, 0, 0, 0.2)" width={15} height={15} />
+            </View>
           </Pressable>
         </View>
 
@@ -215,6 +217,8 @@ const styles = StyleSheet.create({
   closeIcon: {
     width: 24,
     height: 24,
+    alignItems: "center",
+    justifyContent: "center",
   },
   rows: {
     paddingHorizontal: 16,
