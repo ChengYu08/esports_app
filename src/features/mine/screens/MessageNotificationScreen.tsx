@@ -1,7 +1,6 @@
-import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import Animated, {
   interpolateColor,
   useAnimatedStyle,
@@ -13,9 +12,9 @@ import Toast from "react-native-root-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
-  fetchSmsNotifyStatus,
-  updateSmsNotifySwitch,
-} from "@/features/mine/api/notification-settings.api";
+  useSmsNotifyStatus,
+  useUpdateSmsNotify,
+} from "@/features/mine/hooks/use-sms-notify";
 
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 
@@ -28,54 +27,36 @@ const SWITCH_KNOB_TRAVEL =
 
 function MessageNotificationScreenImpl() {
   const insets = useSafeAreaInsets();
-  const token = useAuthStore((state) => state.accessToken);
-  const [smsEnabled, setSmsEnabled] = useState(false);
-  const [smsLoaded, setSmsLoaded] = useState(false);
-  const [smsSaving, setSmsSaving] = useState(false);
+  // 状态通常已由基础设置页预热进缓存，此处命中后直接渲染，不再出现加载刷新
+  const { data, isSuccess, isError, error } = useSmsNotifyStatus();
+  const updateSmsNotify = useUpdateSmsNotify();
+  const smsEnabled = data === 1;
 
   useEffect(() => {
-    if (!token) return;
-    let active = true;
-    void (async () => {
-      try {
-        const status = await fetchSmsNotifyStatus(token);
-        if (!active) return;
-        setSmsEnabled(status === 1);
-        setSmsLoaded(true);
-      } catch (error) {
-        Toast.show(
-          error instanceof Error
-            ? error.message
-            : "短信通知设置加载失败，请刷新重试",
-          { duration: Toast.durations.SHORT },
-        );
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [token]);
+    if (isError) {
+      Toast.show(
+        error instanceof Error
+          ? error.message
+          : "短信通知设置加载失败，请刷新重试",
+        { duration: Toast.durations.SHORT },
+      );
+    }
+  }, [isError, error]);
 
   const toggleSmsNotify = (next: boolean) => {
-    if (!smsLoaded || smsSaving || !token) {
+    if (!isSuccess || updateSmsNotify.isPending) {
       return;
     }
-    setSmsSaving(true);
-    void (async () => {
-      try {
-        await updateSmsNotifySwitch(token, next);
-        setSmsEnabled(next);
-      } catch (error) {
+    updateSmsNotify.mutate(next, {
+      onError: (mutationError) => {
         Toast.show(
-          error instanceof Error
-            ? error.message
+          mutationError instanceof Error
+            ? mutationError.message
             : "短信通知设置保存失败，请重试",
           { duration: Toast.durations.SHORT },
         );
-      } finally {
-        setSmsSaving(false);
-      }
-    })();
+      },
+    });
   };
 
   return (
@@ -110,7 +91,7 @@ function MessageNotificationScreenImpl() {
           >
             <NotificationSwitch
               value={smsEnabled}
-              disabled={!smsLoaded || smsSaving}
+              disabled={!isSuccess || updateSmsNotify.isPending}
               onToggle={toggleSmsNotify}
             />
           </NotificationRow>

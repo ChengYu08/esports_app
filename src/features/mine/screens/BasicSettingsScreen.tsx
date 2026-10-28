@@ -23,6 +23,7 @@ import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { clearAuthSession } from "@/features/auth/session-persistence";
 import { messageStore } from "@/features/message/message-store";
 import { readTeenMode } from "@/features/mine/teen-mode-store";
+import { useSmsNotifyStatus } from "@/features/mine/hooks/use-sms-notify";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
@@ -57,6 +58,9 @@ export default function BasicSettingsScreen() {
   );
   const [loggingOut, setLoggingOut] = useState(false);
   const [teenModeEnabled, setTeenModeEnabled] = useState(false);
+
+  // 提前预热短信通知开关缓存，进入消息通知页时无需再等待加载
+  useSmsNotifyStatus();
 
   useFocusEffect(
     useCallback(() => {
