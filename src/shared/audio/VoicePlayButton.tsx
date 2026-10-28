@@ -43,7 +43,7 @@ export function VoicePlayButton({
         )}
       </View>
       <VoiceWaveform playing={playing} compact={compact} />
-      <Text style={[styles.duration, compact && styles.compactDuration]}>{duration ?? 0}&quot;&quot;</Text>
+      <Text style={[styles.duration, compact && styles.compactDuration]}>{duration ?? 0}&quot;</Text>
     </Pressable>
   );
 }
@@ -84,6 +84,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     lineHeight: 11,
     marginLeft: 1,
+    marginTop: -1,
   },
   compactPlayIcon: { fontSize: 8, lineHeight: 9 },
   pauseIcon: { flexDirection: "row", gap: 3 },

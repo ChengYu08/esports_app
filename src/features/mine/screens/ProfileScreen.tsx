@@ -1,3 +1,7 @@
+import {
+  Star16Filled,
+  Star16Regular,
+} from "@fluentui/react-native-icons";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
@@ -533,13 +537,7 @@ export default function ProfileScreen() {
         profileListItems.push(
           ...reviews.map((review, index) => ({
             key: `review-${review.id}-${index}`,
-            content: (
-              <View
-                style={index === 0 ? styles.reviewList : styles.reviewListItem}
-              >
-                <ReviewCard review={review} />
-              </View>
-            ),
+            content: <ReviewCard review={review} />,
           })),
         );
       }
@@ -664,7 +662,7 @@ export default function ProfileScreen() {
         <View
           style={[
             styles.actionBar,
-            { paddingBottom: Math.max(insets.bottom, 12) },
+            { paddingBottom: Math.max(insets.bottom, 12) + 12 },
           ]}
         >
           <Pressable
@@ -1055,7 +1053,7 @@ function ServiceCard({
           <Text style={styles.price}>{card.price}</Text>
           {/* <Text style={styles.diamond}>◇</Text> */}
           <Image source={diamondIcon} style={styles.gameLogo} />
-          <Text style={styles.metaText}>订单{card.orderCount}</Text>
+          <Text style={styles.metaText}>销量 {card.orderCount}</Text>
           {card.goodRate !== null && card.goodRate !== undefined ? (
             <Text style={styles.metaText}>{card.goodRate}%好评</Text>
           ) : null}
@@ -1083,18 +1081,24 @@ function ReviewCard({ review }: { review: ProfileReview }) {
           <Text numberOfLines={1} style={styles.reviewer}>
             {review.buyerNickname}
           </Text>
-          <View style={styles.stars}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <Text
-                key={star}
-                style={[
-                  styles.star,
-                  star <= review.rating && styles.starActive,
-                ]}
-              >
-                ★
-              </Text>
-            ))}
+          <View style={styles.starsRow}>
+            {[1, 2, 3, 4, 5].map((star) =>
+              star <= review.rating ? (
+                <Star16Filled
+                  key={star}
+                  color="#FF943D"
+                  width={12}
+                  height={12}
+                />
+              ) : (
+                <Star16Regular
+                  key={star}
+                  color="#EBEBEB"
+                  width={12}
+                  height={12}
+                />
+              ),
+            )}
           </View>
         </View>
         <Text numberOfLines={2} style={styles.reviewText}>
@@ -1102,7 +1106,7 @@ function ReviewCard({ review }: { review: ProfileReview }) {
         </Text>
         {review.imageUrls.length > 0 ? (
           <View style={styles.reviewImages}>
-            {review.imageUrls.slice(0, 3).map((image, index) => (
+            {review.imageUrls.map((image, index) => (
               <Pressable
                 key={`${image}-${index}`}
                 accessibilityLabel={`预览评价图片 ${index + 1}`}
@@ -1282,6 +1286,11 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "column",
     overflow: "hidden",
+  },
+  starsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   navbarCompactRow: {
     flexDirection: "row",
@@ -1505,15 +1514,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     position: "relative",
   },
-  tabText: { color: "#777", fontFamily: DOUYIN_SANS, fontSize: 16 },
-  tabTextActive: { color: "#111", fontWeight: "600" },
+  tabText: { color: "#656566", fontFamily: DOUYIN_SANS, fontSize: 14, lineHeight: 22 },
+  tabTextActive: { color: "#0D0D0F", fontWeight: "600", fontSize: 16, lineHeight: 22 },
   tabIndicator: {
     position: "absolute",
     bottom: 0,
     width: 12,
     height: 3,
     borderRadius: 2,
-    backgroundColor: "#FF3158",
+    backgroundColor: "#FE1F4C",
   },
   gameTags: { flexDirection: "row", gap: 10, marginTop: 12, paddingRight: 16 },
   gameTag: {
@@ -1523,16 +1532,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "#F5F6F7",
   },
   gameTagActive: {
-    borderWidth: 1,
-    borderColor: "#FF3158",
-    backgroundColor: "#fff",
+    borderWidth: 0.5,
+    borderColor: "#FE4267",
+    backgroundColor: "#FFF5F7",
   },
-  gameLogo: { width: 15, height: 15 },
-  gameText: { color: "#777", fontFamily: DOUYIN_SANS, fontSize: 14 },
-  gameTextActive: { color: "#111" },
+  gameLogo: { width: 20, height: 20, borderRadius: 4 },
+  gameText: { color: "#656566", fontFamily: DOUYIN_SANS, fontSize: 12, lineHeight: 18 },
+  gameTextActive: { color: "#0A0A0A", fontWeight: "600" },
   sectionHeader: {
     marginTop: 24,
     flexDirection: "row",
@@ -1540,24 +1549,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   sectionTitle: {
-    color: "#111",
+    color: "#0A0A0A",
     fontFamily: DOUYIN_SANS,
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: "500",
   },
   description: {
     marginTop: 14,
-    color: "#222",
+    color: "#656566",
     fontFamily: DOUYIN_SANS,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 12,
+    lineHeight: 18,
   },
   gallery: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 14 },
   galleryItem: {
-    width: 65,
-    height: 65,
+    width: 62,
+    height: 62,
     overflow: "hidden",
-    borderRadius: 5,
+    borderRadius: 6,
     backgroundColor: "#ddd",
   },
   moreOverlay: {
@@ -1633,30 +1643,31 @@ const styles = StyleSheet.create({
   },
   serviceCopy: { flex: 1, minWidth: 0, gap: 6 },
   serviceName: {
-    color: "#111",
+    color: "#0A0A0A",
     fontFamily: DOUYIN_SANS,
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "400",
   },
   serviceMeta: { flexDirection: "row", alignItems: "center", gap: 7 },
   price: {
-    color: "#FF3158",
+    color: "#FF1F4C",
     fontFamily: DOUYIN_SANS,
-    fontSize: 16,
+    fontSize: 18,
+    lineHeight: 22,
     fontWeight: "600",
   },
   diamond: { color: "#FF3158", fontSize: 14 },
-  metaText: { color: "#999", fontFamily: DOUYIN_SANS, fontSize: 12 },
+  metaText: { color: "#979799", fontFamily: DOUYIN_SANS, fontSize: 11, lineHeight: 16 },
   orderButton: {
     flexShrink: 0,
-    width: 48,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#FF3158",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "#FF1F4C",
     alignItems: "center",
     justifyContent: "center",
   },
-  orderText: { color: "#fff", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  orderText: { color: "#fff", fontFamily: DOUYIN_SANS, fontSize: 12, lineHeight: 18 },
   inlineState: { alignItems: "center", paddingVertical: 48 },
   empty: { alignItems: "center", paddingVertical: 48 },
   emptyText: { color: "#777", fontFamily: DOUYIN_SANS, fontSize: 14 },
@@ -1666,16 +1677,12 @@ const styles = StyleSheet.create({
     fontFamily: DOUYIN_SANS,
     fontSize: 12,
   },
-  reviewList: { marginHorizontal: 8, marginTop: 8 },
-  reviewListItem: { marginHorizontal: -16 },
   reviewCard: {
     flexDirection: "row",
     gap: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: "#fff",
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#EBEBEB",
   },
   reviewAvatar: {
     width: 32,
@@ -1684,7 +1691,7 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: "#EBEBEB",
   },
-  reviewBody: { flex: 1, minWidth: 0, gap: 6 },
+  reviewBody: { flex: 1, minWidth: 0, gap: 4 },
   reviewTopLine: { flexDirection: "row", alignItems: "center", gap: 4 },
   reviewer: {
     flex: 1,
@@ -1693,17 +1700,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
   },
-  stars: { flexDirection: "row", gap: 2 },
-  star: { color: "#EBEBEB", fontSize: 12, lineHeight: 14 },
-  starActive: { color: "#FF943D" },
   reviewText: {
     color: "#333",
     fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
-  reviewImages: { flexDirection: "row", gap: 4 },
-  reviewImage: { width: 64, height: 64, borderRadius: 8, overflow: "hidden" },
+  reviewImages: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
+  reviewImage: { width: 57, height: 57, borderRadius: 6, overflow: "hidden" },
   reviewDate: {
     color: "#999",
     fontFamily: DOUYIN_SANS,
