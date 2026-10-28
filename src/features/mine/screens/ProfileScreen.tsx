@@ -9,11 +9,13 @@ import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import {
+  Animated,
   FlatList,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -86,6 +88,9 @@ export default function ProfileScreen() {
   const routeParams = getProfileRouteParams(route);
   const isMine = !routeParams || String(user?.id ?? "") === routeParams.userId;
   const [tab, setTab] = useState<ProfileTab>("技能");
+  const [coverHeight, setCoverHeight] = useState(0);
+  const headerFade = useMemo(() => new Animated.Value(0), []);
+  const [compactActive, setCompactActive] = useState(false);
   const [selectedGameId, setSelectedGameId] = useState("");
   const [orderCard, setOrderCard] = useState<ProfileSkillCard | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
@@ -266,8 +271,48 @@ export default function ProfileScreen() {
     );
   }
 
+  const tabsContent = (
+    <View style={styles.tabs}>
+      {(["技能", "评价"] as ProfileTab[]).map((item) => (
+        <Pressable
+          key={item}
+          onPress={() => setTab(item)}
+          style={styles.tabButton}
+        >
+          <Text
+            style={[styles.tabText, tab === item && styles.tabTextActive]}
+          >
+            {item}
+          </Text>
+          {tab === item ? <View style={styles.tabIndicator} /> : null}
+        </Pressable>
+      ))}
+    </View>
+  );
+
+  // 默认头部中的标签栏:紧凑头部淡入时反向淡出
+  const tabsInverseFade = headerFade.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
+
+  const profileTabs = (
+    <Animated.View
+      pointerEvents="box-none"
+      style={[styles.tabsBar, { opacity: tabsInverseFade }]}
+    >
+      {tabsContent}
+    </Animated.View>
+  );
+
   const profileCover = (
-    <View style={styles.cover}>
+    <View
+      style={styles.cover}
+      onLayout={(event) => {
+        const height = event.nativeEvent.layout.height;
+        if (Math.abs(height - coverHeight) > 1) setCoverHeight(height);
+      }}
+    >
       {coverPreviewParams ? (
         <Pressable
           accessibilityLabel="预览主页背景图"
@@ -340,30 +385,20 @@ export default function ProfileScreen() {
     </View>
   );
 
-  const profileTabs = (
-    <View style={styles.stickyTabs}>
-      <View style={styles.tabs}>
-        {(["技能", "评价"] as ProfileTab[]).map((item) => (
-          <Pressable
-            key={item}
-            onPress={() => setTab(item)}
-            style={styles.tabButton}
-          >
-            <Text
-              style={[styles.tabText, tab === item && styles.tabTextActive]}
-            >
-              {item}
-            </Text>
-            {tab === item ? <View style={styles.tabIndicator} /> : null}
-          </Pressable>
-        ))}
-      </View>
-    </View>
-  );
 
   const profileListItems: ProfileListItem[] = [
     { key: "profile-cover", content: profileCover },
-    { key: "profile-tabs", content: profileTabs },
+    {
+      key: "profile-tabs",
+      content: (
+        <Animated.View
+          pointerEvents={compactActive ? "none" : "box-none"}
+          style={[styles.tabsBar, { opacity: tabsInverseFade }]}
+        >
+          {tabsContent}
+        </Animated.View>
+      ),
+    },
   ];
 
   if (games.length > 0) {
@@ -425,9 +460,18 @@ export default function ProfileScreen() {
           },
         );
 
-        if (gameDetail.skillCards.length > 0) {
+        // TODO: 临时测试数据——接口数据 ×3 并改名,用于滚动效果联调,联调完成后删除
+        const testSkillCards = gameDetail.skillCards.flatMap((card, index) =>
+          [0, 1, 2].map((copy) => ({
+            ...card,
+            companionServiceId: -(index * 3 + copy + 1),
+            modeName: `【测试数据${index * 3 + copy + 1}】${card.modeName}`,
+          })),
+        );
+
+        if (testSkillCards.length > 0) {
           profileListItems.push(
-            ...gameDetail.skillCards.map((card) => ({
+            ...testSkillCards.map((card) => ({
               key: `service-${card.companionServiceId}-${card.gameLevelId}`,
               content: (
                 <View style={styles.scrollBody}>
@@ -524,17 +568,67 @@ export default function ProfileScreen() {
   return (
     <View style={styles.screen}>
       <StatusBar style="light" />
-      <View style={[styles.navbar, styles.navbarOverlay, { paddingTop: insets.top }]}>
-        <Pressable
-          accessibilityLabel="返回"
-          hitSlop={12}
-          onPress={() => router.back()}
-          style={styles.navButton}
+      <Animated.View
+        style={[
+          styles.navbar,
+          styles.navbarOverlay,
+          styles.navbarCompact,
+          { paddingTop: insets.top },
+        ]}
+      >
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.navbarBg,
+            { height: insets.top + 92, overflow: "hidden", opacity: headerFade },
+          ]}
         >
-          <Image source={backIcon} style={styles.backIcon} />
-        </Pressable>
-        <View style={styles.navButton} />
-      </View>
+          <Image
+            source={coverImageUrl ? { uri: coverImageUrl } : background}
+            contentFit="cover"
+            style={styles.navbarBgImage}
+          />
+          <LinearGradient
+            pointerEvents="none"
+            style={styles.navbarBgOverlay}
+            colors={["#3B79BA00", "#3B79BA", "#3B79BA"]}
+            locations={[0, 0.6, 1]}
+          />
+          <LinearGradient
+            pointerEvents="none"
+            style={styles.navbarBgOverlay}
+            colors={["rgba(0,0,0,0.2)", "rgba(0,0,0,0.8)"]}
+          />
+        </Animated.View>
+        <View style={styles.navbarCompactRow}>
+          <Pressable
+            accessibilityLabel="返回"
+            hitSlop={12}
+            onPress={() => router.back()}
+            style={[styles.navButton, { marginTop: 3 }]}
+          >
+            <Image source={backIcon} style={styles.backIcon} />
+          </Pressable>
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.compactIdentity, { opacity: headerFade }]}
+          >
+            <Image
+              source={profile.headImage ? { uri: profile.headImage } : fallbackAvatar}
+              style={styles.compactAvatar}
+            />
+            <Text numberOfLines={1} style={styles.compactName}>
+              {profile.nickname}
+            </Text>
+          </Animated.View>
+        </View>
+        <Animated.View
+          pointerEvents={compactActive ? "box-none" : "none"}
+          style={[styles.tabsBar, { opacity: headerFade }]}
+        >
+          {tabsContent}
+        </Animated.View>
+      </Animated.View>
       <FlatList
         style={styles.scrollView}
         data={profileListItems}
@@ -542,10 +636,21 @@ export default function ProfileScreen() {
         renderItem={({ item }) => item.content}
         ListFooterComponent={editProfileButton}
         ListFooterComponentStyle={isMine ? styles.profileListFooter : undefined}
-        stickyHeaderIndices={[1]}
         initialNumToRender={6}
         maxToRenderPerBatch={5}
         windowSize={5}
+        onScroll={(event) => {
+          // 头像块剩余 136→44px 区间内,紧凑头部淡入(透明度渐变)
+          const fadeStart = coverHeight - 136;
+          const progress = Math.max(
+            0,
+            Math.min(1, (event.nativeEvent.contentOffset.y - fadeStart) / 92),
+          );
+          headerFade.setValue(progress);
+          const active = progress >= 1;
+          if (active !== compactActive) setCompactActive(active);
+        }}
+        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           flexGrow: 1,
@@ -810,7 +915,7 @@ function ProfileIdentity({
                 source={
                   status.label === "游戏中" ? playingStatusIcon : idleStatusIcon
                 }
-                style={styles.onlineIcon}
+                style={[styles.onlineIcon, { tintColor: status.color }]}
               />
               <Text style={[styles.onlineText, { color: status.color }]}>
                 {status.label}
@@ -1171,17 +1276,65 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 10,
   },
+  navbarCompact: {
+    flex: 1,
+    flexDirection: "column",
+    overflow: "hidden",
+  },
+  navbarCompactRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: 44,
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  navbarBg: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    overflow: "hidden",
+  },
+  navbarBgImage: {
+    width: "100%",
+    aspectRatio: 1,
+  },
+  navbarBgOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    // 与默认封面同高(375),让遮罩在顶部条上的渐变进度与默认头部完全一致
+    height: 375,
+  },
+  compactIdentity: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  compactAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  compactName: {
+    flexShrink: 1,
+    color: "#FFF",
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: "600",
+  },
   scrollView: { flex: 1, backgroundColor: "#fff" },
   coverShade: {
     ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(24,35,47,0.52)",
   },
   navbar: {
-    height: 68,
-    paddingHorizontal: 20,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
+    paddingHorizontal: 12,
+    flexDirection: "column",
+    alignItems: "stretch",
   },
   navButton: {
     width: 24,
@@ -1279,6 +1432,19 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
     paddingTop: 16,
+  },
+  tabsBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: 48,
+    paddingHorizontal: 16,
+    gap: 24,
+    backgroundColor: "#FFF",
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  tabsBarInCover: {
+    marginTop: 12,
   },
   stickyTabs: {
     paddingHorizontal: 16,
