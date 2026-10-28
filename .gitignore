@@ -9,6 +9,9 @@ dist/
 web-build/
 expo-env.d.ts
 
+# Pushy / react-native-update local credentials
+.update
+
 # Native
 .kotlin/
 *.orig.*
@@ -59,3 +62,6 @@ modules/*/android/.gradle/
 .workbuddy/
 .claude/
 .codex/
+
+# react-native-update
+.pushy

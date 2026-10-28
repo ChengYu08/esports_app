@@ -31,6 +31,7 @@ import { VoiceRoomKickListener } from "@/features/voice-room/components/VoiceRoo
 import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
 import { leaveVoiceChatRoom } from "@/features/voice-room/voice-room-rongcloud";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
+import { PushyUpdateHost } from "@/features/ota/PushyUpdateHost";
 import { PrivacyConsentGate } from "@/features/privacy/components/PrivacyConsentGate";
 import { readPrivacyConsent } from "@/features/privacy/privacy-consent";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
@@ -208,8 +209,8 @@ export default function RootLayout() {
           <RootSiblingParent>
             <StatusBar style="dark" />
             {privacyAccepted ? (
-              <>
-                {/* Network monitoring starts only after privacy consent. */}
+              <PushyUpdateHost>
+                {/* 网络监控与热更新均在同意隐私后启动 */}
                 <NetworkRecovery />
                 <Stack
                   screenOptions={{
@@ -229,7 +230,7 @@ export default function RootLayout() {
                   <Stack.Screen name="account-settings" />
                   <Stack.Screen name="about" />
                 </Stack>
-              </>
+              </PushyUpdateHost>
             ) : (
               <PrivacyConsentGate onAccepted={() => setPrivacyAccepted(true)} />
             )}

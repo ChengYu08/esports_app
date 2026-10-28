@@ -16,6 +16,8 @@ function withAndroidReleaseBuild(config) {
     set('android.enableMinifyInReleaseBuilds', 'true');
     set('android.enableShrinkResourcesInReleaseBuilds', 'true');
     set('android.enablePngCrunchInReleaseBuilds', 'false');
+    // 禁止 Foojay 自动下载 JDK（用本机 JAVA_HOME）
+    set('org.gradle.java.installations.auto-download', 'false');
     return mod;
   });
 

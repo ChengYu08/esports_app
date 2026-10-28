@@ -52,6 +52,7 @@
       ],
       "./plugins/withNodeCommandUtf8",
       "./plugins/withAndroidReleaseBuild",
+      "./plugins/withPushyDeepLink",
       [
         "expo-image-picker",
         {
