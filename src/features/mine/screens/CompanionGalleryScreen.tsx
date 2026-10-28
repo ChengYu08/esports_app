@@ -53,7 +53,9 @@ export default function CompanionGalleryScreen() {
   const addImages = async () => {
     if (busyRef.current || !managed.enabled || !gameId) return;
     if (images.length >= MAX_IMAGES) {
-      Toast.show(`最多上传${MAX_IMAGES}张截图`, { position: Toast.positions.CENTER });
+      Toast.show(`最多上传${MAX_IMAGES}张截图`, {
+        position: Toast.positions.CENTER,
+      });
       return;
     }
     busyRef.current = true;
@@ -62,6 +64,8 @@ export default function CompanionGalleryScreen() {
       managed.assertCurrentAccount();
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
+        // Android 使用原图片来源的文件名
+        legacy: true,
         allowsMultipleSelection: true,
         selectionLimit: MAX_IMAGES - images.length,
         quality: 0.85,
