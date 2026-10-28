@@ -53,6 +53,7 @@
       "./plugins/withNodeCommandUtf8",
       "./plugins/withAndroidReleaseBuild",
       "./plugins/withPushyDeepLink",
+      "./plugins/withPzOneClickLibs",
       [
         "expo-image-picker",
         {
