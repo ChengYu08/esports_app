@@ -1,11 +1,9 @@
-import {
-  Star16Filled,
-  Star16Regular,
-} from "@fluentui/react-native-icons";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
   Edit24Regular,
+  Star16Filled,
+  Star16Regular,
 } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -19,7 +17,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -283,9 +280,7 @@ export default function ProfileScreen() {
           onPress={() => setTab(item)}
           style={styles.tabButton}
         >
-          <Text
-            style={[styles.tabText, tab === item && styles.tabTextActive]}
-          >
+          <Text style={[styles.tabText, tab === item && styles.tabTextActive]}>
             {item}
           </Text>
           {tab === item ? <View style={styles.tabIndicator} /> : null}
@@ -388,7 +383,6 @@ export default function ProfileScreen() {
       </Text>
     </View>
   );
-
 
   const profileListItems: ProfileListItem[] = [
     { key: "profile-cover", content: profileCover },
@@ -571,7 +565,11 @@ export default function ProfileScreen() {
           pointerEvents="none"
           style={[
             styles.navbarBg,
-            { height: insets.top + 92, overflow: "hidden", opacity: headerFade },
+            {
+              height: insets.top + 92,
+              overflow: "hidden",
+              opacity: headerFade,
+            },
           ]}
         >
           <Image
@@ -605,7 +603,9 @@ export default function ProfileScreen() {
             style={[styles.compactIdentity, { opacity: headerFade }]}
           >
             <Image
-              source={profile.headImage ? { uri: profile.headImage } : fallbackAvatar}
+              source={
+                profile.headImage ? { uri: profile.headImage } : fallbackAvatar
+              }
               style={styles.compactAvatar}
             />
             <Text numberOfLines={1} style={styles.compactName}>
@@ -615,7 +615,10 @@ export default function ProfileScreen() {
         </View>
         <Animated.View
           pointerEvents={compactActive ? "box-none" : "none"}
-          style={[styles.tabsBar, { opacity: headerFade, marginHorizontal: -12 }]}
+          style={[
+            styles.tabsBar,
+            { opacity: headerFade, marginHorizontal: -12 },
+          ]}
         >
           {tabsContent}
         </Animated.View>
@@ -832,7 +835,6 @@ export default function ProfileScreen() {
     }
   }
 }
-
 
 function ProfileIdentity({
   profile,
@@ -1057,7 +1059,6 @@ function ServiceCard({
   );
 }
 
-
 function ReviewCard({ review }: { review: ProfileReview }) {
   return (
     <View style={styles.reviewCard}>
@@ -1193,7 +1194,6 @@ function getStatus(onlineStatus: number, gameStatus: number) {
   if (onlineStatus === 1) return { label: "空闲中", color: "#14A357" };
   return null;
 }
-
 
 function formatReviewDate(value?: string) {
   if (!value) return "";
@@ -1505,8 +1505,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     position: "relative",
   },
-  tabText: { color: "#656566", fontFamily: DOUYIN_SANS, fontSize: 14, lineHeight: 22 },
-  tabTextActive: { color: "#0D0D0F", fontWeight: "600", fontSize: 16, lineHeight: 22 },
+  tabText: {
+    color: "#656566",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  tabTextActive: {
+    color: "#0D0D0F",
+    fontWeight: "600",
+    fontSize: 16,
+    lineHeight: 22,
+  },
   tabIndicator: {
     position: "absolute",
     bottom: 0,
@@ -1531,7 +1541,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF5F7",
   },
   gameLogo: { width: 20, height: 20, borderRadius: 4 },
-  gameText: { color: "#656566", fontFamily: DOUYIN_SANS, fontSize: 12, lineHeight: 18 },
+  gameText: {
+    color: "#656566",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 12,
+    lineHeight: 18,
+  },
   gameTextActive: { color: "#0A0A0A", fontWeight: "600" },
   sectionHeader: {
     marginTop: 24,
@@ -1648,7 +1663,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   diamond: { color: "#FF3158", fontSize: 14 },
-  metaText: { color: "#979799", fontFamily: DOUYIN_SANS, fontSize: 11, lineHeight: 16 },
+  metaText: {
+    color: "#979799",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 11,
+    lineHeight: 16,
+  },
   orderButton: {
     flexShrink: 0,
     paddingHorizontal: 12,
@@ -1658,7 +1678,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  orderText: { color: "#fff", fontFamily: DOUYIN_SANS, fontSize: 12, lineHeight: 18 },
+  orderText: {
+    color: "#fff",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 12,
+    lineHeight: 18,
+  },
   inlineState: { alignItems: "center", paddingVertical: 48 },
   empty: { alignItems: "center", paddingVertical: 48 },
   emptyText: { color: "#777", fontFamily: DOUYIN_SANS, fontSize: 14 },
@@ -1668,6 +1693,8 @@ const styles = StyleSheet.create({
     fontFamily: DOUYIN_SANS,
     fontSize: 12,
   },
+  reviewList: { marginHorizontal: 8, marginTop: 8 },
+  reviewListItem: { marginHorizontal: 8 },
   reviewCard: {
     flexDirection: "row",
     gap: 8,

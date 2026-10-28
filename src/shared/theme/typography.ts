@@ -11,4 +11,3 @@ export const SYSTEM_FONT = Platform.select({
   android: "sans-serif",
   default: '"PingFang SC", system-ui, sans-serif',
 });
-

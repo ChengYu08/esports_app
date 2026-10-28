@@ -26,7 +26,7 @@ import {
 } from "@/features/auth/session-persistence";
 import { messageStore } from "@/features/message/message-store";
 import { RealNameVerificationSheet } from "@/features/mine/components/RealNameVerificationSheet";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { DOUYIN_SANS, PINGFANG_SC } from "@/shared/theme/typography";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 
@@ -564,7 +564,7 @@ const styles = StyleSheet.create({
   },
   value: {
     color: "#666",
-    fontFamily: DOUYIN_SANS,
+    fontFamily: PINGFANG_SC,
     fontSize: 14,
     textAlign: "right",
   },

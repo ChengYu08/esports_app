@@ -4,21 +4,15 @@ import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useStarIap } from "@/features/iap/use-star-iap";
 import { fetchStarBalance } from "@/features/mine/api/companion-order.api";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 
 const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
-
-// The Figma frame shows six cards using the same 300-star / ¥30 option.
-const rechargePackages = Array.from({ length: 6 }, (_, index) => ({
-  id: index,
-  diamonds: 300,
-  price: 30,
-}));
 
 function formatAmount(value: number): string {
   return value.toLocaleString("zh-CN");
@@ -44,19 +38,66 @@ export default function StarRechargeScreen() {
       ? parsedProfileBalance
       : null,
   );
-  const [selectedPackageId, setSelectedPackageId] = useState(3);
+  const [selectedPackageId, setSelectedPackageId] = useState<string | null>(
+    null,
+  );
+  const [userTouchedSelection, setUserTouchedSelection] = useState(false);
   const [agreementAccepted, setAgreementAccepted] = useState(true);
   const [prompt, setPrompt] = useState<{
     title: string;
     message: string;
   } | null>(null);
 
+  const refreshBalance = useCallback(() => {
+    if (!token) {
+      return;
+    }
+    fetchStarBalance(token)
+      .then(setBalance)
+      .catch(() => {
+        // Keep the last known balance when the refresh is unavailable.
+      });
+  }, [token]);
+
+  const handleDelivered = useCallback(() => {
+    // 到账以服务端钱包为准，重新拉取余额。
+    refreshBalance();
+    setPrompt({
+      title: "充值成功",
+      message: "星钻已到账，可用于平台服务消费。",
+    });
+  }, [refreshBalance]);
+
+  const handlePending = useCallback(() => {
+    setPrompt({
+      title: "充值处理中",
+      message: "系统将自动补发，请稍后查询星钻余额。",
+    });
+  }, []);
+
+  const {
+    packages,
+    products,
+    status: iapStatus,
+    errorMessage: iapErrorMessage,
+    purchase,
+    clearError,
+  } = useStarIap({
+    token,
+    onDelivered: handleDelivered,
+    onPending: handlePending,
+  });
+
   useEffect(() => {
-    if (!token) return;
+    if (!token) {
+      return;
+    }
     let active = true;
-    void fetchStarBalance(token)
+    fetchStarBalance(token)
       .then((nextBalance) => {
-        if (active) setBalance(nextBalance);
+        if (active) {
+          setBalance(nextBalance);
+        }
       })
       .catch(() => {
         // Keep the last known profile balance if refreshing fails.
@@ -66,7 +107,45 @@ export default function StarRechargeScreen() {
     };
   }, [token]);
 
-  const selectedPackage = rechargePackages[selectedPackageId];
+  // 选中项为派生值：用户未手动选择或所选档位已下架时，回退到第二个（或第一个）档位。
+  const userSelectedValid =
+    userTouchedSelection &&
+    selectedPackageId !== null &&
+    packages.some((item) => item.productId === selectedPackageId);
+  const selectedPackage = userSelectedValid
+    ? packages.find((item) => item.productId === selectedPackageId)
+    : (packages[1] ?? packages[0]);
+  const selectedStoreProduct = products.find(
+    (product) => product.id === selectedPackage?.productId,
+  );
+  const purchaseDisabled =
+    !agreementAccepted ||
+    selectedStoreProduct === undefined ||
+    iapStatus === "purchasing" ||
+    iapStatus === "verifying";
+
+  function handleConfirmPurchase() {
+    if (!agreementAccepted || !selectedPackage) {
+      return;
+    }
+
+    if (!selectedStoreProduct) {
+      setPrompt({
+        title: "商品暂不可用",
+        message: "苹果内购商品尚未加载完成，请稍后重试。",
+      });
+      return;
+    }
+
+    clearError();
+    purchase(selectedPackage.productId).catch((error: unknown) => {
+      setPrompt({
+        title: "购买失败",
+        message:
+          error instanceof Error ? error.message : "购买失败，请稍后重试",
+      });
+    });
+  }
 
   return (
     <View style={styles.screen}>
@@ -123,21 +202,25 @@ export default function StarRechargeScreen() {
           </View>
 
           <View style={styles.packageGrid}>
-            {[rechargePackages.slice(0, 3), rechargePackages.slice(3)].map(
-              (row, rowIndex) => (
-                <View key={rowIndex} style={styles.packageRow}>
-                  {row.map((item) => (
-                    <RechargeOption
-                      key={item.id}
-                      diamonds={item.diamonds}
-                      price={item.price}
-                      selected={selectedPackageId === item.id}
-                      onPress={() => setSelectedPackageId(item.id)}
-                    />
-                  ))}
-                </View>
-              ),
-            )}
+            <View style={styles.packageRow}>
+              {packages.map((item) => {
+                const storeProduct = products.find(
+                  (product) => product.id === item.productId,
+                );
+                return (
+                  <RechargeOption
+                    key={item.productId}
+                    diamonds={item.stars}
+                    price={storeProduct?.displayPrice ?? "--"}
+                    selected={selectedPackage?.productId === item.productId}
+                    onPress={() => {
+                      setSelectedPackageId(item.productId);
+                      setUserTouchedSelection(true);
+                    }}
+                  />
+                );
+              })}
+            </View>
           </View>
         </View>
 
@@ -176,15 +259,15 @@ export default function StarRechargeScreen() {
             </Pressable>
           </View>
 
+          {iapErrorMessage ? (
+            <Text style={styles.purchaseError}>{iapErrorMessage}</Text>
+          ) : null}
+
           <Pressable
             accessibilityRole="button"
-            disabled={!agreementAccepted}
-            onPress={() =>
-              setPrompt({
-                title: "暂未接入支付",
-                message: "移动端支付流程尚未接入，当前不会创建充值订单。",
-              })
-            }
+            accessibilityState={{ disabled: purchaseDisabled }}
+            disabled={purchaseDisabled}
+            onPress={handleConfirmPurchase}
             style={styles.confirmButton}
           >
             <LinearGradient
@@ -193,11 +276,13 @@ export default function StarRechargeScreen() {
               end={{ x: 1, y: 0 }}
               style={[
                 styles.confirmGradient,
-                !agreementAccepted && styles.confirmDisabled,
+                purchaseDisabled && styles.confirmDisabled,
               ]}
             >
               <Text style={styles.confirmText}>
-                确认支付 ¥{selectedPackage.price}
+                {iapStatus === "purchasing" || iapStatus === "verifying"
+                  ? "支付处理中..."
+                  : `确认支付 ${selectedStoreProduct?.displayPrice ?? ""}`}
               </Text>
             </LinearGradient>
           </Pressable>
@@ -221,7 +306,7 @@ function RechargeOption({
   onPress,
 }: {
   diamonds: number;
-  price: number;
+  price: string;
   selected: boolean;
   onPress: () => void;
 }) {
@@ -229,7 +314,7 @@ function RechargeOption({
     <Pressable
       accessibilityRole="radio"
       accessibilityState={{ selected }}
-      accessibilityLabel={`${diamonds} 星钻，${price} 元`}
+      accessibilityLabel={`${diamonds} 星钻，${price}`}
       onPress={onPress}
       style={[styles.packageCard, selected && styles.packageCardSelected]}
     >
@@ -244,7 +329,7 @@ function RechargeOption({
         </Text>
       </View>
       <Text style={[styles.packagePrice, selected && styles.selectedText]}>
-        ¥{price}
+        {price}
       </Text>
     </Pressable>
   );
@@ -287,7 +372,6 @@ const styles = StyleSheet.create({
   },
   balanceValue: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 32,
     lineHeight: 38,
     fontWeight: "600",
@@ -352,6 +436,12 @@ const styles = StyleSheet.create({
   },
   selectedText: { color: "#FF4754" },
   purchaseFooter: { gap: 10, paddingVertical: 8, alignItems: "center" },
+  purchaseError: {
+    color: "#D9363E",
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: "center",
+  },
   agreementRow: {
     minHeight: 18,
     flexDirection: "row",
