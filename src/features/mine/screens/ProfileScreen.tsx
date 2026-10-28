@@ -466,18 +466,9 @@ export default function ProfileScreen() {
           },
         );
 
-        // TODO: 临时测试数据——接口数据 ×3 并改名,用于滚动效果联调,联调完成后删除
-        const testSkillCards = gameDetail.skillCards.flatMap((card, index) =>
-          [0, 1, 2].map((copy) => ({
-            ...card,
-            companionServiceId: -(index * 3 + copy + 1),
-            modeName: `【测试数据${index * 3 + copy + 1}】${card.modeName}`,
-          })),
-        );
-
-        if (testSkillCards.length > 0) {
+        if (gameDetail.skillCards.length > 0) {
           profileListItems.push(
-            ...testSkillCards.map((card) => ({
+            ...gameDetail.skillCards.map((card) => ({
               key: `service-${card.companionServiceId}-${card.gameLevelId}`,
               content: (
                 <View style={styles.scrollBody}>
