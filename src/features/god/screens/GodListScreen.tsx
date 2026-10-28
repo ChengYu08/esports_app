@@ -606,12 +606,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 2,
     borderRadius: 3,
-    paddingHorizontal: 4,
-    paddingVertical: 2,
+    // 设计稿 L2 Tag：高 16（文字 14 + 上下 1）、左右 3
+    paddingHorizontal: 3,
+    paddingVertical: 1,
   },
   statusBusyBg: { backgroundColor: "#FFF4EB" },
   statusIdleBg: { backgroundColor: "#E6FAEF" },
-  statusTagIcon: { width: 10, height: 10, marginTop: 1 },
+  statusTagIcon: { width: 10, height: 10 },
   statusIconBusy: { tintColor: "#F5821D" },
   statusIconIdle: { tintColor: "#14A357" },
   statusTagText: { fontSize: 10, lineHeight: 14, fontWeight: "500" },
@@ -624,7 +625,9 @@ const styles = StyleSheet.create({
     gap: 4,
     backgroundColor: "#FFF4EB",
     borderRadius: 3,
+    // 设计稿 tag/game：高 16（文字 14 + 上下 1）、右 4
     paddingRight: 4,
+    paddingVertical: 1,
   },
   gameTagIcon: { width: 16, height: 16, borderRadius: 3 },
   gameTagText: { color: "#B25C15", fontSize: 10, lineHeight: 14, fontWeight: "500" },
@@ -636,7 +639,10 @@ const styles = StyleSheet.create({
   levelTag: {
     borderRadius: 2,
     paddingHorizontal: 2,
-    height: 14,
+    // 文字 lineHeight 13 + 中文字形下沉，14 高会贴住底边；抬高到 16 并
+    // 额外给 1 底边距，视觉重心略微上提
+    height: 16,
+    paddingBottom: 1,
     justifyContent: "center",
   },
   levelTagText: { color: "#FFF", fontSize: 10, lineHeight: 13, fontWeight: "500" },
