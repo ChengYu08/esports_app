@@ -2,7 +2,6 @@ import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { Add24Regular, Dismiss12Regular } from "@fluentui/react-native-icons";
 import { File } from "expo-file-system";
-import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { useRef, useState } from "react";
 import {
@@ -17,6 +16,10 @@ import Toast from "react-native-root-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { companionManagementApi as api } from "../api/companion-management.api";
 import type { ManagedImage } from "../api/companion-management.contract";
+import {
+  pickCompanionGalleryImages,
+  type CompanionGalleryImage,
+} from "../companion-gallery-picker";
 import { selectCompanionImages } from "../companion-gallery-selection";
 import { newestCompanionImages } from "../companion-image-order";
 import { uploadCompanionMedia } from "../companion-upload";
@@ -25,7 +28,7 @@ import { CompanionImagePreview } from "../components/CompanionImagePreview";
 import { useManagedGame } from "../hooks/use-companion-management";
 
 const MAX_IMAGES = 9;
-type PendingImage = { id: number; asset: ImagePicker.ImagePickerAsset };
+type PendingImage = { id: number; asset: CompanionGalleryImage };
 
 export default function CompanionGalleryScreen() {
   const { gameId } = useLocalSearchParams<{ gameId?: string }>();
@@ -51,7 +54,9 @@ export default function CompanionGalleryScreen() {
   ];
 
   const addImages = async () => {
-    if (busyRef.current || !managed.enabled || !gameId) return;
+    if (busyRef.current || !managed.enabled || !gameId) {
+      return;
+    }
     if (images.length >= MAX_IMAGES) {
       Toast.show(`最多上传${MAX_IMAGES}张截图`, {
         position: Toast.positions.CENTER,
@@ -62,18 +67,13 @@ export default function CompanionGalleryScreen() {
     setPicking(true);
     try {
       managed.assertCurrentAccount();
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"],
-        // Android 使用原图片来源的文件名
-        legacy: true,
-        allowsMultipleSelection: true,
-        selectionLimit: MAX_IMAGES - images.length,
-        quality: 0.85,
-      });
-      if (result.canceled) return;
+      const assets = await pickCompanionGalleryImages(MAX_IMAGES - images.length);
+      if (!assets.length) {
+        return;
+      }
       managed.assertCurrentAccount();
       const { accepted, warnings } = selectCompanionImages(
-        result.assets.slice(0, MAX_IMAGES - images.length).map((asset) => ({
+        assets.map((asset) => ({
           ...asset,
           fileSize: asset.fileSize ?? new File(asset.uri).size,
         })),
@@ -81,7 +81,9 @@ export default function CompanionGalleryScreen() {
       if (warnings.length) {
         Toast.show(warnings.join("\n"), { position: Toast.positions.CENTER });
       }
-      if (!accepted.length) return;
+      if (!accepted.length) {
+        return;
+      }
       setPendingImages((current) => [
         ...accepted.map((asset) => ({ id: nextLocalId.current--, asset })),
         ...current,
@@ -212,7 +214,7 @@ export default function CompanionGalleryScreen() {
               accessibilityHint={`最多${MAX_IMAGES}张，每张不超过2MB`}
               accessibilityState={{ disabled: busy }}
               disabled={busy}
-              onPress={() => void addImages()}
+              onPress={addImages}
               style={[
                 styles.cell,
                 styles.add,
