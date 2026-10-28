@@ -9,4 +9,6 @@ import { env } from "@/core/config/env";
 export const APP_LINKS = {
   userAgreement: `${env.protocolBaseUrl}/public/protocols?code=user_server`,
   privacyPolicy: `${env.protocolBaseUrl}/public/protocols?code=user_privacy`,
+  // 盼之电竞购买须知（星钻充值页）
+  purchaseNotice: `${env.protocolBaseUrl}/public/protocols?code=user_recharge`,
 } as const;

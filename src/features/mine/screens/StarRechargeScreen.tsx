@@ -9,6 +9,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { fetchStarBalance } from "@/features/mine/api/companion-order.api";
+import { APP_LINKS } from "@/core/config/links";
+import { openExternalLink } from "@/shared/navigation/open-external-link";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 
 const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
@@ -165,12 +167,7 @@ export default function StarRechargeScreen() {
             <Text style={styles.agreementCopy}>支付即同意</Text>
             <Pressable
               accessibilityRole="link"
-              onPress={() =>
-                setPrompt({
-                  title: "盼之电竞购买须知",
-                  message: "请在支付前确认本次充值的星钻数量与金额。",
-                })
-              }
+              onPress={() => void openExternalLink(APP_LINKS.purchaseNotice)}
             >
               <Text style={styles.agreementLink}>《盼之电竞购买须知》</Text>
             </Pressable>
