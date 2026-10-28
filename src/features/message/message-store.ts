@@ -39,11 +39,15 @@ import {
   type BlacklistEntry,
 } from '@/features/mine/blacklist';
 import {
+  ensureNotificationSettingsLoaded,
+  isMessageNotificationMuted,
+} from '@/features/mine/notification-settings';
+import {
   getSystemConversationTitle,
   isSystemConversationId,
   normalizeSystemConversationId,
 } from './system-conversations';
-import { dispatchInAppNotification, shouldSuppressInAppBanner } from './notification-hub';
+import { dispatchInAppNotification } from './notification-hub';
 
 export type MessageConnectionState = 'idle' | 'connecting' | 'ready' | 'unavailable' | 'error';
 
@@ -126,7 +130,7 @@ function createPendingImage(path: string): ManagedMessage {
   return { id: clientId, clientId, kind: 'image', imageUrl: path, time: formatTime(sentAt), isMine: true, status: 'pending', sentAt, retryPayload: { kind: 'image', path } };
 }
 
-function toConversationShell(conversation: Pick<MessageConversation, 'id' | 'title' | 'avatar'>): MessageConversation {
+function toConversationShell(conversation: Pick<MessageConversation, 'id' | 'title' | 'avatar' | 'isCustomerService'>): MessageConversation {
   const id = normalizeSystemConversationId(conversation.id);
   return { ...conversation, id, title: getSystemConversationTitle(id, conversation.title), preview: '', time: '', unreadCount: 0, updatedAt: 0 };
 }
@@ -210,7 +214,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         return;
       }
       const normalizedConversation = { ...conversation, id: normalizedPeerId, title: normalizedConversationTitle };
-      if (!isActive && !message.isMine && !shouldSuppressInAppBanner(message.kind)) {
+      if (!isActive && !message.isMine && !isMessageNotificationMuted()) {
         dispatchInAppNotification({
           peerId: normalizedPeerId,
           title: getSystemConversationTitle(normalizedPeerId, normalizedConversation.title),
@@ -401,6 +405,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       initialize: async (token) => {
         const initializationRevision = lifecycleRevision;
         onlineStatusToken = token || null;
+        ensureNotificationSettingsLoaded().catch(() => undefined);
         if (!stopBlacklistSubscription) {
           stopBlacklistSubscription = subscribeBlacklist((entries) => {
             blacklistRevision += 1;

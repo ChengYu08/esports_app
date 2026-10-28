@@ -17,7 +17,7 @@
       "blockedPermissions": ["android.permission.CAMERA"],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#AB1E31"
       }
     },
     "web": {
@@ -53,6 +53,7 @@
       "./plugins/withNodeCommandUtf8",
       "./plugins/withAndroidReleaseBuild",
       "./plugins/withPushyDeepLink",
+      "./plugins/withPzOneClickLibs",
       [
         "expo-image-picker",
         {

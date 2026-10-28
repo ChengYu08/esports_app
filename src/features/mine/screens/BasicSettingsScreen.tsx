@@ -1,15 +1,12 @@
 import { useAuthStore } from "@esports/auth";
-import {
-  ChevronLeft24Regular,
-  ChevronRight16Regular,
-  Delete24Regular,
-} from "@fluentui/react-native-icons";
+import { Delete24Regular } from "@fluentui/react-native-icons";
 import { Paths } from "expo-file-system";
 import { Image } from "expo-image";
-import { router } from "expo-router";
-import { useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   Platform,
   Pressable,
@@ -25,8 +22,12 @@ import { queryClient } from "@/core/query/query-client";
 import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { clearAuthSession } from "@/features/auth/session-persistence";
 import { messageStore } from "@/features/message/message-store";
+import { readTeenMode } from "@/features/mine/teen-mode-store";
+import { useSmsNotifyStatus } from "@/features/mine/hooks/use-sms-notify";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
-import { useAppConfirm } from "@/shared/ui/app-confirm";
+
+const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
+const arrowIcon = require("../../../../assets/mine/figma/mine-arrow-right.svg");
 
 function readCacheSize() {
   if (Platform.OS === "web") return 0;
@@ -56,6 +57,18 @@ export default function BasicSettingsScreen() {
     readCacheSize(),
   );
   const [loggingOut, setLoggingOut] = useState(false);
+  const [teenModeEnabled, setTeenModeEnabled] = useState(false);
+
+  // 提前预热短信通知开关缓存，进入消息通知页时无需再等待加载
+  useSmsNotifyStatus();
+
+  useFocusEffect(
+    useCallback(() => {
+      readTeenMode().then((record) =>
+        setTeenModeEnabled(record?.enabled ?? false),
+      );
+    }, []),
+  );
 
   const clearCache = () => setCacheModalVisible(true);
 
@@ -88,30 +101,33 @@ export default function BasicSettingsScreen() {
   };
 
   const logout = () => {
-    void (async () => {
-      const confirmed = await useAppConfirm.getState().confirm({
-        title: "退出登录",
-        message: "确认退出当前账号吗？您的数据将被清除！",
-        cancelText: "取消",
-        confirmText: "退出登录",
-      });
-      if (!confirmed || loggingOut) return;
-      setLoggingOut(true);
-      if (token) void clientAuthApi.logout(token).catch(() => undefined);
-      try {
-        await clearAuthSession();
-      } catch {
-        // Local sign-out still completes when secure storage is unavailable.
-      }
-      clearSession();
-      queryClient.clear();
-      await messageStore
-        .getState()
-        .reset()
-        .catch(() => undefined);
-      router.replace("/");
-      setLoggingOut(false);
-    })();
+    Alert.alert("退出登录", "确认退出当前账号吗？", [
+      { text: "取消", style: "cancel" },
+      {
+        text: "退出登录",
+        style: "destructive",
+        onPress: () => {
+          if (loggingOut) return;
+          void (async () => {
+            setLoggingOut(true);
+            if (token) void clientAuthApi.logout(token).catch(() => undefined);
+            try {
+              await clearAuthSession();
+            } catch {
+              // Local sign-out still completes when secure storage is unavailable.
+            }
+            clearSession();
+            queryClient.clear();
+            await messageStore
+              .getState()
+              .reset()
+              .catch(() => undefined);
+            router.replace("/");
+            setLoggingOut(false);
+          })();
+        },
+      },
+    ]);
   };
 
   return (
@@ -128,7 +144,7 @@ export default function BasicSettingsScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <ChevronLeft24Regular color="#0A0A0A" width={24} height={24} style={styles.backIcon} />
+          <Image source={backIcon} style={styles.backIcon} />
         </Pressable>
         <Text style={styles.headerTitle}>基础设置</Text>
         <View style={styles.headerEnd} />
@@ -140,18 +156,18 @@ export default function BasicSettingsScreen() {
       >
         <View style={styles.settingsGroup}>
           <SettingsRow
-            label="账号设置"
-            onPress={() => router.push("/account-settings")}
-          />
-          <SettingsRow
             label="账号与安全"
             onPress={() => router.push("/account-security")}
           />
-          {/* <SettingsRow label="青少年模式" value="未开启" onPress={() => void useAppConfirm.getState().confirm({ title: "青少年模式", message: "青少年模式设置暂未开放" })} /> */}
-          {/* <SettingsRow
+          <SettingsRow
+            label="青少年模式"
+            value={teenModeEnabled ? "已开启" : "未开启"}
+            onPress={() => router.push("/teen-mode")}
+          />
+          <SettingsRow
             label="消息通知"
-            onPress={() => void useAppConfirm.getState().confirm({ title: "消息通知", message: "消息通知设置暂未开放" })}
-          /> */}
+            onPress={() => router.push("/message-notification")}
+          />
           <SettingsRow
             label={clearing ? "正在清理缓存" : "清除缓存"}
             value={formatBytes(cacheSize)}
@@ -160,7 +176,6 @@ export default function BasicSettingsScreen() {
           />
           <SettingsRow
             label="关于盼之电竞"
-            last
             onPress={() => router.push("/about")}
           />
         </View>
@@ -240,33 +255,30 @@ function SettingsRow({
   label,
   value,
   onPress,
-  last,
   disabled,
 }: {
   label: string;
   value?: string;
   onPress: () => void;
-  last?: boolean;
   disabled?: boolean;
 }) {
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.row,
-        !last && styles.rowDivider,
-        pressed && styles.pressed,
-      ]}
-    >
-      <Text style={styles.rowLabel}>{label}</Text>
-      <View style={styles.rowRight}>
-        {value ? <Text style={styles.rowValue}>{value}</Text> : null}
-        <ChevronRight16Regular color="#0A0A0A" width={18} height={18} style={styles.arrow} />
-      </View>
-    </Pressable>
+    <View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        disabled={disabled}
+        onPress={onPress}
+        style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+      >
+        <Text style={styles.rowLabel}>{label}</Text>
+        <View style={styles.rowRight}>
+          {value ? <Text style={styles.rowValue}>{value}</Text> : null}
+          <Image source={arrowIcon} style={styles.arrow} />
+        </View>
+      </Pressable>
+      <View style={styles.rowDivider} />
+    </View>
   );
 }
 
@@ -277,42 +289,46 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
   },
-  backButton: { width: 44, height: 44, justifyContent: "center" },
-  backIcon: { width: 24, height: 24 },
+  backButton: {
+    width: 48,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
   headerTitle: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
-    fontWeight: "600",
-    fontSize: 17,
+    fontWeight: "500",
+    fontSize: 16,
     lineHeight: 24,
   },
-  headerEnd: { width: 44 },
+  headerEnd: { width: 16 },
   settingsGroup: { marginTop: 8, backgroundColor: "#FFF" },
   row: {
     minHeight: 54,
-    paddingHorizontal: 16,
+    paddingLeft: 16,
+    paddingRight: 12,
+    paddingVertical: 16,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
   rowDivider: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#E8E8E8",
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "#EBEBEB",
+    marginLeft: 16,
   },
   rowLabel: {
-    color: "#222",
-    fontFamily: DOUYIN_SANS,
+    color: "#333333",
     fontSize: 14,
     lineHeight: 22,
   },
-  rowRight: { flexDirection: "row", alignItems: "center", gap: 6 },
+  rowRight: { flexDirection: "row", alignItems: "center", gap: 4 },
   rowValue: {
-    color: "#999",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 13,
-    lineHeight: 20,
+    color: "#666666",
+    fontSize: 14,
+    lineHeight: 22,
   },
   arrow: { width: 18, height: 18 },
   logout: {
@@ -323,10 +339,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   logoutText: {
-    color: "#E11D2A",
-    fontFamily: DOUYIN_SANS,
+    color: "#FF1F4C",
     fontSize: 14,
     lineHeight: 22,
+    fontWeight: "600",
   },
   pressed: { backgroundColor: "#F5F5F5" },
   modalBackdrop: {

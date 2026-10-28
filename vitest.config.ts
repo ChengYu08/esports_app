@@ -1,7 +1,22 @@
 import path from "node:path";
-import { defineConfig } from "vitest/config";
+import { defineConfig, type Plugin } from "vitest/config";
+
+// RN 资源（require 图片/SVG）在 node 测试环境无法解析，统一返回桩模块。
+function assetStub(): Plugin {
+  return {
+    name: "vitest-asset-stub",
+    enforce: "pre",
+    load(id) {
+      if (id.match(/\.(png|jpe?g|gif|webp|svg)$/)) {
+        return "export default 1;";
+      }
+      return null;
+    },
+  };
+}
 
 export default defineConfig({
+  plugins: [assetStub()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -15,5 +30,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // *.test.mjs / *.test.cjs 走 node --test，不属于 vitest。
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
   },
 });

@@ -104,4 +104,23 @@ describe('conversation loading', () => {
     engine.getRemoteConversationList.mockResolvedValue(33002);
     await expect(loadConversationSnapshot(engine, 1)).rejects.toThrow('33002');
   });
+
+  it('returns an empty local list when remote sync is rejected for auto-pull (33302)', async () => {
+    const engine = makeEngine([]);
+    engine.getRemoteConversationList.mockResolvedValue(33302);
+    await expect(loadConversationSnapshot(engine, 1)).resolves.toEqual([]);
+    expect(engine.getConversations).toHaveBeenCalledTimes(2);
+  });
+
+  it('treats auto-pull (33302) from the sync listener as soft success', async () => {
+    const engine = makeEngine([]);
+    engine.getRemoteConversationList.mockImplementation(async (callback) => {
+      callback?.onSuccess?.();
+      return 0;
+    });
+    const snapshot = loadConversationSnapshot(engine, 1);
+    await vi.waitFor(() => expect(engine.getRemoteConversationList).toHaveBeenCalled());
+    engine.finishSync(33302);
+    await expect(snapshot).resolves.toEqual([conversation]);
+  });
 });

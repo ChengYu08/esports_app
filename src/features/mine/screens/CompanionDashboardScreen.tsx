@@ -34,7 +34,6 @@ import {
   type ManagedService,
 } from "../api/companion-management.contract";
 import { newestCompanionImages } from "../companion-image-order";
-import { MAX_COMPANION_VOICE_SECONDS } from "../companion-voice-file";
 import { CompanionAgreementSheet } from "../components/CompanionAgreementSheet";
 import { CompanionDashboardHeader } from "../components/CompanionDashboardHeader";
 import { CompanionImagePreview } from "../components/CompanionImagePreview";
@@ -307,9 +306,6 @@ export default function CompanionDashboardScreen() {
                     ) : (
                       <Text style={styles.noImages}>暂未上传语音介绍</Text>
                     )}
-                    <Text style={styles.voiceHint}>
-                      仅支持{MAX_COMPANION_VOICE_SECONDS}秒以内的音频
-                    </Text>
                   </View>
                 </View>
                 <View>

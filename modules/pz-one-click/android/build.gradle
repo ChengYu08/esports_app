@@ -17,6 +17,13 @@ android {
   }
 }
 
+repositories {
+  flatDir { dirs 'libs' }
+}
+
 dependencies {
-  implementation fileTree(dir: 'libs', include: ['*.aar'])
+  // AGP 禁止 library 项目直接 fileTree 引用本地 .aar，改用 flatDir 按名引用
+  implementation(name: 'auth_number_product-2.14.24-log-online-standard-cuum-release', ext: 'aar')
+  implementation(name: 'logger-2.2.2-release', ext: 'aar')
+  implementation(name: 'main-2.2.3-release', ext: 'aar')
 }

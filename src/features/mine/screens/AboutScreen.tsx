@@ -1,7 +1,8 @@
-import { ChevronLeft24Regular, ChevronRight16Regular } from "@fluentui/react-native-icons";
+import Constants from "expo-constants";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import {
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,16 +11,22 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { APP_LINKS } from "@/core/config/links";
+import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { openExternalLink } from "@/shared/navigation/open-external-link";
 
 const appIcon = require("../../../../assets/images/icon.png");
+const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
+const arrowIcon = require("../../../../assets/mine/figma/mine-arrow-right.svg");
 
-const VERSION = "v1.0.0";
+const VERSION = `v${Constants.expoConfig?.version ?? "1.0.0"}`;
 
 export default function AboutScreen() {
   const insets = useSafeAreaInsets();
+
+  const checkForUpdate = () => {
+    Alert.alert("检测更新", "请前往应用商店查看是否有新版本");
+  };
 
   return (
     <View style={styles.screen}>
@@ -36,7 +43,7 @@ export default function AboutScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <ChevronLeft24Regular color="#0A0A0A" width={24} height={24} style={styles.backIcon} />
+          <Image source={backIcon} style={styles.backIcon} />
         </Pressable>
         <Text style={styles.headerTitle}>关于盼之电竞</Text>
         <View style={styles.headerSpace} />
@@ -62,15 +69,18 @@ export default function AboutScreen() {
         </View>
 
         <View style={styles.list}>
-          {/* <AboutRow label="检测更新" onPress={() => void useAppConfirm.getState().confirm({ title: "检查更新", message: "请前往应用商店查看是否有新版本" })} /> */}
+          <AboutRow label="检测更新" onPress={checkForUpdate} />
+          <View style={styles.divider} />
           <AboutRow
             label="用户协议"
             onPress={() => void openExternalLink(APP_LINKS.userAgreement)}
           />
+          <View style={styles.divider} />
           <AboutRow
             label="隐私政策"
             onPress={() => void openExternalLink(APP_LINKS.privacyPolicy)}
           />
+          <View style={styles.divider} />
         </View>
       </ScrollView>
     </View>
@@ -81,7 +91,7 @@ function AboutRow({ label, onPress }: { label: string; onPress: () => void }) {
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
-      <ChevronRight16Regular color="#0A0A0A" width={18} height={18} style={styles.arrowIcon} />
+      <Image source={arrowIcon} style={styles.arrowIcon} />
     </Pressable>
   );
 }
@@ -101,7 +111,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  backIcon: { width: 24, height: 24 },
+  backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
   headerTitle: {
     color: "#0A0A0A",
     fontFamily: DOUYIN_SANS,
@@ -134,8 +144,11 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     flexDirection: "row",
     alignItems: "center",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#EBEBEB",
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "#EBEBEB",
+    marginHorizontal: 16,
   },
   rowLabel: {
     flex: 1,
