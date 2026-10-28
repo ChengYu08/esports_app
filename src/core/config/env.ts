@@ -5,6 +5,7 @@ import { z } from "zod";
 const envSchema = z.object({
   apiBaseUrl: z.string().url().default("https://djapi.jlgkj.top"),
   ssoBaseUrl: z.string().url().default("https://auth.jlgkj.top"),
+  protocolBaseUrl: z.string().url(),
   environment: z
     .enum(["development", "preview", "production"])
     .default("development"),
@@ -18,11 +19,22 @@ const envSchema = z.object({
 
 const extra = (Constants.expoConfig?.extra ?? {}) as Record<string, unknown>;
 const isIos = Platform.OS === "ios";
+const environment =
+  (extra.environment as string | undefined) ??
+  process.env.EXPO_PUBLIC_ENVIRONMENT;
+const defaultProtocolBaseUrl =
+  environment === "production"
+    ? "https://dj.panzhi.com"
+    : "https://djpc.yingbowl.com";
 
 export const env = envSchema.parse({
   apiBaseUrl: extra.apiBaseUrl ?? process.env.EXPO_PUBLIC_API_BASE_URL,
   ssoBaseUrl: extra.ssoBaseUrl ?? process.env.EXPO_PUBLIC_SSO_BASE_URL,
-  environment: extra.environment ?? process.env.EXPO_PUBLIC_ENVIRONMENT,
+  protocolBaseUrl:
+    extra.protocolBaseUrl ??
+    process.env.EXPO_PUBLIC_PROTOCOL_BASE_URL ??
+    defaultProtocolBaseUrl,
+  environment,
   ssoClientAppId: isIos ? "dianjing-ios" : "dianjing-android",
   ssoClientSecret: isIos
     ? (extra.ssoIosClientSecret ??
