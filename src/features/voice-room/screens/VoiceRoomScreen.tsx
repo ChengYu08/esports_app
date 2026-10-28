@@ -258,7 +258,6 @@ export default function VoiceRoomScreen() {
     Boolean(currentUser?.id) &&
     room?.serviceUserId != null &&
     String(room.serviceUserId) === String(currentUser?.id);
-  const showCallService = isOwner && !hasService;
 
   // ---- 场景 A：试音自发 ----
   const auditionFromSession =
@@ -283,6 +282,7 @@ export default function VoiceRoomScreen() {
   const quickMatchCreatedRequestNo =
     quickMatchCreatedFromSession?.matchRequestNo || undefined;
 
+  // 与「呼叫接待」互斥（对齐 PC）：进行中的派单已包含呼叫客服语义，该位置让给「选择陪玩」
   const showSelectCompanion =
     (isOwner &&
       isAuditionScene &&
@@ -292,6 +292,7 @@ export default function VoiceRoomScreen() {
       isQuickMatchCreatedScene &&
       Boolean(quickMatchCreatedRequestNo) &&
       matchActiveForQuickMatchCreated === true);
+  const showCallService = isOwner && !hasService && !showSelectCompanion;
   const rtcReady = Boolean(roomId && rtcReadyRoomId === roomId);
   const muted = !roomId || micState?.roomId !== roomId || micState.muted;
   const profileRequests = useRef(new Set<string>());
