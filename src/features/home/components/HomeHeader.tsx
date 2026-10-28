@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
   },
   bannerImage: { width: "100%", height: "100%" },
   gameTabs: {
-    height: 55,
+    height: 38,
   },
   gameTabsContent: {
     paddingHorizontal: 16,

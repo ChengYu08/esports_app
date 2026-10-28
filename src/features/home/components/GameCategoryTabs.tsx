@@ -74,7 +74,8 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
     gap: spacing.sm,
   },
-  item: { height: 56, borderRadius: radius.md, overflow: "hidden" },
+  // 按品类图原始比例确定高度，避免 contain 在固定高度内产生上下留白。
+  item: { aspectRatio: 15 / 4, borderRadius: radius.md, overflow: "hidden" },
   selected: {
     position: "absolute",
     top: 0,

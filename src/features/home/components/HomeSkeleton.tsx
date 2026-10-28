@@ -19,7 +19,7 @@ export function HomeSkeleton({ bottomPadding = 0 }: HomeSkeletonProps) {
       <View style={styles.categories}>
         {[0, 1, 2].map((index) => (
           <View key={index} style={styles.category}>
-            <Skeleton width="100%" height={56} radius={radius.md} />
+            <Skeleton width="100%" radius={radius.md} style={styles.categoryPlaceholder} />
           </View>
         ))}
       </View>
@@ -55,9 +55,10 @@ export function HomeSkeleton({ bottomPadding = 0 }: HomeSkeletonProps) {
 const styles = StyleSheet.create({
   content: { flexGrow: 1, backgroundColor: colors.surface },
   categories: { flexDirection: "row", paddingHorizontal: spacing.lg, paddingTop: spacing.xs, paddingBottom: spacing.sm, gap: spacing.sm },
-  category: { flex: 1 },
+  category: { flex: 1, aspectRatio: 15 / 4 },
+  categoryPlaceholder: { height: "100%" },
   gameTabs: {
-    height: 55,
+    height: 38,
     paddingHorizontal: spacing.lg,
     flexDirection: "row",
     alignItems: "flex-end",
