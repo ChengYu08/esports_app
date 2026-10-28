@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { fetchBanners, fetchClubDetail, fetchClubGameModes, fetchClubPage, fetchCompanionPage, fetchGames, fetchPriceList } from "@/features/home/api/home.api";
-import type { CompanionFilters, GameKey, HomeTab } from "@/features/home/api/home.types";
+import { fetchBanners, fetchClubDetail, fetchClubGameModes, fetchClubPage, fetchCompanionPage, fetchGameCategories, fetchGames, fetchPriceList } from "@/features/home/api/home.api";
+import type { ClubFilters, CompanionFilters, HomeTab } from "@/features/home/api/home.types";
 
 export function useHomeBanners(tab: HomeTab) {
   return useQuery({
@@ -13,12 +13,19 @@ export function useHomeGames() {
   return useQuery({ queryKey: ["home-games"], queryFn: ({ signal }) => fetchGames(signal) });
 }
 
-export function useHomeClubs(tab: HomeTab, game: GameKey) {
+export function useHomeGameCategories() {
+  return useQuery({
+    queryKey: ["home-game-categories"],
+    queryFn: ({ signal }) => fetchGameCategories(signal),
+  });
+}
+
+export function useHomeClubs(tab: HomeTab, filters: ClubFilters) {
   return useInfiniteQuery({
-    queryKey: ["home-clubs", tab, game],
-    enabled: tab === "home" && game.length > 0,
+    queryKey: ["home-clubs", tab, filters],
+    enabled: tab === "home",
     initialPageParam: 1,
-    queryFn: ({ pageParam, signal }) => fetchClubPage(game, pageParam, 10, signal),
+    queryFn: ({ pageParam, signal }) => fetchClubPage(filters, pageParam, 10, signal),
     getNextPageParam: (last) => (last.hasMore ? last.nextPage : undefined),
   });
 }
