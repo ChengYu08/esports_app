@@ -6,7 +6,6 @@ import {
   ChevronRight20Regular,
   Dismiss24Regular,
   Headset24Regular,
-  Settings24Regular,
 } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
@@ -37,6 +36,7 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 const avatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const heroBackground = require("../../../../assets/mine/figma/mine-hero-bg.png");
 const menuClubIcon = require("../../../../assets/mine/figma/mine-menu-club.svg");
+const settingsIcon = require("../../../../assets/mine/figma/mine-settings.svg");
 const maleIcon = require("../../../../assets/home/club-detail/male.svg");
 const femaleIcon = require("../../../../assets/home/club-detail/female.svg");
 const companionEntryQrCode = require("../../../../assets/coms/qrcode-pws.png");
@@ -248,14 +248,14 @@ export default function MineScreen() {
               onPress={() => router.push("/basic-settings")}
               style={styles.toolbarButton}
             >
-              <Settings24Regular color="#0D0D0F" width={24} height={24} />
+              <Image source={settingsIcon} style={styles.toolbarIcon} />
             </Pressable>
           </View>
           <View style={styles.profile}>
             <Pressable
               accessibilityRole="link"
-              accessibilityLabel={user ? "账号设置" : "登录 / 注册"}
-              onPress={() => router.push(user ? "/account-settings" : "/login")}
+              accessibilityLabel={user ? "编辑资料" : "登录 / 注册"}
+              onPress={() => router.push(user ? "/edit-profile" : "/login")}
             >
               <CachedImage
                 source={user?.headImage ? { uri: user.headImage } : avatar}
@@ -423,6 +423,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  toolbarIcon: { width: 24, height: 24 },
   profile: {
     minHeight: 76,
     paddingHorizontal: 16,
