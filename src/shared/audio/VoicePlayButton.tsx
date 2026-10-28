@@ -1,6 +1,9 @@
+import { Image } from "expo-image";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { VoiceWaveform } from "./VoiceWaveform";
+
+const playTriangleIcon = require("../../../assets/shared/play-triangle-white.svg");
 
 type VoicePlayButtonProps = {
   url: string;
@@ -9,6 +12,8 @@ type VoicePlayButtonProps = {
   onToggleVoice: (url: string) => void;
   inline?: boolean;
   compact?: boolean;
+  /** solid：粉底白字胶囊；light：透明底品牌色图标文字，用于头像左下角试听标签 */
+  tone?: "solid" | "light";
 };
 
 export function VoicePlayButton({
@@ -18,8 +23,10 @@ export function VoicePlayButton({
   onToggleVoice,
   inline = false,
   compact = false,
+  tone = "solid",
 }: VoicePlayButtonProps) {
   const playing = playingUrl === url;
+  const light = tone === "light";
 
   return (
     <Pressable
@@ -30,20 +37,48 @@ export function VoicePlayButton({
         event.stopPropagation();
         onToggleVoice(url);
       }}
-      style={[styles.button, inline ? styles.inlineButton : styles.overlayButton, compact && styles.compactButton]}
+      style={[
+        styles.button,
+        inline || light ? styles.inlineButton : styles.overlayButton,
+        compact && styles.compactButton,
+        light && styles.lightButton,
+      ]}
     >
-      <View style={[styles.iconCircle, compact && styles.compactIconCircle]}>
+      <View
+        style={[
+          styles.iconCircle,
+          compact && styles.compactIconCircle,
+          light && styles.lightIconCircle,
+        ]}
+      >
         {playing ? (
-          <View style={[styles.pauseIcon, compact && styles.compactPauseIcon]}>
-            <View style={[styles.pauseBar, compact && styles.compactPauseBar]} />
-            <View style={[styles.pauseBar, compact && styles.compactPauseBar]} />
+          <View
+            style={[
+              styles.pauseIcon,
+              compact && styles.compactPauseIcon,
+              light && styles.lightPauseIcon,
+            ]}
+          >
+            <View
+              style={[styles.pauseBar, compact && styles.compactPauseBar, light && styles.lightPauseBar]}
+            />
+            <View
+              style={[styles.pauseBar, compact && styles.compactPauseBar, light && styles.lightPauseBar]}
+            />
           </View>
+        ) : light ? (
+          <Image source={playTriangleIcon} style={styles.lightPlayTriangle} />
         ) : (
-          <Text style={[styles.playIcon, compact && styles.compactPlayIcon]}>▶</Text>
+          <Text style={[styles.playIcon, compact && styles.compactPlayIcon]}>
+            ▶
+          </Text>
         )}
       </View>
-      <VoiceWaveform playing={playing} compact={compact} />
-      <Text style={[styles.duration, compact && styles.compactDuration]}>{duration ?? 0}&quot;</Text>
+      {light && !playing ? null : <VoiceWaveform playing={playing} compact={compact} />}
+      <Text style={[styles.duration, compact && styles.compactDuration, light && styles.lightDuration]}>
+        {duration ?? 0}
+        {light ? "''" : '"'}
+      </Text>
     </Pressable>
   );
 }
@@ -69,6 +104,14 @@ const styles = StyleSheet.create({
     zIndex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.45)",
   },
+  lightButton: {
+    height: 20,
+    backgroundColor: "transparent",
+    borderRadius: 0,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    gap: 3,
+  },
   iconCircle: {
     width: 22,
     height: 22,
@@ -79,6 +122,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   compactIconCircle: { width: 18, height: 18, borderRadius: 9 },
+  lightIconCircle: { width: 16, height: 16, borderRadius: 8, backgroundColor: "#FE4267" },
   playIcon: {
     color: "#FF3158",
     fontSize: 10,
@@ -87,8 +131,10 @@ const styles = StyleSheet.create({
     marginTop: -1,
   },
   compactPlayIcon: { fontSize: 8, lineHeight: 9 },
+  lightPlayTriangle: { width: 11, height: 11, marginLeft: 1 },
   pauseIcon: { flexDirection: "row", gap: 3 },
   compactPauseIcon: { gap: 2 },
+  lightPauseIcon: { gap: 2 },
   pauseBar: {
     width: 3,
     height: 10,
@@ -96,6 +142,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#FF3158",
   },
   compactPauseBar: { width: 2, height: 8, borderRadius: 1 },
+  lightPauseBar: { width: 2, height: 7, backgroundColor: "#FFF" },
   duration: { color: "#fff", fontSize: 12, lineHeight: 22, fontWeight: "700" },
   compactDuration: { fontSize: 10, lineHeight: 18 },
+  lightDuration: { color: "#FE4267", fontSize: 10, lineHeight: 14 },
 });
