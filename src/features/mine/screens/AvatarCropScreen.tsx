@@ -1,5 +1,5 @@
 import { useLocalSearchParams, router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
@@ -7,17 +7,24 @@ import Animated, {
 } from "react-native-reanimated";
 import {
   Pressable,
-  StatusBar,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from "react-native";
+import Toast from "react-native-root-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
 
 import { DOUYIN_SANS } from "@/shared/theme/typography";
-import { completeAvatarEdit } from "@/features/mine/utils/avatar-edit-session";
-import { computeAvatarCropRect } from "@/features/mine/utils/avatar-crop";
+import {
+  completeAvatarEdit,
+  isAvatarEditActive,
+} from "@/features/mine/utils/avatar-edit-session";
+import {
+  clampAvatarPan,
+  computeAvatarCropRect,
+} from "@/features/mine/utils/avatar-crop";
 import {
   manipulateAsync,
   SaveFormat,
@@ -38,7 +45,9 @@ export default function AvatarCropScreen() {
   }>();
 
   const imageUri = Array.isArray(route.uri) ? route.uri[0] : route.uri;
-  const imageWidth = Number(Array.isArray(route.width) ? route.width[0] : route.width);
+  const imageWidth = Number(
+    Array.isArray(route.width) ? route.width[0] : route.width,
+  );
   const imageHeight = Number(
     Array.isArray(route.height) ? route.height[0] : route.height,
   );
@@ -63,11 +72,14 @@ export default function AvatarCropScreen() {
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
 
-  const clampOffset = (value: number, zoomLevel: number) => {
-    // 图片显示尺寸超出视口的部分允许各半平移，保证圆形视口内无空隙
-    const max = Math.max(0, (baseWidth * zoomLevel - containerSize) / 2);
-    return Math.min(Math.max(-max, value), max);
-  };
+  // 手势返回/物理返回键时兜底终结会话，避免编辑资料页悬挂在等待态
+  useEffect(() => {
+    return () => {
+      if (isAvatarEditActive()) {
+        completeAvatarEdit(null);
+      }
+    };
+  }, []);
 
   const pinchGesture = Gesture.Pinch()
     .onUpdate((event) => {
@@ -76,10 +88,17 @@ export default function AvatarCropScreen() {
         Math.max(1, savedZoom.value * event.scale),
       );
       zoom.value = next;
-      // 以视口中心为锚点缩放，平移量随缩放等比收缩后 clamp
+      // 以视口中心为锚点缩放，平移量随缩放等比收缩后按轴 clamp
       const ratio = next / (savedZoom.value || 1);
-      translateX.value = clampOffset(savedTranslateX.value * ratio, next);
-      translateY.value = clampOffset(savedTranslateY.value * ratio, next);
+      const clamped = clampAvatarPan({
+        offsetX: savedTranslateX.value * ratio,
+        offsetY: savedTranslateY.value * ratio,
+        displayedWidth: baseWidth * next,
+        displayedHeight: baseHeight * next,
+        containerSize,
+      });
+      translateX.value = clamped.offsetX;
+      translateY.value = clamped.offsetY;
     })
     .onEnd(() => {
       savedZoom.value = zoom.value;
@@ -89,14 +108,15 @@ export default function AvatarCropScreen() {
 
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
-      translateX.value = clampOffset(
-        savedTranslateX.value + event.translationX,
-        zoom.value,
-      );
-      translateY.value = clampOffset(
-        savedTranslateY.value + event.translationY,
-        zoom.value,
-      );
+      const clamped = clampAvatarPan({
+        offsetX: savedTranslateX.value + event.translationX,
+        offsetY: savedTranslateY.value + event.translationY,
+        displayedWidth: baseWidth * zoom.value,
+        displayedHeight: baseHeight * zoom.value,
+        containerSize,
+      });
+      translateX.value = clamped.offsetX;
+      translateY.value = clamped.offsetY;
     })
     .onEnd(() => {
       savedTranslateX.value = translateX.value;
@@ -113,18 +133,22 @@ export default function AvatarCropScreen() {
     ],
   }));
 
+  // 圆形挖孔：单 View 超大边框实现（尺寸 ×1.42、圆角 ×0.71、边宽 = (1.42-1)×尺寸/2）
+  const maskHolder = circleSize * 1.42;
+  const maskBorder = (maskHolder - circleSize) / 2;
   const circleTop = insets.top + (containerSize - circleSize) / 2;
   const circleLeft = (containerSize - circleSize) / 2;
-  const circleBottom = circleTop + circleSize;
-  const circleRight = circleLeft + circleSize;
 
   const cancel = () => {
     completeAvatarEdit(null);
-    router.back();
+    // 取消视为放弃本次流程，直接回编辑资料页
+    router.dismiss(2);
   };
 
   const save = async () => {
-    if (saving || !imageUri || !imageWidth || !imageHeight) return;
+    if (saving || !imageUri || !imageWidth || !imageHeight) {
+      return;
+    }
     setSaving(true);
     try {
       const zoomLevel = zoom.value;
@@ -156,25 +180,33 @@ export default function AvatarCropScreen() {
       // 回到编辑资料页：弹出裁剪页与相册页两层
       router.dismiss(2);
     } catch {
-      completeAvatarEdit(null);
-      router.back();
+      Toast.show("图片处理失败，请重试", { duration: Toast.durations.SHORT });
+      setSaving(false);
     }
   };
 
   if (!imageUri || !imageWidth || !imageHeight) {
     return (
       <View style={[styles.screen, styles.center]}>
+        <StatusBar style="light" />
         <Text style={styles.hintText}>图片加载失败，请重新选择</Text>
-        <Text onPress={cancel} style={styles.hintAction}>
-          返回
-        </Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            completeAvatarEdit(null);
+            router.dismiss(2);
+          }}
+          style={styles.hintActionWrap}
+        >
+          <Text style={styles.hintAction}>返回</Text>
+        </Pressable>
       </View>
     );
   }
 
   return (
     <View style={styles.screen}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar style="light" />
       {/* 图片区：捏合缩放 + 拖动 */}
       <GestureDetector gesture={gesture}>
         <Animated.View
@@ -200,17 +232,32 @@ export default function AvatarCropScreen() {
         </Animated.View>
       </GestureDetector>
 
-      {/* 圆形挖孔遮罩：四块半透明矩形拼装 */}
+      {/* 圆形挖孔遮罩 */}
       <View pointerEvents="none" style={StyleSheet.absoluteFill}>
         <View
           style={[
             styles.maskPiece,
             {
-              position: "absolute",
               top: 0,
               left: 0,
-              height: circleTop,
-              width: "100%",
+              right: 0,
+              height: Math.max(
+                0,
+                circleTop + circleSize / 2 - maskHolder / 2,
+              ),
+            },
+          ]}
+        />
+        <View
+          style={[
+            styles.maskHoleBorder,
+            {
+              top: circleTop + circleSize / 2 - maskHolder / 2,
+              left: circleLeft + circleSize / 2 - maskHolder / 2,
+              width: maskHolder,
+              height: maskHolder,
+              borderRadius: maskHolder / 2,
+              borderWidth: maskBorder,
             },
           ]}
         />
@@ -218,30 +265,11 @@ export default function AvatarCropScreen() {
           style={[
             styles.maskPiece,
             {
-              position: "absolute",
-              top: circleTop,
+              top: circleTop + circleSize / 2 + maskHolder / 2,
               left: 0,
-              width: circleLeft,
-              height: circleSize,
+              right: 0,
+              bottom: 0,
             },
-          ]}
-        />
-        <View
-          style={[
-            styles.maskPiece,
-            {
-              position: "absolute",
-              top: circleTop,
-              left: circleRight,
-              width: containerSize - circleRight,
-              height: circleSize,
-            },
-          ]}
-        />
-        <View
-          style={[
-            styles.maskPiece,
-            { position: "absolute", top: circleBottom, width: "100%", bottom: 0 },
           ]}
         />
       </View>
@@ -272,11 +300,6 @@ export default function AvatarCropScreen() {
           <Text style={styles.buttonText}>{saving ? "处理中" : "保存"}</Text>
         </Pressable>
       </View>
-      {/* 图片区以下到按钮栏之间的黑色过渡区 */}
-      <View
-        pointerEvents="none"
-        style={[styles.blackFiller, { top: insets.top + containerSize }]}
-      />
     </View>
   );
 }
@@ -301,12 +324,8 @@ const styles = StyleSheet.create({
   maskPiece: {
     backgroundColor: "rgba(0,0,0,0.6)",
   },
-  blackFiller: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "#000000",
+  maskHoleBorder: {
+    borderColor: "rgba(0,0,0,0.6)",
   },
   buttonBar: {
     position: "absolute",
@@ -346,8 +365,10 @@ const styles = StyleSheet.create({
     fontFamily: DOUYIN_SANS,
     fontSize: 14,
   },
-  hintAction: {
+  hintActionWrap: {
     marginTop: 16,
+  },
+  hintAction: {
     color: "#FE1F4C",
     fontFamily: DOUYIN_SANS,
     fontSize: 14,

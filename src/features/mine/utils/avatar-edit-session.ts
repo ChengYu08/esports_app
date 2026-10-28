@@ -19,3 +19,8 @@ export function completeAvatarEdit(uri: string | null): void {
   resolver = null;
   current?.(uri);
 }
+
+/** 是否仍有未终结的会话（供页面卸载兜底判断，避免误吞已完成的会话）。 */
+export function isAvatarEditActive(): boolean {
+  return resolver !== null;
+}

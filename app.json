@@ -65,7 +65,7 @@
       [
         "expo-media-library",
         {
-          "photosPermission": "允许盼之电竞访问你的照片，用于选择头像图片。",
+          "photosPermission": "允许盼之电竞访问你的照片，用于选择头像及发送图片。",
           "savePhotosPermission": false
         }
       ]

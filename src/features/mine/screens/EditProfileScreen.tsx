@@ -5,7 +5,6 @@ import {
   ChevronRight16Regular,
 } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
-import * as MediaLibrary from "expo-media-library/legacy";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
@@ -148,15 +147,10 @@ export default function EditProfileScreen() {
   };
 
   const changeAvatar = async () => {
-    if (!token || !user || avatarUploading || avatarEditing) return;
-    const permission = await MediaLibrary.requestPermissionsAsync();
-    if (!permission.granted) {
-      Toast.show("请在系统设置中允许访问照片，用于选择头像", {
-        duration: Toast.durations.SHORT,
-      });
+    if (!token || !user || avatarUploading || avatarEditing) {
       return;
     }
-    // 进入相册选择 → 裁剪，裁剪结果经会话桥接回传
+    // 进入相册选择 → 裁剪，裁剪结果经会话桥接回传（权限在相册页内处理）
     const editPending = beginAvatarEdit();
     setAvatarEditing(true);
     router.push("/avatar-album");

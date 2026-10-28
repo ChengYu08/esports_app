@@ -5,18 +5,23 @@ import {
 import { Image } from "expo-image";
 import * as MediaLibrary from "expo-media-library/legacy";
 import { router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FlatList,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Toast from "react-native-root-toast";
 
 import { DOUYIN_SANS } from "@/shared/theme/typography";
-import { completeAvatarEdit } from "@/features/mine/utils/avatar-edit-session";
+import {
+  completeAvatarEdit,
+  isAvatarEditActive,
+} from "@/features/mine/utils/avatar-edit-session";
 
 type MediaAsset = MediaLibrary.Asset;
 
@@ -42,6 +47,9 @@ export default function AvatarAlbumScreen() {
     name: "最近项目",
   });
   const [albumsOpen, setAlbumsOpen] = useState(false);
+  // 请求序号：递增使过期响应失效，避免切相册竞态与双触发重复追加
+  const requestSeq = useRef(0);
+  const navigatingRef = useRef(false);
 
   const requestPermission = useCallback(async () => {
     const response = await MediaLibrary.requestPermissionsAsync();
@@ -49,42 +57,51 @@ export default function AvatarAlbumScreen() {
     return response.granted;
   }, []);
 
-  const loadPage = useCallback(
-    async (album: AlbumOption, after?: string) => {
-      if (loading) return;
-      setLoading(true);
-      try {
-        const page = await MediaLibrary.getAssetsAsync({
-          mediaType: ["photo"],
-          first: PAGE_SIZE,
-          sortBy: [["creationTime", false]],
-          ...(album.id ? { album: album.id } : {}),
-          ...(after ? { after } : {}),
+  const loadPage = useCallback(async (album: AlbumOption, after?: string) => {
+    const seq = ++requestSeq.current;
+    setLoading(true);
+    try {
+      const page = await MediaLibrary.getAssetsAsync({
+        mediaType: ["photo"],
+        first: PAGE_SIZE,
+        sortBy: [["creationTime", false]],
+        ...(album.id ? { album: album.id } : {}),
+        ...(after ? { after } : {}),
+      });
+      // 过期响应（期间又发起了新请求）直接丢弃
+      if (seq !== requestSeq.current) return;
+      setAssets((current) =>
+        after ? [...current, ...page.assets] : page.assets,
+      );
+      setEndCursor(page.endCursor);
+      setHasNextPage(page.hasNextPage);
+    } catch {
+      if (seq === requestSeq.current) {
+        Toast.show("照片加载失败，请稍后重试", {
+          duration: Toast.durations.SHORT,
         });
-        setAssets((current) =>
-          after ? [...current, ...page.assets] : page.assets,
-        );
-        setEndCursor(page.endCursor);
-        setHasNextPage(page.hasNextPage);
-      } finally {
+      }
+    } finally {
+      if (seq === requestSeq.current) {
         setLoading(false);
       }
-    },
-    [loading],
-  );
+    }
+  }, []);
 
   // 初始化：权限 → 最近项目 + 相册下拉数据
   useEffect(() => {
     void (async () => {
       const granted = await requestPermission();
-      if (!granted) return;
+      if (!granted) {
+        return;
+      }
       await loadPage(activeAlbum);
       const list = await MediaLibrary.getAlbumsAsync({
         includeSmartAlbums: true,
       });
       setAlbums(
         list
-          .filter((album) => album.assetCount > 0)
+          .filter((album) => album.assetCount > 0 && album.title !== "最近项目")
           .map((album) => ({
             id: album.id,
             name: album.title,
@@ -94,9 +111,20 @@ export default function AvatarAlbumScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 手势/物理返回键兜底：终结会话，避免编辑资料页悬挂
+  useEffect(() => {
+    return () => {
+      if (isAvatarEditActive()) {
+        completeAvatarEdit(null);
+      }
+    };
+  }, []);
+
   const switchAlbum = (album: AlbumOption) => {
     setAlbumsOpen(false);
-    if (album.id === activeAlbum.id) return;
+    if (album.id === activeAlbum.id) {
+      return;
+    }
     setActiveAlbum(album);
     setAssets([]);
     setEndCursor(null);
@@ -104,12 +132,20 @@ export default function AvatarAlbumScreen() {
   };
 
   const close = () => {
+    if (navigatingRef.current) {
+      return;
+    }
+    navigatingRef.current = true;
     completeAvatarEdit(null);
     router.back();
   };
 
   // iOS 的 ph:// 无法直接裁剪，先换取本地文件路径
   const openCrop = async (asset: MediaAsset) => {
+    if (navigatingRef.current) {
+      return;
+    }
+    navigatingRef.current = true;
     let uri = asset.uri;
     if (uri.startsWith("ph://")) {
       const info = await MediaLibrary.getAssetInfoAsync(asset);
@@ -126,18 +162,30 @@ export default function AvatarAlbumScreen() {
   };
 
   if (permission && !permission.granted) {
+    // 已判定拒绝且系统不再弹框时，只能引导用户去系统设置开启
+    const goSettings = !permission.canAskAgain;
     return (
       <View style={[styles.screen, styles.center, { paddingTop: insets.top }]}>
         <Dismiss24Regular color="#333333" width={24} height={24} />
         <Text style={styles.deniedText}>
-          没有访问照片的权限，请在系统设置中允许访问照片后重试。
+          {goSettings
+            ? "相册访问权限已被拒绝，请前往系统设置开启后重试。"
+            : "没有访问照片的权限，需要允许访问照片后才能选择头像。"}
         </Text>
         <Pressable
           accessibilityRole="button"
-          onPress={() => void requestPermission()}
+          onPress={() => {
+            if (goSettings) {
+              void Linking.openSettings();
+            } else {
+              void requestPermission();
+            }
+          }}
           style={styles.retryButton}
         >
-          <Text style={styles.retryText}>重新授权</Text>
+          <Text style={styles.retryText}>
+            {goSettings ? "去设置开启" : "重新授权"}
+          </Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
