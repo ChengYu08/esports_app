@@ -28,8 +28,14 @@ const defaultProtocolBaseUrl =
     : "https://djpc.yingbowl.com";
 
 export const env = envSchema.parse({
-  apiBaseUrl: extra.apiBaseUrl ?? process.env.EXPO_PUBLIC_API_BASE_URL,
-  ssoBaseUrl: extra.ssoBaseUrl ?? process.env.EXPO_PUBLIC_SSO_BASE_URL,
+  apiBaseUrl: isIos
+    ? (extra.apiBaseUrlIos ?? process.env.EXPO_PUBLIC_API_BASE_URL_IOS)
+    : (extra.apiBaseUrlAndroid ??
+      process.env.EXPO_PUBLIC_API_BASE_URL_ANDROID),
+  ssoBaseUrl: isIos
+    ? (extra.ssoBaseUrlIos ?? process.env.EXPO_PUBLIC_SSO_BASE_URL_IOS)
+    : (extra.ssoBaseUrlAndroid ??
+      process.env.EXPO_PUBLIC_SSO_BASE_URL_ANDROID),
   protocolBaseUrl:
     extra.protocolBaseUrl ??
     process.env.EXPO_PUBLIC_PROTOCOL_BASE_URL ??

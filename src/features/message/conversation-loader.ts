@@ -4,10 +4,25 @@ type ConversationEngine = Pick<RCIMIWEngine,
   'getConversations' | 'getRemoteConversationList' | 'setOnRemoteConversationListSyncedListener'
 >;
 
+/** AppKey 开启会话自动拉取时，手动 getRemoteConversationList 会返回此码。 */
+const AUTO_PULL_CONVERSATION_CODE = 33302;
+
 const pendingSyncs = new WeakMap<ConversationEngine, Promise<void>>();
 
 function syncError(code: number) {
   return new Error(code === 33301 ? '历史消息同步暂不可用（33301）' : `消息同步失败（${code}）`);
+}
+
+function settleRemoteSync(
+  code: number,
+  resolve: () => void,
+  reject: (error: Error) => void,
+) {
+  if (code === 0 || code === AUTO_PULL_CONVERSATION_CODE) {
+    resolve();
+    return;
+  }
+  reject(syncError(code));
 }
 
 function synchronizeRemoteConversations(engine: ConversationEngine): Promise<void> {
@@ -20,15 +35,15 @@ function synchronizeRemoteConversations(engine: ConversationEngine): Promise<voi
   const synchronization = new Promise<void>((resolve, reject) => {
     timeout = setTimeout(() => reject(new Error('消息同步超时，请重试')), 15_000);
     engine.setOnRemoteConversationListSyncedListener((code) => {
-      if (code === 0) resolve();
-      else reject(syncError(code));
+      settleRemoteSync(code, resolve, reject);
     });
     // onSuccess only acknowledges the request; the listener confirms the DB
     // has been updated and it is safe to read the local conversation snapshot.
+    // 33302 means auto-pull is on — treat as soft success and read local later.
     void engine.getRemoteConversationList({
-      onError: (code) => reject(syncError(code)),
+      onError: (code) => settleRemoteSync(code, resolve, reject),
     }).then((code) => {
-      if (code !== 0) reject(syncError(code));
+      if (code !== 0) settleRemoteSync(code, resolve, reject);
     }).catch(reject);
   }).finally(() => {
     clearTimeout(timeout);
@@ -59,6 +74,8 @@ export async function loadConversationSnapshot(
 
   // Reinstalling or signing in on a new device leaves the SDK's local DB empty.
   // Restore the server snapshot before declaring that the user has no messages.
+  // When auto-pull is enabled (33302), skip failing and re-read local; offline
+  // sync completion will refresh the list via subscribeConversationSync.
   await synchronizeRemoteConversations(engine);
   return readLocalConversations(engine, conversationType);
 }
