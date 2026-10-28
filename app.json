@@ -61,7 +61,14 @@
           "cameraPermission": "允许盼之电竞使用相机拍摄照片，用于发送聊天图片。"
         }
       ],
-      "./plugins/withVoiceRoomBackground"
+      "./plugins/withVoiceRoomBackground",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "允许盼之电竞访问你的照片，用于选择头像图片。",
+          "savePhotosPermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
