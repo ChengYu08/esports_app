@@ -22,9 +22,9 @@ import {
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 
 const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
-const headerBg = require("../../../../assets/mine/figma/star-recharge-header-bg.png");
-const alipayIcon = require("../../../../assets/mine/figma/star-recharge-alipay.png");
-const wechatIcon = require("../../../../assets/mine/figma/star-recharge-wechat.png");
+const headerBg = require("../../../../assets/images/star-recharge-header-bg.png");
+const alipayIcon = require("../../../../assets/images/star-recharge-alipay.png");
+const wechatIcon = require("../../../../assets/images/star-recharge-wechat.png");
 
 function formatAmount(value: number): string {
   return String(value);
