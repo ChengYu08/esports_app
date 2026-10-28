@@ -391,12 +391,14 @@ export default function ProfileScreen() {
     {
       key: "profile-tabs",
       content: (
-        <Animated.View
-          pointerEvents={compactActive ? "none" : "box-none"}
-          style={[styles.tabsBar, { opacity: tabsInverseFade }]}
-        >
-          {tabsContent}
-        </Animated.View>
+        <View style={styles.tabsBackdrop}>
+          <Animated.View
+            pointerEvents={compactActive ? "none" : "box-none"}
+            style={[styles.tabsBar, { opacity: tabsInverseFade }]}
+          >
+            {tabsContent}
+          </Animated.View>
+        </View>
       ),
     },
   ];
@@ -624,7 +626,7 @@ export default function ProfileScreen() {
         </View>
         <Animated.View
           pointerEvents={compactActive ? "box-none" : "none"}
-          style={[styles.tabsBar, { opacity: headerFade }]}
+          style={[styles.tabsBar, { opacity: headerFade, marginHorizontal: -12 }]}
         >
           {tabsContent}
         </Animated.View>
@@ -1442,6 +1444,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF",
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
+  },
+  tabsBackdrop: {
+    backgroundColor: "#141C28",
   },
   tabsBarInCover: {
     marginTop: 12,
