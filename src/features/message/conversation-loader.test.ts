@@ -1,6 +1,8 @@
 import type { RCIMIWEngine } from '@rongcloud/react-native-im-wrapper';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('@/core/logging/logger', () => ({ logger: { warn: vi.fn() } }));
+
 import { loadConversationSnapshot } from './conversation-loader';
 
 const conversation = { targetId: '42', conversationType: 1, unreadCount: 2 };
@@ -121,6 +123,25 @@ describe('conversation loading', () => {
     const snapshot = loadConversationSnapshot(engine, 1);
     await vi.waitFor(() => expect(engine.getRemoteConversationList).toHaveBeenCalled());
     engine.finishSync(33302);
+    await expect(snapshot).resolves.toEqual([conversation]);
+  });
+
+  it('returns an empty local list when remote pull is not allowed (33301)', async () => {
+    const engine = makeEngine([]);
+    engine.getRemoteConversationList.mockResolvedValue(33301);
+    await expect(loadConversationSnapshot(engine, 1)).resolves.toEqual([]);
+    expect(engine.getConversations).toHaveBeenCalledTimes(2);
+  });
+
+  it('treats remote pull not allowed (33301) from the sync listener as soft success', async () => {
+    const engine = makeEngine([]);
+    engine.getRemoteConversationList.mockImplementation(async (callback) => {
+      callback?.onSuccess?.();
+      return 0;
+    });
+    const snapshot = loadConversationSnapshot(engine, 1);
+    await vi.waitFor(() => expect(engine.getRemoteConversationList).toHaveBeenCalled());
+    engine.finishSync(33301);
     await expect(snapshot).resolves.toEqual([conversation]);
   });
 });
