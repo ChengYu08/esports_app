@@ -20,8 +20,10 @@ import {
   type RechargeChannel,
   type RechargePlan,
 } from "@/features/mine/api/recharge.api";
+import { APP_LINKS } from "@/core/config/links";
 import { env } from "@/core/config/env";
 import AlipayPayment from "../../../../modules/alipay-payment";
+import { openExternalLink } from "@/shared/navigation/open-external-link";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 
 const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
@@ -402,26 +404,14 @@ export default function StarRechargeAndroidScreen() {
             onPress={() => setAgreementAccepted((accepted) => !accepted)}
             style={styles.checkboxHitArea}
           >
-            <View
-              style={[
-                styles.checkbox,
-                agreementAccepted && styles.checkboxSelected,
-              ]}
-            >
-              {agreementAccepted ? (
-                <Text style={styles.checkboxMark}>✓</Text>
-              ) : null}
-            </View>
+            <RadioMark selected={agreementAccepted} size={16} />
           </Pressable>
           <Text style={styles.agreementCopy}>
             支付即同意
             <Text
               style={styles.agreementLink}
               onPress={() =>
-                setPrompt({
-                  title: "盼之电竞购买须知",
-                  message: "请在支付前确认本次充值的星钻数量与金额。",
-                })
+                void openExternalLink(APP_LINKS.rechargeAgreement)
               }
             >
               《盼之电竞购买须知》
@@ -459,9 +449,21 @@ export default function StarRechargeAndroidScreen() {
   );
 }
 
-function RadioMark({ selected }: { selected: boolean }) {
+function RadioMark({
+  selected,
+  size = 20,
+}: {
+  selected: boolean;
+  size?: number;
+}) {
   return (
-    <View style={[styles.radio, selected && styles.radioSelected]}>
+    <View
+      style={[
+        styles.radio,
+        { width: size, height: size, borderRadius: size / 2 },
+        selected && styles.radioSelected,
+      ]}
+    >
       {selected ? <Text style={styles.radioMark}>✓</Text> : null}
     </View>
   );
@@ -684,25 +686,10 @@ const styles = StyleSheet.create({
   },
   checkboxHitArea: {
     width: 16,
-    height: 18,
-    justifyContent: "flex-start",
-    paddingTop: 2,
-  },
-  checkbox: {
-    width: 16,
     height: 16,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#CACACC",
-    borderRadius: 3,
-  },
-  checkboxSelected: { borderColor: "#FE1F4C", backgroundColor: "#FE1F4C" },
-  checkboxMark: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    lineHeight: 13,
-    fontWeight: "700",
+    marginTop: 1,
   },
   agreementCopy: {
     flex: 1,

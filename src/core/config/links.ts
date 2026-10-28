@@ -9,4 +9,5 @@ import { env } from "@/core/config/env";
 export const APP_LINKS = {
   userAgreement: `${env.protocolBaseUrl}/public/protocols?code=user_server`,
   privacyPolicy: `${env.protocolBaseUrl}/public/protocols?code=user_privacy`,
+  rechargeAgreement: `${env.protocolBaseUrl}/public/protocols?code=user_recharge`,
 } as const;
