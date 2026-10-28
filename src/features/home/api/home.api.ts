@@ -1,6 +1,6 @@
 import { apiClient } from '@/core/network/api-client';
 import { demoBanners } from "./home.mock";
-import type { Banner, ClubDetail, ClubDetailGame, ClubGameMode, ClubPage, CompanionFilters, CompanionPage, Game, GameKey, HomeTab, PriceListTab } from "./home.types";
+import type { Banner, ClubDetail, ClubDetailGame, ClubFilters, ClubGameMode, ClubPage, CompanionFilters, CompanionPage, Game, GameCategory, HomeTab, PriceListTab } from "./home.types";
 
 export type { Banner, Club, ClubPage, Game, GameKey, HomeTab } from "./home.types";
 
@@ -9,8 +9,9 @@ export async function fetchBanners(_tab: HomeTab): Promise<Banner[]> {
 }
 
 type ApiEnvelope<T> = { success?: boolean; code?: string; info?: string; data?: T };
-type ApiGame = { id: number | string; gameName?: string; iconUrl?: string; backgroundUrl?: string; gameCategory?: number };
-type ApiClub = { id: number | string; clubName?: string; logoUrl?: string; intro?: string; followCount?: number; memberCount?: number; orderNoticeUrl?: string };
+type ApiGame = { id: number | string; gameName?: string; iconUrl?: string; backgroundUrl?: string; gameCategory?: number; gameCategoryId?: number | string };
+type ApiGameCategory = { id: number | string; name: string; iconUrl?: string | null };
+type ApiClub = { id: number | string; clubName?: string; clubTag?: string | null; logoUrl?: string; intro?: string; followCount?: number; memberCount?: number; orderNoticeUrl?: string };
 type ApiClubPage = { page?: number; totalPages?: number; total?: number; records?: ApiClub[] };
 type ApiClubDetail = {
   id: number | string;
@@ -71,23 +72,39 @@ export async function fetchCompanionPage(filters: CompanionFilters, page = 1, pa
 
 export async function fetchGames(signal?: AbortSignal): Promise<Game[]> {
   const response = await apiClient<ApiEnvelope<ApiGame[]>>('/client/v1/game/public/games', { signal });
-  if (response.code !== 'SUCCESS' || !Array.isArray(response.data)) return [];
-  return response.data.map((game) => ({
+  return requireSuccess(response, "游戏列表加载失败").map((game) => ({
     id: Number(game.id),
     name: game.gameName || '未命名游戏',
     iconUrl: game.iconUrl,
     backgroundUrl: game.backgroundUrl,
     category: game.gameCategory,
+    gameCategoryId: game.gameCategoryId == null ? undefined : String(game.gameCategoryId),
   }));
 }
 
-export async function fetchClubPage(game: GameKey, page: number, pageSize = 10, signal?: AbortSignal): Promise<ClubPage> {
+export async function fetchGameCategories(signal?: AbortSignal): Promise<GameCategory[]> {
+  const response = await apiClient<ApiEnvelope<ApiGameCategory[]>>("/client/v1/game/public/categories", { signal });
+  return requireSuccess(response, "游戏品类加载失败").map((category) => ({
+    id: String(category.id),
+    name: category.name,
+    iconUrl: category.iconUrl ?? undefined,
+  }));
+}
+
+export async function fetchClubPage(filters: ClubFilters, page: number, pageSize = 10, signal?: AbortSignal): Promise<ClubPage> {
   const response = await apiClient<ApiEnvelope<ApiClubPage>>('/client/v1/club/public/page', {
     method: 'POST',
-    body: { page, pageSize, action: { gameId: Number(game) } },
+    body: {
+      page,
+      pageSize,
+      action: {
+        ...(filters.gameId ? { gameId: Number(filters.gameId) } : {}),
+        ...(filters.gameCategoryId ? { gameCategoryId: Number(filters.gameCategoryId) } : {}),
+      },
+    },
     signal,
   });
-  const data = response.data;
+  const data = requireSuccess(response, "俱乐部列表加载失败");
   const records = data?.records ?? [];
   return {
     items: records.map((club) => ({
@@ -99,6 +116,7 @@ export async function fetchClubPage(game: GameKey, page: number, pageSize = 10, 
       memberCount: club.memberCount ?? 0,
       clubCode: String(club.id),
       isSelfOperated: club.clubName?.includes('自营') ?? false,
+      clubTag: club.clubTag || undefined,
     })),
     hasMore: (data?.page ?? page) < (data?.totalPages ?? page),
     nextPage: page + 1,

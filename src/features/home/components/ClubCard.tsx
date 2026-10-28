@@ -1,8 +1,9 @@
 import type { Club } from "@/features/home/api/home.types";
 import { colors, radius, spacing } from "@/shared/theme/tokens";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { DOUYIN_SANS, SYSTEM_FONT } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -34,6 +35,17 @@ export function ClubCard({ club, onSelect }: { club: Club; onSelect?: (club: Clu
           />
         ) : (
           <Text style={styles.coverText}>{club.name.slice(0, 1)}</Text>
+        )}
+        {club.clubTag && (
+          <LinearGradient
+            colors={["#FF8C6C", "#F92E7F"]}
+            locations={[0.0157, 0.9764]}
+            start={{ x: 0, y: 0.42 }}
+            end={{ x: 1, y: 0.58 }}
+            style={styles.tag}
+          >
+            <Text numberOfLines={1} style={styles.tagText}>{club.clubTag}</Text>
+          </LinearGradient>
         )}
       </View>
       <View style={styles.body}>
@@ -83,6 +95,27 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   coverImage: { width: "100%", height: "100%", borderRadius: radius.md },
+  tag: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    maxWidth: "100%",
+    height: 16,
+    paddingHorizontal: spacing.xs,
+    alignItems: "center",
+    justifyContent: "center",
+    borderTopLeftRadius: radius.md,
+    borderBottomRightRadius: 6,
+    overflow: "hidden",
+  },
+  tagText: {
+    fontFamily: SYSTEM_FONT,
+    fontSize: 10,
+    fontWeight: "600",
+    lineHeight: 12,
+    includeFontPadding: false,
+    color: colors.surface,
+  },
   body: { flex: 1, paddingTop: 1 },
   titleRow: {
     flexDirection: "row",

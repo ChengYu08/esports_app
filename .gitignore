@@ -9,6 +9,9 @@ dist/
 web-build/
 expo-env.d.ts
 
+# Pushy / react-native-update local credentials
+.update
+
 # Native
 .kotlin/
 *.orig.*
@@ -61,3 +64,6 @@ modules/*/android/.gradle/
 .codex/
 # Figma 临时渲染产物
 .figma-tmp/
+
+# react-native-update
+.pushy

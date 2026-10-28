@@ -8,6 +8,7 @@ import { HomeSkeleton } from "@/features/home/components/HomeSkeleton";
 import {
   useHomeBanners,
   useHomeClubs,
+  useHomeGameCategories,
   useHomeGames,
 } from "@/features/home/hooks/use-home-data";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
@@ -29,11 +30,25 @@ export default function HomeScreen() {
     "court",
   );
   const [game, setGame] = useState<GameKey>("");
+  const [category, setCategory] = useState("");
   const games = useHomeGames();
-  const selectedGame = game || String(games.data?.[0]?.id ?? "");
+  const categories = useHomeGameCategories();
+  const { refetch: refetchGames } = games;
+  const { refetch: refetchCategories } = categories;
+  const selectedCategory = categories.data?.some((item) => item.id === category) ? category : "";
+  const categoryGames = useMemo(
+    () => (games.data ?? []).filter((item) => !selectedCategory || item.gameCategoryId === selectedCategory),
+    [games.data, selectedCategory],
+  );
+  // 后台移除已选品类时，同时清除该品类下的游戏筛选。
+  const isCategoryAvailable = !category || selectedCategory !== "";
+  const selectedGame = isCategoryAvailable && categoryGames.some((item) => String(item.id) === game) ? game : "";
   const [bannerIndex, setBannerIndex] = useState(0);
   const banners = useHomeBanners(topTab);
-  const clubs = useHomeClubs(topTab, selectedGame);
+  const clubs = useHomeClubs(topTab, {
+    gameId: selectedGame || undefined,
+    gameCategoryId: selectedCategory || undefined,
+  });
   const bannerItems = useMemo(() => banners.data ?? [], [banners.data]);
 
   useFocusEffect(
@@ -65,7 +80,9 @@ export default function HomeScreen() {
   );
 
   useEffect(() => {
-    if (bannerItems.length < 2) return undefined;
+    if (bannerItems.length < 2) {
+      return undefined;
+    }
     const timer = setInterval(
       () => setBannerIndex((value) => (value + 1) % bannerItems.length),
       4000,
@@ -81,6 +98,21 @@ export default function HomeScreen() {
     setBannerIndex(0);
     setTopTab(tab);
   }, []);
+  const selectCategory = useCallback((id: string) => {
+    setCategory(id);
+    setGame("");
+  }, []);
+  const retryFilters = useCallback(async () => {
+    await Promise.all([refetchGames(), refetchCategories()]);
+  }, [refetchGames, refetchCategories]);
+  const refreshHome = async () => {
+    await Promise.all([clubs.refetch(), games.refetch(), categories.refetch()]);
+  };
+  const loadMoreClubs = () => {
+    if (clubs.hasNextPage && !clubs.isFetching) {
+      clubs.fetchNextPage();
+    }
+  };
   const renderClub = useCallback(
     ({ item }: { item: (typeof clubItems)[number] }) => (
       <ClubCard club={item} />
@@ -92,16 +124,21 @@ export default function HomeScreen() {
       <HomeHeader
         tab={topTab}
         game={selectedGame}
-        games={games.data ?? []}
+        games={categoryGames}
+        categories={categories.data ?? []}
+        category={selectedCategory}
+        onCategoryChange={selectCategory}
+        filterError={games.isError || categories.isError}
+        onRetryFilters={retryFilters}
         bannerIndex={bannerIndex}
         banners={bannerItems}
         onTabChange={selectTopTab}
         onGameChange={setGame}
       />
     ),
-    [topTab, selectedGame, games.data, bannerIndex, bannerItems, selectTopTab],
+    [topTab, selectedGame, categoryGames, categories.data, selectedCategory, selectCategory, games.isError, categories.isError, retryFilters, bannerIndex, bannerItems, selectTopTab],
   );
-  const isHomeLoading = games.isLoading || banners.isLoading;
+  const isHomeLoading = games.isLoading || categories.isLoading || banners.isLoading;
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -129,21 +166,18 @@ export default function HomeScreen() {
           }}
           refreshControl={
             <RefreshControl
-              refreshing={clubs.isRefetching && !clubs.isFetchingNextPage}
-              onRefresh={() => void clubs.refetch()}
+              refreshing={(clubs.isRefetching && !clubs.isFetchingNextPage) || games.isRefetching || categories.isRefetching}
+              onRefresh={refreshHome}
               tintColor="#ff214b"
             />
           }
-          onEndReached={() => {
-            if (clubs.hasNextPage && !clubs.isFetchingNextPage)
-              void clubs.fetchNextPage();
-          }}
+          onEndReached={loadMoreClubs}
           onEndReachedThreshold={0.3}
           ListEmptyComponent={
             clubs.isLoading ? (
               <LoadingState />
             ) : clubs.isError ? (
-              <ErrorState onRetry={() => void clubs.refetch()} />
+              <ErrorState onRetry={clubs.refetch} />
             ) : (
               <EmptyState message="暂无俱乐部" />
             )

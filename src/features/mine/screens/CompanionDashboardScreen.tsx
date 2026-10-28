@@ -193,9 +193,7 @@ export default function CompanionDashboardScreen() {
               </Text>
               <Text style={styles.statCaption}>
                 好评
-                <Text style={styles.captionValue}>
-                  {rate}%
-                </Text>
+                <Text style={styles.captionValue}>{rate}%</Text>
               </Text>
             </View>
             {orders.isError ? (
@@ -293,7 +291,7 @@ export default function CompanionDashboardScreen() {
                           : "上传"
                     }
                     disabled={voiceUpload.uploading}
-                    onPress={() => void voiceUpload.upload()}
+                    onPress={voiceUpload.upload}
                   />
                   <View style={styles.voiceContent}>
                     {detail.voiceUrl ? (
@@ -629,6 +627,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     justifyContent: "center",
   },
+  voiceHint: { marginTop: 4, color: "#999", fontSize: 12, lineHeight: 18 },
   imageGrid: {
     flexDirection: "row",
     flexWrap: "wrap",

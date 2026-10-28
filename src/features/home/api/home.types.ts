@@ -7,6 +7,18 @@ export type Game = {
   iconUrl?: string;
   backgroundUrl?: string;
   category?: number;
+  gameCategoryId?: string;
+};
+
+export type GameCategory = {
+  id: string;
+  name: string;
+  iconUrl?: string;
+};
+
+export type ClubFilters = {
+  gameId?: string;
+  gameCategoryId?: string;
 };
 
 export type Banner = {
@@ -25,6 +37,7 @@ export type Club = {
   memberCount: number;
   clubCode: string;
   isSelfOperated?: boolean;
+  clubTag?: string;
 };
 
 export type ClubPage = {

@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "react-native-update": {
+      "source": "reactnativecn/react-native-update-skill",
+      "sourceType": "github",
+      "skillPath": "skill/react-native-update/SKILL.md",
+      "computedHash": "291869dd892f526528249039af41e87d8f9617dd3574e66f0d225f4b6a1e7a34"
+    }
+  }
+}
