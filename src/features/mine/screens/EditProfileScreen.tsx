@@ -5,7 +5,7 @@ import {
   ChevronRight16Regular,
 } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
-import * as ImagePicker from "expo-image-picker";
+import * as MediaLibrary from "expo-media-library/legacy";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
@@ -23,6 +23,9 @@ import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { toAuthUser } from "@/features/auth/client-auth-flow";
 import { uploadClientObject } from "@/features/auth/oss-upload";
 import { saveAuthSession } from "@/features/auth/session-persistence";
+import {
+  beginAvatarEdit,
+} from "@/features/mine/utils/avatar-edit-session";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 
@@ -81,6 +84,7 @@ export default function EditProfileScreen() {
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarEditing, setAvatarEditing] = useState(false);
 
   const age = calcAge(user?.birth);
 
@@ -144,49 +148,29 @@ export default function EditProfileScreen() {
   };
 
   const changeAvatar = async () => {
-    if (!token || !user || avatarUploading) return;
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!token || !user || avatarUploading || avatarEditing) return;
+    const permission = await MediaLibrary.requestPermissionsAsync();
     if (!permission.granted) {
-      Toast.show("请在系统设置中允许访问照片，用于更换头像", {
+      Toast.show("请在系统设置中允许访问照片，用于选择头像", {
         duration: Toast.durations.SHORT,
       });
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.9,
-    });
-    if (result.canceled || !result.assets[0]) return;
-    const selected = result.assets[0];
-    if (selected.fileSize && selected.fileSize > 2 * 1024 * 1024) {
-      Toast.show("头像图片不能超过 2MB", { duration: Toast.durations.SHORT });
-      return;
-    }
-    setAvatarUploading(true);
+    // 进入相册选择 → 裁剪，裁剪结果经会话桥接回传
+    const editPending = beginAvatarEdit();
+    setAvatarEditing(true);
+    router.push("/avatar-album");
     try {
-      const fileName = selected.fileName || `avatar-${Date.now()}.jpg`;
-      let imageUrl = "";
-      let lastUploadError: unknown;
-      for (let attempt = 0; attempt < 2; attempt += 1) {
-        const sts = await clientAuthApi.getOssSts(token, "101", [fileName]);
-        const objectKey = sts.objectList?.[0];
-        if (!objectKey) throw new Error("上传凭证无效");
-        try {
-          imageUrl = await uploadClientObject(sts, objectKey, selected);
-          break;
-        } catch (error) {
-          lastUploadError = error;
-        }
-      }
-      if (!imageUrl) {
-        throw new Error(
-          lastUploadError instanceof Error
-            ? lastUploadError.message
-            : "上传图片失败",
-        );
-      }
+      const croppedUri = await editPending;
+      if (!croppedUri) return;
+      setAvatarUploading(true);
+      const fileName = `avatar-${Date.now()}.jpg`;
+      const sts = await clientAuthApi.getOssSts(token, "101", [fileName]);
+      const objectKey = sts.objectList?.[0];
+      if (!objectKey) throw new Error("上传凭证无效");
+      const imageUrl = await uploadClientObject(sts, objectKey, {
+        uri: croppedUri,
+      });
       const profile = await clientAuthApi.updateProfile(token, {
         headImage: imageUrl,
       });
@@ -199,6 +183,7 @@ export default function EditProfileScreen() {
       );
     } finally {
       setAvatarUploading(false);
+      setAvatarEditing(false);
     }
   };
 
@@ -231,9 +216,12 @@ export default function EditProfileScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="更换头像"
-            disabled={avatarUploading}
+            disabled={avatarUploading || avatarEditing}
             onPress={() => void changeAvatar()}
-            style={styles.changeAvatarCapsule}
+            style={[
+              styles.changeAvatarCapsule,
+              (avatarUploading || avatarEditing) && styles.capsuleDisabled,
+            ]}
           >
             <Image
               source={cameraIcon}
@@ -241,7 +229,7 @@ export default function EditProfileScreen() {
               contentFit="contain"
             />
             <Text style={styles.changeAvatarText}>
-              {avatarUploading ? "上传中" : "更换"}
+              {avatarUploading ? "上传中" : avatarEditing ? "选择中" : "更换"}
             </Text>
           </Pressable>
         </View>
@@ -402,6 +390,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   cameraIcon: { width: 16, height: 16 },
+  capsuleDisabled: { opacity: 0.6 },
   changeAvatarText: {
     color: "#333333",
     fontFamily: DOUYIN_SANS,
