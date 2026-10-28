@@ -42,3 +42,27 @@ export async function fetchRechargeConfig(
   );
   return requireSuccess(response, "充值配置查询失败");
 }
+
+export type CreateAppPayOrderAction = {
+  payChannel?: string;
+  payWay?: string;
+  moneyAmount: number;
+  starAmount: number;
+};
+
+export type CreateAppPayOrderResult = {
+  rechargeNo?: string;
+  orderStr?: string;
+  platformTxno?: string;
+};
+
+export async function createAppPayOrder(
+  token: string,
+  action: CreateAppPayOrderAction,
+): Promise<CreateAppPayOrderResult> {
+  const response = await apiClient<ApiEnvelope<CreateAppPayOrderResult>>(
+    "/client/v1/pay/createAppPayOrder",
+    { method: "POST", token, body: action },
+  );
+  return requireSuccess(response, "创建支付订单失败，请稍后再试");
+}

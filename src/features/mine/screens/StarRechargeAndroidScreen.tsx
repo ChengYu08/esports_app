@@ -15,10 +15,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { fetchStarBalance } from "@/features/mine/api/companion-order.api";
 import {
+  createAppPayOrder,
   fetchRechargeConfig,
   type RechargeChannel,
   type RechargePlan,
 } from "@/features/mine/api/recharge.api";
+import { env } from "@/core/config/env";
+import AlipayPayment from "../../../../modules/alipay-payment";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 
 const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
@@ -36,7 +39,7 @@ function toNumber(value: number | string | undefined): number | null {
   return Number.isFinite(next) ? next : null;
 }
 
-function channelIconSource(channel: RechargeChannel) {
+function isWechatChannel(channel: RechargeChannel): boolean {
   const haystack = [
     channel.key,
     channel.label,
@@ -46,10 +49,11 @@ function channelIconSource(channel: RechargeChannel) {
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
-  if (haystack.includes("wechat") || haystack.includes("微信")) {
-    return wechatIcon;
-  }
-  return alipayIcon;
+  return haystack.includes("wechat") || haystack.includes("微信");
+}
+
+function channelIconSource(channel: RechargeChannel) {
+  return isWechatChannel(channel) ? wechatIcon : alipayIcon;
 }
 
 function channelStableKey(channel: RechargeChannel, index: number): string {
@@ -97,6 +101,14 @@ export default function StarRechargeAndroidScreen() {
     title: string;
     message: string;
   } | null>(null);
+  const [paying, setPaying] = useState(false);
+
+  useEffect(() => {
+    // Official recommendation: register the merchant appId on the payment
+    // page for anti-fraud and faster cashier launch. Optional per docs.
+    if (!token || !env.alipayAppId) return;
+    AlipayPayment?.registerAppAsync(env.alipayAppId).catch(() => undefined);
+  }, [token]);
 
   useEffect(() => {
     if (!token) return;
@@ -158,12 +170,70 @@ export default function StarRechargeAndroidScreen() {
 
   const selectedPlan = plans[selectedPlanIndex];
   const selectedMoney = toNumber(selectedPlan?.moneyAmount) ?? 0;
+  const selectedStar = toNumber(selectedPlan?.starAmount) ?? 0;
+  const selectedChannel = channels.find(
+    (channel, index) => channelStableKey(channel, index) === selectedChannelKey,
+  );
   const planRows = useMemo(() => chunkPlans(plans, 3), [plans]);
   const canConfirm =
     agreementAccepted &&
     !configLoading &&
     plans.length > 0 &&
     selectedPlan !== undefined;
+
+  async function handleConfirmPay() {
+    if (paying || !token || !selectedPlan) return;
+    if (!selectedChannel) {
+      setPrompt({ title: "提示", message: "请先选择支付方式" });
+      return;
+    }
+    if (isWechatChannel(selectedChannel)) {
+      setPrompt({ title: "提示", message: "微信支付暂未接入，请选择支付宝支付。" });
+      return;
+    }
+    if (!AlipayPayment) {
+      setPrompt({ title: "提示", message: "当前版本暂不支持支付宝支付，请更新 App 后重试。" });
+      return;
+    }
+    setPaying(true);
+    try {
+      const order = await createAppPayOrder(token, {
+        payChannel: selectedChannel.payChannel ?? "ALIPAY",
+        payWay: selectedChannel.payWay ?? "ALIPAY_APP",
+        moneyAmount: selectedMoney,
+        starAmount: selectedStar,
+      });
+      if (!order.orderStr) {
+        setPrompt({ title: "支付失败", message: "未获取到支付订单信息，请稍后再试。" });
+        return;
+      }
+      const result = await AlipayPayment.payAsync(
+        order.orderStr,
+        // 沙箱支付，暂无法使用
+        false,
+      );
+      if (result.code === "SUCCESS") {
+        setPrompt({ title: "支付成功", message: "星钻已到账。" });
+        fetchStarBalance(token)
+          .then((nextBalance) => setBalance(nextBalance))
+          .catch(() => undefined);
+      } else if (result.code === "DEALING") {
+        setPrompt({ title: "支付处理中", message: result.message ?? "支付处理中，请稍后在订单中查看结果。" });
+      } else if (result.code === "CANCELLED") {
+        setPrompt({ title: "支付取消", message: "已取消本次支付。" });
+      } else {
+        setPrompt({ title: "支付失败", message: result.message ?? "支付失败，请重试。" });
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "支付失败，请重试。";
+      setPrompt({ title: "支付失败", message });
+    } finally {
+      setPaying(false);
+    }
+  }
 
   return (
     <View style={styles.screen}>
@@ -362,17 +432,19 @@ export default function StarRechargeAndroidScreen() {
 
         <Pressable
           accessibilityRole="button"
-          disabled={!canConfirm}
-          onPress={() =>
-            setPrompt({
-              title: "暂未接入支付",
-              message: "移动端支付流程尚未接入，当前不会创建充值订单。",
-            })
-          }
-          style={[styles.confirmButton, !canConfirm && styles.confirmDisabled]}
+          accessibilityState={{ disabled: !canConfirm || paying }}
+          disabled={!canConfirm || paying}
+          onPress={() => {
+            void handleConfirmPay();
+          }}
+          style={[
+            styles.confirmButton,
+            !canConfirm && styles.confirmDisabled,
+            paying && styles.confirmDisabled,
+          ]}
         >
           <Text style={styles.confirmText}>
-            确认支付 ¥{formatAmount(selectedMoney)}
+            {paying ? "支付中…" : `确认支付 ¥${formatAmount(selectedMoney)}`}
           </Text>
         </Pressable>
       </View>

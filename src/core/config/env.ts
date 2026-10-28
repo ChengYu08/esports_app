@@ -14,6 +14,7 @@ const envSchema = z.object({
   aliyunAndroidAuthKey: z.string().default(""),
   rongCloudAppKey: z.string().default(""),
   agoraAppId: z.string().default(""),
+  alipayAppId: z.string().default(""),
 });
 
 const extra = (Constants.expoConfig?.extra ?? {}) as Record<string, unknown>;
@@ -37,4 +38,6 @@ export const env = envSchema.parse({
   rongCloudAppKey:
     extra.rongCloudAppKey ?? process.env.EXPO_PUBLIC_RONGCLOUD_APP_KEY,
   agoraAppId: extra.agoraAppId ?? process.env.EXPO_PUBLIC_AGORA_APP_ID,
+  alipayAppId:
+    extra.alipayAppId ?? process.env.EXPO_PUBLIC_ALIPAY_APP_ID,
 });
