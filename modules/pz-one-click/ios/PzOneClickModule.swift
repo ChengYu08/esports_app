@@ -3,8 +3,13 @@ import ExpoModulesCore
 import UIKit
 
 private let quickLoginTag = "[DEBUG-QUICK-LOGIN]"
-private let userAgreementURL = "https://djpc.jlgkj.top/user.html"
-private let privacyPolicyURL = "https://djpc.jlgkj.top/privacy.html"
+#if DEBUG
+private let protocolBaseURL = "https://djpc.yingbowl.com"
+#else
+private let protocolBaseURL = "https://dj.panzhi.com"
+#endif
+private let userAgreementURL = "\(protocolBaseURL)/public/protocols?code=user_server"
+private let privacyPolicyURL = "\(protocolBaseURL)/public/protocols?code=user_privacy"
 
 public class PzOneClickModule: Module {
   private let authHandler = TXCommonHandler.sharedInstance()

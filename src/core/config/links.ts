@@ -1,8 +1,10 @@
+import { env } from "@/core/config/env";
+
 /**
  * App-level links that may change independently from the app code.
- * Update this file when the hosted agreement pages move.
+ * Protocol pages are hosted on PC; content is managed server-side by code.
  */
 export const APP_LINKS = {
-  userAgreement: "https://djpc.jlgkj.top/user.html",
-  privacyPolicy: "https://djpc.jlgkj.top//privacy.html",
+  userAgreement: `${env.protocolBaseUrl}/public/protocols?code=user_server`,
+  privacyPolicy: `${env.protocolBaseUrl}/public/protocols?code=user_privacy`,
 } as const;
