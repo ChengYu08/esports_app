@@ -94,6 +94,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 40,
+    // 半透明黑色遮罩
+    backgroundColor: "rgba(0,0,0,0.6)",
   },
   dialog: {
     width: "100%",
@@ -130,7 +132,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   checkboxRow: {
-    alignSelf: "flex-start",
+    alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
     gap: 6,

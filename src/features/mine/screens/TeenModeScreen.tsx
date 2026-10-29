@@ -24,6 +24,7 @@ import {
 import type { TeenModeStatus } from "@/features/mine/api/teen-mode.contract";
 import { saveLastTeenEnabled } from "@/features/mine/teen-mode-store";
 import { colors } from "@/shared/theme/tokens";
+import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const closedIllustration = require("../../../../assets/mine/figma/teen-mode-closed.svg");
@@ -35,6 +36,7 @@ type Phase =
   | "setFirst"
   | "setConfirm"
   | "openWithPassword"
+  | "openWithPasswordConfirm"
   | "disable";
 
 type PasswordPhase = Exclude<Phase, "overview">;
@@ -121,21 +123,36 @@ export default function TeenModeScreen({
           Toast.show("青少年模式已开启", { duration: Toast.durations.SHORT });
           return;
         }
-        if (phase === "openWithPassword") {
-          // 已设过密码：只校验密码后开启
+        if (
+          phase === "openWithPasswordConfirm"
+        ) {
+          // 已设过密码：两次输入一致后，校验密码并开启
+          if (code !== firstPassword) {
+            Toast.show("前后两次密码不一致", {
+              duration: Toast.durations.SHORT,
+            });
+            setCode("");
+            setFirstPassword("");
+            setPhase("openWithPassword");
+            return;
+          }
           applyStatus(await teenModeApi.open(token, code));
           setPhase("overview");
           Toast.show("青少年模式已开启", { duration: Toast.durations.SHORT });
           return;
         }
-        // disable：关闭青少年模式（密码错误信息由服务端返回）
-        applyStatus(await teenModeApi.close(token, code));
-        setPhase("overview");
-        Toast.show("青少年模式已关闭", { duration: Toast.durations.SHORT });
+        if (phase === "disable") {
+          // 关闭青少年模式：单次输入，密码正确性由服务端校验
+          applyStatus(await teenModeApi.close(token, code));
+          setPhase("overview");
+          Toast.show("青少年模式已关闭", { duration: Toast.durations.SHORT });
+          return;
+        }
       } catch (error) {
+        // 密码错误等信息需要用户明确看到，使用长时长提示
         Toast.show(
           error instanceof Error ? error.message : "操作失败，请稍后重试",
-          { duration: Toast.durations.SHORT },
+          { duration: Toast.durations.LONG },
         );
         setCode("");
       } finally {
@@ -157,12 +174,26 @@ export default function TeenModeScreen({
             {enabled ? "青少年模式已开启" : "青少年模式未开启"}
           </Text>
           {enabled ? (
-            <View style={styles.bulletRow}>
-              <Image source={starIcon} style={styles.bulletIcon} />
-              <Text style={styles.bulletText}>
-                青少年模式开启中，您无法使用盼之电竞核心功能
-              </Text>
-            </View>
+            <>
+              <View style={styles.bulletRow}>
+                <Image source={starIcon} style={styles.bulletIcon} />
+                <Text style={styles.bulletText}>
+                  青少年模式开启中，您无法使用盼之电竞核心功能
+                </Text>
+              </View>
+              <View style={styles.bulletRow}>
+                <Image source={starIcon} style={styles.bulletIcon} />
+                <Text style={styles.bulletText}>
+                  我们将持续进行深度探索与迭代优化，不断拓展场景适配能力
+                </Text>
+              </View>
+              <View style={styles.bulletRow}>
+                <Image source={starIcon} style={styles.bulletIcon} />
+                <Text style={styles.bulletText}>
+                  为保障未成年人的充足休息与健康作息，开启未成年人模式后，晚10点至次日早6点期间无法访问盼之社区
+                </Text>
+              </View>
+            </>
           ) : (
             <>
               <View style={styles.bulletRow}>
@@ -182,6 +213,11 @@ export default function TeenModeScreen({
           )}
         </View>
       </View>
+      {enabled ? (
+        <Text style={styles.noticeText}>
+          {"可在“设置”中查看未成年人模式"}
+        </Text>
+      ) : null}
       <View style={[styles.bottomBar, { paddingBottom: 24 + insets.bottom }]}>
         <Pressable
           accessibilityRole="button"
@@ -210,27 +246,30 @@ export default function TeenModeScreen({
   );
 
   const renderPassword = () => {
-    const titles: Record<
-      "setFirst" | "setConfirm" | "openWithPassword" | "disable",
-      string
-    > = {
+    // 进入密码输入视图时 phase 必然是四个密码子阶段之一
+    const passwordPhase = phase as PasswordPhase;
+    const titles: Record<PasswordPhase, string> = {
       setFirst: "设置密码",
       setConfirm: "再次输入密码",
       openWithPassword: "输入密码",
+      openWithPasswordConfirm: "再次输入密码",
+      // 设计稿 274-47290：关闭页标题与副标题用词不同
       disable: "关闭青少年模式",
     };
+    // 设计稿 274-47290：关闭页副标题为“解锁未成年人模式”，其余阶段为“解锁青少年模式”
+    // 关闭流程：整页只保留标题，无副标题与小文案
     const subtitle =
-      phase === "disable"
-        ? null
-        : phase === "openWithPassword"
-          ? "输入密码后即可开启青少年模式"
-          : "该密码将用于解锁青少年模式";
-    // 进入密码输入视图时 phase 必然是四个密码子阶段之一
-    const passwordPhase = phase as PasswordPhase;
+      passwordPhase === "disable" ? null : "该密码将用于解锁青少年模式";
+    const centered = passwordPhase === "disable";
     return (
       <View style={styles.passwordContent}>
         <View style={styles.passwordBody}>
-          <View style={styles.passwordTitleWrap}>
+          <View
+            style={[
+              styles.passwordTitleWrap,
+              centered && styles.passwordTitleWrapCentered,
+            ]}
+          >
             <Text style={styles.passwordTitle}>{titles[passwordPhase]}</Text>
             {subtitle ? (
               <Text style={styles.passwordSubtitle}>{subtitle}</Text>
@@ -256,7 +295,22 @@ export default function TeenModeScreen({
             <TextInput
               ref={inputRef}
               value={code}
-              onChangeText={(value) => setCode(filterDigits(value))}
+              onChangeText={(value) => {
+                const next = filterDigits(value);
+                setCode(next);
+                // 任一密码输入阶段：输满 4 位自动进入“再次输入密码”
+                if (isPasswordComplete(next)) {
+                  if (phase === "setFirst") {
+                    setFirstPassword(next);
+                    setCode("");
+                    setPhase("setConfirm");
+                  } else if (phase === "openWithPassword") {
+                    setFirstPassword(next);
+                    setCode("");
+                    setPhase("openWithPasswordConfirm");
+                  }
+                }
+              }}
               keyboardType="number-pad"
               maxLength={TEEN_MODE_PASSWORD_LENGTH}
               autoFocus
@@ -264,8 +318,7 @@ export default function TeenModeScreen({
               style={styles.hiddenInput}
             />
           </Pressable>
-        </View>
-        <View style={[styles.bottomBar, { paddingBottom: 24 + insets.bottom }]}>
+          {/* 确认按钮位于输入框正下方（设计稿 274-46247/46328） */}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="确认"
@@ -273,6 +326,7 @@ export default function TeenModeScreen({
             onPress={() => void confirmCode()}
             style={[
               styles.primaryButton,
+              styles.confirmInFlow,
               (!codeComplete || submitting) && styles.primaryButtonDisabled,
             ]}
           >
@@ -366,6 +420,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: colors.brand,
   },
+  // 密码页确认按钮：紧跟输入框下方（设计稿 274-46247/46328）
+  confirmInFlow: { marginTop: 24 },
   primaryButtonDisabled: { backgroundColor: "#FF708D" },
   primaryButtonText: {
     color: "#FFF",
@@ -377,24 +433,21 @@ const styles = StyleSheet.create({
   passwordBody: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingVertical: 56,
-    gap: 88,
+    paddingTop: 32,
+    gap: 24,
   },
-  passwordTitleWrap: { alignItems: "center", gap: 4 },
+  passwordTitleWrap: { alignItems: "flex-start", gap: 4 },
+  passwordTitleWrapCentered: { alignItems: "center" },
   passwordTitle: {
     color: "#333333",
     fontSize: 18,
     lineHeight: 26,
     fontWeight: "600",
-    textAlign: "center",
   },
   passwordSubtitle: {
     color: "#999999",
     fontSize: 14,
     lineHeight: 24,
-    textAlign: "center",
-    alignSelf: "center",
-    width: 311,
   },
   boxesRow: {
     flexDirection: "row",
@@ -419,7 +472,16 @@ const styles = StyleSheet.create({
     width: 3,
     height: 28,
     borderRadius: 1.5,
-    backgroundColor: "#0A0A0A",
+    // 设计稿 274-46328：光标为红色
+    backgroundColor: "#FE1F4C",
+  },
+  noticeText: {
+    color: "#999999",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: "center",
+    paddingBottom: 12,
   },
   hiddenInput: {
     position: "absolute",
