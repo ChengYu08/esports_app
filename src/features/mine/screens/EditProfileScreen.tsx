@@ -600,20 +600,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#CCCCCC",
   },
-  // 选中：16 红圈（边宽 2）+ 中心 6 红点，圆环与红点间留白色间隙
+  // 选中：外圈 Ø16（环宽 1.5 红）+ 中心 Ø8 红点，间隙约 2.5（设计稿几何：16.25/8.07/1.5）
   radioCircleSelected: {
     width: 16,
     height: 16,
     borderRadius: 8,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: "#E01B28",
     alignItems: "center",
     justifyContent: "center",
   },
   radioDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: "#E01B28",
   },
   genderDivider: {
