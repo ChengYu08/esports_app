@@ -1,7 +1,6 @@
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
-  Checkmark16Regular,
   ChevronLeft24Regular,
   ChevronRight16Regular,
   Dismiss24Regular,
@@ -319,19 +318,26 @@ export default function EditProfileScreen() {
             ] as const).map(([value, label]) => {
               const selected = Number(user?.gender ?? 0) === value;
               return (
-                <Pressable
-                  key={String(value)}
-                  accessibilityRole="button"
-                  accessibilityLabel={label}
-                  disabled={genderSaving}
-                  onPress={() => void saveGenderImmediate(value)}
-                  style={styles.genderRadioRow}
-                >
-                  <Text style={styles.genderRadioText}>{label}</Text>
-                  {selected ? (
-                    <Checkmark16Regular color="#FE1F4C" width={16} height={16} />
-                  ) : null}
-                </Pressable>
+                <View key={String(value)}>
+                  <Pressable
+                    accessibilityRole="radio"
+                    accessibilityLabel={label}
+                    accessibilityState={{ selected }}
+                    disabled={genderSaving}
+                    onPress={() => void saveGenderImmediate(value)}
+                    style={styles.genderRadioRow}
+                  >
+                    <Text style={styles.genderRadioText}>{label}</Text>
+                    {/* 选中：红色实心圆；未选中：灰色圆环（设计稿 Radio/Small-Large-20） */}
+                    <View
+                      style={[
+                        styles.radioCircle,
+                        selected && styles.radioCircleSelected,
+                      ]}
+                    />
+                  </Pressable>
+                  <View style={styles.genderDivider} />
+                </View>
               );
             })}
           </>
@@ -585,5 +591,20 @@ const styles = StyleSheet.create({
     fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
+  },
+  radioCircle: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#CCCCCC",
+  },
+  radioCircleSelected: {
+    borderWidth: 0,
+    backgroundColor: "#E01B28",
+  },
+  genderDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "#EBEBEB",
   },
 });
