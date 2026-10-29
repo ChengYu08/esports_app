@@ -3,7 +3,7 @@ import {
   ChevronLeft24Regular,
   Copy16Regular,
 } from "@fluentui/react-native-icons";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -64,7 +64,6 @@ export default function OrderDetailRoute() {
   }>();
   const scope: OrderScope = scopeParam === "accept" ? "accept" : "place";
   const insets = useSafeAreaInsets();
-  const queryClient = useQueryClient();
   const token = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.user);
   const [cancelPromptVisible, setCancelPromptVisible] = useState(false);
@@ -516,6 +515,7 @@ export default function OrderDetailRoute() {
                   style={styles.primaryGradient}
                 >
                   <Text
+                    numberOfLines={1}
                     style={[
                       styles.primaryText,
                       scope === "accept" && styles.acceptActionText,
@@ -526,6 +526,7 @@ export default function OrderDetailRoute() {
                 </LinearGradient>
               ) : (
                 <Text
+                  numberOfLines={1}
                   style={[
                     styles.outlineText,
                     scope === "accept" && styles.acceptActionText,
@@ -642,10 +643,12 @@ export default function OrderDetailRoute() {
           try {
             await completeOrder(order.id, token);
             setCompletePromptVisible(false);
-            await invalidateOrderQueries(order.id);
-            await queryClient.invalidateQueries({
-              queryKey: ["orders", "accept"],
-            });
+            if (currentUser?.id) {
+              // 列表接口此时可能仍返回旧状态，以详情为准就地刷新缓存中的该单。
+              await refreshOrderAfterAction(order.id, token, currentUser.id);
+            } else {
+              await invalidateOrderQueries(order.id);
+            }
             await detail.refetch();
             Toast.show("服务已完成", { duration: Toast.durations.SHORT });
           } catch (error) {
@@ -1085,7 +1088,8 @@ const styles = StyleSheet.create({
     borderTopColor: "#F7F7F7",
   },
   acceptBottom: { borderTopWidth: 0, paddingTop: 8 },
-  bottomAction: { flex: 1, width: undefined },
+  // 多按钮均分一行时收紧内边距，保证窄屏（<360pt）下四字按钮不换行。
+  bottomAction: { flex: 1, width: undefined, minWidth: 0, paddingHorizontal: 8 },
   outlineButton: {
     width: "100%",
     height: 42,
