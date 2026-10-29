@@ -166,7 +166,7 @@ export default function StarRechargeScreen() {
           style={styles.headerSide}
         >
           <ChevronLeft24Regular
-            color="white"
+            color="#0D0D0F"
             width={24}
             height={24}
             style={styles.backIcon}
