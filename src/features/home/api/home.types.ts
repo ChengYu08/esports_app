@@ -39,6 +39,12 @@ export type HomeBannerSlot = {
   items: Banner[];
 };
 
+export type ClubGameIcon = {
+  id: number;
+  name: string;
+  iconUrl?: string;
+};
+
 export type Club = {
   id: string;
   name: string;
@@ -51,6 +57,7 @@ export type Club = {
   clubTag?: string;
   /** 俱乐部开启的游戏列表（列表卡片展示游戏图标用） */
   clubGames?: { iconUrl?: string }[];
+  games?: ClubGameIcon[];
 };
 
 export type ClubPage = {

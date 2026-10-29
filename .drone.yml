@@ -126,7 +126,17 @@ steps:
         ls -lh ./apks/ 2>/dev/null || echo "未找到 APK"
 
         # ---- 生成构建元数据（供最终信息展示步骤读取） ----
-        version=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' ./app.json | head -1)
+        version=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' ./app.json | head -1 | tr -d '[:space:]')
+        # 兜底：从 APK 文件名解析版本号（格式：盼之电竞-<version>-<abi>-<env>-<ts>.apk）
+        if [ -z "$version" ]; then
+          for apk_path in ./apks/*.apk; do
+            [ -f "$apk_path" ] || continue
+            fname=$(basename "$apk_path" .apk)
+            version=$(echo "$fname" | sed -E 's/^[^-]+-([0-9]+\.[0-9]+\.[0-9]+)-.*/\1/')
+            [ -n "$version" ] && break
+          done
+        fi
+        echo "解析到版本号: [$version]"
         {
           echo "BUILD_ENV=$${BUILD_ENV}"
           echo "BUILD_ABI=$${BUILD_ABI}"
@@ -136,7 +146,7 @@ steps:
 
         # 构建的 UTC 与本地时间（构建容器默认 UTC；展示步骤会用东八区偏移换算为北京时间）
         {
-          echo "BUILD_TIME_UTC=$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          printf 'BUILD_TIME_UTC=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
           printf 'DRONE_COMMIT_SHORT=%s\n' "$(echo "$DRONE_COMMIT_SHA" | cut -c1-8)"
           printf 'DRONE_BUILD_START_TS=%s\n' "$DRONE_BUILD_STARTED"
           printf 'DRONE_BUILD_FINISH_TS=%s\n' "$(date +%s)"
@@ -231,6 +241,16 @@ steps:
         echo "------------------------------------------------"
         printf "  构建环境    : %s\n" "$BUILD_ENV"
         printf "  CPU 架构    : %s\n" "$BUILD_ABI"
+        # 版本号从 APK 文件名解析（不依赖跨步骤的元数据传递）
+        for apk_path in ./apks/*.apk; do
+          [ -f "$apk_path" ] || continue
+          fname_noext=$(basename "$apk_path" .apk)
+          base="$${fname_noext%-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]}"
+          rest="$${base#*-}"
+          rest2="$${rest%-*}"
+          APP_VERSION="$${rest2%-*}"
+          break
+        done
         printf "  应用版本号  : %s\n" "$APP_VERSION"
 
         # ---- 时间信息（本地时间 / 北京时间）----
@@ -266,9 +286,22 @@ steps:
           apks_found=$((apks_found + 1))
           filename=$(basename "$apk_path")
           size=$(ls -lh "$apk_path" | awk '{print $5}')
-          url="http://dev.jinliwangluo.com/android/esportsapp/$DRONE_BRANCH/$APP_VERSION/$filename"
+
+          # 优先从 APK 文件名解析版本号（不依赖 build-android 的元数据文件）
+          fname_noext="$${filename%.apk}"
+          # 去掉尾部 -YYYYMMDDHHMM 时间戳（12 位数字）
+          base="$${fname_noext%-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]}"
+          # 取第一个 "-" 后剩下的部分：1.0.0-arm64-test
+          rest="$${base#*-}"
+          # 再截掉最后的 -<env>，得到 1.0.0-arm64
+          rest2="$${rest%-*}"
+          # 再截掉最后的 -<abi>，得到 1.0.0
+          file_version="$${rest2%-*}"
+
+          url="http://dev.jinliwangluo.com/android/esportsapp/$DRONE_BRANCH/$file_version/$filename"
           printf "  文件名      : %s\n" "$filename"
           printf "  大小        : %s\n" "$size"
+          printf "  应用版本号  : %s\n" "$file_version"
           printf "  下载地址    : %s\n" "$url"
           echo "  ------------------------------------------------"
         done
