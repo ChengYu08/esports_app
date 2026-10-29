@@ -18,8 +18,9 @@ export type TeenRequester = <T>(
 ) => Promise<TeenResponse<T>>;
 
 function unwrap<T>(response: TeenResponse<T>): T {
-  // R 包络 code 为数字 0（对字符串 "0" 容错）；data 缺失视为业务异常
-  if (Number(response?.code) !== 0) {
+  // 实测（2026-10-29 抓包）code 为字符串 "SUCCESS"（后端文档写数字 0 有误），两种形态都容错
+  const success = response?.code === "SUCCESS" || Number(response?.code) === 0;
+  if (!success) {
     throw new Error(response?.msg || "请求失败，请稍后重试");
   }
   if (response.data === undefined || response.data === null) {

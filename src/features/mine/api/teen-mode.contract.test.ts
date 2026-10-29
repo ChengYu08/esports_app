@@ -2,7 +2,19 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createTeenModeApi } from "./teen-mode.contract";
 
-type FakeResponse = { code: number | string; msg?: string; data?: unknown };
+type FakeResponse = {
+  code: number | string;
+  msg?: string;
+  data?: unknown;
+  success?: boolean;
+};
+
+// 实测（2026-10-29 真机抓包）：该接口实际返回字符串 code="SUCCESS" 的 R 包络
+const SUCCESS_RESPONSE: FakeResponse = {
+  success: true,
+  code: "SUCCESS",
+  msg: "操作成功",
+};
 
 function createFakeRequester(response: FakeResponse) {
   const calls = vi.fn(async (path: string, options: { method: "POST"; token?: string; body?: unknown }) => response);
@@ -15,10 +27,9 @@ function createFakeRequester(response: FakeResponse) {
 describe("createTeenModeApi", () => {
   const TOKEN = "test-token";
 
-  it("status：POST /client/v1/youth/status，action 空包络，返回 data", async () => {
+  it("status：POST /client/v1/youth/status，action 空包络，返回 data（code 为字符串 SUCCESS）", async () => {
     const fake = createFakeRequester({
-      code: 0,
-      msg: "success",
+      ...SUCCESS_RESPONSE,
       data: { enabled: true, passwordSet: true, remainingAttempts: 3 },
     });
     const api = createTeenModeApi(fake.requester);
@@ -28,6 +39,19 @@ describe("createTeenModeApi", () => {
       expect.objectContaining({ method: "POST", token: TOKEN, body: { action: {} } }),
     );
     expect(status).toEqual({ enabled: true, passwordSet: true, remainingAttempts: 3 });
+  });
+
+  it("容错：数字 code 0 同样视为成功", async () => {
+    const fake = createFakeRequester({
+      code: 0,
+      data: { enabled: false, passwordSet: false, remainingAttempts: 10 },
+    });
+    const api = createTeenModeApi(fake.requester);
+    await expect(api.status(TOKEN)).resolves.toEqual({
+      enabled: false,
+      passwordSet: false,
+      remainingAttempts: 10,
+    });
   });
 
   it("open：首次开启带 password+confirmPassword", async () => {
