@@ -166,7 +166,9 @@ export function LoginScreen({
             },
           ]}
           keyboardShouldPersistTaps="handled"
-          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+          keyboardDismissMode={
+            Platform.OS === "ios" ? "interactive" : "on-drag"
+          }
           showsVerticalScrollIndicator={false}
         >
           <View style={[styles.top, compact && styles.compactTop]}>
@@ -237,7 +239,10 @@ export function LoginScreen({
                       onPress={() => setPasswordVisible((visible) => !visible)}
                       style={styles.eyeButton}
                     >
-                      <PasswordVisibilityIcon visible={passwordVisible} size={20} />
+                      <PasswordVisibilityIcon
+                        visible={passwordVisible}
+                        size={20}
+                      />
                     </Pressable>
                     <View style={styles.divider} />
                     <Pressable
@@ -259,7 +264,10 @@ export function LoginScreen({
                       onPress={() => void handleSendCode()}
                     >
                       <Text
-                        style={[styles.send, !canSendCode && styles.sendDisabled]}
+                        style={[
+                          styles.send,
+                          !canSendCode && styles.sendDisabled,
+                        ]}
                       >
                         {getSmsCodeActionLabel(isSendingCode, codeCountdown)}
                       </Text>
@@ -302,11 +310,11 @@ export function LoginScreen({
           </View>
           <View style={[styles.footer, compact && styles.compactFooter]}>
             <View style={styles.other}>
-              {/* <LoginMethod
+              <LoginMethod
                 icon={phoneIcon}
                 label="一键登录"
                 onPress={onQuickLogin}
-              /> */}
+              />
               <LoginMethod
                 icon={lockIcon}
                 label={isPasswordMode ? "验证码登录" : "密码登录"}
@@ -332,7 +340,9 @@ export function LoginScreen({
                   agreementAccepted && styles.checkboxChecked,
                 ]}
               >
-                {agreementAccepted ? <Text style={styles.checkmark}>✓</Text> : null}
+                {agreementAccepted ? (
+                  <Text style={styles.checkmark}>✓</Text>
+                ) : null}
               </View>
               <Text style={styles.agreementText}>
                 已阅读并同意{" "}
@@ -456,7 +466,13 @@ const styles = StyleSheet.create({
   canvas: { flexGrow: 1 },
   top: { height: 208, overflow: "hidden", backgroundColor: "#ffe5e7" },
   compactTop: { height: 176 },
-  topArt: { position: "absolute", left: 0, top: 0, width: "100%", height: "100%" },
+  topArt: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    width: "100%",
+    height: "100%",
+  },
   back: {
     position: "absolute",
     left: 8,
