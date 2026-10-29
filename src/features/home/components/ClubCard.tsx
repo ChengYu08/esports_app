@@ -209,7 +209,6 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginTop: 4,
   },
-<<<<<<< HEAD
   gameIcons: {
     marginLeft: "auto",
     height: 14,
@@ -229,22 +228,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   meta: { flexDirection: "row", alignItems: "center", gap: 4 },
-=======
-  metaRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
-  gameIcons: {
-    marginLeft: "auto",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  gameIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "#F2F2F2",
-  },
-  meta: { flexDirection: "row", alignItems: "center", gap: 3 },
->>>>>>> origin/test
   metaText: {
     fontFamily: DOUYIN_SANS,
     color: "#7F7F80",
