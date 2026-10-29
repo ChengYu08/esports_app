@@ -3,11 +3,11 @@ plugins {
   id 'expo-module-gradle-plugin'
 }
 
-group = 'expo.modules.app.permission'
+group = 'expo.modules.app.toolkit'
 version = '0.1.0'
 
 android {
-  namespace "expo.modules.app.permission"
+  namespace "expo.modules.app.toolkit"
   defaultConfig {
     versionCode 1
     versionName "0.1.0"

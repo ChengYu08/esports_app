@@ -32,6 +32,8 @@ describe("app upgrade contract", () => {
     const data = {
       versionNo: "1.1.0",
       packageUrl: "https://oss.example.com/app.apk",
+      packageFileName: "app-1.1.0.apk",
+      md5: "d41d8cd98f00b204e9800998ecf8427e",
       updateContent: "修复已知问题",
       needForceUpdate: 1,
     };

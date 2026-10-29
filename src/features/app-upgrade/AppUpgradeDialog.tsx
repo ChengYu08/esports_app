@@ -14,6 +14,7 @@ export function AppUpgradeDialog() {
     forceUpdate,
     latest,
     downloadPhase,
+    downloadErrorType,
     downloadProgress,
     closeDialog,
     confirmUpdate,
@@ -34,7 +35,7 @@ export function AppUpgradeDialog() {
           : downloadPhase === "error"
             ? "重新下载"
             : "立即更新";
-  const updateContent = latest?.updateContent?.trim() || "暂无更新说明";
+  const updateContent = latest?.updateContent?.trim() ?? "";
 
   const requestClose = () => {
     if (!forceUpdate && !busy) closeDialog();
@@ -68,7 +69,11 @@ export function AppUpgradeDialog() {
               <Text style={styles.updateContent}>{updateContent}</Text>
             </ScrollView>
             {downloadPhase === "error" && (
-              <Text style={styles.errorText}>下载失败，请检查网络后重试</Text>
+              <Text style={styles.errorText}>
+                {downloadErrorType === "integrity"
+                  ? "安装包校验失败，已删除损坏文件，请重新下载"
+                  : "下载失败，请检查网络后重试"}
+              </Text>
             )}
             {downloadPhase === "need-permission" && (
               <Text style={styles.errorText}>

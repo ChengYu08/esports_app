@@ -17,6 +17,8 @@ export type AppVersionVO = {
   /** 安装包下载地址（Android APK / iOS 安装链接） */
   packageUrl?: string;
   packageFileName?: string;
+  /** 安装包校验值（当前为 MD5 32位小写）；缺失时客户端跳过校验，兼容旧数据 */
+  md5?: string;
   /** 更新说明 */
   updateContent?: string;
   /** 启用版本自身的强制更新开关：0否 1是 */

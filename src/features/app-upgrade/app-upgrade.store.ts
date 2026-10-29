@@ -5,6 +5,9 @@ import { create } from "zustand";
 import { logger } from "@/core/logging/logger";
 
 import {
+  computeFileMd5,
+  decideMd5Verification,
+  deleteApk,
   downloadApk,
   hasInstallPermission,
   installApk,
@@ -23,6 +26,12 @@ export type AppUpgradeDownloadPhase =
   /** 未授予"安装未知应用"权限，等待用户去系统设置开启 */
   | "need-permission";
 
+export type AppUpgradeDownloadErrorType =
+  /** 下载包 MD5 校验失败，损坏文件已删除 */
+  | "integrity"
+  /** 网络/下载/安装等常规失败 */
+  | null;
+
 type AppUpgradeState = {
   /** 升级弹窗是否可见 */
   visible: boolean;
@@ -31,6 +40,8 @@ type AppUpgradeState = {
   latest: AppVersionVO | null;
   checking: boolean;
   downloadPhase: AppUpgradeDownloadPhase;
+  /** 错误细分类型，弹窗按此区分提示文案 */
+  downloadErrorType: AppUpgradeDownloadErrorType;
   /** 0-100 */
   downloadProgress: number;
   /** 已下载完成的 APK 文件 uri，重试/授权返回后复用避免重新下载 */
@@ -59,12 +70,26 @@ function runCheck(silent: boolean): Promise<boolean> {
     try {
       const latest = await appUpgradeApi.fetchLatestVersion("ANDROID", currentVersion);
       const decision = decideAppUpgrade(latest, currentVersion);
+      // 重新弹出弹窗时清理上次下载尝试的残留状态，避免显示过期的失败提示；
+      // 下载/安装进行中不打断，已缓存的下载文件保留（复用路径会重新校验 md5）
+      const { downloadPhase } = useAppUpgradeStore.getState();
+      const resettable =
+        decision.hasUpdate &&
+        downloadPhase !== "downloading" &&
+        downloadPhase !== "installing";
       store.setState({
         checking: false,
         hasUpdate: decision.hasUpdate,
         forceUpdate: decision.forceUpdate,
         latest: decision.latest,
         visible: decision.hasUpdate,
+        ...(resettable
+          ? {
+              downloadPhase: "idle" as const,
+              downloadProgress: 0,
+              downloadErrorType: null,
+            }
+          : {}),
       });
       return decision.hasUpdate;
     } catch (error) {
@@ -87,6 +112,7 @@ export const useAppUpgradeStore = create<AppUpgradeState>(() => ({
   latest: null,
   checking: false,
   downloadPhase: "idle",
+  downloadErrorType: null,
   downloadProgress: 0,
   downloadedApkUri: null,
 
@@ -132,11 +158,61 @@ export const useAppUpgradeStore = create<AppUpgradeState>(() => ({
         useAppUpgradeStore.setState({
           downloadPhase: "downloading",
           downloadProgress: 0,
+          downloadErrorType: null,
         });
-        fileUri = await downloadApk(packageUrl, latest?.packageFileName, (percent) => {
+        fileUri = await downloadApk(packageUrl, latest?.versionNo, (percent) => {
           useAppUpgradeStore.setState({ downloadProgress: percent });
         });
         useAppUpgradeStore.setState({ downloadedApkUri: fileUri });
+      }
+
+      // 完整性校验：后端提供 md5 时，对新下载与缓存复用两条路径都校验
+      const expectedMd5 = latest?.md5?.trim().toLowerCase();
+      if (!expectedMd5) {
+        logger.info("app_upgrade.md5_skip", { fileUri, reason: "no_expected" });
+      } else {
+        const hashStartedAt = Date.now();
+        let actualMd5: string | null = null;
+        try {
+          actualMd5 = await computeFileMd5(fileUri);
+        } catch (hashError) {
+          logger.warn("app_upgrade.md5_compute_failed", {
+            fileUri,
+            message:
+              hashError instanceof Error ? hashError.message : String(hashError),
+          });
+        }
+        logger.info("app_upgrade.md5_computed", {
+          fileUri,
+          md5: actualMd5,
+          costMs: Date.now() - hashStartedAt,
+        });
+        // actualMd5 为 null 仅发生在本地模块不可用（Expo Go/旧构建），跳过校验
+        if (actualMd5 === null) {
+          logger.info("app_upgrade.md5_skip", {
+            fileUri,
+            reason: "module_unavailable",
+          });
+        } else if (
+          decideMd5Verification(expectedMd5, actualMd5) === "mismatch"
+        ) {
+          logger.warn("app_upgrade.md5_mismatch", {
+            fileUri,
+            expected: expectedMd5,
+            actual: actualMd5,
+          });
+          await deleteApk(fileUri);
+          logger.info("app_upgrade.corrupt_apk_deleted", { fileUri });
+          useAppUpgradeStore.setState({
+            downloadedApkUri: null,
+            downloadProgress: 0,
+            downloadErrorType: "integrity",
+            downloadPhase: "error",
+          });
+          return;
+        } else {
+          logger.info("app_upgrade.md5_match", { fileUri, md5: actualMd5 });
+        }
       }
 
       useAppUpgradeStore.setState({ downloadPhase: "installing" });
@@ -155,7 +231,10 @@ export const useAppUpgradeStore = create<AppUpgradeState>(() => ({
       logger.warn("app_upgrade.install_failed", {
         message: error instanceof Error ? error.message : String(error),
       });
-      useAppUpgradeStore.setState({ downloadPhase: "error" });
+      useAppUpgradeStore.setState({
+        downloadPhase: "error",
+        downloadErrorType: null,
+      });
     }
   },
 
@@ -166,7 +245,11 @@ export const useAppUpgradeStore = create<AppUpgradeState>(() => ({
   },
 
   resetDownload: () => {
-    useAppUpgradeStore.setState({ downloadPhase: "idle", downloadProgress: 0 });
+    useAppUpgradeStore.setState({
+      downloadPhase: "idle",
+      downloadProgress: 0,
+      downloadErrorType: null,
+    });
   },
 }));
 
