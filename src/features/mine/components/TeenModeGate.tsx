@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-
+import { StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 import { useAuthStore } from "@esports/auth";
 
