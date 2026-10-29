@@ -1,17 +1,21 @@
 import Constants from "expo-constants";
 import { Image } from "expo-image";
 import { router } from "expo-router";
+import { useState } from "react";
 import {
-  Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  View
+  View,
 } from "react-native";
+import Toast from "react-native-root-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { APP_LINKS } from "@/core/config/links";
+import { fetchLatestDesktopVersion } from "@/features/mine/api/desktop-version.api";
+import { compareVersionNos } from "@/features/mine/utils/version-compare";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { openExternalLink } from "@/shared/navigation/open-external-link";
 
@@ -20,12 +24,46 @@ const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const arrowIcon = require("../../../../assets/mine/figma/mine-arrow-right.svg");
 
 const VERSION = `v${Constants.expoConfig?.version ?? "1.0.0"}`;
+const LOCAL_VERSION = Constants.expoConfig?.version ?? "1.0.0";
 
 export default function AboutScreen() {
   const insets = useSafeAreaInsets();
+  const [checking, setChecking] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<string | undefined>(
+    undefined,
+  );
 
   const checkForUpdate = () => {
-    Alert.alert("检测更新", "请前往应用商店查看是否有新版本");
+    if (checking) {
+      return;
+    }
+    setChecking(true);
+    setUpdateStatus("检查中...");
+    void (async () => {
+      try {
+        const platform = Platform.OS === "ios" ? "IOS" : "ANDROID";
+        const latest = await fetchLatestDesktopVersion(
+          platform,
+          LOCAL_VERSION,
+        );
+        // 无启用版本视为无更新
+        if (
+          latest === null ||
+          compareVersionNos(LOCAL_VERSION, latest.versionNo) >= 0
+        ) {
+          setUpdateStatus("已是最新版本");
+          return;
+        }
+        setUpdateStatus(`发现新版本 v${latest.versionNo}`);
+        Toast.show("发现新版本，请前往应用中心下载更新", {
+          duration: Toast.durations.LONG,
+        });
+      } catch {
+        setUpdateStatus("检查更新失败");
+      } finally {
+        setChecking(false);
+      }
+    })();
   };
 
   return (
@@ -69,7 +107,11 @@ export default function AboutScreen() {
         </View>
 
         <View style={styles.list}>
-          <AboutRow label="检测更新" onPress={checkForUpdate} />
+          <AboutRow
+            label="检测更新"
+            value={checking ? "检查中..." : updateStatus}
+            onPress={checkForUpdate}
+          />
           <View style={styles.divider} />
           <AboutRow
             label="用户协议"
@@ -87,10 +129,19 @@ export default function AboutScreen() {
   );
 }
 
-function AboutRow({ label, onPress }: { label: string; onPress: () => void }) {
+function AboutRow({
+  label,
+  value,
+  onPress,
+}: {
+  label: string;
+  value?: string;
+  onPress: () => void;
+}) {
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
+      {value ? <Text style={styles.rowValue}>{value}</Text> : null}
       <Image source={arrowIcon} style={styles.arrowIcon} />
     </Pressable>
   );
@@ -149,6 +200,13 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     backgroundColor: "#EBEBEB",
     marginHorizontal: 16,
+  },
+  rowValue: {
+    color: "#999999",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 14,
+    lineHeight: 22,
+    textAlign: "right",
   },
   rowLabel: {
     flex: 1,
