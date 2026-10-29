@@ -136,7 +136,7 @@ steps:
 
         # 构建的 UTC 与本地时间（构建容器默认 UTC；展示步骤会用东八区偏移换算为北京时间）
         {
-          echo "BUILD_TIME_UTC=$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          printf 'BUILD_TIME_UTC=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
           printf 'DRONE_COMMIT_SHORT=%s\n' "$(echo "$DRONE_COMMIT_SHA" | cut -c1-8)"
           printf 'DRONE_BUILD_START_TS=%s\n' "$DRONE_BUILD_STARTED"
           printf 'DRONE_BUILD_FINISH_TS=%s\n' "$(date +%s)"
