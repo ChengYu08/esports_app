@@ -1,8 +1,10 @@
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
+  Checkmark16Regular,
   ChevronLeft24Regular,
   ChevronRight16Regular,
+  Dismiss24Regular,
 } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
@@ -81,6 +83,7 @@ export default function EditProfileScreen() {
   const [editing, setEditing] = useState<EditField | null>(null);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
+  const [genderSaving, setGenderSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarEditing, setAvatarEditing] = useState(false);
 
@@ -121,11 +124,9 @@ export default function EditProfileScreen() {
     }
     setSaving(true);
     try {
-      const data =
-        editing === "gender"
-          ? { gender: Number(value) }
-          : { birth: value || undefined };
-      const profile = await clientAuthApi.updateProfile(token, data);
+      const profile = await clientAuthApi.updateProfile(token, {
+        birth: value || undefined,
+      });
       await applyProfile(profile);
       setEditing(null);
       Toast.show("保存成功", { duration: Toast.durations.SHORT });
@@ -136,6 +137,26 @@ export default function EditProfileScreen() {
       );
     } finally {
       setSaving(false);
+    }
+  };
+
+  // 性别浮层：点选项立即保存（设计稿交互规则 1：点击选项立即生效，浮层自动收起）
+  const saveGenderImmediate = async (gender: number) => {
+    if (!token || !user || genderSaving) {
+      return;
+    }
+    setGenderSaving(true);
+    try {
+      const profile = await clientAuthApi.updateProfile(token, { gender });
+      await applyProfile(profile);
+      setEditing(null);
+    } catch (error) {
+      Toast.show(
+        error instanceof Error ? error.message : "保存失败，请稍后重试",
+        { duration: Toast.durations.SHORT },
+      );
+    } finally {
+      setGenderSaving(false);
     }
   };
 
@@ -277,28 +298,46 @@ export default function EditProfileScreen() {
         onClose={() => setEditing(null)}
         contentStyle={[styles.modalCard, { paddingBottom: 20 + insets.bottom }]}
       >
-        <View>
-          <Text style={styles.modalTitle}>{editTitle(editing)}</Text>
-          {editing === "gender" ? (
-            <View style={styles.genderOptions}>
-              {[
-                [1, "男"],
-                [2, "女"],
-                [0, "保密"],
-              ].map(([value, label]) => (
+        {editing === "gender" ? (
+          <>
+            {/* 性别浮层：标题+叉号，点选项立即生效（设计稿 253-37294 / 361-40404） */}
+            <View style={styles.sheetTitleRow}>
+              <Text style={styles.sheetTitle}>选择性别</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="关闭"
+                hitSlop={12}
+                onPress={() => setEditing(null)}
+                style={styles.sheetClose}
+              >
+                <Dismiss24Regular color="#999999" width={20} height={20} />
+              </Pressable>
+            </View>
+            {([
+              [1, "男"],
+              [2, "女"],
+            ] as const).map(([value, label]) => {
+              const selected = Number(user?.gender ?? 0) === value;
+              return (
                 <Pressable
                   key={String(value)}
-                  onPress={() => setDraft(String(value))}
-                  style={[
-                    styles.genderOption,
-                    draft === String(value) && styles.genderOptionActive,
-                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={label}
+                  disabled={genderSaving}
+                  onPress={() => void saveGenderImmediate(value)}
+                  style={styles.genderRadioRow}
                 >
-                  <Text style={styles.genderOptionText}>{label}</Text>
+                  <Text style={styles.genderRadioText}>{label}</Text>
+                  {selected ? (
+                    <Checkmark16Regular color="#FE1F4C" width={16} height={16} />
+                  ) : null}
                 </Pressable>
-              ))}
-            </View>
-          ) : (
+              );
+            })}
+          </>
+        ) : (
+          <View>
+            <Text style={styles.modalTitle}>{editTitle(editing)}</Text>
             <TextInput
               autoFocus
               value={draft}
@@ -309,25 +348,25 @@ export default function EditProfileScreen() {
               }
               style={styles.input}
             />
-          )}
-          <View style={styles.modalActions}>
-            <Pressable
-              onPress={() => setEditing(null)}
-              style={styles.cancelButton}
-            >
-              <Text style={styles.cancelText}>取消</Text>
-            </Pressable>
-            <Pressable
-              disabled={saving}
-              onPress={() => void saveEdit()}
-              style={styles.confirmButton}
-            >
-              <Text style={styles.confirmText}>
-                {saving ? "保存中" : "保存"}
-              </Text>
-            </Pressable>
+            <View style={styles.modalActions}>
+              <Pressable
+                onPress={() => setEditing(null)}
+                style={styles.cancelButton}
+              >
+                <Text style={styles.cancelText}>取消</Text>
+              </Pressable>
+              <Pressable
+                disabled={saving}
+                onPress={() => void saveEdit()}
+                style={styles.confirmButton}
+              >
+                <Text style={styles.confirmText}>
+                  {saving ? "保存中" : "保存"}
+                </Text>
+              </Pressable>
+            </View>
           </View>
-        </View>
+        )}
       </BottomSheet>
     </View>
   );
@@ -511,5 +550,40 @@ const styles = StyleSheet.create({
     fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "600",
+  },
+  sheetTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 28,
+    marginBottom: 8,
+  },
+  sheetTitle: {
+    color: "#333333",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: "600",
+  },
+  sheetClose: {
+    position: "absolute",
+    right: 0,
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  genderRadioRow: {
+    height: 54,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+  },
+  genderRadioText: {
+    color: "#333333",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 14,
+    lineHeight: 22,
   },
 });
