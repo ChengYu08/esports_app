@@ -76,6 +76,19 @@ export function ClubCard({
             <Image source={icons.id} style={styles.metaIcon} />
             <Text style={styles.metaText}>{club.clubCode}</Text>
           </View>
+          {club.games?.length ? (
+            <View style={styles.gameIcons}>
+              {club.games.slice(0, 3).map((game) => (
+                <CachedImage
+                  key={game.id}
+                  accessibilityLabel={game.name}
+                  source={{ uri: game.iconUrl as string }}
+                  style={styles.gameIcon}
+                  contentFit="cover"
+                />
+              ))}
+            </View>
+          ) : null}
         </View>
       </View>
     </Pressable>
@@ -157,6 +170,18 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
+  gameIcons: {
+    marginLeft: "auto",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  gameIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#F2F2F2",
+  },
   meta: { flexDirection: "row", alignItems: "center", gap: 3 },
   metaText: {
     fontFamily: DOUYIN_SANS,
