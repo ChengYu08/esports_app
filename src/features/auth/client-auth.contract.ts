@@ -45,6 +45,13 @@ export type ClientOssSts = {
 export type ClientImToken = { token: string };
 export type ClientUserProfile = { id: string; nickname: string; headImage: string };
 
+export type ClientCancellationStatus = {
+  inCooling: boolean;
+  coolEndTime?: string | null;
+  remainDays?: number;
+  coolingDays?: number;
+};
+
 export type AuthRequestOptions = {
   method: 'POST';
   body?: unknown;
@@ -99,11 +106,15 @@ export function createClientAuthContract(requester: AuthRequester) {
         method: 'POST', token,
       }));
     },
-    async checkAccountCancellation(token: string) {
+    async applyCancellation(token: string) {
       await unwrap(await requester<unknown>('/client/v1/user/cancellation/apply', {
         method: 'POST', token,
       }));
-      return [];
+    },
+    async queryCancellationStatus(token: string) {
+      return requireData(await requester<ClientCancellationStatus>('/client/v1/user/cancellation/query', {
+        method: 'POST', token,
+      }));
     },
     async sendAccountCancellationSms(token: string) {
       return unwrap(await requester<unknown>('/client/v1/user/cancellation/sms/send', {

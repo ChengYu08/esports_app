@@ -62,6 +62,8 @@ modules/*/android/.gradle/
 .workbuddy/
 .claude/
 .codex/
+# Figma 临时渲染产物
+.figma-tmp/
 
 # react-native-update
 .pushy

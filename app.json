@@ -17,7 +17,7 @@
       "blockedPermissions": ["android.permission.CAMERA"],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#AB1E31"
       }
     },
     "web": {
@@ -26,6 +26,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-iap",
       [
         "expo-splash-screen",
         {
@@ -34,10 +35,9 @@
           "backgroundColor": "#2A1013",
           "enableFullScreenImage_legacy": true,
           "android": {
-            "backgroundColor": "#FFFFFF",
-            "image": "./assets/images/splash-icon.png",
-            "resizeMode": "cover",
-            "imageWidth": 288
+            "backgroundColor": "#2A1013",
+            "image": "./assets/images/splash-screen.png",
+            "resizeMode": "cover"
           }
         }
       ],
@@ -53,6 +53,7 @@
       "./plugins/withNodeCommandUtf8",
       "./plugins/withAndroidReleaseBuild",
       "./plugins/withPushyDeepLink",
+      "./plugins/withPzOneClickLibs",
       [
         "expo-image-picker",
         {

@@ -1,4 +1,4 @@
-import { Search24Regular } from "@fluentui/react-native-icons";
+import { COURT_FONT_FAMILY } from "@/features/court/court.theme";
 import type {
   HomeBannerSlot,
   Game,
@@ -9,12 +9,12 @@ import type {
 import { DOUYIN_SANS, SYSTEM_FONT } from "@/shared/theme/typography";
 import { GameCategoryTabs } from "./GameCategoryTabs";
 import { HomeBannerSections } from "./HomeBannerSections";
-import { COURT_FONT_FAMILY } from "@/features/court/court.theme";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
+const searchIcon = require("../../../../assets/home/h_search.svg");
 const tabLeftCorner = require("../../../../assets/home/h_tab_left.svg");
 const tabRightCorner = require("../../../../assets/home/h_tab_right.svg");
 type HomeHeaderProps = {
@@ -146,13 +146,12 @@ export function HomeTopBar({ tab, onTabChange }: Pick<HomeHeaderProps, "tab" | "
     <View style={styles.topBar}>
       <View style={styles.topTabs}>
         <Tab label="首页" court={tab === "court"} selected={tab === "home"} onPress={() => onTabChange("home")} />
+        <Tab label="大神" court={tab === "court"} selected={tab === "god"} onPress={() => onTabChange("god")} />
         <Tab label="小法庭" court={tab === "court"} selected={tab === "court"} onPress={() => onTabChange("court")} />
       </View>
       <View style={styles.actions}>
         <Pressable accessibilityLabel="搜索" style={styles.search} onPress={() => router.push({ pathname: "/search", params: { type: "club" } })}>
-          <View style={styles.searchIcon}>
-            <Search24Regular color="#1A1A1A" width={20} height={20} />
-          </View>
+          <Image source={searchIcon} style={styles.searchIcon} />
         </Pressable>
       </View>
     </View>
@@ -215,12 +214,7 @@ const styles = StyleSheet.create({
   },
   actions: { alignItems: "center", flexDirection: "row", gap: 10, height: "100%", paddingRight: 12 },
   search: { alignItems: "center", height: 44, justifyContent: "center", width: 40 },
-  searchIcon: {
-    width: 48,
-    height: 48,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  searchIcon: { width: 48, height: 48 },
   gameTabs: {
     height: 38,
   },

@@ -14,8 +14,10 @@ import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
 private const val TAG = "PzOneClick"
-private const val USER_AGREEMENT_URL = "https://djpc.jlgkj.top/user.html"
-private const val PRIVACY_POLICY_URL = "https://djpc.jlgkj.top//privacy.html"
+private val PROTOCOL_BASE_URL =
+  if (BuildConfig.DEBUG) "https://djpc.yingbowl.com" else "https://dj.panzhi.com"
+private val USER_AGREEMENT_URL = "$PROTOCOL_BASE_URL/public/protocols?code=user_server"
+private val PRIVACY_POLICY_URL = "$PROTOCOL_BASE_URL/public/protocols?code=user_privacy"
 
 class PzOneClickModule : Module() {
   private var authHelper: PhoneNumberAuthHelper? = null

@@ -1,23 +1,25 @@
-import { ChevronLeft24Regular, ChevronRight16Regular } from "@fluentui/react-native-icons";
 import { useAuthStore } from "@esports/auth";
+import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { RealNameVerificationSheet } from "@/features/mine/components/RealNameVerificationSheet";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
+const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
+const arrowIcon = require("../../../../assets/mine/figma/mine-arrow-right.svg");
 
 export default function AccountSecurityScreen() {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
-  const [verifyVisible, setVerifyVisible] = useState(false);
   const phone = user?.phone;
   const maskedPhone = phone
     ? phone.includes("*")
       ? phone
       : `${phone.slice(0, 3)} **** ${phone.slice(-4)}`
     : "未绑定";
+
+  const openRealNameVerification = () => {
+    router.push("/real-name-verification");
+  };
 
   return (
     <View style={styles.screen}>
@@ -33,7 +35,7 @@ export default function AccountSecurityScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <ChevronLeft24Regular color="#0A0A0A" width={24} height={24} style={styles.backIcon} />
+          <Image source={backIcon} style={styles.backIcon} />
         </Pressable>
         <Text style={styles.title}>账号与安全</Text>
         <View style={styles.headerEnd} />
@@ -42,53 +44,33 @@ export default function AccountSecurityScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="实名认证"
-          onPress={() => user?.isRealName !== 1 && setVerifyVisible(true)}
+          onPress={openRealNameVerification}
           style={({ pressed }) => [styles.row, pressed && styles.pressed]}
         >
           <Text style={styles.label}>实名认证</Text>
           <View style={styles.rowRight}>
-            <Text style={styles.value}>
+            <Text
+              style={
+                user?.isRealName === 1
+                  ? styles.value
+                  : styles.valuePlaceholder
+              }
+            >
               {user?.isRealName === 1
                 ? `已认证（${user.realName || "本人"}）`
                 : "未认证"}
             </Text>
-            <ChevronRight16Regular color="#0A0A0A" width={18} height={18} style={styles.arrow} />
+            <Image source={arrowIcon} style={styles.arrow} />
           </View>
         </Pressable>
-        <View style={[styles.row, styles.lastRow]}>
+        <View style={styles.divider} />
+        <View style={styles.row}>
           <Text style={styles.label}>手机号</Text>
           <Text style={styles.value}>
             {maskedPhone}
             {phone ? "（已绑定）" : ""}
           </Text>
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="修改密码"
-          onPress={() =>
-            router.push({
-              pathname: "/forgot-password",
-              params: { phone: user?.phone || "" },
-            })
-          }
-          style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-        >
-          <Text style={styles.label}>修改密码</Text>
-          <View style={styles.rowRight}>
-            <ChevronRight16Regular color="#0A0A0A" width={18} height={18} style={styles.arrow} />
-          </View>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="黑名单"
-          onPress={() => router.push("/blacklist")}
-          style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-        >
-          <Text style={styles.label}>黑名单</Text>
-          <View style={styles.rowRight}>
-            <ChevronRight16Regular color="#0A0A0A" width={18} height={18} style={styles.arrow} />
-          </View>
-        </Pressable>
       </View>
       <Pressable
         accessibilityRole="button"
@@ -100,10 +82,6 @@ export default function AccountSecurityScreen() {
       >
         <Text style={styles.cancellationText}>注销账户</Text>
       </Pressable>
-      <RealNameVerificationSheet
-        visible={verifyVisible}
-        onClose={() => setVerifyVisible(false)}
-      />
     </View>
   );
 }
@@ -115,32 +93,44 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
   },
-  backButton: { width: 44, height: 44, justifyContent: "center" },
-  backIcon: { width: 24, height: 24 },
-  headerEnd: { width: 44 },
+  backButton: {
+    width: 48,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
+  headerEnd: { width: 16 },
   title: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 17,
+    fontSize: 16,
     lineHeight: 24,
-    fontWeight: "600",
+    fontWeight: "500",
   },
   group: { marginTop: 8, backgroundColor: "#FFF" },
   row: {
     minHeight: 54,
-    paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#E8E8E8",
+    paddingLeft: 16,
+    paddingRight: 12,
+    paddingVertical: 16,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  lastRow: { borderBottomWidth: 0 },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "#EBEBEB",
+    marginHorizontal: 16,
+  },
   rowRight: { flexDirection: "row", alignItems: "center", gap: 4 },
-  label: { color: "#222", fontFamily: DOUYIN_SANS, fontSize: 14 },
-  value: { color: "#999", fontSize: 13 },
+  label: {
+    color: "#0A0A0A",
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  value: { color: "#666666", fontSize: 14, lineHeight: 22 },
+  valuePlaceholder: { color: "#CCCCCC", fontSize: 14, lineHeight: 22 },
   arrow: { width: 18, height: 18 },
   cancellation: {
     minHeight: 54,
@@ -149,6 +139,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  cancellationText: { color: "#E11D2A", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  cancellationText: {
+    color: "#FF1F4C",
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: "600",
+  },
   pressed: { backgroundColor: "#F5F5F5" },
 });

@@ -83,8 +83,8 @@ const styles = StyleSheet.create({
   },
   compactWave: { width: 16, height: 16, gap: 2 },
   bar: {
-    width: 2,
-    borderRadius: 1,
+    width: 1.5,
+    borderRadius: 0.75,
     backgroundColor: "#fff",
     transformOrigin: "center",
   },

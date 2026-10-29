@@ -1,11 +1,13 @@
+import dispatchAssistantAvatar from "../../../assets/images/dispatch-assistant.png";
+import orderAssistantAvatar from "../../../assets/message/order-assistant.svg";
 import {
   isDispatchAssistantConversationId,
   isOrderAssistantConversationId,
   isSystemConversationId,
 } from "./system-conversations";
 
-export const ORDER_ASSISTANT_AVATAR = require("../../../assets/message/order-assistant.svg");
-export const DISPATCH_ASSISTANT_AVATAR = require("../../../assets/images/dispatch-assistant.png");
+export const ORDER_ASSISTANT_AVATAR = orderAssistantAvatar;
+export const DISPATCH_ASSISTANT_AVATAR = dispatchAssistantAvatar;
 
 export function resolveConversationAvatar(
   avatar: string | undefined,
