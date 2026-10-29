@@ -31,16 +31,16 @@ import { BottomSheet } from "@/shared/ui/BottomSheet";
 const fallbackAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const cameraIcon = require("../../../../assets/mine/figma/edit-camera.svg");
 
-type EditField = "nickname" | "signature" | "gender" | "birth";
+type EditField = "signature" | "gender" | "birth";
 
 type EditRow = {
-  key: EditField;
+  // nickname 行跳转独立页面，不走 BottomSheet 编辑态，故 key 为普通字符串
+  key: string;
   label: string;
   value: string;
 };
 
 function editTitle(field: EditField | null): string {
-  if (field === "nickname") return "修改昵称";
   if (field === "signature") return "修改个性签名";
   if (field === "gender") return "选择性别";
   if (field === "birth") return "修改年龄";
@@ -106,12 +106,10 @@ export default function EditProfileScreen() {
   };
 
   const saveEdit = async () => {
-    if (!editing || !token || !user) return;
-    const value = draft.trim();
-    if (editing === "nickname" && !value) {
-      Toast.show("昵称不能为空", { duration: Toast.durations.SHORT });
+    if (!editing || !token || !user) {
       return;
     }
+    const value = draft.trim();
     if (
       editing === "birth" &&
       value &&
@@ -125,13 +123,11 @@ export default function EditProfileScreen() {
     setSaving(true);
     try {
       const data =
-        editing === "nickname"
-          ? { nickname: value }
-          : editing === "signature"
-            ? { signature: value }
-            : editing === "gender"
-              ? { gender: Number(value) }
-              : { birth: value || undefined };
+        editing === "signature"
+          ? { signature: value }
+          : editing === "gender"
+            ? { gender: Number(value) }
+            : { birth: value || undefined };
       const profile = await clientAuthApi.updateProfile(token, data);
       await applyProfile(profile);
       setEditing(null);
@@ -235,15 +231,21 @@ export default function EditProfileScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={`编辑${row.label}`}
                 onPress={() => {
-                  setEditing(row.key);
+                  // 昵称走独立的“编辑名字”页（设计稿 253-36947）
+                  if (row.key === "nickname") {
+                    router.push({
+                      pathname: "/edit-nickname",
+                      params: { nickname: user?.nickname ?? "" },
+                    });
+                    return;
+                  }
+                  setEditing(row.key as EditField);
                   setDraft(
-                    row.key === "nickname"
-                      ? user?.nickname || ""
-                      : row.key === "signature"
-                        ? user?.signature || ""
-                        : row.key === "gender"
-                          ? String(user?.gender ?? 0)
-                          : user?.birth || "",
+                    row.key === "signature"
+                      ? user?.signature || ""
+                      : row.key === "gender"
+                        ? String(user?.gender ?? 0)
+                        : user?.birth || "",
                   );
                 }}
                 style={styles.row}
@@ -299,9 +301,7 @@ export default function EditProfileScreen() {
               autoFocus
               value={draft}
               onChangeText={setDraft}
-              maxLength={
-                editing === "signature" ? 60 : editing === "nickname" ? 20 : 10
-              }
+              maxLength={editing === "signature" ? 60 : 10}
               placeholder={
                 editing === "birth" ? "请输入出生日期，如 2000-01-01" : "请输入"
               }
