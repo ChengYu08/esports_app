@@ -17,8 +17,16 @@ android {
   }
 }
 
+// 本模块编译需要；:app 解析 runtimeClasspath 时也要能解析同名 AAR。
+// 在模块内向根工程注册 flatDir，避免依赖 prebuild 注入 android/build.gradle（CNG 会丢）。
+def oneClickLibsDir = file('libs')
 repositories {
-  flatDir { dirs 'libs' }
+  flatDir { dirs oneClickLibsDir }
+}
+rootProject.allprojects { proj ->
+  proj.repositories {
+    flatDir { dirs oneClickLibsDir }
+  }
 }
 
 dependencies {

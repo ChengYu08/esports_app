@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { mapRongMessage, type RongSdkMessage } from "./chat-message";
+import { mapRongMessage, messagePreview, type RongSdkMessage } from "./chat-message";
 
 const enums = { image: 4, send: 0 };
 
@@ -11,7 +11,7 @@ describe("server system notifications", () => {
     { objectName: "TEXT_NOTIFY_MSG", rawData: JSON.stringify({ commandName: "TEXT_NOTIFY_MSG", content: "您的实名认证已通过" }) },
   ])("renders platform notifications with business fields decoded by the SDK: %j", (body) => {
     expect(mapRongMessage({ ...body, messageUId: "platform-decoded-1", direction: 1 }, enums)).toMatchObject({
-      id: "platform-decoded-1", kind: "text", text: "您的实名认证已通过", isMine: false,
+      id: "platform-decoded-1", kind: "markdown", text: "您的实名认证已通过", isMine: false,
     });
   });
 
@@ -21,7 +21,7 @@ describe("server system notifications", () => {
   ])("renders platform notification content from the native SDK: %j", (body) => {
     const message: RongSdkMessage = { ...body, messageUId: "platform-1", direction: 1 };
     expect(mapRongMessage(message, enums)).toMatchObject({
-      id: "platform-1", kind: "text", text: "您的实名认证已通过", isMine: false,
+      id: "platform-1", kind: "markdown", text: "您的实名认证已通过", isMine: false,
     });
   });
 
@@ -62,7 +62,21 @@ describe("server system notifications", () => {
         content: "通知摘要",
         data: JSON.stringify({ content: "您的实名认证已通过" }),
       },
-    }, enums)).toMatchObject({ kind: "text", text: "您的实名认证已通过" });
+    }, enums)).toMatchObject({ kind: "markdown", text: "您的实名认证已通过" });
+  });
+
+  it("keeps quick match cancellation notices as markdown like the PC client", () => {
+    const content = "### 快速匹配取消通知\n\n您发起的快速匹配，因30分钟未确认自动取消。\n\n开始匹配单号: QM2114996677449506818\n时间: 2026-10-27 16:54:37";
+    expect(mapRongMessage({
+      messageIdentifier: "RC:CustomMsg",
+      fields: { name: "TEXT_NOTIFY_MSG", data: JSON.stringify({ content }) },
+    }, enums)).toMatchObject({ kind: "markdown", text: content });
+    expect(messagePreview({ id: "1", kind: "markdown", text: content, time: "", isMine: false }))
+      .toBe("快速匹配取消通知\n\n您发起的快速匹配，因30分钟未确认自动取消。\n\n开始匹配单号: QM2114996677449506818\n时间: 2026-10-27 16:54:37");
+  });
+
+  it("falls back to [通知] when a markdown message only contains markers", () => {
+    expect(messagePreview({ id: "1", kind: "markdown", text: "### **", time: "", isMine: false })).toBe("[通知]");
   });
 
   it("ignores non-text notification content", () => {

@@ -98,6 +98,9 @@ function mapConversation(conversation: RCIMIWConversation): RongConversation {
     time: last.time,
     unreadCount: conversation.unreadCount || 0,
     updatedAt: conversation.lastMessage?.sentTime || 0,
+    // 与 Web 端一致：置顶态以融云服务端的 top 为准（多端同步）；
+    // 快照未携带该字段时保持 undefined，交由 mergeConversations 保留本地态。
+    isPinned: conversation.top == null ? undefined : Boolean(conversation.top),
   };
 }
 
@@ -678,6 +681,20 @@ export async function markRongConversationRead(targetId: string) {
   if (!engine || !connected || !sdk || !targetId) return false;
   const code = await engine.clearUnreadCount(sdk.RCIMIWConversationType.PRIVATE, getRongConversationTargetId(targetId), '', Date.now());
   if (code !== 0) throw new Error(`清除未读失败（${code}）`);
+  return true;
+}
+
+// 与 Web 端保持一致：置顶写入融云服务端，保证多端同步。
+export async function setRongConversationPinned(targetId: string, isPinned: boolean) {
+  const sdk = loadSdk();
+  if (!engine || !connected || !sdk || !targetId) return false;
+  const code = await engine.changeConversationTopStatus(
+    sdk.RCIMIWConversationType.PRIVATE,
+    getRongConversationTargetId(targetId),
+    '',
+    isPinned,
+  );
+  if (code !== 0) throw new Error(`设置置顶失败（${code}）`);
   return true;
 }
 

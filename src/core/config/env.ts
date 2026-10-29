@@ -15,6 +15,7 @@ const envSchema = z.object({
   aliyunAndroidAuthKey: z.string().default(""),
   rongCloudAppKey: z.string().default(""),
   agoraAppId: z.string().default(""),
+  alipayAppId: z.string().default(""),
 });
 
 const extra = (Constants.expoConfig?.extra ?? {}) as Record<string, unknown>;
@@ -28,8 +29,14 @@ const defaultProtocolBaseUrl =
     : "https://djpc.yingbowl.com";
 
 export const env = envSchema.parse({
-  apiBaseUrl: extra.apiBaseUrl ?? process.env.EXPO_PUBLIC_API_BASE_URL,
-  ssoBaseUrl: extra.ssoBaseUrl ?? process.env.EXPO_PUBLIC_SSO_BASE_URL,
+  apiBaseUrl: isIos
+    ? (extra.apiBaseUrlIos ?? process.env.EXPO_PUBLIC_API_BASE_URL_IOS)
+    : (extra.apiBaseUrlAndroid ??
+      process.env.EXPO_PUBLIC_API_BASE_URL_ANDROID),
+  ssoBaseUrl: isIos
+    ? (extra.ssoBaseUrlIos ?? process.env.EXPO_PUBLIC_SSO_BASE_URL_IOS)
+    : (extra.ssoBaseUrlAndroid ??
+      process.env.EXPO_PUBLIC_SSO_BASE_URL_ANDROID),
   protocolBaseUrl:
     extra.protocolBaseUrl ??
     process.env.EXPO_PUBLIC_PROTOCOL_BASE_URL ??
@@ -49,4 +56,6 @@ export const env = envSchema.parse({
   rongCloudAppKey:
     extra.rongCloudAppKey ?? process.env.EXPO_PUBLIC_RONGCLOUD_APP_KEY,
   agoraAppId: extra.agoraAppId ?? process.env.EXPO_PUBLIC_AGORA_APP_ID,
+  alipayAppId:
+    extra.alipayAppId ?? process.env.EXPO_PUBLIC_ALIPAY_APP_ID,
 });

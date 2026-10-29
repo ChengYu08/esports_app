@@ -82,12 +82,14 @@ export default function RankingScreen({
     <View style={[styles.screen, { paddingTop: embedded ? 6 : insets.top, paddingBottom: 60 + insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }]}>
       <View style={styles.header}>
         <Text accessibilityRole="header" style={styles.title}>排行榜</Text>
+      </View>
+      <View style={styles.boardRow}>
+        <RankingBoardTabs value={filters.boardCode} onChange={(boardCode) => setFilters((value) => ({ ...value, boardCode }))} />
         <Pressable accessibilityRole="button" accessibilityLabel="查看榜单规则" onPress={() => setRulesVisible(true)} style={styles.rulesButton}>
           <View style={styles.infoIcon}><Text style={styles.infoLabel}>i</Text></View>
           <Text style={styles.rulesLabel}>榜单规则</Text>
         </Pressable>
       </View>
-      <RankingBoardTabs value={filters.boardCode} onChange={(boardCode) => setFilters((value) => ({ ...value, boardCode }))} />
       {board.hasGame && (
         <>
           <RankingGameFilter games={games.data ?? []} value={filters.gameId} onChange={(gameId) => setFilters((value) => ({ ...value, gameId }))} />
@@ -141,9 +143,10 @@ function RetryNotice({ message, onRetry }: { message: string; onRetry: () => voi
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingTop: 4, minHeight: 56 },
+  header: { alignItems: "center", paddingBottom: 4 },
   title: { fontFamily: DOUYIN_SANS, fontSize: 22, fontWeight: "600", color: colors.text },
-  rulesButton: { flexDirection: "row", alignItems: "center", gap: 5, minHeight: 44, paddingLeft: 12 },
+  boardRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  rulesButton: { flexDirection: "row", alignItems: "center", gap: 5, minHeight: 44, paddingHorizontal: 16 },
   rulesLabel: { fontFamily: DOUYIN_SANS, fontSize: 11, color: colors.textSecondary },
   infoIcon: { width: 13, height: 13, borderRadius: 7, borderWidth: 1, borderColor: colors.textMuted, justifyContent: "center", alignItems: "center" },
   infoLabel: { fontSize: 9, fontWeight: "600", color: colors.textMuted, lineHeight: 11 },

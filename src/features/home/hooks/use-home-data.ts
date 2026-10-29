@@ -4,8 +4,9 @@ import type { ClubFilters, CompanionFilters, HomeTab } from "@/features/home/api
 
 export function useHomeBanners(tab: HomeTab) {
   return useQuery({
-    queryKey: ["home-banners", tab],
-    queryFn: () => fetchBanners(tab),
+    queryKey: ["home-banner-slots"],
+    queryFn: ({ signal }) => fetchBanners(signal),
+    enabled: tab === "home",
   });
 }
 

@@ -2,7 +2,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { memo, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { SYSTEM_FONT } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import type {
   OrderAction,
@@ -43,68 +43,121 @@ export const OrderCard = memo(function OrderCard({
         onPress={() => onPress?.(item)}
         style={({ pressed }) => pressed && styles.cardPressed}
       >
-      <View style={styles.sellerRow}>
-        <View style={styles.seller}>
-          <CachedImage
-            contentFit="cover"
-            source={item.sellerAvatar}
-            style={styles.avatar}
-          />
-          <Text numberOfLines={1} style={styles.sellerName}>
-            {item.sellerName}
+        <View style={styles.sellerRow}>
+          <View style={styles.seller}>
+            <CachedImage
+              contentFit="cover"
+              source={item.sellerAvatar}
+              style={styles.avatar}
+            />
+            <Text numberOfLines={1} style={styles.sellerName}>
+              {item.sellerName}
+            </Text>
+            {item.voiceTag ? (
+              <Text
+                style={[
+                  styles.voiceTag,
+                  item.voiceTag === "需试音" && styles.voiceTagRequired,
+                ]}
+              >
+                {item.voiceTag}
+              </Text>
+            ) : null}
+          </View>
+          <Text
+            style={[
+              styles.status,
+              {
+                color: item.sourceLabel
+                  ? item.sourceLabel === "客服派单"
+                    ? "#1B84E0"
+                    : "#FF943D"
+                  : STATUS_COLORS[item.status],
+              },
+            ]}
+          >
+            {item.sourceLabel ?? item.statusLabel}
           </Text>
-          {item.voiceTag ? (
-            <Text style={[styles.voiceTag, item.voiceTag === "需试音" && styles.voiceTagRequired]}>{item.voiceTag}</Text>
-          ) : null}
         </View>
-        <Text style={[styles.status, { color: item.sourceLabel ? (item.sourceLabel === "客服派单" ? "#1B84E0" : "#FF943D") : STATUS_COLORS[item.status] }]}>
-          {item.sourceLabel ?? item.statusLabel}
-        </Text>
-      </View>
 
-      <View style={styles.orderBody}>
-        <Text numberOfLines={1} style={styles.serviceName}>{item.serviceName}</Text>
-        <View style={styles.detailPanel}>
-          <OrderDetailRow label="游戏">
-            <View style={styles.gameValue}>
-              <CachedImage source={item.gameIcon ?? require("../../../../assets/voice-room/game.svg")} contentFit="contain" style={styles.gameIcon} />
-              <Text numberOfLines={1} style={styles.detailValue}>{item.gameName}</Text>
-            </View>
-          </OrderDetailRow>
-          <OrderDetailRow label="单价">
-            <Text style={styles.detailValue}>{item.unitPrice}星钻/{item.billingUnitName ?? "小时"}</Text>
-          </OrderDetailRow>
-          {item.remark ? (
-            <OrderDetailRow label="备注">
-              <Text numberOfLines={2} style={styles.detailValue}>{item.remark}</Text>
+        <View style={styles.orderBody}>
+          <Text numberOfLines={1} style={styles.serviceName}>
+            {item.serviceName}
+          </Text>
+          <View style={styles.detailPanel}>
+            <OrderDetailRow label="游戏">
+              <View style={styles.gameValue}>
+                <CachedImage
+                  source={
+                    item.gameIcon ??
+                    require("../../../../assets/voice-room/game.svg")
+                  }
+                  contentFit="contain"
+                  style={styles.gameIcon}
+                />
+                <Text numberOfLines={1} style={styles.detailValue}>
+                  {item.gameName}
+                </Text>
+              </View>
             </OrderDetailRow>
-          ) : null}
-        </View>
-        <View style={styles.totalRow}>
-          <View style={styles.quantitySummary}>
-            <Text style={styles.totalLabel}>{item.unitPrice}星钻</Text>
-            <Text style={styles.totalLabel}>x</Text>
-            <Text style={styles.quantity}>{item.quantity}{item.billingUnitName ?? "小时"}</Text>
+            <OrderDetailRow label="单价">
+              <Text style={styles.detailValue}>
+                {item.unitPrice}星钻/{item.billingUnitName ?? "小时"}
+              </Text>
+            </OrderDetailRow>
+            {item.remark ? (
+              <OrderDetailRow label="备注">
+                <Text numberOfLines={2} style={styles.detailValue}>
+                  {item.remark}
+                </Text>
+              </OrderDetailRow>
+            ) : null}
           </View>
-          <View style={styles.totalValue}>
-            <Text style={styles.totalLabel}>合计</Text>
-            <Text style={styles.totalPrice}>{item.totalPrice}</Text>
-            <CachedImage source={require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png")} contentFit="contain" style={styles.diamondIcon} />
+          <View style={styles.totalRow}>
+            <View style={styles.quantitySummary}>
+              <Text style={styles.totalLabel}>{item.unitPrice}星钻</Text>
+              <Text style={styles.totalLabel}>x</Text>
+              <Text style={styles.quantity}>
+                {item.quantity}
+                {item.billingUnitName ?? "小时"}
+              </Text>
+            </View>
+            <View style={styles.totalValue}>
+              <Text style={styles.totalLabel}>合计</Text>
+              <Text style={styles.totalPrice}>{item.totalPrice}</Text>
+              <CachedImage
+                source={require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png")}
+                contentFit="contain"
+                style={styles.diamondIcon}
+              />
+            </View>
           </View>
         </View>
-      </View>
       </Pressable>
 
-      {item.actions.length > 0 && <View style={styles.actions}>
-        {item.actions.map((action) => (
-          <ActionButton action={action} key={action.key} disabled={actionPending} onPress={() => onAction(item, action.key)} />
-        ))}
-      </View>}
+      {item.actions.length > 0 && (
+        <View style={styles.actions}>
+          {item.actions.map((action) => (
+            <ActionButton
+              action={action}
+              key={action.key}
+              disabled={actionPending}
+              onPress={() => onAction(item, action.key)}
+            />
+          ))}
+        </View>
+      )}
     </View>
   );
 });
 
-function OrderDetailRow({ label, children }: { label: string; children: ReactNode }) {
+function OrderDetailRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
   return (
     <View style={styles.detailRow}>
       <Text style={styles.detailLabel}>{label}</Text>
@@ -138,7 +191,9 @@ function ActionButton({
           start={{ x: 0, y: 0 }}
           style={styles.primaryButton}
         >
-          <Text style={styles.primaryButtonText}>{disabled ? "处理中…" : action.label}</Text>
+          <Text style={styles.primaryButtonText}>
+            {disabled ? "处理中…" : action.label}
+          </Text>
         </LinearGradient>
       </Pressable>
     );
@@ -183,7 +238,7 @@ const styles = StyleSheet.create({
   avatar: { width: 24, height: 24, borderRadius: 12 },
   sellerName: {
     flex: 1,
-    fontFamily: DOUYIN_SANS,
+    fontFamily: SYSTEM_FONT,
     color: "#0A0A0A",
     fontSize: 14,
     lineHeight: 22,
@@ -191,7 +246,7 @@ const styles = StyleSheet.create({
   },
   status: {
     marginLeft: 12,
-    fontFamily: DOUYIN_SANS,
+    fontFamily: SYSTEM_FONT,
     fontSize: 11,
     lineHeight: 16,
     fontWeight: "500",
@@ -202,14 +257,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#F2F2F2",
     paddingHorizontal: 4,
     color: "#808080",
-    fontFamily: DOUYIN_SANS,
+    fontFamily: SYSTEM_FONT,
     fontSize: 11,
     lineHeight: 18,
   },
   voiceTagRequired: { color: "#581CE5", backgroundColor: "#F1EBFF" },
   orderBody: { gap: 8 },
   serviceName: {
-    fontFamily: DOUYIN_SANS,
+    fontFamily: SYSTEM_FONT,
     color: "#0A0A0A",
     fontSize: 14,
     lineHeight: 22,
@@ -225,14 +280,14 @@ const styles = StyleSheet.create({
   detailLabel: {
     width: 36,
     color: "#999999",
-    fontFamily: DOUYIN_SANS,
+    fontFamily: SYSTEM_FONT,
     fontSize: 12,
     lineHeight: 18,
   },
   detailContent: { flex: 1 },
   detailValue: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
+    fontFamily: SYSTEM_FONT,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -241,7 +296,7 @@ const styles = StyleSheet.create({
   quantitySummary: { flexDirection: "row", alignItems: "center", gap: 4 },
   totalValue: { flexDirection: "row", alignItems: "center", gap: 4 },
   quantity: {
-    fontFamily: DOUYIN_SANS,
+    fontFamily: SYSTEM_FONT,
     color: "#999999",
     fontSize: 12,
     lineHeight: 18,
@@ -253,13 +308,13 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   totalLabel: {
-    fontFamily: DOUYIN_SANS,
+    fontFamily: SYSTEM_FONT,
     color: "#0A0A0A",
     fontSize: 12,
     lineHeight: 18,
   },
   totalPrice: {
-    fontFamily: DOUYIN_SANS,
+    fontFamily: SYSTEM_FONT,
     color: "#FE1F4C",
     fontSize: 16,
     lineHeight: 24,
@@ -283,7 +338,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   secondaryButtonText: {
-    fontFamily: DOUYIN_SANS,
+    fontFamily: SYSTEM_FONT,
     color: "#0A0A0A",
     fontSize: 12,
     lineHeight: 18,
@@ -297,7 +352,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   primaryButtonText: {
-    fontFamily: DOUYIN_SANS,
+    fontFamily: SYSTEM_FONT,
     color: "#FFFFFF",
     fontSize: 12,
     lineHeight: 18,

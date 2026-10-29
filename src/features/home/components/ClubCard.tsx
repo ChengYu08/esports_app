@@ -1,6 +1,6 @@
 import type { Club } from "@/features/home/api/home.types";
 import { colors, radius, spacing } from "@/shared/theme/tokens";
-import { DOUYIN_SANS, SYSTEM_FONT } from "@/shared/theme/typography";
+import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -12,7 +12,13 @@ const icons = {
   id: require("../../../../assets/home/h_id.svg"),
 };
 
-export function ClubCard({ club, onSelect }: { club: Club; onSelect?: (club: Club) => void }) {
+export function ClubCard({
+  club,
+  onSelect,
+}: {
+  club: Club;
+  onSelect?: (club: Club) => void;
+}) {
   const colors = ["#24354b", "#4a2637", "#2e4650", "#493e2e"];
   const hue = colors[Number(club.id.match(/\d+$/)?.[0] ?? 0) % 4];
   const handlePress = () => {
@@ -44,7 +50,9 @@ export function ClubCard({ club, onSelect }: { club: Club; onSelect?: (club: Clu
             end={{ x: 1, y: 0.58 }}
             style={styles.tag}
           >
-            <Text numberOfLines={1} style={styles.tagText}>{club.clubTag}</Text>
+            <Text numberOfLines={1} style={styles.tagText}>
+              {club.clubTag}
+            </Text>
           </LinearGradient>
         )}
       </View>
@@ -109,7 +117,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   tagText: {
-    fontFamily: SYSTEM_FONT,
+    fontFamily: DOUYIN_SANS,
     fontSize: 10,
     fontWeight: "600",
     lineHeight: 12,

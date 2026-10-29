@@ -41,18 +41,28 @@ class PzOneClickModule : Module() {
 
       sendEvent("onStateChange", mapOf("state" to "checking"))
       val helper = createHelper(activity.applicationContext, object : TokenResultListener {
+        private var finished = false
+
         override fun onTokenSuccess(result: String) {
+          if (finished) return
+          finished = true
           val code = resultCode(result)
-          val available = code == ResultCode.CODE_SUCCESS
+          // SDK 文档规定 checkEnvAvailable 成功回调的是 600024 (CODE_ERROR_ENV_CHECK_SUCCESS)，
+          // 但部分版本会回 600000。两个都视为可用。
+          val available = code == ResultCode.CODE_SUCCESS || code == ResultCode.CODE_ERROR_ENV_CHECK_SUCCESS
           Log.i(TAG, "[DEBUG-QUICK-LOGIN] environment check completed: code=$code, available=$available")
+          authHelper?.setAuthListener(null)
           sendEvent("onStateChange", mapOf("state" to if (available) "available" else "unavailable"))
           promise.resolve(available)
         }
 
         override fun onTokenFailed(result: String) {
+          if (finished) return
+          finished = true
           val code = resultCode(result)
           val message = resultMessage(result)
           Log.w(TAG, "[DEBUG-QUICK-LOGIN] environment check failed: code=$code, message=$message")
+          authHelper?.setAuthListener(null)
           sendEvent("onStateChange", mapOf("state" to "unavailable"))
           promise.resolve(false)
         }
@@ -74,7 +84,10 @@ class PzOneClickModule : Module() {
 
       sendEvent("onStateChange", mapOf("state" to "authorizing"))
       val helper = createHelper(activity.applicationContext, object : TokenResultListener {
+        private var finished = false
+
         override fun onTokenSuccess(result: String) {
+          if (finished) return
           val tokenRet = parseResult(result)
           val code = tokenRet?.code ?: "unknown"
           if (code == ResultCode.CODE_START_AUTHPAGE_SUCCESS) {
@@ -82,6 +95,7 @@ class PzOneClickModule : Module() {
             return
           }
           if (code == ResultCode.CODE_SUCCESS && !tokenRet?.token.isNullOrBlank()) {
+            finished = true
             val spToken = tokenRet?.token.orEmpty()
             Log.i(TAG, "[DEBUG-QUICK-LOGIN] carrier authorization succeeded")
             authHelper?.setAuthListener(null)
@@ -90,15 +104,26 @@ class PzOneClickModule : Module() {
             return
           }
           Log.w(TAG, "[DEBUG-QUICK-LOGIN] unexpected authorization response: code=$code")
+          finished = true
           authHelper?.setAuthListener(null)
+          authHelper?.quitLoginPage()
           promise.reject("AUTHORIZATION_FAILED", "一键登录没有返回有效授权结果", null)
         }
 
         override fun onTokenFailed(result: String) {
+          if (finished) return
+          finished = true
           val code = resultCode(result)
-          val cancelled = code == ResultCode.CODE_ERROR_USER_CANCEL || code == ResultCode.CODE_ERROR_USER_SWITCH
+          // 700011 是「用户按返回键」，SDK 在 AAR 里是独立常量 CODE_ERROR_USER_CONTROL_CANCEL_BYKEY。
+          val cancelled =
+            code == ResultCode.CODE_ERROR_USER_CANCEL ||           // 700000
+            code == ResultCode.CODE_ERROR_USER_SWITCH ||           // 700001 切换登录方式
+            code == ResultCode.CODE_ERROR_USER_CONTROL_CANCEL_BYBTN || // 700010
+            code == ResultCode.CODE_ERROR_USER_CONTROL_CANCEL_BYKEY    // 700011 返回键
           Log.i(TAG, "[DEBUG-QUICK-LOGIN] authorization ended: code=$code, cancelled=$cancelled")
           authHelper?.setAuthListener(null)
+          // 失败/取消时都要关掉授权页，避免残留在 Activity 栈里。
+          authHelper?.quitLoginPage()
           sendEvent("onStateChange", mapOf("state" to if (cancelled) "cancelled" else "unavailable"))
           promise.reject(if (cancelled) "USER_CANCELLED" else "AUTHORIZATION_FAILED", "一键登录失败，请使用其他登录方式", null)
         }

@@ -35,6 +35,7 @@ import { EmptyState } from "@/shared/ui/AsyncStates";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { CsInviteCard } from "../components/CsInviteCard";
+import { MarkdownMessage } from "../components/MarkdownMessage";
 import { OrderNotifyCard } from "../components/OrderNotifyCard";
 import { touchCustomerServiceSession } from "../customer-service.api";
 import { resolveConversationAvatar } from "../message-avatar";
@@ -594,7 +595,9 @@ export default function ChatScreen() {
                 accessibilityLabel="置顶对话"
                 accessibilityRole="switch"
                 accessibilityState={{ checked: isPinned }}
-                onPress={() => setConversationPinned(conversationId, !isPinned)}
+                onPress={() => {
+                  void setConversationPinned(conversationId, !isPinned);
+                }}
                 style={[styles.switch, isPinned && styles.switchActive]}
               >
                 <View
@@ -970,6 +973,8 @@ const ChatBubble = memo(function ChatBubble({
           <OrderNotifyCard item={item} onOpenOrder={onOpenOrder} />
         ) : item.kind === "csInvite" ? (
           <CsInviteCard item={item} />
+        ) : item.kind === "markdown" ? (
+          <MarkdownMessage content={item.text} />
         ) : (
           <Text style={styles.bubbleText}>{item.text}</Text>
         )}

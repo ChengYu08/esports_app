@@ -26,6 +26,8 @@
     },
     "plugins": [
       "expo-router",
+      "expo-iap",
+      "./plugins/withAndroidFullscreenSplash",
       [
         "expo-splash-screen",
         {
@@ -34,10 +36,9 @@
           "backgroundColor": "#2A1013",
           "enableFullScreenImage_legacy": true,
           "android": {
-            "backgroundColor": "#FFFFFF",
-            "image": "./assets/images/splash-icon.png",
-            "resizeMode": "cover",
-            "imageWidth": 288
+            "backgroundColor": "#2A1013",
+            "image": "./assets/images/splash-screen.png",
+            "resizeMode": "cover"
           }
         }
       ],

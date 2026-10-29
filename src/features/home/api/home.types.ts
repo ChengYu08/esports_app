@@ -23,9 +23,20 @@ export type ClubFilters = {
 
 export type Banner = {
   id: string;
-  imageUrl?: string;
+  imageUrl: string;
   title?: string;
-  subtitle?: string;
+  contentImageUrl?: string;
+  linkUrl?: string;
+};
+
+export type HomeBannerSlotCode = "APP_HOME_FLOOR1" | "APP_HOME_FLOOR2" | "APP_HOME_FLOOR3";
+
+export type HomeBannerSlot = {
+  code: HomeBannerSlotCode;
+  name: string;
+  displayMode: "CAROUSEL" | "TILE";
+  intervalMs: number;
+  items: Banner[];
 };
 
 export type Club = {
