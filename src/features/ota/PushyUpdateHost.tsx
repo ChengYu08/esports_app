@@ -3,6 +3,8 @@ import { UpdateProvider, useUpdate } from "react-native-update";
 
 import { logger } from "@/core/logging/logger";
 
+import { kickOffStartupCheck } from "@/features/app-upgrade/app-upgrade.store";
+
 import { OTA_CONFIG_KEY, otaConfigApi } from "./ota-config.api";
 import { decideOtaGate } from "./ota-update-gate";
 import { pushyClient } from "./pushy-client";
@@ -30,6 +32,8 @@ function PushyUpdateTrigger() {
     pushyClient?.setOptions({ disableNativeCheck: false });
 
     void (async () => {
+      // 整包升级检查与热更配置拉取并行；有整包待升级时跳过热更，避免升级后热更错乱
+      const wholeUpgradePending = kickOffStartupCheck();
       try {
         const rawConfig = await otaConfigApi.fetchOtaConfig(OTA_CONFIG_KEY);
         const gate = decideOtaGate(rawConfig, RN_BUNDLE_VERSION);
@@ -42,6 +46,10 @@ function PushyUpdateTrigger() {
           pushyClient?.setOptions({
             updateStrategy: gate.config.updateStrategy,
           });
+        }
+        if (await wholeUpgradePending) {
+          logger.debug("ota.skipped_by_whole_upgrade");
+          return;
         }
         void checkUpdate();
       } catch {

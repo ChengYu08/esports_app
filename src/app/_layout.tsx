@@ -31,10 +31,12 @@ import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
 import { leaveVoiceChatRoom } from "@/features/voice-room/voice-room-rongcloud";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
 import { PushyUpdateHost } from "@/features/ota/PushyUpdateHost";
+import { AppUpgradeHost } from "@/features/app-upgrade/AppUpgradeHost";
 import { PrivacyConsentGate } from "@/features/privacy/components/PrivacyConsentGate";
 import { readPrivacyConsent } from "@/features/privacy/privacy-consent";
 import { ActionNoticeHost } from "@/shared/ui/action-notice";
 import { AppConfirmHost } from "@/shared/ui/AppConfirmHost";
+
 import { StartupSplash } from "@/shared/ui/StartupSplash";
 
 // Keep the native screen until the full-screen artwork is ready to display.
@@ -203,8 +205,9 @@ export default function RootLayout() {
             <StatusBar style="dark" />
             {privacyAccepted ? (
               <PushyUpdateHost>
-                {/* 网络监控与热更新均在同意隐私后启动 */}
+                {/* 网络监控、整包升级检查与热更新均在同意隐私后启动 */}
                 <NetworkRecovery />
+                <AppUpgradeHost />
                 <Stack
                   screenOptions={{
                     headerShown: false,

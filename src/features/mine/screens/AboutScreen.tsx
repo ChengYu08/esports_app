@@ -2,7 +2,7 @@ import Constants from "expo-constants";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import {
-  Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,7 +11,10 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import Toast from "react-native-root-toast";
+
 import { APP_LINKS } from "@/core/config/links";
+import { useAppUpgradeStore } from "@/features/app-upgrade/app-upgrade.store";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { openExternalLink } from "@/shared/navigation/open-external-link";
 
@@ -25,7 +28,16 @@ export default function AboutScreen() {
   const insets = useSafeAreaInsets();
 
   const checkForUpdate = () => {
-    Alert.alert("检测更新", "请前往应用商店查看是否有新版本");
+    void (async () => {
+      try {
+        const hasUpdate = await useAppUpgradeStore.getState().checkNow();
+        if (!hasUpdate) {
+          Toast.show("当前已是最新版本", { duration: Toast.durations.SHORT });
+        }
+      } catch {
+        Toast.show("检查失败，请稍后重试", { duration: Toast.durations.SHORT });
+      }
+    })();
   };
 
   return (
@@ -69,8 +81,12 @@ export default function AboutScreen() {
         </View>
 
         <View style={styles.list}>
-          <AboutRow label="检测更新" onPress={checkForUpdate} />
-          <View style={styles.divider} />
+          {Platform.OS === "android" && (
+            <>
+              <AboutRow label="检测更新" onPress={checkForUpdate} />
+              <View style={styles.divider} />
+            </>
+          )}
           <AboutRow
             label="用户协议"
             onPress={() => void openExternalLink(APP_LINKS.userAgreement)}
