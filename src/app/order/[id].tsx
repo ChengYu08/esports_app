@@ -53,10 +53,8 @@ import { CachedImage } from "@/shared/ui/CachedImage";
 const orderStepCheck = require("../../../assets/order/order-step-check.svg");
 const orderStepActive = require("../../../assets/order/order-step-active.svg");
 const orderStepPending = require("../../../assets/order/order-step-pending.svg");
-// 设计稿 Brand-11：linear-gradient(102deg, #FF1F2E 12.12%, #FF1F69 107.82%)
 const ACTION_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
 const ACTION_GRADIENT_START = { x: 0, y: 0 } as const;
-// 102deg ≈ 水平向右、轻微向下（y 分量约 0.21）。
 const ACTION_GRADIENT_END = { x: 1, y: 0.21 } as const;
 
 export default function OrderDetailRoute() {
