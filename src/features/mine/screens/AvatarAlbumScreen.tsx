@@ -95,18 +95,24 @@ export default function AvatarAlbumScreen() {
       if (!granted) {
         return;
       }
-      await loadPage(activeAlbum);
-      const list = await MediaLibrary.getAlbumsAsync({
-        includeSmartAlbums: true,
-      });
-      setAlbums(
-        list
-          .filter((album) => album.assetCount > 0 && album.title !== "最近项目")
-          .map((album) => ({
-            id: album.id,
-            name: album.title,
-          })),
-      );
+      try {
+        await loadPage(activeAlbum);
+        const list = await MediaLibrary.getAlbumsAsync({
+          includeSmartAlbums: true,
+        });
+        setAlbums(
+          list
+            .filter((album) => album.assetCount > 0 && album.title !== "最近项目")
+            .map((album) => ({
+              id: album.id,
+              name: album.title,
+            })),
+        );
+      } catch {
+        Toast.show("照片读取失败，请检查相册权限后重试", {
+          duration: Toast.durations.SHORT,
+        });
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

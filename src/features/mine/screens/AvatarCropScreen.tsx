@@ -15,6 +15,7 @@ import {
 import Toast from "react-native-root-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+import Svg, { Path } from "react-native-svg";
 
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import {
@@ -37,7 +38,7 @@ const OUTPUT_SIZE = 600;
 
 export default function AvatarCropScreen() {
   const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const route = useLocalSearchParams<{
     uri: string;
     width: string;
@@ -54,8 +55,20 @@ export default function AvatarCropScreen() {
 
   const [saving, setSaving] = useState(false);
 
-  const containerSize = windowWidth;
-  const circleSize = containerSize * CIRCLE_RATIO;
+  const containerSize = screenWidth;
+  const circleRadius = (containerSize * CIRCLE_RATIO) / 2;
+
+  // 底部悬浮按钮栏总高：上 12 + 按钮 42 + 下（安全区/12 + 12）
+  const buttonBarHeight = 12 + 42 + Math.max(insets.bottom, 12) + 12;
+
+  // 裁剪区在扣除顶部安全区与底部按钮栏后的剩余空间内垂直居中
+  const availableHeight = Math.max(
+    0,
+    screenHeight - insets.top - buttonBarHeight,
+  );
+  const areaTop = insets.top + Math.max(0, (availableHeight - containerSize) / 2);
+  const circleCenterX = containerSize / 2;
+  const circleCenterY = areaTop + containerSize / 2;
 
   // cover 基准：图片初始铺满视口的缩放
   const baseScale = Math.max(
@@ -133,12 +146,6 @@ export default function AvatarCropScreen() {
     ],
   }));
 
-  // 圆形挖孔：单 View 超大边框实现（尺寸 ×1.42、圆角 ×0.71、边宽 = (1.42-1)×尺寸/2）
-  const maskHolder = circleSize * 1.42;
-  const maskBorder = (maskHolder - circleSize) / 2;
-  const circleTop = insets.top + (containerSize - circleSize) / 2;
-  const circleLeft = (containerSize - circleSize) / 2;
-
   const cancel = () => {
     completeAvatarEdit(null);
     // 取消视为放弃本次流程，直接回编辑资料页
@@ -207,12 +214,12 @@ export default function AvatarCropScreen() {
   return (
     <View style={styles.screen}>
       <StatusBar style="light" />
-      {/* 图片区：捏合缩放 + 拖动 */}
+      {/* 图片区：捏合缩放 + 拖动。在扣除顶栏与底部悬浮按钮栏后的剩余空间内垂直居中 */}
       <GestureDetector gesture={gesture}>
         <Animated.View
           style={[
             styles.imageArea,
-            { top: insets.top, width: containerSize, height: containerSize },
+            { top: areaTop, width: containerSize, height: containerSize },
           ]}
         >
           <Animated.Image
@@ -232,43 +239,24 @@ export default function AvatarCropScreen() {
         </Animated.View>
       </GestureDetector>
 
-      {/* 圆形挖孔遮罩 */}
+      {/* 圆形挖孔遮罩：evenodd 路径（全屏矩形 + 圆形子路径）+ 白色圆环描边 */}
       <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        <Svg style={StyleSheet.absoluteFill}>
+          <Path
+            d={`M0 0 H${screenWidth} V${screenHeight} H0 Z M${circleCenterX} ${circleCenterY} m-${circleRadius} 0 a${circleRadius} ${circleRadius} 0 1 0 ${circleRadius * 2} 0 a${circleRadius} ${circleRadius} 0 1 0 -${circleRadius * 2} 0 Z`}
+            fill="rgba(0,0,0,0.6)"
+            fillRule="evenodd"
+          />
+        </Svg>
         <View
           style={[
-            styles.maskPiece,
+            styles.circleEdge,
             {
-              top: 0,
-              left: 0,
-              right: 0,
-              height: Math.max(
-                0,
-                circleTop + circleSize / 2 - maskHolder / 2,
-              ),
-            },
-          ]}
-        />
-        <View
-          style={[
-            styles.maskHoleBorder,
-            {
-              top: circleTop + circleSize / 2 - maskHolder / 2,
-              left: circleLeft + circleSize / 2 - maskHolder / 2,
-              width: maskHolder,
-              height: maskHolder,
-              borderRadius: maskHolder / 2,
-              borderWidth: maskBorder,
-            },
-          ]}
-        />
-        <View
-          style={[
-            styles.maskPiece,
-            {
-              top: circleTop + circleSize / 2 + maskHolder / 2,
-              left: 0,
-              right: 0,
-              bottom: 0,
+              left: circleCenterX - circleRadius,
+              top: circleCenterY - circleRadius,
+              width: circleRadius * 2,
+              height: circleRadius * 2,
+              borderRadius: circleRadius,
             },
           ]}
         />
@@ -321,11 +309,9 @@ const styles = StyleSheet.create({
   image: {
     position: "absolute",
   },
-  maskPiece: {
-    backgroundColor: "rgba(0,0,0,0.6)",
-  },
-  maskHoleBorder: {
-    borderColor: "rgba(0,0,0,0.6)",
+  circleEdge: {
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
   },
   buttonBar: {
     position: "absolute",

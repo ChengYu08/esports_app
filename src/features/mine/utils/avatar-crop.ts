@@ -42,6 +42,8 @@ export function computeAvatarCropRect(input: {
  * 钳制裁剪页图片的平移量：图片任何时刻必须完全覆盖视口（无空隙）。
  * displayedWidth/Height 为当前缩放下的图片显示尺寸（容器像素）。
  * 某一轴无溢出（显示尺寸小于视口）时该轴钳为 0 并保持居中。
+ *
+ * 在手势 worklet（UI 线程）中同步调用，必须标注 'worklet'。
  */
 export function clampAvatarPan(input: {
   offsetX: number;
@@ -50,6 +52,7 @@ export function clampAvatarPan(input: {
   displayedHeight: number;
   containerSize: number;
 }): { offsetX: number; offsetY: number } {
+  "worklet";
   const { offsetX, offsetY, displayedWidth, displayedHeight, containerSize } =
     input;
   const maxX = Math.max(0, (displayedWidth - containerSize) / 2);
