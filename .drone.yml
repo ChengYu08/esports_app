@@ -126,7 +126,17 @@ steps:
         ls -lh ./apks/ 2>/dev/null || echo "未找到 APK"
 
         # ---- 生成构建元数据（供最终信息展示步骤读取） ----
-        version=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' ./app.json | head -1)
+        version=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' ./app.json | head -1 | tr -d '[:space:]')
+        # 兜底：从 APK 文件名解析版本号（格式：盼之电竞-<version>-<abi>-<env>-<ts>.apk）
+        if [ -z "$version" ]; then
+          for apk_path in ./apks/*.apk; do
+            [ -f "$apk_path" ] || continue
+            fname=$(basename "$apk_path" .apk)
+            version=$(echo "$fname" | sed -E 's/^[^-]+-([0-9]+\.[0-9]+\.[0-9]+)-.*/\1/')
+            [ -n "$version" ] && break
+          done
+        fi
+        echo "解析到版本号: [$version]"
         {
           echo "BUILD_ENV=$${BUILD_ENV}"
           echo "BUILD_ABI=$${BUILD_ABI}"
@@ -260,13 +270,24 @@ steps:
         echo " "
         echo "📦 下载地址"
         echo "------------------------------------------------"
+        # 兜底：若元数据里版本号为空，从 APK 文件名解析
+        if [ -z "$APP_VERSION" ]; then
+          for apk_path in ./apks/*.apk; do
+            [ -f "$apk_path" ] || continue
+            fname=$(basename "$apk_path" .apk)
+            APP_VERSION=$(echo "$fname" | sed -E 's/^[^-]+-([0-9]+\.[0-9]+\.[0-9]+)-.*/\1/')
+            [ -n "$APP_VERSION" ] && break
+          done
+        fi
         apks_found=0
         for apk_path in ./apks/*.apk; do
           [ -f "$apk_path" ] || continue
           apks_found=$((apks_found + 1))
           filename=$(basename "$apk_path")
           size=$(ls -lh "$apk_path" | awk '{print $5}')
-          url="http://dev.jinliwangluo.com/android/esportsapp/$DRONE_BRANCH/$APP_VERSION/$filename"
+          # URL 编码中文文件名（避免部分浏览器/工具识别失败）
+          encoded=$(printf '%s' "$filename" | od -An -v -tx1 | awk '{for(i=1;i<=NF;i++)printf "%%%s",$i}' | tr -d '\n')
+          url="http://dev.jinliwangluo.com/android/esportsapp/$DRONE_BRANCH/$APP_VERSION/$encoded"
           printf "  文件名      : %s\n" "$filename"
           printf "  大小        : %s\n" "$size"
           printf "  下载地址    : %s\n" "$url"
