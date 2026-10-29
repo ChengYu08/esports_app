@@ -55,10 +55,7 @@ export type Club = {
   clubCode: string;
   isSelfOperated?: boolean;
   clubTag?: string;
-  clubTag?: string;
   clubGames?: { iconUrl?: string }[];
-  games?: ClubGameIcon[];
-};
   games?: ClubGameIcon[];
 };
 
