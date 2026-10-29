@@ -117,17 +117,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     height: 56,
-    paddingTop: 4,
-    paddingBottom: 16,
+    // 设计稿 Dialog button group：高 56、按钮 36 → 上下各 10，保证按钮垂直居中
+    paddingTop: 10,
+    paddingBottom: 10,
     paddingHorizontal: 16,
     backgroundColor: "#FFFFFF",
   },
   button: {
     flex: 1,
     minWidth: 86,
-    minHeight: 36,
-    maxHeight: 36,
-    paddingVertical: 8,
+    height: 36,
+    // 36 高由 justify center 垂直居中文字，不加垂直 padding（会挤占 22 行高导致文字下沉）
+    paddingVertical: 0,
     paddingHorizontal: 16,
     borderRadius: 8,
     alignItems: "center",

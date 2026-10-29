@@ -1,9 +1,5 @@
 import type { Club, GameKey } from "./home.types";
 
-export const demoBanners = [
-  { id: "demo-banner", title: "分享助攻商品", subtitle: "第5元限免" },
-];
-
 export const demoClubs: Record<GameKey, Club[]> = {
   pc: [
     { id: "pc-1", name: "盼之电竞自营俱乐部", description: "清一色暖男声线，情绪价值拉满，你的日常陪伴", onlineCount: 21, memberCount: 62, clubCode: "2338820", isSelfOperated: true },

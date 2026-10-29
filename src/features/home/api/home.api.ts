@@ -1,17 +1,82 @@
 import { apiClient } from '@/core/network/api-client';
-import { demoBanners } from "./home.mock";
-import type { Banner, ClubDetail, ClubDetailGame, ClubFilters, ClubGameMode, ClubPage, CompanionFilters, CompanionPage, Game, GameCategory, HomeTab, PriceListTab } from "./home.types";
+import { HOME_BANNER_SLOT_CODES } from "../home-banner.contract";
+import type { ClubDetail, ClubDetailGame, ClubFilters, ClubGameMode, ClubPage, CompanionFilters, CompanionPage, Game, GameCategory, HomeBannerSlot, PriceListTab } from "./home.types";
 
 export type { Banner, Club, ClubPage, Game, GameKey, HomeTab } from "./home.types";
 
-export async function fetchBanners(_tab: HomeTab): Promise<Banner[]> {
-  return demoBanners;
+type ApiBanner = {
+  deliveryId: number | string;
+  materialId: number | string;
+  materialName?: string | null;
+  displayImageUrl?: string | null;
+  contentImageUrl?: string | null;
+  linkUrl?: string | null;
+  sort?: number | null;
+};
+
+type ApiBannerSlot = {
+  slotCode: string;
+  slotName?: string;
+  displayMode: HomeBannerSlot["displayMode"];
+  intervalSec?: number | null;
+  items?: ApiBanner[] | null;
+};
+
+export async function fetchBanners(signal?: AbortSignal): Promise<HomeBannerSlot[]> {
+  const response = await apiClient<ApiEnvelope<ApiBannerSlot[] | null>>("/client/v1/ad/slot/list", {
+    method: "POST",
+    body: { slotCodes: HOME_BANNER_SLOT_CODES },
+    signal,
+  });
+  if (response.code !== "SUCCESS") {
+    throw new Error(response.info || "首页活动加载失败");
+  }
+  // 固定 App 楼层顺序，不依赖接口返回资源位的排列，也不混入 PC 端素材。
+  return HOME_BANNER_SLOT_CODES.flatMap((code) => {
+    const slot = response.data?.find((item) => item.slotCode === code);
+    if (!slot) {
+      return [];
+    }
+    return [{
+      code,
+      name: slot.slotName || "首页活动",
+      displayMode: slot.displayMode,
+      intervalMs: typeof slot.intervalSec === "number" && Number.isFinite(slot.intervalSec) && slot.intervalSec > 0
+        ? slot.intervalSec * 1000
+        : 5000,
+      items: [...(slot.items ?? [])]
+        .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0))
+        .flatMap((banner) => {
+          const imageUrl = banner.displayImageUrl?.trim();
+          if (!imageUrl) {
+            return [];
+          }
+          return [{
+            id: `${banner.deliveryId}-${banner.materialId}`,
+            imageUrl,
+            title: banner.materialName?.trim() || undefined,
+            contentImageUrl: banner.contentImageUrl?.trim() || undefined,
+            linkUrl: banner.linkUrl?.trim() || undefined,
+          }];
+        }),
+    }];
+  });
 }
 
 type ApiEnvelope<T> = { success?: boolean; code?: string; info?: string; data?: T };
 type ApiGame = { id: number | string; gameName?: string; iconUrl?: string; backgroundUrl?: string; gameCategory?: number; gameCategoryId?: number | string };
 type ApiGameCategory = { id: number | string; name: string; iconUrl?: string | null };
-type ApiClub = { id: number | string; clubName?: string; clubTag?: string | null; logoUrl?: string; intro?: string; followCount?: number; memberCount?: number; orderNoticeUrl?: string };
+type ApiClub = {
+  id: number | string;
+  clubName?: string;
+  clubTag?: string | null;
+  logoUrl?: string;
+  intro?: string;
+  followCount?: number;
+  memberCount?: number;
+  orderNoticeUrl?: string;
+  clubGames?: { gameId: number; gameName?: string; iconUrl?: string; status?: number }[];
+};
 type ApiClubPage = { page?: number; totalPages?: number; total?: number; records?: ApiClub[] };
 type ApiClubDetail = {
   id: number | string;
@@ -117,6 +182,14 @@ export async function fetchClubPage(filters: ClubFilters, page: number, pageSize
       clubCode: String(club.id),
       isSelfOperated: club.clubName?.includes('自营') ?? false,
       clubTag: club.clubTag || undefined,
+      // 列表接口已带 clubGames（游戏图标），卡片上展示主打游戏。
+      games: (club.clubGames ?? [])
+        .filter((item) => item.status !== 0 && item.iconUrl)
+        .map((item) => ({
+          id: item.gameId,
+          name: item.gameName || "未命名游戏",
+          iconUrl: item.iconUrl as string,
+        })),
     })),
     hasMore: (data?.page ?? page) < (data?.totalPages ?? page),
     nextPage: page + 1,

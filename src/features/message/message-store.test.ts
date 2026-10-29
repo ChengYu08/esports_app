@@ -22,6 +22,7 @@ vi.mock('./rongcloud-im', () => ({
   downloadRongImageMessage: vi.fn(),
   sendRongAfterSaleCard: vi.fn(),
   markRongConversationRead: vi.fn(),
+  setRongConversationPinned: vi.fn(),
   subscribeRongConnectionStatus: vi.fn(),
   subscribeRongConversationSync: vi.fn(),
   subscribeRongMessages: vi.fn(),
@@ -221,8 +222,25 @@ describe('message store', () => {
     const store = createMessageStore(makeAdapter({ getConversations: vi.fn(async () => [conversation]) }));
     await store.getState().initialize('token');
     store.getState().setConversationNote('42', '常用陪玩');
-    store.getState().setConversationPinned('42', true);
+    await store.getState().setConversationPinned('42', true);
     expect(store.getState().conversations[0]).toMatchObject({ id: '42', note: '常用陪玩', isPinned: true });
+  });
+
+  it('syncs pin state to the adapter and rolls back when the adapter rejects', async () => {
+    const setConversationPinned = vi.fn(async () => true);
+    const store = createMessageStore(makeAdapter({
+      getConversations: vi.fn(async () => [conversation]),
+      setConversationPinned,
+    }));
+    await store.getState().initialize('token');
+    await store.getState().setConversationPinned('42', true);
+    expect(setConversationPinned).toHaveBeenCalledWith('42', true);
+    expect(store.getState().conversations[0]).toMatchObject({ isPinned: true });
+
+    setConversationPinned.mockRejectedValueOnce(new Error('设置置顶失败（1）'));
+    await store.getState().setConversationPinned('42', false);
+    expect(store.getState().conversations[0]).toMatchObject({ isPinned: true });
+    expect(store.getState().lastError).toBe('设置置顶失败（1）');
   });
 
   it('loads older history only once per cursor and prepends it', async () => {

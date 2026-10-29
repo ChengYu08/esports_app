@@ -27,7 +27,7 @@ export function RankingBoardTabs({ value, onChange }: { value: RankingBoard; onC
 }
 
 const styles = StyleSheet.create({
-  tabs: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 20, backgroundColor: colors.surface },
+  tabs: { flexDirection: "row", gap: 32, paddingHorizontal: 20, backgroundColor: colors.surface },
   tab: { minHeight: 48, justifyContent: "center", alignItems: "center", paddingBottom: 6 },
   label: { fontFamily: DOUYIN_SANS, fontSize: 16, color: colors.textMuted },
   selected: { color: colors.text, fontWeight: "600" },

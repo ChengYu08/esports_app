@@ -260,10 +260,10 @@ export default function ClubDetailScreen() {
           />
           <View style={styles.clubCopy}>
             <View style={styles.titleLine}>
-              <Text style={styles.selfTag}>自营</Text>
               <Text numberOfLines={1} style={styles.clubName}>
                 {club.name}
               </Text>
+              <Text style={styles.selfTag}>自营</Text>
               <View style={styles.clubMeta}>
                 <Image source={memberIcon} style={styles.clubMetaIcon} />
                 <Text style={styles.metaText}>{club.memberCount}</Text>

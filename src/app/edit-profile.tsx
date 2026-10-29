@@ -1,3 +1,3 @@
-import AccountSettingsScreen from "@/features/mine/screens/AccountSettingsScreen";
+import EditProfileScreen from "@/features/mine/screens/EditProfileScreen";
 
-export default AccountSettingsScreen;
+export default EditProfileScreen;

@@ -2,7 +2,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { memo, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { PINGFANG_SC } from "@/shared/theme/typography";
+import { SYSTEM_FONT } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import type {
   OrderAction,
@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
   avatar: { width: 24, height: 24, borderRadius: 12 },
   sellerName: {
     flex: 1,
-    fontFamily: PINGFANG_SC,
+    fontFamily: SYSTEM_FONT,
     color: "#0A0A0A",
     fontSize: 14,
     lineHeight: 22,
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
   },
   status: {
     marginLeft: 12,
-    fontFamily: PINGFANG_SC,
+    fontFamily: SYSTEM_FONT,
     fontSize: 11,
     lineHeight: 16,
     fontWeight: "500",
@@ -257,14 +257,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#F2F2F2",
     paddingHorizontal: 4,
     color: "#808080",
-    fontFamily: PINGFANG_SC,
+    fontFamily: SYSTEM_FONT,
     fontSize: 11,
     lineHeight: 18,
   },
   voiceTagRequired: { color: "#581CE5", backgroundColor: "#F1EBFF" },
   orderBody: { gap: 8 },
   serviceName: {
-    fontFamily: PINGFANG_SC,
+    fontFamily: SYSTEM_FONT,
     color: "#0A0A0A",
     fontSize: 14,
     lineHeight: 22,
@@ -280,14 +280,14 @@ const styles = StyleSheet.create({
   detailLabel: {
     width: 36,
     color: "#999999",
-    fontFamily: PINGFANG_SC,
+    fontFamily: SYSTEM_FONT,
     fontSize: 12,
     lineHeight: 18,
   },
   detailContent: { flex: 1 },
   detailValue: {
     color: "#0A0A0A",
-    fontFamily: PINGFANG_SC,
+    fontFamily: SYSTEM_FONT,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
   quantitySummary: { flexDirection: "row", alignItems: "center", gap: 4 },
   totalValue: { flexDirection: "row", alignItems: "center", gap: 4 },
   quantity: {
-    fontFamily: PINGFANG_SC,
+    fontFamily: SYSTEM_FONT,
     color: "#999999",
     fontSize: 12,
     lineHeight: 18,
@@ -308,13 +308,13 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   totalLabel: {
-    fontFamily: PINGFANG_SC,
+    fontFamily: SYSTEM_FONT,
     color: "#0A0A0A",
     fontSize: 12,
     lineHeight: 18,
   },
   totalPrice: {
-    fontFamily: PINGFANG_SC,
+    fontFamily: SYSTEM_FONT,
     color: "#FE1F4C",
     fontSize: 16,
     lineHeight: 24,
@@ -338,7 +338,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   secondaryButtonText: {
-    fontFamily: PINGFANG_SC,
+    fontFamily: SYSTEM_FONT,
     color: "#0A0A0A",
     fontSize: 12,
     lineHeight: 18,
@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   primaryButtonText: {
-    fontFamily: PINGFANG_SC,
+    fontFamily: SYSTEM_FONT,
     color: "#FFFFFF",
     fontSize: 12,
     lineHeight: 18,

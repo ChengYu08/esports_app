@@ -9,6 +9,14 @@ export type ChatTextMessage = {
   isMine: boolean;
 };
 
+export type ChatMarkdownMessage = {
+  id: string;
+  kind: "markdown";
+  text: string;
+  time: string;
+  isMine: boolean;
+};
+
 export type ChatImageMessage = {
   id: string;
   kind: "image";
@@ -68,7 +76,7 @@ export type CsInviteCardMessage = {
   isMine: boolean;
 };
 
-export type ChatMessage = ChatTextMessage | ChatImageMessage | RoomInviteMessage | AfterSaleCardMessage | OrderNotifyCardMessage | CsInviteCardMessage;
+export type ChatMessage = ChatTextMessage | ChatMarkdownMessage | ChatImageMessage | RoomInviteMessage | AfterSaleCardMessage | OrderNotifyCardMessage | CsInviteCardMessage;
 
 export function messagePreview(message: ChatMessage): string {
   switch (message.kind) {
@@ -81,6 +89,9 @@ export function messagePreview(message: ChatMessage): string {
       return message.title;
     case "csInvite":
       return "[接待邀请]";
+    case "markdown":
+      // 与 Web 端一致：摘要剥掉 markdown 标记只留纯文本，空内容回退为 [通知]。
+      return message.text.replace(/[*_~`#>]+/g, "").trim() || "[通知]";
     case "text":
       return message.text;
   }
@@ -207,10 +218,13 @@ export function mapRongMessage(message: RongSdkMessage, enums: { image: number; 
   }
 
   // The SDK can unwrap RC:CustomMsg.data into fields instead of fields.data.
-  const notificationText = customIdentifier === "RC:CustomMsg" || customName === "TEXT_NOTIFY_MSG"
+  const isCustomNotification = customIdentifier === "RC:CustomMsg" || customName === "TEXT_NOTIFY_MSG";
+  const notificationText = isCustomNotification
     ? mergeCustomPayload(fields, customPayload).content
     : undefined;
   const text = message.text || message.content || (typeof notificationText === "string" ? notificationText : undefined);
+  // 平台通知等自定义消息与 Web 端一致，按 markdown 渲染（纯文本是 markdown 子集）。
+  if (isCustomNotification && text) return { id, kind: "markdown", text, time, isMine };
   const roomInvite = text ? parseRoomInviteLink(text) : null;
   if (roomInvite) return { id, kind: "roomInvite", ...roomInvite, time, isMine };
   return text ? { id, kind: "text", text, time, isMine } : null;
