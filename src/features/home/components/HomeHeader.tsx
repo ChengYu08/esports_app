@@ -132,9 +132,6 @@ export function HomeHeader({
               </Pressable>
             ))}
           </ScrollView>
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>热门俱乐部</Text>
-          </View>
         </>
       )}
     </>
@@ -283,12 +280,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     flexDirection: "row",
-  },
-  sectionTitle: {
-    fontFamily: DOUYIN_SANS,
-    color: "#111216",
-    fontSize: 17,
-    fontWeight: "700",
   },
   filter: { width: 24, height: 24 },
 });

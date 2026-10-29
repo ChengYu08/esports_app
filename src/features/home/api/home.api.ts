@@ -66,7 +66,17 @@ export async function fetchBanners(signal?: AbortSignal): Promise<HomeBannerSlot
 type ApiEnvelope<T> = { success?: boolean; code?: string; info?: string; data?: T };
 type ApiGame = { id: number | string; gameName?: string; iconUrl?: string; backgroundUrl?: string; gameCategory?: number; gameCategoryId?: number | string };
 type ApiGameCategory = { id: number | string; name: string; iconUrl?: string | null };
-type ApiClub = { id: number | string; clubName?: string; clubTag?: string | null; logoUrl?: string; intro?: string; followCount?: number; memberCount?: number; orderNoticeUrl?: string };
+type ApiClub = {
+  id: number | string;
+  clubName?: string;
+  clubTag?: string | null;
+  logoUrl?: string;
+  intro?: string;
+  followCount?: number;
+  memberCount?: number;
+  orderNoticeUrl?: string;
+  clubGames?: { gameId: number; gameName?: string; iconUrl?: string }[];
+};
 type ApiClubPage = { page?: number; totalPages?: number; total?: number; records?: ApiClub[] };
 type ApiClubDetail = {
   id: number | string;
@@ -172,6 +182,9 @@ export async function fetchClubPage(filters: ClubFilters, page: number, pageSize
       clubCode: String(club.id),
       isSelfOperated: club.clubName?.includes('自营') ?? false,
       clubTag: club.clubTag || undefined,
+      clubGames: (club.clubGames ?? [])
+        .filter((game) => Boolean(game.iconUrl))
+        .map((game) => ({ iconUrl: game.iconUrl })),
     })),
     hasMore: (data?.page ?? page) < (data?.totalPages ?? page),
     nextPage: page + 1,
