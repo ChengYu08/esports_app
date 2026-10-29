@@ -252,39 +252,41 @@ export default function MineScreen() {
             </Pressable>
           </View>
           <View style={styles.profile}>
+            {/* 头像 + 昵称 + 签名整体可点，进入编辑资料 */}
             <Pressable
               accessibilityRole="link"
               accessibilityLabel={user ? "编辑资料" : "登录 / 注册"}
               onPress={() => router.push(user ? "/edit-profile" : "/login")}
+              style={styles.profileMain}
             >
               <CachedImage
                 source={user?.headImage ? { uri: user.headImage } : avatar}
                 style={styles.avatar}
               />
-            </Pressable>
-            <View style={styles.profileCopy}>
-              <View style={styles.nameLine}>
+              <View style={styles.profileCopy}>
+                <View style={styles.nameLine}>
+                  <Text
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    style={styles.name}
+                  >
+                    {displayName}
+                  </Text>
+                  {genderIcon ? (
+                    <View style={styles.badge}>
+                      <Image source={genderIcon} style={styles.genderIcon} />
+                    </View>
+                  ) : null}
+                </View>
                 <Text
                   numberOfLines={1}
                   ellipsizeMode="tail"
-                  style={styles.name}
+                  style={styles.signatureText}
                 >
-                  {displayName}
+                  {user?.signature || "保持一点神秘感..."}
                 </Text>
-                {genderIcon ? (
-                  <View style={styles.badge}>
-                    <Image source={genderIcon} style={styles.genderIcon} />
-                  </View>
-                ) : null}
               </View>
-              <Text
-                numberOfLines={1}
-                ellipsizeMode="tail"
-                style={styles.signatureText}
-              >
-                {user?.signature || "保持一点神秘感..."}
-              </Text>
-            </View>
+            </Pressable>
             <Pressable
               accessibilityRole="link"
               accessibilityLabel="个人主页"
@@ -434,7 +436,13 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   avatar: { width: 56, height: 56, borderRadius: 28 },
-  profileCopy: { flex: 1, gap: 4 },
+  profileMain: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  profileCopy: { flex: 1, gap: 4, paddingRight: 96 },
   nameLine: { flexDirection: "row", alignItems: "center", gap: 8 },
   name: {
     flexShrink: 1,

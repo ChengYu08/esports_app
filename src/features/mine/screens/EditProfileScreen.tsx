@@ -8,14 +8,7 @@ import {
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useState } from "react";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Toast from "react-native-root-toast";
 
@@ -23,6 +16,7 @@ import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { toAuthUser } from "@/features/auth/client-auth-flow";
 import { uploadClientObject } from "@/features/auth/oss-upload";
 import { saveAuthSession } from "@/features/auth/session-persistence";
+import { BirthDatePickerSheet } from "@/features/mine/components/BirthDatePickerSheet";
 import {
   beginAvatarEdit,
 } from "@/features/mine/utils/avatar-edit-session";
@@ -32,20 +26,14 @@ import { BottomSheet } from "@/shared/ui/BottomSheet";
 const fallbackAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const cameraIcon = require("../../../../assets/mine/figma/edit-camera.svg");
 
-type EditField = "gender" | "birth";
-
 type EditRow = {
-  // nickname 行跳转独立页面，不走 BottomSheet 编辑态，故 key 为普通字符串
+  // nickname/signature 行跳转独立页面，birth 行走滚轮弹层，均不走 BottomSheet 编辑态
   key: string;
   label: string;
   value: string;
+  /** 值为占位文案时置灰 */
+  muted?: boolean;
 };
-
-function editTitle(field: EditField | null): string {
-  if (field === "gender") return "选择性别";
-  if (field === "birth") return "修改年龄";
-  return "编辑";
-}
 
 function genderText(gender?: number): string {
   if (gender === 1) return "男";
@@ -54,45 +42,28 @@ function genderText(gender?: number): string {
   return "-";
 }
 
-/** 由出生日期计算周岁；无法解析时返回 null。 */
-function calcAge(birth?: string): number | null {
-  if (!birth) return null;
-  const dateMatch = birth.trim().match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
-  if (!dateMatch) return null;
-  const date = new Date(
-    Number(dateMatch[1]),
-    Number(dateMatch[2]) - 1,
-    Number(dateMatch[3]),
-  );
-  if (Number.isNaN(date.getTime())) return null;
-  const now = new Date();
-  let age = now.getFullYear() - date.getFullYear();
-  const monthDiff = now.getMonth() - date.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < date.getDate())) {
-    age -= 1;
-  }
-  return age >= 0 ? age : null;
-}
-
 export default function EditProfileScreen() {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.accessToken);
   const setSession = useAuthStore((state) => state.setSession);
-  const [editing, setEditing] = useState<EditField | null>(null);
-  const [draft, setDraft] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState<"gender" | null>(null);
   const [genderSaving, setGenderSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarEditing, setAvatarEditing] = useState(false);
-
-  const age = calcAge(user?.birth);
+  const [birthPickerVisible, setBirthPickerVisible] = useState(false);
+  const [birthSaving, setBirthSaving] = useState(false);
 
   const rows: EditRow[] = [
     { key: "nickname", label: "昵称", value: user?.nickname || "-" },
     { key: "signature", label: "个性签名", value: user?.signature || "-" },
     { key: "gender", label: "性别", value: genderText(user?.gender) },
-    { key: "birth", label: "年龄", value: age == null ? "-" : String(age) },
+    {
+      key: "birth",
+      label: "生日",
+      value: user?.birth || "请选择生日",
+      muted: !user?.birth,
+    },
   ];
 
   const applyProfile = async (
@@ -106,28 +77,16 @@ export default function EditProfileScreen() {
     setSession(session);
   };
 
-  const saveEdit = async () => {
-    if (!editing || !token || !user) {
+  // 生日滚轮弹层确定后保存（老个人设置接口，birth 字段）
+  const saveBirth = async (birth: string) => {
+    if (!token || !user || birthSaving) {
       return;
     }
-    const value = draft.trim();
-    if (
-      editing === "birth" &&
-      value &&
-      !/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(value)
-    ) {
-      Toast.show("请输入有效的出生日期，格式为 YYYY-MM-DD", {
-        duration: Toast.durations.SHORT,
-      });
-      return;
-    }
-    setSaving(true);
+    setBirthSaving(true);
     try {
-      const profile = await clientAuthApi.updateProfile(token, {
-        birth: value || undefined,
-      });
+      const profile = await clientAuthApi.updateProfile(token, { birth });
       await applyProfile(profile);
-      setEditing(null);
+      setBirthPickerVisible(false);
       Toast.show("保存成功", { duration: Toast.durations.SHORT });
     } catch (error) {
       Toast.show(
@@ -135,7 +94,7 @@ export default function EditProfileScreen() {
         { duration: Toast.durations.SHORT },
       );
     } finally {
-      setSaving(false);
+      setBirthSaving(false);
     }
   };
 
@@ -263,12 +222,12 @@ export default function EditProfileScreen() {
                     });
                     return;
                   }
-                  setEditing(row.key as EditField);
-                  setDraft(
-                    row.key === "gender"
-                      ? String(user?.gender ?? 0)
-                      : user?.birth || "",
-                  );
+                  // 生日走滚轮选择弹层（设计稿 1535-181296）
+                  if (row.key === "birth") {
+                    setBirthPickerVisible(true);
+                    return;
+                  }
+                  setEditing("gender");
                 }}
                 style={styles.row}
               >
@@ -277,7 +236,7 @@ export default function EditProfileScreen() {
                   <Text
                     numberOfLines={1}
                     ellipsizeMode="tail"
-                    style={styles.rowValue}
+                    style={[styles.rowValue, row.muted && styles.rowValueMuted]}
                   >
                     {row.value}
                   </Text>
@@ -342,39 +301,15 @@ export default function EditProfileScreen() {
               );
             })}
           </>
-        ) : (
-          <View>
-            <Text style={styles.modalTitle}>{editTitle(editing)}</Text>
-            <TextInput
-              autoFocus
-              value={draft}
-              onChangeText={setDraft}
-              maxLength={10}
-              placeholder={
-                editing === "birth" ? "请输入出生日期，如 2000-01-01" : "请输入"
-              }
-              style={styles.input}
-            />
-            <View style={styles.modalActions}>
-              <Pressable
-                onPress={() => setEditing(null)}
-                style={styles.cancelButton}
-              >
-                <Text style={styles.cancelText}>取消</Text>
-              </Pressable>
-              <Pressable
-                disabled={saving}
-                onPress={() => void saveEdit()}
-                style={styles.confirmButton}
-              >
-                <Text style={styles.confirmText}>
-                  {saving ? "保存中" : "保存"}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        )}
+        ) : null}
       </BottomSheet>
+
+      <BirthDatePickerSheet
+        visible={birthPickerVisible}
+        birth={user?.birth}
+        onCancel={() => setBirthPickerVisible(false)}
+        onConfirm={(birth) => void saveBirth(birth)}
+      />
     </View>
   );
 }
@@ -467,6 +402,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     gap: 4,
   },
+  rowValueMuted: { color: "#CACACA" },
   rowValue: {
     flexShrink: 1,
     color: "#333333",
@@ -482,14 +418,6 @@ const styles = StyleSheet.create({
   modalCard: {
     paddingHorizontal: 20,
     paddingTop: 18,
-  },
-  modalTitle: {
-    color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 17,
-    lineHeight: 24,
-    fontWeight: "600",
-    textAlign: "center",
   },
   genderOptions: {
     marginTop: 16,
@@ -514,49 +442,6 @@ const styles = StyleSheet.create({
     color: "#333333",
     fontFamily: DOUYIN_SANS,
     fontSize: 14,
-  },
-  input: {
-    marginTop: 16,
-    height: 44,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: "#F7F7F7",
-    color: "#333333",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 14,
-  },
-  modalActions: {
-    marginTop: 18,
-    flexDirection: "row",
-    gap: 10,
-  },
-  cancelButton: {
-    flex: 1,
-    height: 44,
-    borderRadius: 8,
-    backgroundColor: "#F5F5F5",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cancelText: {
-    color: "#555555",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  confirmButton: {
-    flex: 1,
-    height: 44,
-    borderRadius: 8,
-    backgroundColor: "#FF1F4C",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  confirmText: {
-    color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 14,
-    fontWeight: "600",
   },
   sheetTitleRow: {
     flexDirection: "row",
