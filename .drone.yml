@@ -245,10 +245,10 @@ steps:
         for apk_path in ./apks/*.apk; do
           [ -f "$apk_path" ] || continue
           fname_noext=$(basename "$apk_path" .apk)
-          base="${fname_noext%-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]}"
-          rest="${base#*-}"
-          rest2="${rest%-*}"
-          APP_VERSION="${rest2%-*}"
+          base="$${fname_noext%-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]}"
+          rest="$${base#*-}"
+          rest2="$${rest%-*}"
+          APP_VERSION="$${rest2%-*}"
           break
         done
         printf "  应用版本号  : %s\n" "$APP_VERSION"
@@ -288,15 +288,15 @@ steps:
           size=$(ls -lh "$apk_path" | awk '{print $5}')
 
           # 优先从 APK 文件名解析版本号（不依赖 build-android 的元数据文件）
-          fname_noext="${filename%.apk}"
+          fname_noext="$${filename%.apk}"
           # 去掉尾部 -YYYYMMDDHHMM 时间戳（12 位数字）
-          base="${fname_noext%-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]}"
+          base="$${fname_noext%-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]}"
           # 取第一个 "-" 后剩下的部分：1.0.0-arm64-test
-          rest="${base#*-}"
+          rest="$${base#*-}"
           # 再截掉最后的 -<env>，得到 1.0.0-arm64
-          rest2="${rest%-*}"
+          rest2="$${rest%-*}"
           # 再截掉最后的 -<abi>，得到 1.0.0
-          file_version="${rest2%-*}"
+          file_version="$${rest2%-*}"
 
           url="http://dev.jinliwangluo.com/android/esportsapp/$DRONE_BRANCH/$file_version/$filename"
           printf "  文件名      : %s\n" "$filename"
