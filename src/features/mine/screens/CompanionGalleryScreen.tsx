@@ -211,7 +211,7 @@ export default function CompanionGalleryScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="添加技能截图"
-              accessibilityHint={`最多${MAX_IMAGES}张，每张不超过2MB`}
+              accessibilityHint={`最多${MAX_IMAGES}张，支持 JPG/PNG/WebP，每张不超过2MB`}
               accessibilityState={{ disabled: busy }}
               disabled={busy}
               onPress={addImages}

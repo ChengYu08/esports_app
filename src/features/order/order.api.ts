@@ -13,11 +13,6 @@ const statusByFilter: Partial<Record<OrderFilter, OrderQueryStatus>> = {
   completed: "FINISHED",
   cancelled: "CANCELED",
 };
-const acceptStatusLabelByFilter: Partial<Record<OrderFilter, string>> = {
-  inProgress: "服务中",
-  completed: "已结束",
-  cancelled: "已退款",
-};
 
 function stringValue(item: ApiOrder, ...keys: string[]) {
   const value = keys.map((key) => item[key]).find((candidate) => candidate !== undefined && candidate !== null && candidate !== "");
@@ -39,7 +34,6 @@ export function mapOrder(
   item: ApiOrder,
   index = 0,
   scope: OrderScope = "place",
-  filter?: OrderFilter,
 ): OrderItemModel {
   const gameIcon = stringValue(item, "gameIconUrl");
   const receiverAvatar = stringValue(item, "receiverHeadImage", "companionHeadImage");
@@ -55,11 +49,9 @@ export function mapOrder(
     : "pendingPayment";
   const id = stringValue(item, "id", "orderId", "orderNo") ?? `order-${index}`;
   const total = stringValue(item, "realPayAmount", "totalPrice", "payAmount", "amount") ?? "0";
-  const statusLabel = scope === "accept"
-    ? acceptStatusLabelByFilter[filter ?? "all"] ?? {
-        pendingPayment: "待支付", paid: "用户已支付", waitingService: "待服务",
-        inService: "服务中", completed: "已结束", cancelled: "已取消", refunded: "已退款",
-      }[status]
+  // 状态文案对齐 Web 的 statusMeta：按真实状态计算，接单侧仅「用户已支付」不同。
+  const statusLabel = scope === "accept" && status === "paid"
+    ? "用户已支付"
     : {
         pendingPayment: "待支付", paid: "已支付", waitingService: "待服务",
         inService: "服务中", completed: "已完成", cancelled: "已取消", refunded: "已退款",
@@ -82,9 +74,8 @@ export function mapOrder(
     ? Date.now() >= serviceEnd
     : Number.isFinite(serviceStart) && Date.now() >= serviceStart + Math.max(1, numberValue(item, "quantity", "count", "num") ?? 1) * 3_600_000;
   const settled = item.isSettle === true;
-  const acceptActions: OrderItemModel["actions"] = status === "completed"
-    ? []
-    : settled
+  // 对齐 Web acceptActions：已结账不再免单；未结账的已完成订单仍可免单。
+  const acceptActions: OrderItemModel["actions"] = settled
     ? status === "inService" && serviceEnded ? [{ key: "complete", label: "完成服务", variant: "primary" }] : []
     : status === "paid"
     ? [{ key: "reject", label: "拒绝", variant: "secondary" }, { key: "accept", label: "同意接单", variant: "primary" }]
@@ -94,7 +85,9 @@ export function mapOrder(
         ? serviceEnded
           ? [{ key: "free", label: "免单", variant: "secondary" }, { key: "complete", label: "完成服务", variant: "primary" }]
           : [{ key: "free", label: "免单", variant: "secondary" }]
-        : [];
+        : status === "completed"
+          ? [{ key: "free", label: "免单", variant: "secondary" }]
+          : [];
   return {
     id,
     orderNo: stringValue(item, "orderNo", "orderNumber") ?? id,
@@ -225,5 +218,5 @@ export async function fetchOrderPage(filter: OrderFilter, token: string, userId:
     : total !== undefined
       ? page * pageSize < total
       : records.length >= pageSize;
-  return { items: records.map((item, index) => mapOrder(item, index, scope, filter)), hasMore };
+  return { items: records.map((item, index) => mapOrder(item, index, scope)), hasMore };
 }

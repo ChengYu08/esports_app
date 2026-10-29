@@ -104,3 +104,18 @@ it("replaces the card with filter-specific labels after an action", async () => 
   const item = queryClient.getQueryData<ReturnType<typeof seed>>(inProgress)!.pages[0].items[0];
   expect(item.statusLabel).toBe("服务中");
 });
+
+it("marks the finished order completed with a free action on the accept side", async () => {
+  queryClient.setQueryData(key, seed());
+  const inProgress = ["orders", "accept", "inProgress", "51"];
+  queryClient.setQueryData(inProgress, seed());
+  vi.mocked(apiClient).mockResolvedValue({ code: "SUCCESS", data: { ...raw, orderStatus: "COMPLETED" } });
+
+  await refreshOrderAfterAction("42", "test-session", "51");
+  const allItems = queryClient.getQueryData<ReturnType<typeof seed>>(key)!.pages[0].items;
+  expect(allItems).toHaveLength(1);
+  expect(allItems[0].status).toBe("completed");
+  expect(allItems[0].statusLabel).toBe("已完成");
+  expect(allItems[0].actions.map((action) => action.key)).toEqual(["free"]);
+  expect(queryClient.getQueryData<ReturnType<typeof seed>>(inProgress)!.pages[0].items).toHaveLength(0);
+});

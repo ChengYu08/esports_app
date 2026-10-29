@@ -66,7 +66,7 @@ export async function refreshOrderAfterAction(orderId: string, token: string, us
   for (const { queryKey } of keys) {
     const [, scope, filter, accountId] = queryKey;
     if (accountId !== userId || (scope !== "accept" && scope !== "place")) continue;
-    const updated = mapOrder(raw, 0, scope, filter as OrderFilter | undefined);
+    const updated = mapOrder(raw, 0, scope);
     const statusFilter = statusFilterOf(updated.status);
     queryClient.setQueryData<InfiniteData<{ items: OrderItemModel[]; hasMore: boolean }>>(
       queryKey,
