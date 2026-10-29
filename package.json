@@ -5,7 +5,9 @@
   "expo": {
     "autolinking": {
       "ios": {
-        "exclude": ["react-native-update"]
+        "exclude": [
+          "react-native-update"
+        ]
       }
     }
   },

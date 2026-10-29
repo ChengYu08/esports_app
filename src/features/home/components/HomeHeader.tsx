@@ -275,6 +275,8 @@ const styles = StyleSheet.create({
   tabCornerLeft: { left: -16 },
   tabCornerRight: { right: -16 },
   section: {
+    backgroundColor: "#fff",
+    borderTopRightRadius: 12,
     height: 50,
     paddingHorizontal: 16,
     alignItems: "center",
