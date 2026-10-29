@@ -112,7 +112,11 @@ export default function EditNicknameScreen() {
             />
             <View style={styles.counter}>
               <Text
-                style={[styles.counterText, charCount > 0 && styles.counterActive]}
+                style={[
+                  styles.counterText,
+                  charCount > 0 && styles.counterActive,
+                  charCount >= NICKNAME_MAX_LENGTH && styles.counterLimit,
+                ]}
               >
                 {charCount}
               </Text>
@@ -204,6 +208,8 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   counterActive: { color: "#999999" },
+  // 达到/超出字数上限时当前计数变红（设计稿 361-40380）
+  counterLimit: { color: "#FF4754" },
   hintText: {
     color: "#808080",
     fontFamily: DOUYIN_SANS,

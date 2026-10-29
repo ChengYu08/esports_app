@@ -31,7 +31,7 @@ import { BottomSheet } from "@/shared/ui/BottomSheet";
 const fallbackAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const cameraIcon = require("../../../../assets/mine/figma/edit-camera.svg");
 
-type EditField = "signature" | "gender" | "birth";
+type EditField = "gender" | "birth";
 
 type EditRow = {
   // nickname 行跳转独立页面，不走 BottomSheet 编辑态，故 key 为普通字符串
@@ -41,7 +41,6 @@ type EditRow = {
 };
 
 function editTitle(field: EditField | null): string {
-  if (field === "signature") return "修改个性签名";
   if (field === "gender") return "选择性别";
   if (field === "birth") return "修改年龄";
   return "编辑";
@@ -123,11 +122,9 @@ export default function EditProfileScreen() {
     setSaving(true);
     try {
       const data =
-        editing === "signature"
-          ? { signature: value }
-          : editing === "gender"
-            ? { gender: Number(value) }
-            : { birth: value || undefined };
+        editing === "gender"
+          ? { gender: Number(value) }
+          : { birth: value || undefined };
       const profile = await clientAuthApi.updateProfile(token, data);
       await applyProfile(profile);
       setEditing(null);
@@ -231,7 +228,7 @@ export default function EditProfileScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={`编辑${row.label}`}
                 onPress={() => {
-                  // 昵称走独立的“编辑名字”页（设计稿 253-36947）
+                  // 昵称/个性签名走独立页面（设计稿 253-36947 / 253-36956）
                   if (row.key === "nickname") {
                     router.push({
                       pathname: "/edit-nickname",
@@ -239,13 +236,18 @@ export default function EditProfileScreen() {
                     });
                     return;
                   }
+                  if (row.key === "signature") {
+                    router.push({
+                      pathname: "/edit-signature",
+                      params: { signature: user?.signature ?? "" },
+                    });
+                    return;
+                  }
                   setEditing(row.key as EditField);
                   setDraft(
-                    row.key === "signature"
-                      ? user?.signature || ""
-                      : row.key === "gender"
-                        ? String(user?.gender ?? 0)
-                        : user?.birth || "",
+                    row.key === "gender"
+                      ? String(user?.gender ?? 0)
+                      : user?.birth || "",
                   );
                 }}
                 style={styles.row}
@@ -301,7 +303,7 @@ export default function EditProfileScreen() {
               autoFocus
               value={draft}
               onChangeText={setDraft}
-              maxLength={editing === "signature" ? 60 : 10}
+              maxLength={10}
               placeholder={
                 editing === "birth" ? "请输入出生日期，如 2000-01-01" : "请输入"
               }

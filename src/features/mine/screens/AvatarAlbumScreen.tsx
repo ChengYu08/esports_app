@@ -52,7 +52,10 @@ export default function AvatarAlbumScreen() {
   const navigatingRef = useRef(false);
 
   const requestPermission = useCallback(async () => {
-    const response = await MediaLibrary.requestPermissionsAsync();
+    // 只申请图片粒度权限（不申请音频/视频，保持权限最小化）
+    const response = await MediaLibrary.requestPermissionsAsync(false, [
+      "photo",
+    ]);
     setPermission(response);
     return response.granted;
   }, []);
