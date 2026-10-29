@@ -1,11 +1,87 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { apiClient } from "@/core/network/api-client";
-import { fetchClubPage, fetchGameCategories, fetchGames } from "./home.api";
+import { fetchBanners, fetchClubPage, fetchGameCategories, fetchGames } from "./home.api";
 
 vi.mock("@/core/network/api-client", () => ({ apiClient: vi.fn() }));
 
 afterEach(() => vi.clearAllMocks());
+
+describe("首页活动轮播下发", () => {
+  it("批量查询 App 三层资源位，按楼层和素材顺序展示，不混入 PC 素材", async () => {
+    const controller = new AbortController();
+    vi.mocked(apiClient).mockResolvedValue({
+      code: "SUCCESS",
+      data: [
+        { slotCode: "APP_HOME_FLOOR3", slotName: "APP首页三楼", displayMode: "TILE", items: [
+          { deliveryId: 8, materialId: 21, displayImageUrl: "https://cdn.example.com/b.jpg", sort: 2 },
+          { deliveryId: 8, materialId: 22, displayImageUrl: " https://cdn.example.com/a.jpg ", sort: 1,
+            materialName: " 活动详情 ", contentImageUrl: " https://cdn.example.com/detail.jpg ", linkUrl: "https://example.com/activity" },
+          { deliveryId: 8, materialId: 23, displayImageUrl: "  ", sort: 3 },
+          { deliveryId: 8, materialId: 24, displayImageUrl: null, sort: 4 },
+        ] },
+        { slotCode: "PC_HOME_CAROUSEL", displayMode: "CAROUSEL", items: [
+          { deliveryId: 9, materialId: 25, displayImageUrl: "pc.jpg" },
+        ] },
+        { slotCode: "APP_HOME_FLOOR2", slotName: "APP首页二楼", displayMode: "TILE", items: [] },
+        { slotCode: "APP_HOME_FLOOR1", slotName: "APP首页一楼", displayMode: "CAROUSEL", intervalSec: 7, items: [
+          { deliveryId: 10, materialId: 26, displayImageUrl: "first.jpg", linkUrl: "  " },
+        ] },
+      ],
+    });
+
+    const slots = await fetchBanners(controller.signal);
+
+    expect(slots.map((slot) => slot.code)).toEqual(["APP_HOME_FLOOR1", "APP_HOME_FLOOR2", "APP_HOME_FLOOR3"]);
+    expect(slots[0]).toMatchObject({ displayMode: "CAROUSEL", intervalMs: 7000 });
+    expect(slots[0].items[0].linkUrl).toBeUndefined();
+    expect(slots[1].items).toEqual([]);
+    expect(slots[2]).toMatchObject({ displayMode: "TILE", intervalMs: 5000 });
+    expect(slots[2].items).toEqual([
+      expect.objectContaining({ id: "8-22", imageUrl: "https://cdn.example.com/a.jpg", title: "活动详情",
+        contentImageUrl: "https://cdn.example.com/detail.jpg", linkUrl: "https://example.com/activity" }),
+      expect.objectContaining({ id: "8-21", imageUrl: "https://cdn.example.com/b.jpg" }),
+    ]);
+    expect(apiClient).toHaveBeenCalledWith("/client/v1/ad/slot/list", {
+      method: "POST",
+      body: { slotCodes: ["APP_HOME_FLOOR1", "APP_HOME_FLOOR2", "APP_HOME_FLOOR3"] },
+      signal: controller.signal,
+    });
+  });
+
+  it("某层停用或缺失不影响其他楼层，也不将其他素材补到该楼层", async () => {
+    vi.mocked(apiClient).mockResolvedValue({
+      code: "SUCCESS",
+      data: [{ slotCode: "APP_HOME_FLOOR2", displayMode: "TILE", items: [
+        { deliveryId: 8, materialId: 22, displayImageUrl: "second.jpg" },
+      ] }],
+    });
+
+    expect(await fetchBanners()).toEqual([expect.objectContaining({
+      code: "APP_HOME_FLOOR2", items: [expect.objectContaining({ imageUrl: "second.jpg" })],
+    })]);
+  });
+
+  it.each([0, -1, null, undefined])("轮播间隔未配置或无效时使用默认值：%j", async (intervalSec) => {
+    vi.mocked(apiClient).mockResolvedValue({ code: "SUCCESS", data: [
+      { slotCode: "APP_HOME_FLOOR1", displayMode: "CAROUSEL", intervalSec, items: null },
+    ] });
+
+    expect(await fetchBanners()).toEqual([expect.objectContaining({ intervalMs: 5000, items: [] })]);
+  });
+
+  it.each([[], null, undefined])("后台没有生效素材时不显示演示 Banner：%j", async (data) => {
+    vi.mocked(apiClient).mockResolvedValue({ code: "SUCCESS", data });
+
+    expect(await fetchBanners()).toEqual([]);
+  });
+
+  it("业务失败进入查询错误状态，不返回演示素材", async () => {
+    vi.mocked(apiClient).mockResolvedValue({ code: "FAILED", info: "活动加载失败" });
+
+    await expect(fetchBanners()).rejects.toThrow("活动加载失败");
+  });
+});
 
 describe("首页品类筛选与店铺标签", () => {
   it("保留后台品类顺序及游戏与品类的关联", async () => {

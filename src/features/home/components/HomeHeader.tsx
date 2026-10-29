@@ -1,6 +1,6 @@
 import { Search24Regular } from "@fluentui/react-native-icons";
 import type {
-  Banner,
+  HomeBannerSlot,
   Game,
   GameCategory,
   GameKey,
@@ -8,13 +8,13 @@ import type {
 } from "@/features/home/api/home.types";
 import { DOUYIN_SANS, SYSTEM_FONT } from "@/shared/theme/typography";
 import { GameCategoryTabs } from "./GameCategoryTabs";
+import { HomeBannerSections } from "./HomeBannerSections";
 import { COURT_FONT_FAMILY } from "@/features/court/court.theme";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-// const banner = require("../../../../assets/home/h_banner.png");
 const tabLeftCorner = require("../../../../assets/home/h_tab_left.svg");
 const tabRightCorner = require("../../../../assets/home/h_tab_right.svg");
 type HomeHeaderProps = {
@@ -26,8 +26,7 @@ type HomeHeaderProps = {
   onCategoryChange: (category: string) => void;
   filterError?: boolean;
   onRetryFilters: () => void;
-  bannerIndex: number;
-  banners: Banner[];
+  bannerSlots: HomeBannerSlot[];
   onTabChange: (tab: HomeTab) => void;
   onGameChange: (game: GameKey) => void;
 };
@@ -41,26 +40,15 @@ export function HomeHeader({
   onCategoryChange,
   filterError,
   onRetryFilters,
-  bannerIndex,
-  banners,
+  bannerSlots,
   onTabChange,
   onGameChange,
 }: HomeHeaderProps) {
   return (
     <>
-      {/* <View style={styles.banner}>
-        <CachedImage
-          source={
-            banners[bannerIndex]?.imageUrl
-              ? { uri: banners[bannerIndex].imageUrl }
-              : banner
-          }
-          style={styles.bannerImage}
-          contentFit="cover"
-        />
-      </View> */}
       {tab === "home" && (
         <>
+          <HomeBannerSections slots={bannerSlots} />
           <GameCategoryTabs categories={categories} selectedId={category} onChange={onCategoryChange} />
           {filterError && (
             <Pressable accessibilityRole="button" onPress={onRetryFilters} style={styles.filterRetry}>
@@ -233,16 +221,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  banner: {
-    marginHorizontal: 12,
-    alignSelf: "stretch",
-    height: 80,
-    marginTop: 8,
-    borderRadius: 8,
-    overflow: "hidden",
-    backgroundColor: "#1b2739",
-  },
-  bannerImage: { width: "100%", height: "100%" },
   gameTabs: {
     height: 38,
   },

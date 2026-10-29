@@ -12,7 +12,7 @@ import {
 } from "@/features/home/hooks/use-home-data";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import Toast from "react-native-root-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -42,13 +42,12 @@ export default function HomeScreen() {
   // 后台移除已选品类时，同时清除该品类下的游戏筛选。
   const isCategoryAvailable = !category || selectedCategory !== "";
   const selectedGame = isCategoryAvailable && categoryGames.some((item) => String(item.id) === game) ? game : "";
-  const [bannerIndex, setBannerIndex] = useState(0);
   const banners = useHomeBanners(topTab);
   const clubs = useHomeClubs(topTab, {
     gameId: selectedGame || undefined,
     gameCategoryId: selectedCategory || undefined,
   });
-  const bannerItems = useMemo(() => banners.data ?? [], [banners.data]);
+  const bannerSlots = useMemo(() => banners.data ?? [], [banners.data]);
 
   useFocusEffect(
     useCallback(() => {
@@ -78,23 +77,11 @@ export default function HomeScreen() {
     }, [reviewerApplied, ticketSubmitted]),
   );
 
-  useEffect(() => {
-    if (bannerItems.length < 2) {
-      return undefined;
-    }
-    const timer = setInterval(
-      () => setBannerIndex((value) => (value + 1) % bannerItems.length),
-      4000,
-    );
-    return () => clearInterval(timer);
-  }, [bannerItems.length]);
-
   const clubItems = useMemo(
     () => clubs.data?.pages.flatMap((page) => page.items) ?? [],
     [clubs.data],
   );
   const selectTopTab = useCallback((tab: HomeTab) => {
-    setBannerIndex(0);
     setTopTab(tab);
   }, []);
   const selectCategory = useCallback((id: string) => {
@@ -105,7 +92,7 @@ export default function HomeScreen() {
     await Promise.all([refetchGames(), refetchCategories()]);
   }, [refetchGames, refetchCategories]);
   const refreshHome = async () => {
-    await Promise.all([clubs.refetch(), games.refetch(), categories.refetch()]);
+    await Promise.all([clubs.refetch(), games.refetch(), categories.refetch(), banners.refetch()]);
   };
   const loadMoreClubs = () => {
     if (clubs.hasNextPage && !clubs.isFetching) {
@@ -129,15 +116,14 @@ export default function HomeScreen() {
         onCategoryChange={selectCategory}
         filterError={games.isError || categories.isError}
         onRetryFilters={retryFilters}
-        bannerIndex={bannerIndex}
-        banners={bannerItems}
+        bannerSlots={bannerSlots}
         onTabChange={selectTopTab}
         onGameChange={setGame}
       />
     ),
-    [topTab, selectedGame, categoryGames, categories.data, selectedCategory, selectCategory, games.isError, categories.isError, retryFilters, bannerIndex, bannerItems, selectTopTab],
+    [topTab, selectedGame, categoryGames, categories.data, selectedCategory, selectCategory, games.isError, categories.isError, retryFilters, bannerSlots, selectTopTab],
   );
-  const isHomeLoading = games.isLoading || categories.isLoading || banners.isLoading;
+  const isHomeLoading = games.isLoading || categories.isLoading;
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -163,7 +149,7 @@ export default function HomeScreen() {
           }}
           refreshControl={
             <RefreshControl
-              refreshing={(clubs.isRefetching && !clubs.isFetchingNextPage) || games.isRefetching || categories.isRefetching}
+              refreshing={(clubs.isRefetching && !clubs.isFetchingNextPage) || games.isRefetching || categories.isRefetching || banners.isRefetching}
               onRefresh={refreshHome}
               tintColor="#ff214b"
             />
