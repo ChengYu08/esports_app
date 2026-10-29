@@ -39,6 +39,12 @@ export type HomeBannerSlot = {
   items: Banner[];
 };
 
+export type ClubGameIcon = {
+  id: number;
+  name: string;
+  iconUrl?: string;
+};
+
 export type Club = {
   id: string;
   name: string;
@@ -49,6 +55,7 @@ export type Club = {
   clubCode: string;
   isSelfOperated?: boolean;
   clubTag?: string;
+  games?: ClubGameIcon[];
 };
 
 export type ClubPage = {
