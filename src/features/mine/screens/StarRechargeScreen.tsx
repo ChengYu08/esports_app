@@ -1,6 +1,5 @@
-import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useAuthStore } from "@esports/auth";
+import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
@@ -11,6 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStarIap } from "@/features/iap/use-star-iap";
 import { fetchStarBalance } from "@/features/mine/api/companion-order.api";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
+import { Skeleton } from "@/shared/ui/Skeleton";
 
 const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
 
@@ -107,6 +107,15 @@ export default function StarRechargeScreen() {
     };
   }, [token]);
 
+  // 后端档位已就位，但苹果价格还没全部拉回来 => 认为页面仍在加载。
+  // 任意一个档位缺价格都视为未就绪，避免骨架屏提前消失后价格还是 "--"。
+  const pricesReady =
+    packages.length > 0 &&
+    packages.every((item) =>
+      products.some((product) => product.id === item.productId),
+    );
+  const pageLoading = !pricesReady;
+
   // 选中项为派生值：用户未手动选择或所选档位已下架时，回退到第二个（或第一个）档位。
   const userSelectedValid =
     userTouchedSelection &&
@@ -162,132 +171,143 @@ export default function StarRechargeScreen() {
           onPress={() => router.back()}
           style={styles.headerSide}
         >
-          <ChevronLeft24Regular color="white" width={24} height={24} style={styles.backIcon} />
+          <ChevronLeft24Regular
+            color="#0D0D0F"
+            width={24}
+            height={24}
+            style={styles.backIcon}
+          />
         </Pressable>
         <Text style={styles.headerTitle}>星钻充值</Text>
         <View style={styles.headerSide} />
       </View>
 
-      <View style={styles.balanceSection}>
-        <Text style={styles.balanceLabel}>我的星钻余额</Text>
-        <Text style={styles.balanceValue}>
-          {balance === null ? "--" : formatAmount(balance)}
-        </Text>
-      </View>
-
-      <ScrollView
-        style={styles.body}
-        contentContainerStyle={[
-          styles.bodyContent,
-          { paddingBottom: insets.bottom },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.optionsSection}>
-          <View style={styles.sectionHeading}>
-            <Text style={styles.sectionTitle}>请选择购买数量</Text>
-            <Text style={styles.sectionDescription}>
-              {shortfall ? (
-                <>
-                  还需充值{" "}
-                  <Text style={styles.shortfallValue}>
-                    {formatAmount(shortfall)}星钻
-                  </Text>{" "}
-                  以购买本次服务
-                </>
-              ) : (
-                "星钻可用于平台服务消费"
-              )}
+      {pageLoading ? (
+        <RechargePageSkeleton bottomInset={insets.bottom} />
+      ) : (
+        <>
+          <View style={styles.balanceSection}>
+            <Text style={styles.balanceLabel}>我的星钻余额</Text>
+            <Text style={styles.balanceValue}>
+              {balance === null ? "--" : formatAmount(balance)}
             </Text>
           </View>
 
-          <View style={styles.packageGrid}>
-            <View style={styles.packageRow}>
-              {packages.map((item) => {
-                const storeProduct = products.find(
-                  (product) => product.id === item.productId,
-                );
-                return (
-                  <RechargeOption
-                    key={item.productId}
-                    diamonds={item.stars}
-                    price={storeProduct?.displayPrice ?? "--"}
-                    selected={selectedPackage?.productId === item.productId}
-                    onPress={() => {
-                      setSelectedPackageId(item.productId);
-                      setUserTouchedSelection(true);
-                    }}
-                  />
-                );
-              })}
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.purchaseFooter}>
-          <View style={styles.agreementRow}>
-            <Pressable
-              accessibilityRole="checkbox"
-              accessibilityLabel="同意盼之电竞购买须知"
-              accessibilityState={{ checked: agreementAccepted }}
-              hitSlop={6}
-              onPress={() => setAgreementAccepted((accepted) => !accepted)}
-              style={styles.checkboxHitArea}
-            >
-              <View
-                style={[
-                  styles.checkbox,
-                  agreementAccepted && styles.checkboxSelected,
-                ]}
-              >
-                {agreementAccepted ? (
-                  <Text style={styles.checkboxMark}>✓</Text>
-                ) : null}
-              </View>
-            </Pressable>
-            <Text style={styles.agreementCopy}>支付即同意</Text>
-            <Pressable
-              accessibilityRole="link"
-              onPress={() =>
-                setPrompt({
-                  title: "盼之电竞购买须知",
-                  message: "请在支付前确认本次充值的星钻数量与金额。",
-                })
-              }
-            >
-              <Text style={styles.agreementLink}>《盼之电竞购买须知》</Text>
-            </Pressable>
-          </View>
-
-          {iapErrorMessage ? (
-            <Text style={styles.purchaseError}>{iapErrorMessage}</Text>
-          ) : null}
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ disabled: purchaseDisabled }}
-            disabled={purchaseDisabled}
-            onPress={handleConfirmPurchase}
-            style={styles.confirmButton}
+          <ScrollView
+            style={styles.body}
+            contentContainerStyle={[
+              styles.bodyContent,
+              { paddingBottom: insets.bottom },
+            ]}
+            showsVerticalScrollIndicator={false}
           >
-            <LinearGradient
-              colors={["#FF1F2E", "#FF1F69"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={[
-                styles.confirmGradient,
-                purchaseDisabled && styles.confirmDisabled,
-              ]}
-            >
-              <Text style={styles.confirmText}>
-                {iapStatus === "purchasing" || iapStatus === "verifying"
-                  ? "支付处理中..."
-                  : `确认支付 ${selectedStoreProduct?.displayPrice ?? ""}`}
-              </Text>
-            </LinearGradient>
-          </Pressable>
-        </View>
-      </ScrollView>
+            <View style={styles.optionsSection}>
+              <View style={styles.sectionHeading}>
+                <Text style={styles.sectionTitle}>请选择购买数量</Text>
+                <Text style={styles.sectionDescription}>
+                  {shortfall ? (
+                    <>
+                      还需充值{" "}
+                      <Text style={styles.shortfallValue}>
+                        {formatAmount(shortfall)}星钻
+                      </Text>{" "}
+                      以购买本次服务
+                    </>
+                  ) : (
+                    "星钻可用于平台服务消费"
+                  )}
+                </Text>
+              </View>
+
+              <View style={styles.packageGrid}>
+                <View style={styles.packageRow}>
+                  {packages.map((item) => {
+                    const storeProduct = products.find(
+                      (product) => product.id === item.productId,
+                    );
+                    return (
+                      <RechargeOption
+                        key={item.productId}
+                        diamonds={item.stars}
+                        price={storeProduct?.displayPrice ?? "--"}
+                        selected={selectedPackage?.productId === item.productId}
+                        onPress={() => {
+                          setSelectedPackageId(item.productId);
+                          setUserTouchedSelection(true);
+                        }}
+                      />
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.purchaseFooter}>
+              <View style={styles.agreementRow}>
+                <Pressable
+                  accessibilityRole="checkbox"
+                  accessibilityLabel="同意盼之电竞购买须知"
+                  accessibilityState={{ checked: agreementAccepted }}
+                  hitSlop={6}
+                  onPress={() => setAgreementAccepted((accepted) => !accepted)}
+                  style={styles.checkboxHitArea}
+                >
+                  <View
+                    style={[
+                      styles.checkbox,
+                      agreementAccepted && styles.checkboxSelected,
+                    ]}
+                  >
+                    {agreementAccepted ? (
+                      <Text style={styles.checkboxMark}>✓</Text>
+                    ) : null}
+                  </View>
+                </Pressable>
+                <Text style={styles.agreementCopy}>支付即同意</Text>
+                <Pressable
+                  accessibilityRole="link"
+                  onPress={() =>
+                    setPrompt({
+                      title: "盼之电竞购买须知",
+                      message: "请在支付前确认本次充值的星钻数量与金额。",
+                    })
+                  }
+                >
+                  <Text style={styles.agreementLink}>《盼之电竞购买须知》</Text>
+                </Pressable>
+              </View>
+
+              {iapErrorMessage ? (
+                <Text style={styles.purchaseError}>{iapErrorMessage}</Text>
+              ) : null}
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ disabled: purchaseDisabled }}
+                disabled={purchaseDisabled}
+                onPress={handleConfirmPurchase}
+                style={styles.confirmButton}
+              >
+                <LinearGradient
+                  colors={["#FF1F2E", "#FF1F69"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[
+                    styles.confirmGradient,
+                    purchaseDisabled && styles.confirmDisabled,
+                  ]}
+                >
+                  <Text style={styles.confirmText}>
+                    {iapStatus === "purchasing" || iapStatus === "verifying"
+                      ? "支付处理中..."
+                      : `确认支付 ${selectedStoreProduct?.displayPrice ?? ""}`}
+                  </Text>
+                </LinearGradient>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </>
+      )}
 
       <AppPrompt
         visible={prompt !== null}
@@ -295,6 +315,43 @@ export default function StarRechargeScreen() {
         message={prompt?.message ?? ""}
         onConfirm={() => setPrompt(null)}
       />
+    </View>
+  );
+}
+
+function RechargePageSkeleton({ bottomInset }: { bottomInset: number }) {
+  return (
+    <View
+      accessible
+      accessibilityLabel="星钻充值加载中"
+      accessibilityState={{ busy: true }}
+      style={[styles.skeletonPage, { paddingBottom: bottomInset + 16 }]}
+    >
+      <View style={styles.skeletonBalance}>
+        <Skeleton width={84} height={12} radius={6} />
+        <Skeleton width={140} height={32} radius={8} />
+      </View>
+
+      <View style={styles.skeletonSection}>
+        <Skeleton width={112} height={14} radius={6} />
+        <Skeleton width={200} height={12} radius={6} />
+      </View>
+
+      <View style={styles.packageRow}>
+        {[0, 1, 2].map((index) => (
+          <Skeleton
+            key={index}
+            height={68}
+            radius={8}
+            style={styles.packageCardSkeleton}
+          />
+        ))}
+      </View>
+
+      <View style={styles.skeletonFooter}>
+        <Skeleton width={180} height={14} radius={6} />
+        <Skeleton height={42} radius={21} style={styles.skeletonConfirm} />
+      </View>
     </View>
   );
 }
@@ -352,7 +409,6 @@ const styles = StyleSheet.create({
   backIcon: { width: 24, height: 24 },
   headerTitle: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "500",
@@ -366,7 +422,6 @@ const styles = StyleSheet.create({
   },
   balanceLabel: {
     color: "#999999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -388,20 +443,33 @@ const styles = StyleSheet.create({
   sectionHeading: { gap: 4 },
   sectionTitle: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "500",
   },
   sectionDescription: {
     color: "#808080",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
   shortfallValue: { color: "#3DA5FF" },
   packageGrid: { gap: 12 },
   packageRow: { flexDirection: "row", gap: 12 },
+  packageCardSkeleton: { flex: 1 },
+  skeletonPage: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    gap: 16,
+  },
+  skeletonBalance: {
+    paddingVertical: 16,
+    alignItems: "center",
+    gap: 10,
+  },
+  skeletonSection: { gap: 8 },
+  skeletonFooter: { marginTop: "auto", gap: 12 },
+  skeletonConfirm: { width: "100%" },
   packageCard: {
     flex: 1,
     minHeight: 68,
@@ -423,7 +491,6 @@ const styles = StyleSheet.create({
   packageIcon: { width: 16, height: 16 },
   packageDiamonds: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 18,
     lineHeight: 22,
     fontWeight: "700",
@@ -462,20 +529,17 @@ const styles = StyleSheet.create({
   checkboxSelected: { borderColor: "#3DA5FF", backgroundColor: "#3DA5FF" },
   checkboxMark: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 11,
     lineHeight: 13,
     fontWeight: "700",
   },
   agreementCopy: {
     color: "#ABABAD",
-    fontFamily: DOUYIN_SANS,
     fontSize: 11,
     lineHeight: 18,
   },
   agreementLink: {
     color: "#3DA5FF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 11,
     lineHeight: 18,
   },
@@ -489,7 +553,6 @@ const styles = StyleSheet.create({
   confirmDisabled: { opacity: 0.45 },
   confirmText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "500",

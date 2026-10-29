@@ -147,7 +147,9 @@ export function HomeTopBar({ tab, onTabChange }: Pick<HomeHeaderProps, "tab" | "
       <View style={styles.topTabs}>
         <Tab label="首页" court={tab === "court"} selected={tab === "home"} onPress={() => onTabChange("home")} />
         <Tab label="大神" court={tab === "court"} selected={tab === "god"} onPress={() => onTabChange("god")} />
+        <Tab label="排行榜" court={tab === "court"} selected={tab === "ranking"} onPress={() => onTabChange("ranking")} />
         <Tab label="小法庭" court={tab === "court"} selected={tab === "court"} onPress={() => onTabChange("court")} />
+        <Tab label="排行榜" court={tab === "court"} selected={tab === "ranking"} onPress={() => onTabChange("ranking")} />
       </View>
       <View style={styles.actions}>
         <Pressable accessibilityLabel="搜索" style={styles.search} onPress={() => router.push({ pathname: "/search", params: { type: "club" } })}>

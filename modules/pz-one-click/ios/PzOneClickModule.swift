@@ -68,15 +68,15 @@ public class PzOneClickModule: Module {
 
         let model = self.makeAuthPageModel()
         var didFinish = false
+        // 只有明确的终止码才结束流程：成功、用户取消，或已知失败码段。
+        // 其余回调（含未来 SDK 新增的中间码）只记日志，绝不提前关页/reject。
+        // 取消码集合：700000 用户取消、700001 切换登录、700010 自绘返回按钮、700011 系统返回键。
+        let cancelledCodes: Set<String> = ["700000", "700001", "700010", "700011", "700020"]
         self.authHandler.getLoginToken(withTimeout: 8, controller: controller, model: model) { result in
           guard !didFinish else { return }
           let code = self.resultCode(result)
           if code == "600001" {
             NSLog("\(quickLoginTag) iOS authorization page presented")
-            return
-          }
-          // UI interaction callbacks precede the final token or failure callback.
-          if ["700002", "700003", "700004", "700006", "700007", "700008", "700009"].contains(code) {
             return
           }
           if code == "600000", let spToken = result["token"] as? String, !spToken.isEmpty {
@@ -86,13 +86,30 @@ public class PzOneClickModule: Module {
             promise.resolve(["spToken": spToken])
             return
           }
+          if cancelledCodes.contains(code) {
+            didFinish = true
+            NSLog("\(quickLoginTag) iOS authorization cancelled by user: code=\(code)")
+            self.sendEvent("onStateChange", ["state": "cancelled"])
+            self.authHandler.cancelLoginVC(animated: true, complete: nil)
+            promise.reject("USER_CANCELLED", "一键登录失败，请使用其他登录方式")
+            return
+          }
+          // 明确的失败码段（6xxxxx 非 600000/600001，7xxxxx 非取消/交互码）才终止；
+          // 其余中间事件码忽略，等待最终回调。
+          let uiInteractionCodes: Set<String> = ["700002", "700003", "700004", "700005", "700006", "700007", "700008", "700009"]
+          let isFailure =
+            (code.hasPrefix("6") && code != "600000" && code != "600001")
+            || (code.hasPrefix("7") && !uiInteractionCodes.contains(code))
+          guard isFailure else {
+            NSLog("\(quickLoginTag) iOS intermediate callback ignored: code=\(code)")
+            return
+          }
 
           didFinish = true
-          let cancelled = code == "700000" || code == "700001" || code == "700010" || code == "700020"
-          NSLog("\(quickLoginTag) iOS authorization ended: code=\(code), cancelled=\(cancelled)")
-          self.sendEvent("onStateChange", ["state": cancelled ? "cancelled" : "unavailable"])
+          NSLog("\(quickLoginTag) iOS authorization failed: code=\(code)")
+          self.sendEvent("onStateChange", ["state": "unavailable"])
           self.authHandler.cancelLoginVC(animated: true, complete: nil)
-          promise.reject(cancelled ? "USER_CANCELLED" : "AUTHORIZATION_FAILED", "一键登录失败，请使用其他登录方式")
+          promise.reject("AUTHORIZATION_FAILED", "一键登录失败，请使用其他登录方式")
         }
       }
     }.runOnQueue(DispatchQueue.main)

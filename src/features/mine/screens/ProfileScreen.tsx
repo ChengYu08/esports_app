@@ -73,6 +73,7 @@ const maleIcon = require("../../../../assets/home/club-detail/male.svg");
 const femaleIcon = require("../../../../assets/mine/figma/mine-female.svg");
 const clubIcon = require("../../../../assets/mine/figma/mine-club-flag.svg");
 const backIcon = require("../../../../assets/mine/figma/profile-back.svg");
+const settingsIcon = require("../../../../assets/mine/figma/mine-settings.svg");
 const diamondIcon = require("../../../../assets/home/club-detail/icon-diamond.svg");
 const idleStatusIcon = require("../../../../assets/home/club-detail/status-idle.svg");
 const playingStatusIcon = require("../../../../assets/home/club-detail/status-playing.svg");
@@ -545,7 +546,6 @@ export default function ProfileScreen() {
       onPress={() => router.push("/edit-profile")}
       style={styles.editProfileButton}
     >
-      <Edit24Regular color="#0A0A0A" height={20} width={20} />
       <Text style={styles.editProfileText}>编辑个人资料</Text>
     </Pressable>
   ) : null;
@@ -612,6 +612,21 @@ export default function ProfileScreen() {
               {profile.nickname}
             </Text>
           </Animated.View>
+          {isMine ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="设置"
+              hitSlop={12}
+              onPress={() => router.push("/edit-profile")}
+              style={styles.navSettingsButton}
+            >
+              <Image
+                source={settingsIcon}
+                style={styles.navSettingsIcon}
+                contentFit="contain"
+              />
+            </Pressable>
+          ) : null}
         </View>
         <Animated.View
           pointerEvents={compactActive ? "box-none" : "none"}
@@ -628,8 +643,6 @@ export default function ProfileScreen() {
         data={profileListItems}
         keyExtractor={(item) => item.key}
         renderItem={({ item }) => item.content}
-        ListFooterComponent={editProfileButton}
-        ListFooterComponentStyle={isMine ? styles.profileListFooter : undefined}
         initialNumToRender={6}
         maxToRenderPerBatch={5}
         windowSize={5}
@@ -648,42 +661,46 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           flexGrow: 1,
-          paddingBottom: isMine ? 24 + insets.bottom : 88 + insets.bottom,
+          paddingBottom: 88 + insets.bottom,
         }}
       />
 
-      {!isMine ? (
-        <View
-          style={[
-            styles.actionBar,
-            { paddingBottom: Math.max(insets.bottom, 12) + 12 },
-          ]}
-        >
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={
-              followStateQuery.data?.followed ? "已关注" : "关注"
-            }
-            accessibilityState={{
-              disabled: followStateQuery.isLoading || followMutation.isPending,
-              busy: followMutation.isPending,
-            }}
-            disabled={followStateQuery.isLoading || followMutation.isPending}
-            style={styles.followButton}
-            onPress={() => void handleFollowPress()}
-          >
-            <Text style={styles.followText}>
-              {followStateQuery.data?.followed ? "已关注" : "关注"}
-            </Text>
-          </Pressable>
-          <Pressable
-            style={styles.chatButton}
-            onPress={() => void handleChatPress()}
-          >
-            <Text style={styles.chatText}>聊一聊</Text>
-          </Pressable>
-        </View>
-      ) : null}
+      <View
+        style={[
+          styles.actionBar,
+          { paddingBottom: Math.max(insets.bottom, 12) + 12 },
+        ]}
+      >
+        {isMine ? (
+          editProfileButton
+        ) : (
+          <>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                followStateQuery.data?.followed ? "已关注" : "关注"
+              }
+              accessibilityState={{
+                disabled: followStateQuery.isLoading || followMutation.isPending,
+                busy: followMutation.isPending,
+              }}
+              disabled={followStateQuery.isLoading || followMutation.isPending}
+              style={styles.followButton}
+              onPress={() => void handleFollowPress()}
+            >
+              <Text style={styles.followText}>
+                {followStateQuery.data?.followed ? "已关注" : "关注"}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={styles.chatButton}
+              onPress={() => void handleChatPress()}
+            >
+              <Text style={styles.chatText}>聊一聊</Text>
+            </Pressable>
+          </>
+        )}
+      </View>
       {!isMine ? (
         <ProfileActionsSheet
           visible={profileActionsVisible}
@@ -1344,6 +1361,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  navSettingsButton: {
+    position: "absolute",
+    right: 12,
+    top: 10,
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  navSettingsIcon: { width: 24, height: 24, tintColor: "#FFFFFF" },
   backIcon: { width: 24, height: 24, tintColor: "#fff" },
   identity: {
     flexDirection: "row",
@@ -1460,25 +1487,21 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   editProfileButton: {
-    height: 48,
-    marginHorizontal: 12,
-    // marginTop: "auto",
-    marginBottom: 8,
+    flex: 1,
+    height: 42,
     borderRadius: 8,
     backgroundColor: "#FFF",
-    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    borderColor: "#EBEBEB",
+    borderColor: "#E9E9EB",
     borderWidth: 1,
-    gap: 8,
-    marginTop: 30,
   },
-  profileListFooter: { flexGrow: 1 },
   editProfileText: {
-    color: "#0A0A0A",
+    color: "#0D0D0F",
     fontFamily: DOUYIN_SANS,
-    fontSize: 15,
+    fontSize: 14,
+    fontWeight: "500",
+    lineHeight: 22,
   },
   stats: { flexDirection: "row", gap: 16 },
   stat: { flexDirection: "row", alignItems: "baseline", gap: 5 },

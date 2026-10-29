@@ -19,6 +19,10 @@ name: android-deployment
 # 冷构建（首次写缓存卷）耗时较长，默认 60 分钟会超时被杀
 timeout: 180
 
+environment:
+  # 当前东八区偏移（分钟），用于把容器内 UTC 时间换算为北京时间
+  TZ_OFFSET_MINUTES: 480
+
 image_pull_secrets:
   - dockerconfig
 
@@ -120,6 +124,25 @@ steps:
 
         echo "构建完成，产物:"
         ls -lh ./apks/ 2>/dev/null || echo "未找到 APK"
+
+        # ---- 生成构建元数据（供最终信息展示步骤读取） ----
+        version=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' ./app.json | head -1)
+        {
+          echo "BUILD_ENV=$${BUILD_ENV}"
+          echo "BUILD_ABI=$${BUILD_ABI}"
+          echo "APP_VERSION=$${version}"
+          echo "BUILD_STARTED_AT=$${DRONE_BUILD_STARTED}"
+        } > ./drone-build-info.env
+
+        # 构建的 UTC 与本地时间（构建容器默认 UTC；展示步骤会用东八区偏移换算为北京时间）
+        {
+          echo "BUILD_TIME_UTC=$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          printf 'DRONE_COMMIT_SHORT=%s\n' "$(echo "$DRONE_COMMIT_SHA" | cut -c1-8)"
+          printf 'DRONE_BUILD_START_TS=%s\n' "$DRONE_BUILD_STARTED"
+          printf 'DRONE_BUILD_FINISH_TS=%s\n' "$(date +%s)"
+        } >> ./drone-build-info.env
+
+        echo "构建元数据已生成: ./drone-build-info.env"
     when:
       event:
         - push
@@ -171,6 +194,101 @@ steps:
         - "*prod*"
         - "*test*"
         - "*dev*"
+
+  - name: print-build-info
+    image: alpine:3.19
+    pull: if-not-exists
+    commands:
+      - |
+        set -e
+
+        echo " "
+        echo "╔════════════════════════════════════════════════════════════════╗"
+        echo "║              盼之电竞 Android APK 构建信息汇总                  ║"
+        echo "╚════════════════════════════════════════════════════════════════╝"
+
+        # 读取构建元数据
+        if [ -f ./drone-build-info.env ]; then
+          . ./drone-build-info.env
+        fi
+
+        # ---- Git 提交信息 ----
+        echo " "
+        echo "📌 Git 提交信息"
+        echo "------------------------------------------------"
+        printf "  分支        : %s\n" "$DRONE_BRANCH"
+        printf "  Commit      : %s\n" "$DRONE_COMMIT_SHA"
+        printf "  Commit 短   : %s\n" "$DRONE_COMMIT_SHORT"
+        printf "  提交作者    : %s <%s>\n" "$DRONE_COMMIT_AUTHOR" "$DRONE_COMMIT_AUTHOR_EMAIL"
+        printf "  提交信息    : %s\n" "$DRONE_COMMIT_MESSAGE"
+        printf "  提交链接    : %s\n" "$DRONE_COMMIT_LINK"
+        printf "  构建编号    : #%s\n" "$DRONE_BUILD_NUMBER"
+        printf "  构建链接    : %s\n" "$DRONE_BUILD_LINK"
+
+        # ---- 构建环境信息 ----
+        echo " "
+        echo "🏷️  构建环境"
+        echo "------------------------------------------------"
+        printf "  构建环境    : %s\n" "$BUILD_ENV"
+        printf "  CPU 架构    : %s\n" "$BUILD_ABI"
+        printf "  应用版本号  : %s\n" "$APP_VERSION"
+
+        # ---- 时间信息（本地时间 / 北京时间）----
+        echo " "
+        echo "🕐 构建时间"
+        echo "------------------------------------------------"
+        printf "  UTC 时间    : %s\n" "$BUILD_TIME_UTC"
+
+        # 通过 TZ_OFFSET_MINUTES 计算北京时间（容器默认 UTC）
+        if [ -n "$DRONE_BUILD_START_TS" ] && [ -n "$TZ_OFFSET_MINUTES" ]; then
+          offset_sec=$(( TZ_OFFSET_MINUTES * 60 ))
+          bj_start=$(( DRONE_BUILD_START_TS + offset_sec ))
+          bj_finish=$(( DRONE_BUILD_FINISH_TS + offset_sec ))
+          if command -v date >/dev/null 2>&1 && date -d "@$bj_start" >/dev/null 2>&1; then
+            printf "  北京时间开始: %s\n" "$(date -d "@$bj_start" '+%Y-%m-%d %H:%M:%S')"
+            printf "  北京时间结束: %s\n" "$(date -d "@$bj_finish" '+%Y-%m-%d %H:%M:%S')"
+          else
+            printf "  东八区开始  : Unix %s (+%s 分钟)\n" "$bj_start" "$TZ_OFFSET_MINUTES"
+            printf "  东八区结束  : Unix %s (+%s 分钟)\n" "$bj_finish" "$TZ_OFFSET_MINUTES"
+          fi
+          # 构建耗时
+          duration=$(( DRONE_BUILD_FINISH_TS - DRONE_BUILD_START_TS ))
+          printf "  构建耗时    : %s 秒 (约 %s 分钟)\n" "$duration" "$(( duration / 60 ))"
+        fi
+
+        # ---- APK 下载地址 ----
+        echo " "
+        echo "📦 下载地址"
+        echo "------------------------------------------------"
+        apks_found=0
+        for apk_path in ./apks/*.apk; do
+          [ -f "$apk_path" ] || continue
+          apks_found=$((apks_found + 1))
+          filename=$(basename "$apk_path")
+          size=$(ls -lh "$apk_path" | awk '{print $5}')
+          url="http://dev.jinliwangluo.com/android/esportsapp/$DRONE_BRANCH/$APP_VERSION/$filename"
+          printf "  文件名      : %s\n" "$filename"
+          printf "  大小        : %s\n" "$size"
+          printf "  下载地址    : %s\n" "$url"
+          echo "  ------------------------------------------------"
+        done
+        if [ "$apks_found" -eq 0 ]; then
+          echo "  ⚠️  未找到 APK 文件"
+        fi
+        echo " "
+    when:
+      event:
+        - push
+        - custom
+      branch:
+        - main
+        - prod
+        - "*main*"
+        - "*prod*"
+        - "*test*"
+        - "*dev*"
+    depends_on:
+      - move-to-dev-server
 
 trigger:
   event:

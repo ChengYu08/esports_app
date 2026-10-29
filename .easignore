@@ -40,8 +40,8 @@ yarn-error.*
 example
 
 # generated native folders
-/ios
-/android
+# /ios
+# /android
 /apks
 
 /.android-signing/
