@@ -18,7 +18,12 @@ import { DEFAULT_RANKING_FILTERS, getRankingBoard } from "../ranking.config";
 
 const emptyRows: RankingItem[] = [];
 
-export default function RankingScreen() {
+export default function RankingScreen({
+  embedded = false,
+}: {
+  /** 作为首页顶部 tab 内嵌时为 true：顶部留白交给首页导航栏，只保留少量间距 */
+  embedded?: boolean;
+}) {
   const insets = useSafeAreaInsets();
   const [filters, setFilters] = useState(DEFAULT_RANKING_FILTERS);
   const [rulesVisible, setRulesVisible] = useState(false);
@@ -74,7 +79,7 @@ export default function RankingScreen() {
   }
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: 60 + insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }]}>
+    <View style={[styles.screen, { paddingTop: embedded ? 6 : insets.top, paddingBottom: 60 + insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }]}>
       <View style={styles.header}>
         <Text accessibilityRole="header" style={styles.title}>排行榜</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="查看榜单规则" onPress={() => setRulesVisible(true)} style={styles.rulesButton}>
