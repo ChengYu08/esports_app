@@ -1,11 +1,66 @@
 import { apiClient } from '@/core/network/api-client';
-import { demoBanners } from "./home.mock";
-import type { Banner, ClubDetail, ClubDetailGame, ClubFilters, ClubGameMode, ClubPage, CompanionFilters, CompanionPage, Game, GameCategory, HomeTab, PriceListTab } from "./home.types";
+import { HOME_BANNER_SLOT_CODES } from "../home-banner.contract";
+import type { ClubDetail, ClubDetailGame, ClubFilters, ClubGameMode, ClubPage, CompanionFilters, CompanionPage, Game, GameCategory, HomeBannerSlot, PriceListTab } from "./home.types";
 
 export type { Banner, Club, ClubPage, Game, GameKey, HomeTab } from "./home.types";
 
-export async function fetchBanners(_tab: HomeTab): Promise<Banner[]> {
-  return demoBanners;
+type ApiBanner = {
+  deliveryId: number | string;
+  materialId: number | string;
+  materialName?: string | null;
+  displayImageUrl?: string | null;
+  contentImageUrl?: string | null;
+  linkUrl?: string | null;
+  sort?: number | null;
+};
+
+type ApiBannerSlot = {
+  slotCode: string;
+  slotName?: string;
+  displayMode: HomeBannerSlot["displayMode"];
+  intervalSec?: number | null;
+  items?: ApiBanner[] | null;
+};
+
+export async function fetchBanners(signal?: AbortSignal): Promise<HomeBannerSlot[]> {
+  const response = await apiClient<ApiEnvelope<ApiBannerSlot[] | null>>("/client/v1/ad/slot/list", {
+    method: "POST",
+    body: { slotCodes: HOME_BANNER_SLOT_CODES },
+    signal,
+  });
+  if (response.code !== "SUCCESS") {
+    throw new Error(response.info || "首页活动加载失败");
+  }
+  // 固定 App 楼层顺序，不依赖接口返回资源位的排列，也不混入 PC 端素材。
+  return HOME_BANNER_SLOT_CODES.flatMap((code) => {
+    const slot = response.data?.find((item) => item.slotCode === code);
+    if (!slot) {
+      return [];
+    }
+    return [{
+      code,
+      name: slot.slotName || "首页活动",
+      displayMode: slot.displayMode,
+      intervalMs: typeof slot.intervalSec === "number" && Number.isFinite(slot.intervalSec) && slot.intervalSec > 0
+        ? slot.intervalSec * 1000
+        : 5000,
+      items: [...(slot.items ?? [])]
+        .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0))
+        .flatMap((banner) => {
+          const imageUrl = banner.displayImageUrl?.trim();
+          if (!imageUrl) {
+            return [];
+          }
+          return [{
+            id: `${banner.deliveryId}-${banner.materialId}`,
+            imageUrl,
+            title: banner.materialName?.trim() || undefined,
+            contentImageUrl: banner.contentImageUrl?.trim() || undefined,
+            linkUrl: banner.linkUrl?.trim() || undefined,
+          }];
+        }),
+    }];
+  });
 }
 
 type ApiEnvelope<T> = { success?: boolean; code?: string; info?: string; data?: T };
