@@ -66,3 +66,28 @@ export async function createAppPayOrder(
   );
   return requireSuccess(response, "创建支付订单失败，请稍后再试");
 }
+
+export type CreatePayOrderAction = {
+  payChannel?: string;
+  payWay?: string;
+  payTypeEnum?: string;
+  moneyAmount: number;
+  starAmount: number;
+};
+
+export type CreatePayOrderResult = {
+  rechargeNo?: string;
+  qrCode?: string;
+  platformTxno?: string;
+};
+
+export async function createPayOrder(
+  token: string,
+  action: CreatePayOrderAction,
+): Promise<CreatePayOrderResult> {
+  const response = await apiClient<ApiEnvelope<CreatePayOrderResult>>(
+    "/client/v1/pay/createPayOrder",
+    { method: "POST", token, body: action },
+  );
+  return requireSuccess(response, "创建支付订单失败，请稍后再试");
+}
