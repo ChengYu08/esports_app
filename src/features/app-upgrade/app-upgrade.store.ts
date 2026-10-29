@@ -13,6 +13,7 @@ import {
   installApk,
   isApkCached,
   openInstallPermissionSettings,
+  reuseCachedApkIfVerified,
 } from "./apk-installer";
 import { appUpgradeApi } from "./app-upgrade.api";
 import type { AppVersionVO } from "./app-upgrade.contract";
@@ -153,13 +154,27 @@ export const useAppUpgradeStore = create<AppUpgradeState>(() => ({
     }
 
     try {
+      const expectedMd5 = latest?.md5?.trim().toLowerCase();
+
       let fileUri = isApkCached(downloadedApkUri) ? downloadedApkUri! : null;
+      let md5Verified = false;
+      if (!fileUri) {
+        // 跨会话复用：上次已下载的 APK md5 校验通过才复用，免重新下载；
+        // 下载中断的残包/同版本重传的旧包会被删除后重新下载
+        fileUri = await reuseCachedApkIfVerified(latest?.versionNo, expectedMd5);
+        if (fileUri) {
+          md5Verified = true;
+          logger.info("app_upgrade.cache_reuse", { fileUri });
+          useAppUpgradeStore.setState({ downloadedApkUri: fileUri });
+        }
+      }
       if (!fileUri) {
         useAppUpgradeStore.setState({
           downloadPhase: "downloading",
           downloadProgress: 0,
           downloadErrorType: null,
         });
+        // .tmp 有残留时 downloadApk 内部自动断点续传
         fileUri = await downloadApk(packageUrl, latest?.versionNo, (percent) => {
           useAppUpgradeStore.setState({ downloadProgress: percent });
         });
@@ -167,9 +182,10 @@ export const useAppUpgradeStore = create<AppUpgradeState>(() => ({
       }
 
       // 完整性校验：后端提供 md5 时，对新下载与缓存复用两条路径都校验
-      const expectedMd5 = latest?.md5?.trim().toLowerCase();
       if (!expectedMd5) {
         logger.info("app_upgrade.md5_skip", { fileUri, reason: "no_expected" });
+      } else if (md5Verified) {
+        logger.info("app_upgrade.md5_match", { fileUri, reused: true });
       } else {
         const hashStartedAt = Date.now();
         let actualMd5: string | null = null;
