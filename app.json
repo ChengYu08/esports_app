@@ -17,7 +17,7 @@
       "blockedPermissions": ["android.permission.CAMERA"],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#AB1E31"
+        "backgroundColor": "#FFFFFF"
       }
     },
     "web": {
