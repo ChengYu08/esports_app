@@ -328,13 +328,14 @@ export default function EditProfileScreen() {
                     style={styles.genderRadioRow}
                   >
                     <Text style={styles.genderRadioText}>{label}</Text>
-                    {/* 选中：红色实心圆；未选中：灰色圆环（设计稿 Radio/Small-Large-20） */}
-                    <View
-                      style={[
-                        styles.radioCircle,
-                        selected && styles.radioCircleSelected,
-                      ]}
-                    />
+                    {/* 选中：红圈 + 内部红点，圆圈与红点之间留白色间隙；未选中：灰色圆环（设计稿 Radio/Small-Large-20） */}
+                    {selected ? (
+                      <View style={styles.radioCircleSelected}>
+                        <View style={styles.radioDot} />
+                      </View>
+                    ) : (
+                      <View style={styles.radioCircle} />
+                    )}
                   </Pressable>
                   <View style={styles.genderDivider} />
                 </View>
@@ -599,8 +600,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#CCCCCC",
   },
+  // 选中：16 红圈（边宽 2）+ 中心 6 红点，圆环与红点间留白色间隙
   radioCircleSelected: {
-    borderWidth: 0,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: "#E01B28",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  radioDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: "#E01B28",
   },
   genderDivider: {
