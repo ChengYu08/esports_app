@@ -1,3 +1,5 @@
+import { Platform } from "react-native";
+
 import { env } from "@/core/config/env";
 
 /**
@@ -5,9 +7,13 @@ import { env } from "@/core/config/env";
  * Protocol pages are hosted on PC; content is managed server-side by code.
  */
 
+// iOS 端协议编码统一追加 `_ios` 后缀（后台按平台区分协议内容）
+const protocolCode = (code: string) =>
+  Platform.OS === "ios" ? `${code}_ios` : code;
+
 // 协议页基础域名取自环境配置（生产/测试域名区分在 env.protocolBaseUrl 内完成）
 export const APP_LINKS = {
-  userAgreement: `${env.protocolBaseUrl}/public/protocols?code=user_server`,
-  privacyPolicy: `${env.protocolBaseUrl}/public/protocols?code=user_privacy`,
-  rechargeAgreement: `${env.protocolBaseUrl}/public/protocols?code=user_recharge`,
+  userAgreement: `${env.protocolBaseUrl}/public/protocols?code=${protocolCode("user_server")}`,
+  privacyPolicy: `${env.protocolBaseUrl}/public/protocols?code=${protocolCode("user_privacy")}`,
+  rechargeAgreement: `${env.protocolBaseUrl}/public/protocols?code=${protocolCode("user_recharge")}`,
 } as const;

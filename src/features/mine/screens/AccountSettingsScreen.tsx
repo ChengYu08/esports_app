@@ -1,6 +1,9 @@
-import { ChevronLeft24Regular, ChevronRight16Regular } from "@fluentui/react-native-icons";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
+import {
+  ChevronLeft24Regular,
+  ChevronRight16Regular,
+} from "@fluentui/react-native-icons";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
@@ -26,7 +29,7 @@ import {
 } from "@/features/auth/session-persistence";
 import { messageStore } from "@/features/message/message-store";
 import { RealNameVerificationSheet } from "@/features/mine/components/RealNameVerificationSheet";
-import { DOUYIN_SANS, PINGFANG_SC } from "@/shared/theme/typography";
+import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 
@@ -251,7 +254,12 @@ export default function AccountSettingsScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <ChevronLeft24Regular color="#0A0A0A" width={24} height={24} style={styles.backIcon} />
+          <ChevronLeft24Regular
+            color="#0A0A0A"
+            width={24}
+            height={24}
+            style={styles.backIcon}
+          />
         </Pressable>
         <Text style={styles.headerTitle}>账号设置</Text>
         <View style={styles.headerSpace} />
@@ -469,7 +477,14 @@ function SettingRow({
             {value}
           </Text>
         )}
-        {onPress ? <ChevronRight16Regular color="#0A0A0A" width={16} height={16} style={styles.arrow} /> : null}
+        {onPress ? (
+          <ChevronRight16Regular
+            color="#0A0A0A"
+            width={16}
+            height={16}
+            style={styles.arrow}
+          />
+        ) : null}
       </View>
     </Pressable>
   );
@@ -564,7 +579,6 @@ const styles = StyleSheet.create({
   },
   value: {
     color: "#666",
-    fontFamily: PINGFANG_SC,
     fontSize: 14,
     textAlign: "right",
   },

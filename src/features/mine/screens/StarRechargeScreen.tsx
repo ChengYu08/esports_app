@@ -1,6 +1,5 @@
-import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useAuthStore } from "@esports/auth";
+import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
@@ -11,6 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStarIap } from "@/features/iap/use-star-iap";
 import { fetchStarBalance } from "@/features/mine/api/companion-order.api";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
+import { Skeleton } from "@/shared/ui/Skeleton";
 
 const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
 
@@ -107,6 +107,9 @@ export default function StarRechargeScreen() {
     };
   }, [token]);
 
+  // 档位和价格都还没回来之前展示骨架屏。
+  const packagesLoading = packages.length === 0;
+
   // 选中项为派生值：用户未手动选择或所选档位已下架时，回退到第二个（或第一个）档位。
   const userSelectedValid =
     userTouchedSelection &&
@@ -162,7 +165,12 @@ export default function StarRechargeScreen() {
           onPress={() => router.back()}
           style={styles.headerSide}
         >
-          <ChevronLeft24Regular color="white" width={24} height={24} style={styles.backIcon} />
+          <ChevronLeft24Regular
+            color="white"
+            width={24}
+            height={24}
+            style={styles.backIcon}
+          />
         </Pressable>
         <Text style={styles.headerTitle}>星钻充值</Text>
         <View style={styles.headerSide} />
@@ -202,25 +210,38 @@ export default function StarRechargeScreen() {
           </View>
 
           <View style={styles.packageGrid}>
-            <View style={styles.packageRow}>
-              {packages.map((item) => {
-                const storeProduct = products.find(
-                  (product) => product.id === item.productId,
-                );
-                return (
-                  <RechargeOption
-                    key={item.productId}
-                    diamonds={item.stars}
-                    price={storeProduct?.displayPrice ?? "--"}
-                    selected={selectedPackage?.productId === item.productId}
-                    onPress={() => {
-                      setSelectedPackageId(item.productId);
-                      setUserTouchedSelection(true);
-                    }}
+            {packagesLoading ? (
+              <View style={styles.packageRow}>
+                {[0, 1, 2].map((index) => (
+                  <Skeleton
+                    key={index}
+                    height={68}
+                    radius={8}
+                    style={styles.packageCardSkeleton}
                   />
-                );
-              })}
-            </View>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.packageRow}>
+                {packages.map((item) => {
+                  const storeProduct = products.find(
+                    (product) => product.id === item.productId,
+                  );
+                  return (
+                    <RechargeOption
+                      key={item.productId}
+                      diamonds={item.stars}
+                      price={storeProduct?.displayPrice ?? "--"}
+                      selected={selectedPackage?.productId === item.productId}
+                      onPress={() => {
+                        setSelectedPackageId(item.productId);
+                        setUserTouchedSelection(true);
+                      }}
+                    />
+                  );
+                })}
+              </View>
+            )}
           </View>
         </View>
 
@@ -352,7 +373,6 @@ const styles = StyleSheet.create({
   backIcon: { width: 24, height: 24 },
   headerTitle: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "500",
@@ -366,7 +386,6 @@ const styles = StyleSheet.create({
   },
   balanceLabel: {
     color: "#999999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -388,20 +407,19 @@ const styles = StyleSheet.create({
   sectionHeading: { gap: 4 },
   sectionTitle: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "500",
   },
   sectionDescription: {
     color: "#808080",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
   shortfallValue: { color: "#3DA5FF" },
   packageGrid: { gap: 12 },
   packageRow: { flexDirection: "row", gap: 12 },
+  packageCardSkeleton: { flex: 1 },
   packageCard: {
     flex: 1,
     minHeight: 68,
@@ -423,7 +441,6 @@ const styles = StyleSheet.create({
   packageIcon: { width: 16, height: 16 },
   packageDiamonds: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 18,
     lineHeight: 22,
     fontWeight: "700",
@@ -462,20 +479,17 @@ const styles = StyleSheet.create({
   checkboxSelected: { borderColor: "#3DA5FF", backgroundColor: "#3DA5FF" },
   checkboxMark: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 11,
     lineHeight: 13,
     fontWeight: "700",
   },
   agreementCopy: {
     color: "#ABABAD",
-    fontFamily: DOUYIN_SANS,
     fontSize: 11,
     lineHeight: 18,
   },
   agreementLink: {
     color: "#3DA5FF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 11,
     lineHeight: 18,
   },
@@ -489,7 +503,6 @@ const styles = StyleSheet.create({
   confirmDisabled: { opacity: 0.45 },
   confirmText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "500",

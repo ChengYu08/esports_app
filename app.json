@@ -27,6 +27,7 @@
     "plugins": [
       "expo-router",
       "expo-iap",
+      "./plugins/withAndroidFullscreenSplash",
       [
         "expo-splash-screen",
         {

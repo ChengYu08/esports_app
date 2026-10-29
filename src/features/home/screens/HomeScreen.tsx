@@ -5,6 +5,7 @@ import { ClubCard } from "@/features/home/components/ClubCard";
 import { HomeBackground } from "@/features/home/components/HomeBackground";
 import { HomeHeader, HomeTopBar } from "@/features/home/components/HomeHeader";
 import { HomeSkeleton } from "@/features/home/components/HomeSkeleton";
+import RankingScreen from "@/features/ranking/screens/RankingScreen";
 import {
   useHomeBanners,
   useHomeClubs,
@@ -220,6 +221,8 @@ export default function HomeScreen() {
           bottomInset={insets.bottom}
           initialPage={courtInitialPage}
         />
+      ) : topTab === "ranking" ? (
+        <RankingScreen />
       ) : (
         <Animated.FlatList
           style={styles.clubList}
