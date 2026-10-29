@@ -11,16 +11,18 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useAuthStore } from "@esports/auth";
+
 import {
   TEEN_MODE_PASSWORD_LENGTH,
   filterDigits,
   isPasswordComplete,
 } from "@/features/mine/teen-mode";
 import {
-  clearTeenMode,
-  readTeenMode,
-  saveTeenMode,
-} from "@/features/mine/teen-mode-store";
+  teenModeApi,
+} from "@/features/mine/api/teen-mode.api";
+import type { TeenModeStatus } from "@/features/mine/api/teen-mode.contract";
+import { saveLastTeenEnabled } from "@/features/mine/teen-mode-store";
 import { colors } from "@/shared/theme/tokens";
 
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
@@ -28,20 +30,65 @@ const closedIllustration = require("../../../../assets/mine/figma/teen-mode-clos
 const openIllustration = require("../../../../assets/mine/figma/teen-mode-open.svg");
 const starIcon = require("../../../../assets/mine/figma/teen-mode-star.svg");
 
-type Phase = "overview" | "setFirst" | "setConfirm" | "disable";
+type Phase =
+  | "overview"
+  | "setFirst"
+  | "setConfirm"
+  | "openWithPassword"
+  | "disable";
 
-export default function TeenModeScreen() {
+type PasswordPhase = Exclude<Phase, "overview">;
+
+export default function TeenModeScreen({
+  onStatusChanged,
+  locked = false,
+}: {
+  /** 每次服务端状态变化后回调（启动门禁据此解除锁定覆盖层）。 */
+  onStatusChanged?: (status: TeenModeStatus) => void;
+  /** 作为启动门禁锁定页使用：隐藏返回键，用户必须输密码关闭才能离开。 */
+  locked?: boolean;
+}) {
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
-  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const token = useAuthStore((state) => state.accessToken);
+  const [status, setStatus] = useState<TeenModeStatus | null>(null);
   const [phase, setPhase] = useState<Phase>("overview");
   const [code, setCode] = useState("");
   const [firstPassword, setFirstPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  const enabled = status?.enabled === true;
+  const passwordSet = status?.passwordSet === true;
+
+  const applyStatus = (next: TeenModeStatus) => {
+    setStatus(next);
+    void saveLastTeenEnabled(next.enabled);
+    onStatusChanged?.(next);
+  };
+
+  // 挂载即拉取服务端状态；拉取失败保持当前视图（fail-open，不阻断页面）
   useEffect(() => {
-    readTeenMode().then((record) => setEnabled(record?.enabled ?? false));
-  }, []);
+    if (!token) {
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const next = await teenModeApi.status(token);
+        if (cancelled) {
+          return;
+        }
+        applyStatus(next);
+      } catch {
+        // 状态拉取失败保持当前视图，避免网络抖动导致页面不可用
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // applyStatus 依赖 token/user，本 effect 仅随登录态变化重新拉取
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const codeComplete = isPasswordComplete(code);
 
@@ -52,7 +99,9 @@ export default function TeenModeScreen() {
   };
 
   const confirmCode = () => {
-    if (!codeComplete || submitting) return;
+    if (!codeComplete || submitting || !token) {
+      return;
+    }
     if (phase === "setFirst") {
       setFirstPassword(code);
       setCode("");
@@ -61,36 +110,43 @@ export default function TeenModeScreen() {
     }
     setSubmitting(true);
     void (async () => {
-      if (phase === "setConfirm") {
-        if (code !== firstPassword) {
-          setSubmitting(false);
-          Toast.show("两次输入的密码不一致，请重新设置", {
-            duration: Toast.durations.SHORT,
-          });
-          setCode("");
-          setFirstPassword("");
-          setPhase("setFirst");
+      try {
+        if (phase === "setConfirm") {
+          if (code !== firstPassword) {
+            Toast.show("前后两次密码不一致", {
+              duration: Toast.durations.SHORT,
+            });
+            setCode("");
+            setFirstPassword("");
+            setPhase("setFirst");
+            return;
+          }
+          // 未设过密码：open 同时完成「设置密码 + 开启」
+          applyStatus(await teenModeApi.open(token, code, code));
+          setPhase("overview");
+          Toast.show("青少年模式已开启", { duration: Toast.durations.SHORT });
           return;
         }
-        await saveTeenMode({ enabled: true, password: code });
-        setSubmitting(false);
-        setEnabled(true);
+        if (phase === "openWithPassword") {
+          // 已设过密码：只校验密码后开启
+          applyStatus(await teenModeApi.open(token, code));
+          setPhase("overview");
+          Toast.show("青少年模式已开启", { duration: Toast.durations.SHORT });
+          return;
+        }
+        // disable：关闭青少年模式（密码错误信息由服务端返回）
+        applyStatus(await teenModeApi.close(token, code));
         setPhase("overview");
-        Toast.show("青少年模式已开启", { duration: Toast.durations.SHORT });
-        return;
-      }
-      const record = await readTeenMode();
-      if (!record || record.password !== code) {
-        setSubmitting(false);
-        Toast.show("密码错误，请重试", { duration: Toast.durations.SHORT });
+        Toast.show("青少年模式已关闭", { duration: Toast.durations.SHORT });
+      } catch (error) {
+        Toast.show(
+          error instanceof Error ? error.message : "操作失败，请稍后重试",
+          { duration: Toast.durations.SHORT },
+        );
         setCode("");
-        return;
+      } finally {
+        setSubmitting(false);
       }
-      await clearTeenMode();
-      setSubmitting(false);
-      setEnabled(false);
-      setPhase("overview");
-      Toast.show("青少年模式已关闭", { duration: Toast.durations.SHORT });
     })();
   };
 
@@ -142,7 +198,12 @@ export default function TeenModeScreen() {
                   setCode("");
                   setPhase("disable");
                 }
-              : openSetPassword
+              : () => {
+                  setCode("");
+                  setFirstPassword("");
+                  // 已设过密码：开启仅需输入密码校验；未设过：进入设置密码页
+                  setPhase(passwordSet ? "openWithPassword" : "setFirst");
+                }
           }
           style={styles.primaryButton}
         >
@@ -155,21 +216,30 @@ export default function TeenModeScreen() {
   );
 
   const renderPassword = () => {
-    const passwordPhase = phase as "setFirst" | "setConfirm" | "disable";
-    const titles: Record<typeof passwordPhase, string> = {
+    const titles: Record<
+      "setFirst" | "setConfirm" | "openWithPassword" | "disable",
+      string
+    > = {
       setFirst: "设置密码",
       setConfirm: "再次输入密码",
+      openWithPassword: "输入密码",
       disable: "关闭青少年模式",
     };
+    const subtitle =
+      phase === "disable"
+        ? null
+        : phase === "openWithPassword"
+          ? "输入密码后即可开启青少年模式"
+          : "该密码将用于解锁青少年模式";
+    // 进入密码输入视图时 phase 必然是四个密码子阶段之一
+    const passwordPhase = phase as PasswordPhase;
     return (
       <View style={styles.passwordContent}>
         <View style={styles.passwordBody}>
           <View style={styles.passwordTitleWrap}>
             <Text style={styles.passwordTitle}>{titles[passwordPhase]}</Text>
-            {passwordPhase !== "disable" ? (
-              <Text style={styles.passwordSubtitle}>
-                该密码将用于解锁青少年模式
-              </Text>
+            {subtitle ? (
+              <Text style={styles.passwordSubtitle}>{subtitle}</Text>
             ) : null}
           </View>
           <Pressable
@@ -227,17 +297,21 @@ export default function TeenModeScreen() {
           { height: 44 + insets.top, paddingTop: insets.top },
         ]}
       >
-        <Pressable
-          accessibilityLabel="返回"
-          accessibilityRole="button"
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Image source={backIcon} style={styles.backIcon} />
-        </Pressable>
+        {locked ? (
+          <View style={styles.backButton} />
+        ) : (
+          <Pressable
+            accessibilityLabel="返回"
+            accessibilityRole="button"
+            onPress={() => router.back()}
+            style={styles.backButton}
+          >
+            <Image source={backIcon} style={styles.backIcon} />
+          </Pressable>
+        )}
         <View style={styles.headerEnd} />
       </View>
-      {enabled === null ? null : phase === "overview"
+      {status === null ? null : phase === "overview"
         ? renderOverview()
         : renderPassword()}
     </View>

@@ -31,6 +31,7 @@ import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
 import { leaveVoiceChatRoom } from "@/features/voice-room/voice-room-rongcloud";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
 import { PushyUpdateHost } from "@/features/ota/PushyUpdateHost";
+import { TeenModeGate } from "@/features/mine/components/TeenModeGate";
 import { PrivacyConsentGate } from "@/features/privacy/components/PrivacyConsentGate";
 import { readPrivacyConsent } from "@/features/privacy/privacy-consent";
 import { ActionNoticeHost } from "@/shared/ui/action-notice";
@@ -223,6 +224,8 @@ export default function RootLayout() {
                   <Stack.Screen name="account-settings" />
                   <Stack.Screen name="about" />
                 </Stack>
+                {/* 青少年模式启动门：enabled 时整屏锁定，未开启按每日规则弹促销窗 */}
+                <TeenModeGate />
               </PushyUpdateHost>
             ) : (
               <PrivacyConsentGate onAccepted={() => setPrivacyAccepted(true)} />

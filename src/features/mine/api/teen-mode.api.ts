@@ -2,7 +2,6 @@ import { apiClient } from "@/core/network/api-client";
 
 import {
   createTeenModeApi,
-  type TeenModeStatus,
   type TeenRequester,
   type TeenResponse,
 } from "./teen-mode.contract";

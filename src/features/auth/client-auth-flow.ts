@@ -10,6 +10,14 @@ import { resolveAuthPhone } from './auth-phone';
 type SetSession = (session: { accessToken: string; user: AuthUser }) => void;
 type SetCompanionStatus = (isCompanion: boolean, profile: CompanionProfile | null) => void;
 
+// 本次启动是否发生过登录：青少年模式促销弹窗"完成登录后的下次启动才弹"依赖此标记。
+let loginThisLaunch = false;
+
+/** 本次启动内是否完成过登录。 */
+export function didLoginThisLaunch(): boolean {
+  return loginThisLaunch;
+}
+
 export function toAuthUser(profile: ClientUserInfo, fallbackPhone?: string): AuthUser {
   return {
     id: String(profile.id),
@@ -42,6 +50,7 @@ export async function completeClientLogin(
   const session = { accessToken: login.token, user: toAuthUser(profile, fallbackPhone ?? ssoToken.phone) };
   await saveAuthSession(session);
   setSession(session);
+  loginThisLaunch = true;
 
   // 检查陪玩身份
   if (setCompanionStatus) {

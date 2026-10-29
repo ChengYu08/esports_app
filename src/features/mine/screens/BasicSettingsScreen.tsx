@@ -22,7 +22,7 @@ import { queryClient } from "@/core/query/query-client";
 import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { clearAuthSession } from "@/features/auth/session-persistence";
 import { messageStore } from "@/features/message/message-store";
-import { readTeenMode } from "@/features/mine/teen-mode-store";
+import { readLastTeenEnabled } from "@/features/mine/teen-mode-store";
 import { useSmsNotifyStatus } from "@/features/mine/hooks/use-sms-notify";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 
@@ -64,8 +64,9 @@ export default function BasicSettingsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      readTeenMode().then((record) =>
-        setTeenModeEnabled(record?.enabled ?? false),
+      // 展示最近一次服务端状态镜像；以 /youth/status 拉取结果为准
+      readLastTeenEnabled().then((enabled) =>
+        setTeenModeEnabled(enabled ?? false),
       );
     }, []),
   );
