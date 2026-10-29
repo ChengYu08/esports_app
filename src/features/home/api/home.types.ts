@@ -55,8 +55,11 @@ export type Club = {
   clubCode: string;
   isSelfOperated?: boolean;
   clubTag?: string;
+<<<<<<< HEAD
   /** 俱乐部开启的游戏列表（列表卡片展示游戏图标用） */
   clubGames?: { iconUrl?: string }[];
+=======
+>>>>>>> origin/test
   games?: ClubGameIcon[];
 };
 
