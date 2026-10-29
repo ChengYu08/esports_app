@@ -197,6 +197,16 @@ export class SsoClient {
         {
           hasJwtToken: Boolean(token.jwtToken),
           hasAccessToken: Boolean(token.accessToken),
+          bodyKeys:
+            body && typeof body === "object" ? Object.keys(body) : typeof body,
+          code:
+            body && typeof body === "object" && "code" in body
+              ? String((body as { code?: unknown }).code)
+              : undefined,
+          info:
+            body && typeof body === "object" && "info" in body
+              ? String((body as { info?: unknown }).info)
+              : undefined,
         },
       );
       throw new SsoError("一键登录鉴权 token 不完整");

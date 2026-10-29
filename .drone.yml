@@ -155,6 +155,46 @@ steps:
         - "*test*"
         - "*dev*"
 
+  - name: move-to-dev-server
+    image: nexus.jinliwangluo.com:8082/appleboy/drone-scp-with-tools:latest
+    pull: if-not-exists
+    settings:
+      host: dev.jinliwangluo.com
+      username: root
+      key:
+        from_secret: ssh_rsa
+      port: 22
+      source: ./apks/*.apk
+      strip_components: 1
+      rm: false
+    commands:
+      - |
+        set -e
+        # 该镜像无 node，用 sed 从 app.json 提取 expo.version
+        version=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' ./app.json | head -1)
+        if [ -z "$version" ]; then echo "无法从 app.json 解析 version"; exit 1; fi
+        echo "使用版本: $version"
+        target="/home/apps/data/baota/wwwroot/dev.jinliwangluo.com/android/esportsapp/${DRONE_BRANCH}/$version/"
+        echo "目标路径: $target"
+        /bin/drone-scp --target "$target"
+        echo "文件上传成功"
+    environment:
+      SSH_KEY:
+        from_secret: ssh_rsa
+    depends_on:
+      - build-android
+    when:
+      event:
+        - push
+        - custom
+      branch:
+        - main
+        - prod
+        - "*main*"
+        - "*prod*"
+        - "*test*"
+        - "*dev*"
+
   - name: print-build-info
     image: alpine:3.19
     pull: if-not-exists
@@ -249,46 +289,6 @@ steps:
         - "*dev*"
     depends_on:
       - move-to-dev-server
-
-  - name: move-to-dev-server
-    image: nexus.jinliwangluo.com:8082/appleboy/drone-scp-with-tools:latest
-    pull: if-not-exists
-    settings:
-      host: dev.jinliwangluo.com
-      username: root
-      key:
-        from_secret: ssh_rsa
-      port: 22
-      source: ./apks/*.apk
-      strip_components: 1
-      rm: false
-    commands:
-      - |
-        set -e
-        # 该镜像无 node，用 sed 从 app.json 提取 expo.version
-        version=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' ./app.json | head -1)
-        if [ -z "$version" ]; then echo "无法从 app.json 解析 version"; exit 1; fi
-        echo "使用版本: $version"
-        target="/home/apps/data/baota/wwwroot/dev.jinliwangluo.com/android/esportsapp/${DRONE_BRANCH}/$version/"
-        echo "目标路径: $target"
-        /bin/drone-scp --target "$target"
-        echo "文件上传成功"
-    environment:
-      SSH_KEY:
-        from_secret: ssh_rsa
-    depends_on:
-      - build-android
-    when:
-      event:
-        - push
-        - custom
-      branch:
-        - main
-        - prod
-        - "*main*"
-        - "*prod*"
-        - "*test*"
-        - "*dev*"
 
 trigger:
   event:
