@@ -15,6 +15,7 @@ import {
   sendRongImage,
   sendRongText,
   sendRongAfterSaleCard,
+  setRongConversationPinned,
   subscribeRongMessageEvents,
   subscribeRongMessages,
   type RongCloudConnectionSignal,
@@ -61,6 +62,7 @@ export type MessageAdapter = {
   downloadImage?: (message: ManagedMessage) => Promise<string>;
   sendAfterSaleCard?: (peerId: string, payload: AfterSaleCardPayload) => Promise<ManagedMessage>;
   markRead: (peerId: string) => Promise<boolean>;
+  setConversationPinned?: (peerId: string, isPinned: boolean) => Promise<boolean>;
   subscribeConnectionStatus?: (listener: (signal: RongCloudConnectionSignal) => void) => () => void;
   subscribeConversationSync?: (listener: () => void) => () => void;
   subscribeConversations: (listener: (conversation: MessageConversation) => void) => () => void;
@@ -97,7 +99,7 @@ export type MessageStoreState = {
   retryMessage: (peerId: string, clientId: string) => Promise<void>;
   markRead: (peerId: string) => Promise<void>;
   setConversationNote: (peerId: string, note: string) => void;
-  setConversationPinned: (peerId: string, isPinned: boolean) => void;
+  setConversationPinned: (peerId: string, isPinned: boolean) => Promise<void>;
   clearAllUnread: () => Promise<void>;
   reset: () => Promise<void>;
 };
@@ -146,6 +148,7 @@ function createAdapter(): MessageAdapter {
     downloadImage: downloadRongImageMessage,
     sendAfterSaleCard: sendRongAfterSaleCard,
     markRead: markRongConversationRead,
+    setConversationPinned: setRongConversationPinned,
     subscribeConnectionStatus: subscribeRongConnectionStatus,
     subscribeConversationSync: subscribeRongConversationSync,
     subscribeConversations: subscribeRongMessages,
@@ -624,11 +627,25 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         conversations: state.conversations.map((conversation) => conversation.id === peerId ? { ...conversation, note } : conversation),
       })),
 
-      setConversationPinned: (peerId, isPinned) => set((state) => ({
-        conversations: state.conversations
-          .map((conversation) => conversation.id === peerId ? { ...conversation, isPinned } : conversation)
-          .sort((left, right) => Number(Boolean(right.isPinned)) - Number(Boolean(left.isPinned)) || right.updatedAt - left.updatedAt),
-      })),
+      setConversationPinned: async (peerId, isPinned) => {
+        const previous = get().conversations.find((item) => item.id === peerId)?.isPinned ?? false;
+        const applyPinned = (value: boolean) => set((state) => ({
+          conversations: state.conversations
+            .map((conversation) => conversation.id === peerId ? { ...conversation, isPinned: value } : conversation)
+            .sort((left, right) => Number(Boolean(right.isPinned)) - Number(Boolean(left.isPinned)) || right.updatedAt - left.updatedAt),
+        }));
+        // 先本地生效保证交互即时，再写回融云服务端实现多端同步。
+        applyPinned(isPinned);
+        if (get().connectionState !== 'ready') return;
+        const pinConversation = adapter.setConversationPinned;
+        if (!pinConversation) return;
+        try {
+          await pinConversation(peerId, isPinned);
+        } catch (error) {
+          applyPinned(previous);
+          set({ lastError: error instanceof Error ? error.message : '设置置顶失败' });
+        }
+      },
 
       clearAllUnread: async () => {
         const peerIds = get().conversations
