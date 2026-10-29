@@ -92,12 +92,6 @@ export default function TeenModeScreen({
 
   const codeComplete = isPasswordComplete(code);
 
-  const openSetPassword = () => {
-    setCode("");
-    setFirstPassword("");
-    setPhase("setFirst");
-  };
-
   const confirmCode = () => {
     if (!codeComplete || submitting || !token) {
       return;
