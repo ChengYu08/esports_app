@@ -30,7 +30,7 @@ import { OrderScopeTabs } from "../components/OrderScopeTabs";
 import { OrderTabs } from "../components/OrderTabs";
 import { grabDispatchRequest } from "../dispatch.api";
 import { useOrderPage } from "../hooks/use-order-page";
-import { invalidateOrderQueries, refreshStartedOrder } from "../order-query";
+import { invalidateOrderQueries, refreshOrderAfterAction } from "../order-query";
 import {
   acceptOrder,
   cancelOrder as cancelOrderRequest,
@@ -168,8 +168,9 @@ export default function OrderScreen() {
         if (action === "reject") await rejectOrder(item.id, token);
         if (action === "start") await startOrderService(item.id, token);
         actionSucceeded = true;
-        if (action === "start" && currentUser?.id) {
-          await refreshStartedOrder(item.id, token, currentUser.id);
+        if (currentUser?.id) {
+          // 列表接口此时可能仍返回旧状态，以详情为准就地替换该单卡片。
+          await refreshOrderAfterAction(item.id, token, currentUser.id);
         } else {
           await invalidateOrderQueries(item.id);
         }

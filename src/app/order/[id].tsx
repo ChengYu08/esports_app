@@ -21,6 +21,7 @@ import { getOrderDetailAction } from "@/features/order/order-detail-actions";
 import {
   invalidateOrderQueries,
   orderDetailQueryKey,
+  refreshOrderAfterAction,
 } from "@/features/order/order-query";
 import {
   acceptOrder,
@@ -52,7 +53,9 @@ import { CachedImage } from "@/shared/ui/CachedImage";
 const orderStepCheck = require("../../../assets/order/order-step-check.svg");
 const orderStepActive = require("../../../assets/order/order-step-active.svg");
 const orderStepPending = require("../../../assets/order/order-step-pending.svg");
-const ACTION_GRADIENT = ["#FF2145", "#FF3158"] as const;
+const ACTION_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
+const ACTION_GRADIENT_START = { x: 0, y: 0 } as const;
+const ACTION_GRADIENT_END = { x: 1, y: 0.21 } as const;
 
 export default function OrderDetailRoute() {
   const { id, scope: scopeParam } = useLocalSearchParams<{
@@ -86,6 +89,20 @@ export default function OrderDetailRoute() {
     queryFn: async ({ signal }) =>
       mapOrder(await fetchOrderDetail(id, token as string, signal), 0, scope),
     enabled: Boolean(id && token),
+    // 陪玩侧的接单/开始/完成随时推进订单；推送可能缺失（开始服务事件
+    // 不一定下发 ORDER_NOTIFY），停留期间对活跃订单轮询兜底。
+    refetchOnMount: "always",
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (
+        status === "paid" ||
+        status === "waitingService" ||
+        status === "inService"
+      ) {
+        return 5_000;
+      }
+      return false;
+    },
   });
   const [clock, setClock] = useState(() => Date.now());
   const dispatchDeadline = detail.data?.dispatchDeadline;
@@ -216,8 +233,12 @@ export default function OrderDetailRoute() {
     try {
       if (action === "accept") await acceptOrder(order.id, token);
       if (action === "start") await startOrderService(order.id, token);
-      await invalidateOrderQueries(order.id);
-      await queryClient.invalidateQueries({ queryKey: ["orders", "accept"] });
+      if (currentUser?.id) {
+        // 列表接口此时可能仍返回旧状态，以详情为准就地刷新缓存中的该单。
+        await refreshOrderAfterAction(order.id, token, currentUser.id);
+      } else {
+        await invalidateOrderQueries(order.id);
+      }
       await detail.refetch();
       Toast.show("操作成功", { duration: Toast.durations.SHORT });
     } catch (error) {
@@ -490,8 +511,8 @@ export default function OrderDetailRoute() {
               {action.variant === "primary" ? (
                 <LinearGradient
                   colors={ACTION_GRADIENT}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
+                  start={ACTION_GRADIENT_START}
+                  end={ACTION_GRADIENT_END}
                   style={styles.primaryGradient}
                 >
                   <Text
@@ -659,7 +680,11 @@ export default function OrderDetailRoute() {
               : rejectOrder(order.id, token);
           void operation
             .then(async () => {
-              await invalidateOrderQueries(order.id);
+              if (currentUser?.id) {
+                await refreshOrderAfterAction(order.id, token, currentUser.id);
+              } else {
+                await invalidateOrderQueries(order.id);
+              }
               await detail.refetch();
               Toast.show("操作成功", { duration: Toast.durations.SHORT });
             })
@@ -1083,6 +1108,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     borderWidth: 0,
     backgroundColor: "transparent",
+    borderRadius: 8,
+    overflow: "hidden",
   },
   primaryGradient: {
     width: "100%",

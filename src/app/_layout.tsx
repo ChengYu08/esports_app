@@ -25,6 +25,7 @@ import {
 } from "@/features/message/message-store";
 import { InAppNotificationBanner } from "@/features/message/components/InAppNotificationBanner";
 import { RongCommandHost } from "@/features/message/rong-command-dispatch/RongCommandHost";
+import { OrderNotifySyncHost } from "@/features/order/order-notify-sync";
 import { VoiceRoomMiniPlayer } from "@/features/voice-room/components/VoiceRoomMiniPlayer";
 import { VoiceRoomKickListener } from "@/features/voice-room/components/VoiceRoomKickListener";
 import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
@@ -232,6 +233,7 @@ export default function RootLayout() {
             <VoiceRoomMiniPlayer />
             <VoiceRoomKickListener />
             <RongCommandHost />
+            <OrderNotifySyncHost />
             <AppConfirmHost />
           </RootSiblingParent>
         </GestureHandlerRootView>
