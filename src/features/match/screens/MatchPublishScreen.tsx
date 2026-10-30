@@ -35,7 +35,11 @@ import {
 } from "@/features/match/hooks/use-match-form";
 import { useRestoreActiveMatch } from "@/features/match/hooks/use-quick-match-session";
 import { exitVoiceRoom } from "@/features/voice-room/exit-voice-room";
-import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
+import {
+  resolveVoiceRoomId,
+  voiceRoomApi,
+} from "@/features/voice-room/voice-room.api";
+import type { VoiceRoomDetail } from "@/features/voice-room/voice-room.types";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 
@@ -63,9 +67,10 @@ export default function MatchPublishScreen() {
   const [exitRoomPromptVisible, setExitRoomPromptVisible] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const pendingPublishRef = useRef<(() => Promise<void>) | null>(null);
+  const joinedRoomRef = useRef<VoiceRoomDetail | null>(null);
+  const checkingJoinedRoomRef = useRef(false);
 
   const user = useAuthStore((state) => state.user);
-  const activeRoom = useVoiceRoomSessionStore((state) => state.activeRoom);
   const form = useMatchForm();
   const { restoring } = useRestoreActiveMatch();
 
@@ -162,8 +167,20 @@ export default function MatchPublishScreen() {
     const needVoice = form.voice === "需试音";
     setSubmitting(true);
     try {
-      if (needVoice && activeRoom && user?.id) {
-        await exitVoiceRoom(activeRoom, String(user.id), form.token);
+      const joinedRoom = joinedRoomRef.current;
+      joinedRoomRef.current = null;
+      const joinedRoomId = joinedRoom ? resolveVoiceRoomId(joinedRoom) : null;
+      if (needVoice && joinedRoom && joinedRoomId && user?.id) {
+        await exitVoiceRoom(
+          {
+            roomId: joinedRoomId,
+            roomVersion: joinedRoom.roomVersion ?? "1",
+            creatorUserId: joinedRoom.creatorUserId,
+            rongChatroomId: joinedRoom.rongChatroomId,
+          },
+          String(user.id),
+          form.token,
+        );
       }
 
       const result = await publishQuickMatch(
@@ -201,16 +218,39 @@ export default function MatchPublishScreen() {
     } finally {
       setSubmitting(false);
     }
-  }, [activeRoom, form, goMatching, submitting, user?.id]);
+  }, [form, goMatching, submitting, user?.id]);
 
-  const handlePublish = useCallback(() => {
-    if (form.voice === "需试音" && activeRoom) {
-      pendingPublishRef.current = runPublish;
-      setExitRoomPromptVisible(true);
+  const handlePublish = useCallback(async () => {
+    if (form.voice !== "需试音") {
+      joinedRoomRef.current = null;
+      void runPublish();
       return;
     }
-    void runPublish();
-  }, [activeRoom, form.voice, runPublish]);
+    if (!form.token) {
+      showToast("请先登录");
+      return;
+    }
+    if (checkingJoinedRoomRef.current || submitting) return;
+    checkingJoinedRoomRef.current = true;
+    try {
+      const joined = await voiceRoomApi.getJoinedRoom(form.token);
+      const joinedId = resolveVoiceRoomId(joined);
+      if (joined && joinedId) {
+        joinedRoomRef.current = joined;
+        pendingPublishRef.current = runPublish;
+        setExitRoomPromptVisible(true);
+        return;
+      }
+      joinedRoomRef.current = null;
+      void runPublish();
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : "查询语聊房状态失败，请重试",
+      );
+    } finally {
+      checkingJoinedRoomRef.current = false;
+    }
+  }, [form.token, form.voice, runPublish, submitting]);
 
   return (
     <View style={styles.root}>
@@ -521,6 +561,7 @@ export default function MatchPublishScreen() {
         onCancel={() => {
           setExitRoomPromptVisible(false);
           pendingPublishRef.current = null;
+          joinedRoomRef.current = null;
         }}
         onConfirm={() => {
           setExitRoomPromptVisible(false);
