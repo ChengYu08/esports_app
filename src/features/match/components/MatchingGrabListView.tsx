@@ -101,8 +101,7 @@ export function MatchingGrabListView({
                     <Text style={styles.multiCompanionTip}>
                       {MULTI_COMPANION_TIP}
                     </Text>
-                  ) : null}
-                  {item.remark ? (
+                  ) : item.remark ? (
                     <Text style={styles.signature} numberOfLines={1}>
                       {item.remark}
                     </Text>
