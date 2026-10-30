@@ -1,10 +1,11 @@
 import { queryClient } from "@/core/query/query-client";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
+import { showToast } from "@/shared/ui/app-toast";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
-import { showToast } from "@/shared/ui/app-toast";
 import { useAuthStore } from "@esports/auth";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FlatList,
@@ -16,6 +17,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { grabQuickMatchAndEnterAudition } from "@/features/match/grab-quick-match-flow";
 import {
   fetchStarBalance,
   payCompanionOrder,
@@ -30,8 +32,10 @@ import { OrderHeader } from "../components/OrderHeader";
 import { OrderReviewSheet } from "../components/OrderReviewSheet";
 import { OrderScopeTabs } from "../components/OrderScopeTabs";
 import { OrderTabs } from "../components/OrderTabs";
-import { grabDispatchRequest } from "../dispatch.api";
-import { computeFreeStarAmount, computeOrderPayableStars } from "../free-amount";
+import {
+  computeFreeStarAmount,
+  computeOrderPayableStars,
+} from "../free-amount";
 import { useOrderPage } from "../hooks/use-order-page";
 import {
   invalidateOrderQueries,
@@ -152,14 +156,16 @@ export default function OrderScreen() {
     }
     if (action === "free") setFreeTarget(item);
     if (action === "grab" && item.requestNo && token) {
+      if (pendingOrderRef.current) return;
+      pendingOrderRef.current = item.id;
+      setPendingOrderId(item.id);
       try {
-        await grabDispatchRequest(item.requestNo, token);
-        await orders.refetch();
-      } catch (error) {
-        setPrompt({
-          title: "抢单失败",
-          message: error instanceof Error ? error.message : "请稍后重试",
-        });
+        // 与抢单条同一条流程：需要试音的订单抢单成功后直接进试音房
+        const result = await grabQuickMatchAndEnterAudition(item.requestNo);
+        if (result.status === "failed") showToast(result.message);
+      } finally {
+        pendingOrderRef.current = null;
+        setPendingOrderId(null);
       }
     }
     if (
@@ -288,7 +294,12 @@ export default function OrderScreen() {
     }
     const target = freeTarget;
     const starAmount = computeFreeStarAmount(target, freeHours);
-    if (starAmount == null || starAmount <= 0 || freeHours > target.quantity || starAmount > computeOrderPayableStars(target)) {
+    if (
+      starAmount == null ||
+      starAmount <= 0 ||
+      freeHours > target.quantity ||
+      starAmount > computeOrderPayableStars(target)
+    ) {
       return;
     }
     setFreeSubmitting(true);
@@ -313,18 +324,21 @@ export default function OrderScreen() {
   };
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <OrderHeader title={isCompanion ? "派单中心" : "订单"} />
-      {isCompanion ? (
-        <OrderScopeTabs
-          value={scope}
-          onChange={(nextScope) => {
-            setSelectedScope(nextScope);
-            setFilter(nextScope === "dispatch" ? "grabbing" : "all");
-          }}
-        />
-      ) : null}
-      <OrderTabs scope={scope} onChange={setFilter} value={visibleFilter} />
+    <View style={styles.screen}>
+      <StatusBar style="dark" />
+      <View style={[styles.stickyHeader, { paddingTop: insets.top }]}>
+        {isCompanion ? null : <OrderHeader />}
+        {isCompanion ? (
+          <OrderScopeTabs
+            value={scope}
+            onChange={(nextScope) => {
+              setSelectedScope(nextScope);
+              setFilter(nextScope === "dispatch" ? "grabbing" : "all");
+            }}
+          />
+        ) : null}
+        <OrderTabs scope={scope} onChange={setFilter} value={visibleFilter} />
+      </View>
       <FlatList
         contentContainerStyle={[
           styles.content,
@@ -478,10 +492,14 @@ export default function OrderScreen() {
       {freeTarget ? (
         <OrderFreeConfirmFlow
           order={freeTarget}
-          companionName={freeTarget.receiverName || currentUser?.nickname || "陪玩师"}
+          companionName={
+            freeTarget.receiverName || currentUser?.nickname || "陪玩师"
+          }
           companionAvatar={
             freeTarget.receiverAvatar ??
-            (currentUser?.headImage ? { uri: currentUser.headImage } : undefined)
+            (currentUser?.headImage
+              ? { uri: currentUser.headImage }
+              : undefined)
           }
           loading={freeSubmitting}
           onClose={() => {
@@ -662,6 +680,7 @@ function OrderSeparator() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F7F7" },
+  stickyHeader: { backgroundColor: "#FFFFFF" },
   content: { flexGrow: 1, paddingTop: 8 },
   separator: { height: 8 },
   empty: {

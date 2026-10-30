@@ -33,15 +33,15 @@ export function OrderScopeTabs({ value, onChange }: { value: OrderScope; onChang
 
 const styles = StyleSheet.create({
   tabs: {
+    width: "100%",
     height: 50,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#FFFFFF",
     paddingHorizontal: 16,
-    gap: 28,
   },
   tab: {
-    minWidth: 76,
+    flex: 1,
     height: 46,
     alignItems: "center",
     justifyContent: "center",

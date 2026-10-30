@@ -12,6 +12,7 @@ import {
   isCoolingActive,
   type CoolingRecord,
 } from "@/features/auth/cancellation-cooling";
+import { useOnboardingStore } from "@/features/auth/onboarding-store";
 import { getPasswordLoginErrorMessage } from "@/features/auth/password-login-error";
 import { openExternalLink } from "@/shared/navigation/open-external-link";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
@@ -33,6 +34,9 @@ export default function LoginRoute() {
   const initialPhone = typeof params.phone === "string" ? params.phone : "";
   const setSession = useAuthStore((state) => state.setSession);
   const setCompanionStatus = useAuthStore((state) => state.setCompanionStatus);
+  const shouldShowOnboarding = useOnboardingStore(
+    (state) => state.shouldShowProfileOnboarding,
+  );
   const [passwordLoginError, setPasswordLoginError] = useState<string | null>(
     null,
   );
@@ -103,6 +107,12 @@ export default function LoginRoute() {
     return true;
   };
 
+  // 新登录用户（register=true）或需要完善资料的老用户，跳转到资料完善页
+  const resolvePostLoginRoute = (userId: string, isNewUser: boolean) => {
+    if (isNewUser || shouldShowOnboarding(userId)) return "/onboarding";
+    return "/";
+  };
+
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
@@ -133,14 +143,14 @@ export default function LoginRoute() {
           }
           try {
             const token = await adapter.passwordLogin(payload);
-            await completeClientLogin(
+            const { login, profile } = await completeClientLogin(
               token,
               "PASSWORD",
               setSession,
               setCompanionStatus,
               payload.username,
             );
-            router.replace("/");
+            router.replace(resolvePostLoginRoute(String(profile.id), login.register));
           } catch (error) {
             setPasswordLoginError(getPasswordLoginErrorMessage(error));
           }
@@ -169,14 +179,14 @@ export default function LoginRoute() {
           }
           try {
             const token = await adapter.quickLogin(quickLoginProvider);
-            await completeClientLogin(
+            const { login, profile } = await completeClientLogin(
               token,
               "ONE_CLICK_LOGIN",
               setSession,
               setCompanionStatus,
               token.phone,
             );
-            router.replace("/");
+            router.replace(resolvePostLoginRoute(String(profile.id), login.register));
           } catch (error) {
             console.error("[DEBUG-QUICK-LOGIN] failed", {
               name: error instanceof Error ? error.name : "UnknownError",
@@ -195,14 +205,14 @@ export default function LoginRoute() {
           }
           try {
             const token = await adapter.login(payload);
-            await completeClientLogin(
+            const { login, profile } = await completeClientLogin(
               token,
               "SMS_CODE",
               setSession,
               setCompanionStatus,
               payload.phone,
             );
-            router.replace("/");
+            router.replace(resolvePostLoginRoute(String(profile.id), login.register));
           } catch (error) {
             showToast(
               `登录失败，${error instanceof Error ? error.message : "请检查手机号和验证码"}`,

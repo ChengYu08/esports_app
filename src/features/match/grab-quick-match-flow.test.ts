@@ -22,7 +22,7 @@ vi.mock("@esports/auth", () => ({
 }));
 
 vi.mock("expo-router", () => ({
-  router: { push: vi.fn() },
+  router: { push: vi.fn(), replace: vi.fn() },
 }));
 
 vi.mock("react-native-root-toast", () => ({
@@ -63,6 +63,15 @@ vi.mock("@/features/voice-room/voice-room.api", () => ({
   },
 }));
 
+vi.mock("@/features/order/order-query", () => ({
+  refreshDispatchAfterGrabAttempt: vi.fn(),
+  refreshDispatchDetail: vi.fn(),
+}));
+
+vi.mock("@/shared/ui/action-notice/action-notice-store", () => ({
+  actionNotice: { dismiss: vi.fn() },
+}));
+
 vi.mock("@/features/voice-room/exit-voice-room", () => ({
   exitVoiceRoom: vi.fn(async () => {
     mocks.exitCount += 1;
@@ -82,6 +91,8 @@ const { router } = await import("expo-router");
 const Toast = (await import("react-native-root-toast")).default;
 const { voiceRoomApi } = await import("@/features/voice-room/voice-room.api");
 const { exitVoiceRoom } = await import("@/features/voice-room/exit-voice-room");
+const { refreshDispatchAfterGrabAttempt, refreshDispatchDetail } = await import("@/features/order/order-query");
+const { actionNotice } = await import("@/shared/ui/action-notice/action-notice-store");
 
 function auditionDetail(overrides: Record<string, unknown> = {}) {
   return {
@@ -146,12 +157,14 @@ describe("hasAuditionRoom", () => {
 });
 
 describe("grabQuickMatchAndEnterAudition", () => {
-  it("未登录返回 failed", async () => {
+  it("未登录返回 failed，不撤条也不刷新", async () => {
     mocks.authState.accessToken = null;
     await expect(grabQuickMatchAndEnterAudition("QM1")).resolves.toEqual({
       status: "failed",
       message: "请先登录",
     });
+    expect(actionNotice.dismiss).not.toHaveBeenCalled();
+    expect(refreshDispatchAfterGrabAttempt).not.toHaveBeenCalled();
   });
 
   it("无试音：抢单成功只 Toast，不跳详情也不进房", async () => {
@@ -164,6 +177,9 @@ describe("grabQuickMatchAndEnterAudition", () => {
     expect(Toast.show).toHaveBeenCalledWith("抢单成功", expect.anything());
     expect(router.push).not.toHaveBeenCalled();
     expect(voiceRoomApi.getDetail).not.toHaveBeenCalled();
+    expect(actionNotice.dismiss).toHaveBeenCalledWith("qm:QM1");
+    expect(refreshDispatchAfterGrabAttempt).toHaveBeenCalledTimes(1);
+    expect(refreshDispatchDetail).toHaveBeenCalledWith("QM1");
   });
 
   it("缺 roomId：视为无试音房，不进房", async () => {
@@ -192,6 +208,20 @@ describe("grabQuickMatchAndEnterAudition", () => {
       params: { id: "100", v: "3" },
     });
     expect(exitVoiceRoom).not.toHaveBeenCalled();
+  });
+
+  it("replaceRoom：进房用 replace，不把详情页压在下面", async () => {
+    mocks.detail = auditionDetail();
+    mocks.grabResult = auditionDetail();
+
+    await expect(
+      grabQuickMatchAndEnterAudition("QM1", { replaceRoom: true }),
+    ).resolves.toEqual({ status: "entered" });
+    expect(router.replace).toHaveBeenCalledWith({
+      pathname: "/voice-room/[id]",
+      params: { id: "100", v: "3" },
+    });
+    expect(router.push).not.toHaveBeenCalled();
   });
 
   it("有试音且在其他房：确认后切房进入", async () => {
@@ -231,9 +261,12 @@ describe("grabQuickMatchAndEnterAudition", () => {
     await expect(flow).resolves.toEqual({ status: "cancelled" });
     expect(grabDispatchRequest).not.toHaveBeenCalled();
     expect(router.push).not.toHaveBeenCalled();
+    expect(actionNotice.dismiss).not.toHaveBeenCalled();
+    expect(refreshDispatchAfterGrabAttempt).not.toHaveBeenCalled();
+    expect(refreshDispatchDetail).not.toHaveBeenCalled();
   });
 
-  it("抢单失败返回 failed", async () => {
+  it("抢单失败返回 failed，同样撤条并刷新其它入口", async () => {
     mocks.detail = noVoiceDetail({ currentGrabStatus: undefined });
     mocks.grabError = new Error("人数已满");
 
@@ -241,6 +274,9 @@ describe("grabQuickMatchAndEnterAudition", () => {
       status: "failed",
       message: "人数已满",
     });
+    expect(actionNotice.dismiss).toHaveBeenCalledWith("qm:QM1");
+    expect(refreshDispatchAfterGrabAttempt).toHaveBeenCalledTimes(1);
+    expect(refreshDispatchDetail).toHaveBeenCalledWith("QM1");
   });
 
   it("同一 requestNo 防重入", async () => {

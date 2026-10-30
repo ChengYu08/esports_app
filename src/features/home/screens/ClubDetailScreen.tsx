@@ -1,22 +1,29 @@
-import { ChevronLeft24Regular, Headset24Regular, Search24Regular } from "@fluentui/react-native-icons";
+import { ChevronLeft24Regular, Search24Regular } from "@fluentui/react-native-icons";
 import { useAuthStore } from "@esports/auth";
 import { useQuery } from "@tanstack/react-query";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
-import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
 import { EmptyState, ErrorState } from "@/shared/ui/AsyncStates";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import { CompanionCard } from "@/shared/ui/CompanionCard";
 import { fetchClubGameLevels } from "@/features/match/api/match.api";
 import {
   ClubDetailMemberSkeletonList,
   ClubDetailSkeleton,
 } from "@/features/home/components/ClubDetailSkeleton";
 import { ClubQuickMatchSheet } from "@/features/match/components/ClubQuickMatchSheet";
+import { useCustomerDispatch } from "@/features/voice-room/use-customer-dispatch";
 import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Animated,
   Easing,
@@ -26,8 +33,8 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  View,
   useWindowDimensions,
+  View,
 } from "react-native";
 import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -40,16 +47,15 @@ import {
 
 // 切图资源（新设计稿：俱乐部主页 455-68151 / 490-84520 / 557-88105）
 const bgClubImage = require("../../../../assets/home/club-detail/bg-club.png");
-const tabCornerIcon = require("../../../../assets/home/club-detail/tab-corner.svg");
+// 设计稿导航栏内容行高度 44（不含状态栏，状态栏高度由安全区 insets 提供）
+const NAV_BAR_CONTENT_HEIGHT = 44;
+const tabCornerLeftIcon = require("../../../../assets/home/club-detail/tab-corner-left.svg");
+const tabCornerRightIcon = require("../../../../assets/home/club-detail/tab-corner.svg");
 const arrowDownIcon = require("../../../../assets/home/club-detail/arrow-fill-down-new.svg");
 const arrowUpRedIcon = require("../../../../assets/home/club-detail/arrow-fill-up-red.svg");
-const statusPlayingIcon = require("../../../../assets/home/club-detail/status-playing-new.svg");
-const statusIdleIcon = require("../../../../assets/home/club-detail/status-idle-new.svg");
 const introToggleIcon = require("../../../../assets/home/club-detail/intro-toggle.svg");
-const maleIcon = require("../../../../assets/home/club-detail/male.svg");
-const femaleIcon = require("../../../../assets/home/club-detail/female.svg");
-const diamondIcon = require("../../../../assets/home/club-detail/icon-diamond.svg");
 const emptyStateIllustration = require("../../../../assets/coms/empty-state-illustration.svg");
+const customerIcon = require("../../../../assets/coms/customer.svg");
 
 // 设计稿色板
 const COLORS = {
@@ -70,7 +76,9 @@ const COLORS = {
   border: "#E9E9EB",
 } as const;
 
-type FilterKey = "mode" | "level" | "gender" | "advanced";
+type FilterKey = "mode" | "level" | "gender" | "advanced" | "status" | "price";
+
+/** 设计稿筛选栏 4 维度：模式 / 等级 / 性别 / 筛选（筛选聚合状态+价格） */
 const filterDefinitions: { key: FilterKey; label: string }[] = [
   { key: "mode", label: "模式" },
   { key: "level", label: "等级" },
@@ -78,14 +86,11 @@ const filterDefinitions: { key: FilterKey; label: string }[] = [
   { key: "advanced", label: "筛选" },
 ];
 
-type MemberStatus = "playing" | "idle";
-
 const memberKeyExtractor = (member: Companion) => String(member.profileId);
 
 export default function ClubDetailScreen() {
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { height: windowHeight } = useWindowDimensions();  const { id } = useLocalSearchParams<{ id?: string }>();
   const [game, setGame] = useState<GameKey>("");
   // 简介展开状态：默认收起两行，点击右下角按钮切换
   const [introExpanded, setIntroExpanded] = useState(false);
@@ -95,6 +100,8 @@ export default function ClubDetailScreen() {
   const [quickMatchVisible, setQuickMatchVisible] = useState(false);
   const accessToken = useAuthStore((state) => state.accessToken);
   const { openCustomerService } = useCustomerServiceEntry();
+  // 俱乐部「接待派单」流程（创建/切换语聊房并自动呼叫接待）
+  const { dispatch: dispatchReception } = useCustomerDispatch();
   const [priceSort, setPriceSort] =
     useState<CompanionFilters["priceSort"]>("DEFAULT");
   const [selectedSex, setSelectedSex] = useState<CompanionFilters["sex"]>();
@@ -151,35 +158,7 @@ export default function ClubDetailScreen() {
     () => (club ? { id: club.id, name: club.name } : { id: "", name: "" }),
     [club],
   );
-  const renderMember = useCallback(
-    ({ item }: { item: Companion }) => (
-      <MemberCard
-        clubId={clubId}
-        userId={item.userId}
-        image={item.headImage}
-        name={item.nickname}
-        description={item.signature}
-        gender={item.sex === 1 ? "male" : "female"}
-        price={item.price}
-        orderCount={item.orderCount}
-        voiceDuration={item.voiceDurationSeconds}
-        voiceUrl={item.voiceUrl}
-        voicePlaying={voicePlayer.playingUrl === item.voiceUrl}
-        onToggleVoice={voicePlayer.toggle}
-        // 游戏角标跟列表所选游戏一致（列表本身按该游戏过滤）
-        gameName={selectedGameInfo?.name}
-        gameIconUrl={selectedGameInfo?.iconUrl}
-        status={
-          item.gameStatus === 1
-            ? "playing"
-            : item.onlineStatus === 1
-              ? "idle"
-              : undefined
-        }
-      />
-    ),
-    [clubId, selectedGameInfo?.iconUrl, selectedGameInfo?.name, voicePlayer.playingUrl, voicePlayer.toggle],
-  );
+  // 筛选底部弹窗（原始实现：蒙层渐隐 + 白色面板上滑）
   const [filterBackdropOpacity] = useState(() => new Animated.Value(0));
   const [filterSheetTranslateY] = useState(
     () => new Animated.Value(windowHeight),
@@ -216,6 +195,42 @@ export default function ClubDetailScreen() {
     windowHeight,
   ]);
 
+  const renderMember = useCallback(
+    ({ item }: { item: Companion }) => (
+      <CompanionCard
+        nickname={item.nickname}
+        avatar={item.headImage ?? ""}
+        sex={item.sex ?? 0}
+        age={item.age ?? null}
+        // 第三行标签对齐 PC 端大神列表：tagName + tagBackgroundColor（PC colorWithAlpha 缺省色）
+        introTagText={item.tagName}
+        introTagColor={item.tagBackgroundColor || "#474748"}
+        // 列表本身按所选游戏过滤，接口记录不带图标时沿用所选游戏
+        gameName={item.gameName || selectedGameInfo?.name}
+        gameIconUrl={selectedGameInfo?.iconUrl}
+        modeName={item.modeName}
+        levelName={item.levelName}
+        serviceName={item.serviceName}
+        signature={item.signature}
+        onlineStatus={item.onlineStatus}
+        gameStatus={item.gameStatus}
+        price={item.price}
+        orderCount={item.orderCount}
+        voiceUrl={item.voiceUrl ?? null}
+        voiceDurationSeconds={item.voiceDurationSeconds ?? null}
+        voicePlayingUrl={voicePlayer.playingUrl}
+        onToggleVoice={voicePlayer.toggle}
+        onPress={() =>
+          router.push({
+            pathname: "/profile",
+            params: { clubId, userId: String(item.userId) },
+          })
+        }
+      />
+    ),
+    [clubId, selectedGameInfo?.iconUrl, selectedGameInfo?.name, voicePlayer.playingUrl, voicePlayer.toggle],
+  );
+  // 性别/状态/价格筛选的当前值，统一映射到接口参数
   function openFilterSheet(filter: FilterKey) {
     if (isFilterSheetVisible) {
       return;
@@ -282,7 +297,7 @@ export default function ClubDetailScreen() {
         pointerEvents="none"
       />
       {/* 导航栏：返回 + 搜索 + 客服 */}
-      <View style={[styles.nav, { paddingTop: insets.top }]}>
+      <View style={[styles.nav, { paddingTop: insets.top, height: insets.top + NAV_BAR_CONTENT_HEIGHT }]}>
         <Pressable
           accessibilityLabel="返回"
           hitSlop={10}
@@ -306,9 +321,10 @@ export default function ClubDetailScreen() {
           <Pressable
             accessibilityLabel="在线客服"
             hitSlop={10}
+            style={styles.navActionCustomer}
             onPress={openCustomerService}
           >
-            <Headset24Regular color={COLORS.white} width={24} height={24} />
+            <Image source={customerIcon} style={{ width: 24, height: 24 }} />
           </Pressable>
         </View>
       </View>
@@ -325,7 +341,9 @@ export default function ClubDetailScreen() {
               <Text numberOfLines={1} style={styles.clubName}>
                 {club.name}
               </Text>
-              <Text style={styles.selfTag}>自营</Text>
+              <View style={styles.selfTag}>
+                <Text style={styles.selfTagText}>自营</Text>
+              </View>
             </View>
             <View style={styles.clubMetaRow}>
               <View style={styles.clubMetaItem}>
@@ -381,10 +399,12 @@ export default function ClubDetailScreen() {
         </ScrollView>
       </View>
       {/* 成员列表（白色圆角面板：筛选栏 + 卡片） */}
-      <FlatList
-        data={members}
+      <View style={styles.listWrap}>
+        <FlatList
+          data={members}
         keyExtractor={memberKeyExtractor}
         renderItem={renderMember}
+        ItemSeparatorComponent={MemberCardSeparator}
         initialNumToRender={8}
         maxToRenderPerBatch={8}
         windowSize={7}
@@ -439,7 +459,8 @@ export default function ClubDetailScreen() {
           )
         }
       />
-      {/* 筛选底部弹窗 */}
+      </View>
+      {/* 筛选底部弹窗（原始实现） */}
       <Modal
         transparent
         visible={isFilterSheetVisible}
@@ -665,7 +686,7 @@ export default function ClubDetailScreen() {
           </Pressable>
         </Pressable>
       </Modal>
-      {/* 底部操作栏：价目表 + 一键匹配 */}
+      {/* 底部操作栏：价目表 + 接待派单 + 一键匹配 */}
       <View
         style={[
           styles.bottomBar,
@@ -686,6 +707,14 @@ export default function ClubDetailScreen() {
           }}
         >
           <Text style={styles.priceButtonText}>价目表</Text>
+        </Pressable>
+        <Pressable
+          style={styles.matchButton}
+          onPress={() => {
+            void dispatchReception({ clubId: club?.id });
+          }}
+        >
+          <Text style={styles.matchButtonText}>接待派单</Text>
         </Pressable>
         <Pressable
           style={styles.matchButton}
@@ -749,39 +778,24 @@ function GameTab({
         </Text>
       </View>
       {active ? (
-        <Image
-          source={tabCornerIcon}
-          style={styles.gameTabCorner}
-          pointerEvents="none"
-        />
+        <>
+          <Image
+            source={tabCornerLeftIcon}
+            style={[styles.gameTabCorner, styles.gameTabCornerLeft]}
+            pointerEvents="none"
+          />
+          <Image
+            source={tabCornerRightIcon}
+            style={[styles.gameTabCorner, styles.gameTabCornerRight]}
+            pointerEvents="none"
+          />
+        </>
       ) : null}
     </Pressable>
   );
 }
 
-/** 成员状态标签：游戏中（橙）/ 空闲中（绿） */
-function StatusTag({ status }: { status: MemberStatus }) {
-  const playing = status === "playing";
-  return (
-    <View
-      style={[styles.statusTag, playing ? styles.statusTagPlaying : styles.statusTagIdle]}
-    >
-      <Image
-        source={playing ? statusPlayingIcon : statusIdleIcon}
-        style={styles.statusTagIcon}
-      />
-      <Text
-        style={[
-          styles.statusTagText,
-          { color: playing ? COLORS.orangeText : COLORS.greenText },
-        ]}
-      >
-        {playing ? "游戏中" : "空闲中"}
-      </Text>
-    </View>
-  );
-}
-
+/** 筛选弹窗内整行选项：文字 + 右侧选中✓ */
 function FilterOption({
   label,
   selected,
@@ -811,119 +825,10 @@ function FilterOption({
   );
 }
 
-const MemberCard = memo(function MemberCard({
-  clubId,
-  userId,
-  image,
-  name,
-  description,
-  gender,
-  price,
-  orderCount,
-  voiceDuration,
-  voiceUrl,
-  voicePlaying,
-  onToggleVoice,
-  status,
-  gameName,
-  gameIconUrl,
-}: {
-  clubId: string;
-  userId: number;
-  image?: string;
-  name: string;
-  description?: string;
-  gender: "male" | "female";
-  price: number;
-  orderCount: number;
-  voiceDuration?: number;
-  voiceUrl?: string;
-  voicePlaying: boolean;
-  onToggleVoice: (voiceUrl: string) => void;
-  status?: MemberStatus;
-  gameName?: string;
-  gameIconUrl?: string;
-}) {
-  return (
-    <Pressable
-      style={styles.memberCard}
-      onPress={() =>
-        router.push({
-          pathname: "/profile",
-          params: { clubId, userId: String(userId) },
-        })
-      }
-    >
-      <View style={styles.memberLeft}>
-        <CachedImage
-          source={image ? { uri: image } : undefined}
-          contentFit="cover"
-          style={styles.memberAvatar}
-        />
-        {voiceUrl ? (
-          <View style={styles.memberVoicePill}>
-            <VoicePlayButton
-              tone="pill"
-              duration={voiceDuration}
-              onToggleVoice={onToggleVoice}
-              playingUrl={voicePlaying ? voiceUrl : null}
-              url={voiceUrl}
-            />
-          </View>
-        ) : null}
-      </View>
-      <View style={styles.memberBody}>
-        <View style={styles.memberContent}>
-          <View style={styles.memberTitleRow}>
-            <View style={styles.memberNameGroup}>
-              <Text numberOfLines={1} style={styles.memberName}>
-                {name}
-              </Text>
-              <Image
-                source={gender === "male" ? maleIcon : femaleIcon}
-                style={styles.memberGenderIcon}
-              />
-            </View>
-            {status ? <StatusTag status={status} /> : null}
-          </View>
-          {gameName ? (
-            <View style={styles.memberGameTag}>
-              <View style={styles.memberGameTagIcon}>
-                {gameIconUrl ? (
-                  <CachedImage
-                    source={{ uri: gameIconUrl }}
-                    style={styles.memberGameTagIconImage}
-                  />
-                ) : (
-                  <View style={styles.gameTabIconFallback} />
-                )}
-              </View>
-              <Text numberOfLines={1} style={styles.memberGameTagText}>
-                {gameName}
-              </Text>
-            </View>
-          ) : null}
-          <View style={styles.memberSubtitleRow}>
-            <Text numberOfLines={1} style={styles.memberSubtitle}>
-              {description || "暂无个人简介"}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.memberPriceRow}>
-          <View style={styles.memberPrice}>
-            <Text style={styles.memberPriceText}>{price}</Text>
-            <Image source={diamondIcon} style={styles.memberDiamondIcon} />
-          </View>
-          <View style={styles.memberSales}>
-            <Text style={styles.memberSalesLabel}>销量</Text>
-            <Text style={styles.memberSalesValue}>{orderCount}</Text>
-          </View>
-        </View>
-      </View>
-      <View style={styles.memberDivider} pointerEvents="none" />
-    </Pressable>
-  );
-});
+/** 成员卡片分割线：原卡片内绝对定位分割线改为列表分隔符 */
+function MemberCardSeparator() {
+  return <View style={styles.memberSeparator} />;
+}
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.white },
@@ -936,7 +841,8 @@ const styles = StyleSheet.create({
   },
   // 导航栏（叠加在背景图上）
   nav: {
-    height: 44,
+    // 导航行内容高度 44（设计稿），加上状态栏高度由动态 style 传入
+    height: NAV_BAR_CONTENT_HEIGHT,
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
@@ -946,6 +852,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+  },
+  // 客服图标相对搜索图标视觉下移 1pt，对齐设计稿
+  navActionCustomer: {
+    marginTop: 1,
   },
   // 俱乐部信息区
   infoSection: {
@@ -986,16 +896,20 @@ const styles = StyleSheet.create({
     lineHeight: 28,
   },
   selfTag: {
-    height: 16,
+    height: 17,
     paddingHorizontal: 4,
-    textAlignVertical: "center",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: COLORS.brandLight,
+    borderRadius: 3,
+  },
+  selfTagText: {
     color: COLORS.white,
     fontFamily: SYSTEM_FONT,
     fontSize: 10,
     fontWeight: "600",
     lineHeight: 13,
-    backgroundColor: COLORS.brandLight,
-    borderRadius: 3,
+    includeFontPadding: false,
   },
   clubMetaRow: {
     flexDirection: "row",
@@ -1063,6 +977,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   gameTabContent: {
+    position: "relative",
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
@@ -1105,12 +1020,18 @@ const styles = StyleSheet.create({
   },
   gameTabCorner: {
     position: "absolute",
-    right: -12,
     bottom: 0,
     width: 12,
     height: 12,
   },
+  gameTabCornerLeft: {
+    left: -12,
+  },
+  gameTabCornerRight: {
+    right: -12,
+  },
   // 成员列表面板
+  listWrap: { flex: 1 },
   listScroll: { flex: 1 },
   listContent: {
     backgroundColor: COLORS.white,
@@ -1199,15 +1120,6 @@ const styles = StyleSheet.create({
     fontFamily: SYSTEM_FONT,
     fontSize: 14,
   },
-  filterSectionTitle: {
-    marginTop: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 6,
-    color: COLORS.textTertiary,
-    fontFamily: SYSTEM_FONT,
-    fontSize: 12,
-    lineHeight: 18,
-  },
   filterSheetOption: {
     height: 48,
     paddingHorizontal: 20,
@@ -1229,176 +1141,21 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "700",
   },
+  filterSectionTitle: {
+    marginTop: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 6,
+    color: COLORS.textTertiary,
+    fontFamily: SYSTEM_FONT,
+    fontSize: 12,
+    lineHeight: 18,
+  },
   memberEmpty: { alignSelf: "center", marginTop: 24 },
-  // 陪玩介绍卡片（设计稿 696:122217）
-  memberCard: {
-    minHeight: 132,
-    flexDirection: "row",
-    gap: 12,
-    padding: 16,
-    backgroundColor: COLORS.white,
-  },
-  memberLeft: {
-    width: 100,
-    height: 100,
-  },
-  memberAvatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 8,
-    backgroundColor: "#F5F6F7",
-  },
-  memberVoicePill: {
-    position: "absolute",
-    left: 6,
-    bottom: 7,
-    zIndex: 1,
-  },
-  memberBody: {
-    flex: 1,
-    minWidth: 0,
-    justifyContent: "space-between",
-  },
-  memberContent: {
-    gap: 6,
-  },
-  memberTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 24,
-  },
-  memberNameGroup: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  memberName: {
-    flexShrink: 1,
-    color: COLORS.textDark,
-    fontFamily: SYSTEM_FONT,
-    fontSize: 14,
-    fontWeight: "600",
-    lineHeight: 22,
-  },
-  memberGenderIcon: {
-    width: 12,
-    height: 12,
-  },
-  statusTag: {
-    flexShrink: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    paddingHorizontal: 3,
-    borderRadius: 3,
-  },
-  statusTagPlaying: {
-    backgroundColor: COLORS.orangeBg,
-  },
-  statusTagIdle: {
-    backgroundColor: COLORS.greenBg,
-  },
-  statusTagIcon: {
-    width: 10,
-    height: 10,
-  },
-  statusTagText: {
-    fontFamily: SYSTEM_FONT,
-    fontSize: 10,
-    lineHeight: 14,
-    fontWeight: "500",
-  },
-  memberGameTag: {
-    alignSelf: "flex-start",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingRight: 4,
-    backgroundColor: COLORS.orangeBg,
-    borderRadius: 3,
-  },
-  memberGameTagIcon: {
-    width: 16,
-    height: 16,
-    borderRadius: 3,
-    overflow: "hidden",
-  },
-  memberGameTagIconImage: {
-    width: 16,
-    height: 16,
-    borderRadius: 3,
-  },
-  memberGameTagText: {
-    flexShrink: 1,
-    color: COLORS.gameTagText,
-    fontFamily: SYSTEM_FONT,
-    fontSize: 10,
-    lineHeight: 14,
-    fontWeight: "500",
-  },
-  memberSubtitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  memberSubtitle: {
-    flexShrink: 1,
-    color: COLORS.textTertiary,
-    fontFamily: SYSTEM_FONT,
-    fontSize: 11,
-    lineHeight: 16,
-    fontWeight: "400",
-  },
-  memberPriceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-  memberPrice: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 4,
-  },
-  memberPriceText: {
-    color: COLORS.brand,
-    fontFamily: SYSTEM_FONT,
-    fontSize: 20,
-    fontWeight: "600",
-    lineHeight: 24,
-  },
-  memberDiamondIcon: {
-    width: 15,
-    height: 15,
-    marginBottom: 3,
-  },
-  memberSales: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  memberSalesLabel: {
-    color: COLORS.textTertiary,
-    fontFamily: SYSTEM_FONT,
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: "400",
-  },
-  memberSalesValue: {
-    color: COLORS.textQuaternary,
-    fontFamily: SYSTEM_FONT,
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: "400",
-  },
-  memberDivider: {
-    position: "absolute",
-    left: 16,
-    right: 16,
-    bottom: 0,
+  // 成员卡片分隔符（对齐大神列表 hairline 分割线）
+  memberSeparator: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: COLORS.border,
+    marginHorizontal: 16,
   },
   // 暂无价目表弹窗
   priceEmptyBackdrop: {

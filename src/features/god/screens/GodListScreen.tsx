@@ -8,6 +8,7 @@ import {
   FlatList,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -21,19 +22,13 @@ import {
   type GodListItem,
 } from "@/features/god/api/god.api";
 import { fetchGames } from "@/features/home/api/home.api";
-import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { EmptyState } from "@/shared/ui/AsyncStates";
+import { CompanionCard } from "@/shared/ui/CompanionCard";
 
-const maleIcon = require("../../../../assets/home/club-detail/male.svg");
-const femaleIcon = require("../../../../assets/mine/figma/mine-female.svg");
-const diamondIcon = require("../../../../assets/home/club-detail/icon-diamond.svg");
-const emptyAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const allGamesIcon = require("../../../../assets/mine/figma/god-all-games.svg");
 const arrowDownIcon = require("../../../../assets/home/club-detail/arrow-fill-down.svg");
 const arrowUpDownIcon = require("../../../../assets/home/club-detail/arrow-fill-up-down.svg");
-const statusPlayingIcon = require("../../../../assets/home/club-detail/status-playing.svg");
-const statusIdleIcon = require("../../../../assets/home/club-detail/status-idle.svg");
 
 const PAGE_SIZE = 10;
 
@@ -116,7 +111,7 @@ function FilterMenu({
           style={styles.menuOverlayPress}
         />
       </Animated.View>
-      <Animated.View style={[styles.menuPanel, { opacity: progress, transform: [{ translateY }] }]}>
+      <Animated.View style={[styles.menuPanel, { transform: [{ translateY }] }]}>
         <View style={styles.menuOptions}>
           {options.map((option) => {
             const selected = option.value === value;
@@ -138,6 +133,21 @@ function FilterMenu({
       </Animated.View>
     </>
   );
+}
+
+/** 标签兜底配色：后台未下发移动端背景色时使用（对齐设计稿 Tag/陪玩 组件色板 node 1126-176457） */
+function levelTagColor(tagName: string) {
+  // 注意顺序：魔王pro 要先于 魔王 判断
+  if (tagName.includes("魔王pro")) return "#BB3EFA";
+  if (tagName.includes("颜值")) return "#3DA5FF";
+  if (tagName.includes("人气")) return "#13AEBD";
+  if (tagName.includes("大神")) return "#8BAD23";
+  if (tagName.includes("魔王")) return "#FF42A1";
+  if (tagName.includes("顶尖")) return "#FE4267";
+  if (tagName.includes("明星")) return "#7D47FC";
+  if (tagName.includes("金")) return "#D19643";
+  if (tagName.includes("娱乐")) return "#477BFE";
+  return "#C0C4CC";
 }
 
 export default function GodListScreen() {
@@ -191,9 +201,25 @@ export default function GodListScreen() {
   );
 
   const renderCard = ({ item }: { item: GodListItem }) => (
-    <GodCard
-      item={item}
+    <CompanionCard
+      nickname={item.nickname}
+      avatar={item.avatar}
+      sex={item.sex}
+      age={item.age}
+      introTagText={item.tagName}
+      introTagColor={item.tagColor || levelTagColor(item.tagName)}
+      gameName={item.gameName}
       gameIconUrl={gameIconByName.get(item.gameName)}
+      modeName={item.modeName}
+      levelName={item.levelName}
+      serviceName={item.serviceName}
+      signature={item.signature}
+      onlineStatus={item.onlineStatus}
+      gameStatus={item.gameStatus}
+      price={item.price}
+      orderCount={item.orderCount}
+      voiceUrl={item.voiceUrl}
+      voiceDurationSeconds={item.voiceDurationSeconds}
       voicePlayingUrl={voicePlayer.playingUrl}
       onToggleVoice={voicePlayer.toggle}
       onPress={() =>
@@ -211,7 +237,12 @@ export default function GodListScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.gameBar}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.gameBar}
+        contentContainerStyle={styles.gameBarContent}
+      >
         <GamePill
           label="全部"
           iconUrl={null}
@@ -227,7 +258,7 @@ export default function GodListScreen() {
             onPress={() => setGameKey(String(game.id))}
           />
         ))}
-      </View>
+      </ScrollView>
       <View style={styles.listSheet}>
         <View style={styles.filterBar}>
           {FILTER_DEFS.map((def) => {
@@ -337,131 +368,12 @@ function GamePill({
   );
 }
 
-/** 卡片等级标签颜色：与设计稿色板一致 */
-function levelTagColor(levelName: string) {
-  if (levelName.includes("颜值")) return "#3DA5FF";
-  if (levelName.includes("人气")) return "#13AEBD";
-  if (levelName.includes("魔王")) return "#BB3EFA";
-  if (levelName.includes("顶尖")) return "#FE4267";
-  if (levelName.includes("明星")) return "#7D47FC";
-  if (levelName.includes("金")) return "#D19643";
-  if (levelName.includes("娱乐")) return "#477BFE";
-  return "#C0C4CC";
-}
-
-function GodCard({
-  item,
-  gameIconUrl,
-  voicePlayingUrl,
-  onToggleVoice,
-  onPress,
-}: {
-  item: GodListItem;
-  gameIconUrl: string | undefined;
-  voicePlayingUrl: string | null;
-  onToggleVoice: (url: string) => void;
-  onPress: () => void;
-}) {
-  const online = item.onlineStatus === 1;
-  const busy = item.gameStatus === 1;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-    >
-      <View style={styles.cardLeft}>
-        <Image
-          source={item.avatar ? { uri: item.avatar } : emptyAvatar}
-          style={styles.avatar}
-          contentFit="cover"
-        />
-        {item.voiceUrl ? (
-          <View style={styles.voicePill}>
-            <VoicePlayButton
-              url={item.voiceUrl}
-              duration={item.voiceDurationSeconds}
-              tone="light"
-              playingUrl={voicePlayingUrl}
-              onToggleVoice={onToggleVoice}
-            />
-          </View>
-        ) : null}
-      </View>
-      <View style={styles.cardRight}>
-        <View style={styles.cardContent}>
-          <View style={styles.nameRow}>
-            <Text numberOfLines={1} style={styles.name}>
-              {item.nickname}
-            </Text>
-            {item.sex === 1 || item.sex === 2 ? (
-              <Image
-                source={item.sex === 1 ? maleIcon : femaleIcon}
-                style={[styles.genderIcon, item.sex === 1 ? styles.genderMale : styles.genderFemale]}
-              />
-            ) : null}
-            {item.age != null && (item.sex === 1 || item.sex === 2) ? (
-              <Text
-                style={[
-                  styles.ageText,
-                  item.sex === 1 ? styles.ageTextMale : styles.ageTextFemale,
-                ]}
-              >
-                {item.age}
-              </Text>
-            ) : null}
-            {online ? (
-              <View style={[styles.statusTag, busy ? styles.statusBusyBg : styles.statusIdleBg]}>
-                <Image
-                  source={busy ? statusPlayingIcon : statusIdleIcon}
-                  style={[
-                    styles.statusTagIcon,
-                    busy ? styles.statusIconBusy : styles.statusIconIdle,
-                  ]}
-                />
-                <Text style={[styles.statusTagText, busy ? styles.statusBusyText : styles.statusIdleText]}>
-                  {busy ? "游戏中" : "空闲中"}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-          {item.gameName ? (
-            <View style={styles.gameTag}>
-              {gameIconUrl ? (
-                <Image source={{ uri: gameIconUrl }} style={styles.gameTagIcon} contentFit="cover" />
-              ) : null}
-              <Text style={styles.gameTagText}>{item.gameName}</Text>
-            </View>
-          ) : null}
-          <View style={styles.introRow}>
-            {item.levelName ? (
-              <View style={[styles.levelTag, { backgroundColor: levelTagColor(item.levelName) }]}>
-                <Text style={styles.levelTagText}>{item.levelName}</Text>
-              </View>
-            ) : null}
-            <Text numberOfLines={1} style={styles.introText}>
-              {item.signature || "保持一点神秘感..."}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.priceRow}>
-          <View style={styles.priceWrap}>
-            <Text style={styles.price}>{item.price}</Text>
-            <Image source={diamondIcon} style={styles.diamond} />
-          </View>
-          <View style={styles.salesWrap}>
-            <Text style={styles.salesLabel}>销量</Text>
-            <Text style={styles.salesValue}>{item.orderCount}</Text>
-          </View>
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F5F6F7" },
   gameBar: {
+    flexGrow: 0,
+  },
+  gameBarContent: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
@@ -556,116 +468,4 @@ const styles = StyleSheet.create({
     backgroundColor: "#E9E9EB",
     marginHorizontal: 16,
   },
-  card: {
-    flexDirection: "row",
-    gap: 12,
-    padding: 16,
-  },
-  cardPressed: { backgroundColor: "#F7F7F7" },
-  cardLeft: { width: 100, height: 100 },
-  avatar: { width: 100, height: 100, borderRadius: 8 },
-  voicePill: {
-    position: "absolute",
-    left: 6,
-    bottom: 6,
-    backgroundColor: "rgba(255,255,255,0.75)",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#FFF",
-    borderRadius: 99,
-    paddingTop: 3,
-    paddingRight: 2,
-    paddingBottom: 3,
-    paddingLeft: 2,
-  },
-  cardRight: {
-    flex: 1,
-    justifyContent: "space-between",
-  },
-  cardContent: { gap: 4 },
-  nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  name: {
-    color: "#0D0D0F",
-    fontSize: 14,
-    lineHeight: 22,
-    fontWeight: "600",
-    flexShrink: 1,
-  },
-  genderIcon: { width: 12, height: 12 },
-  genderMale: { tintColor: "#3DA5FF" },
-  genderFemale: { tintColor: "#FF42A1" },
-  ageText: { fontSize: 12, lineHeight: 18, fontWeight: "500" },
-  ageTextMale: { color: "#3DA5FF" },
-  ageTextFemale: { color: "#FF42A1" },
-  statusTag: {
-    marginLeft: "auto",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    borderRadius: 3,
-    // 设计稿 L2 Tag：高 16（文字 14 + 上下 1）、左右 3
-    paddingHorizontal: 3,
-    paddingVertical: 1,
-  },
-  statusBusyBg: { backgroundColor: "#FFF4EB" },
-  statusIdleBg: { backgroundColor: "#E6FAEF" },
-  statusTagIcon: { width: 10, height: 10 },
-  statusIconBusy: { tintColor: "#F5821D" },
-  statusIconIdle: { tintColor: "#14A357" },
-  statusTagText: { fontSize: 10, lineHeight: 14, fontWeight: "500" },
-  statusBusyText: { color: "#F5821D" },
-  statusIdleText: { color: "#14A357" },
-  gameTag: {
-    alignSelf: "flex-start",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "#FFF4EB",
-    borderRadius: 3,
-    // 设计稿 tag/game：高 16（文字 14 + 上下 1）、右 4
-    paddingRight: 4,
-    paddingVertical: 1,
-  },
-  gameTagIcon: { width: 16, height: 16, borderRadius: 3 },
-  gameTagText: { color: "#B25C15", fontSize: 10, lineHeight: 14, fontWeight: "500" },
-  introRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  levelTag: {
-    borderRadius: 2,
-    paddingHorizontal: 2,
-    // 文字 lineHeight 13 + 中文字形下沉，14 高会贴住底边；抬高到 16 并
-    // 额外给 1 底边距，视觉重心略微上提
-    height: 16,
-    paddingBottom: 1,
-    justifyContent: "center",
-  },
-  levelTagText: { color: "#FFF", fontSize: 10, lineHeight: 13, fontWeight: "500" },
-  introText: {
-    flex: 1,
-    color: "#979799",
-    fontSize: 11,
-    lineHeight: 16,
-  },
-  priceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-  priceWrap: { flexDirection: "row", alignItems: "flex-end", gap: 4 },
-  price: {
-    color: "#FE1F4C",
-    fontSize: 20,
-    lineHeight: 24,
-    fontWeight: "600",
-  },
-  diamond: { width: 15, height: 15, marginBottom: 3 },
-  salesWrap: { marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 4 },
-  salesLabel: { color: "#979799", fontSize: 12, lineHeight: 18 },
-  salesValue: { color: "#7F7F80", fontSize: 12, lineHeight: 18 },
 });

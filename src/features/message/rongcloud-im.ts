@@ -405,6 +405,11 @@ export function isRongCloudConnected() {
 export function connectRongCloud(accessToken: string) {
   if (connectionAttempt) return connectionAttempt;
   const attemptEpoch = connectionEpoch;
+  logger.info('RongCloud connectRongCloud invoked', {
+    stage: 'connect-invoked',
+    hasEngine: Boolean(engine),
+    hasStartedConnection,
+  });
   const attempt = connectRongCloudOnce(accessToken, attemptEpoch).finally(() => {
     if (connectionAttempt === attempt) connectionAttempt = null;
   });
@@ -468,6 +473,7 @@ async function connectRongCloudOnce(accessToken: string, attemptEpoch: number) {
     }
 
     stage = 'im-token';
+    logger.info('RongCloud fetching IM token', { stage });
     const tokenResponse = await fetchImTokenWithRetry(accessToken, attemptEpoch);
     if (attemptEpoch !== connectionEpoch) return false;
     const token = tokenResponse?.token;
@@ -476,6 +482,10 @@ async function connectRongCloudOnce(accessToken: string, attemptEpoch: number) {
       return false;
     }
     stage = 'connect';
+    logger.info('RongCloud invoking engine.connect', {
+      stage,
+      hasExistingConnection: hasStartedConnection,
+    });
     hasStartedConnection = true;
     return await new Promise<boolean>((resolve) => {
       let settled = false;

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { apiClient } from "@/core/network/api-client";
-import { fetchBanners, fetchClubPage, fetchGameCategories, fetchGames } from "./home.api";
+import { fetchBanners, fetchClubPage, fetchCompanionPage, fetchGameCategories, fetchGames } from "./home.api";
 
 vi.mock("@/core/network/api-client", () => ({ apiClient: vi.fn() }));
 
@@ -154,5 +154,89 @@ describe("首页品类筛选与店铺标签", () => {
     await expect(fetchClubPage({}, 1)).rejects.toThrow("服务暂不可用");
     await expect(fetchGameCategories()).rejects.toThrow("服务暂不可用");
     await expect(fetchGames()).rejects.toThrow("服务暂不可用");
+  });
+});
+
+describe("俱乐部陪玩列表字段映射", () => {
+  it("陪玩列表映射标签与模式/等级/服务字段，缺省时兜底空值", async () => {
+    vi.mocked(apiClient).mockResolvedValue({
+      code: "SUCCESS",
+      data: {
+        page: 1,
+        totalPages: 1,
+        records: [
+          {
+            profileId: 29,
+            userId: 50100075,
+            nickname: "哈吉蜂",
+            sex: 1,
+            age: 21,
+            tagName: "明星",
+            tagBackgroundColor: "#138666",
+            tagMobileBackgroundColor: "#FE4267",
+            gameName: "三角洲行动手游",
+            modeName: "大乱斗",
+            levelName: "星耀",
+            clubGameServiceName: "陪玩",
+            orderCount: 10,
+            onlineStatus: 1,
+            gameStatus: 1,
+            price: 112,
+          },
+          { profileId: 68, nickname: "盼友", sex: 2, orderCount: 0 },
+        ],
+      },
+    });
+
+    const page = await fetchCompanionPage({ clubId: "1000006", gameId: "11" });
+
+    expect(page.items[0]).toMatchObject({
+      tagName: "明星",
+      tagBackgroundColor: "#138666",
+      gameName: "三角洲行动手游",
+      modeName: "大乱斗",
+      levelName: "星耀",
+      serviceName: "陪玩",
+      age: 21,
+      price: 112,
+      onlineStatus: 1,
+      gameStatus: 1,
+    });
+    expect(page.items[1]).toMatchObject({
+      tagName: "",
+      tagBackgroundColor: "",
+      gameName: "",
+      modeName: "",
+      levelName: "",
+      serviceName: "",
+      age: null,
+      signature: "",
+      onlineStatus: 0,
+    });
+  });
+
+  it("标签背景色直接使用后台通用色值，未下发时兜底空字符串", async () => {
+    vi.mocked(apiClient).mockResolvedValue({
+      code: "SUCCESS",
+      data: {
+        page: 1,
+        totalPages: 1,
+        records: [
+          {
+            profileId: 1,
+            nickname: "甲",
+            tagName: "魔王pro",
+            tagBackgroundColor: "#8F4033",
+            tagMobileBackgroundColor: "#FE4267",
+          },
+          { profileId: 2, nickname: "乙", tagName: "明星" },
+        ],
+      },
+    });
+
+    const page = await fetchCompanionPage({ clubId: "1000006", gameId: "11" });
+
+    expect(page.items[0]).toMatchObject({ tagName: "魔王pro", tagBackgroundColor: "#8F4033" });
+    expect(page.items[1]).toMatchObject({ tagName: "明星", tagBackgroundColor: "" });
   });
 });

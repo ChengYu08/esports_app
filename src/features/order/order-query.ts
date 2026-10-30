@@ -49,6 +49,42 @@ export async function refreshOrdersForRemoteChange(
   }
 }
 
+/**
+ * 收到抢单通知 / 需求结束信号后失效派单中心「正在抢单」：可见时立即重拉，
+ * 不可见则标记 stale，下次进入派单中心自动拉取（对齐 PC 打开抽屉即 reload）。
+ */
+export async function refreshDispatchForRemoteChange() {
+  await queryClient.invalidateQueries(
+    {
+      queryKey: ["orders", "dispatch", "grabbing"],
+      refetchType: "active",
+    },
+    { cancelRefetch: false },
+  );
+}
+
+/** 一次抢单结算（成功或失败）后失效派单中心两个列表：「正在抢单」与「抢单记录」。 */
+export async function refreshDispatchAfterGrabAttempt() {
+  await queryClient.invalidateQueries(
+    {
+      queryKey: ["orders", "dispatch"],
+      refetchType: "active",
+    },
+    { cancelRefetch: false },
+  );
+}
+
+/** 抢单结算后失效该需求的派单详情，详情页开着时同步为已抢单/已失效状态。 */
+export async function refreshDispatchDetail(requestNo: string) {
+  await queryClient.invalidateQueries(
+    {
+      queryKey: ["dispatch-detail", requestNo],
+      refetchType: "active",
+    },
+    { cancelRefetch: false },
+  );
+}
+
 /** 订单真实状态 → 列表筛选（与后端 qryStatus 对齐，Web 端 toQryStatus 同源）。 */
 function statusFilterOf(
   status: OrderItemModel["status"],

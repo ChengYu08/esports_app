@@ -10,6 +10,7 @@ import {
   PLATFORM_NOTICE_USER_ID,
 } from "@/features/message/rongcloud-commands";
 import { grabQuickMatchAndEnterAudition } from "@/features/match/grab-quick-match-flow";
+import { refreshDispatchForRemoteChange } from "@/features/order/order-query";
 import { acceptOrder } from "@/features/order/order.api";
 import { actionNotice } from "@/shared/ui/action-notice/action-notice-store";
 import { TRADE_NOTICE_ICON } from "@/shared/ui/action-notice/trade-notice-icon";
@@ -48,6 +49,7 @@ export function handleQuickMatchExpired(
   const payload = parseQuickMatchExpired(command.data);
   if (!payload) return;
 
+  void refreshDispatchForRemoteChange();
   actions.notifyEnded(payload.requestNo, reason);
   actions.dismissQuickMatchBar(payload.requestNo);
 }
@@ -77,6 +79,9 @@ export function handleQuickMatchNotice(command: RongCommand, now = Date.now()) {
 
   const payload = parseQuickMatchNotice(command.data);
   if (!payload) return;
+
+  // 无论是否弹条（重复/已过期）都让派单中心失效：可见时立即重拉，否则下次进入再拉
+  void refreshDispatchForRemoteChange();
   if (quickMatchNoticeKeys.has(payload.requestNo)) return;
 
   const expireAt = Number.isFinite(payload.expireAtMs)
@@ -98,11 +103,7 @@ export function handleQuickMatchNotice(command: RongCommand, now = Date.now()) {
     {
       onAction: async () => {
         const result = await grabQuickMatchAndEnterAudition(payload.requestNo);
-        if (result.status === "failed") {
-          showToast(result.message);
-          return;
-        }
-        actionNotice.dismiss(noticeId);
+        if (result.status === "failed") showToast(result.message);
       },
       onDisappear: () => releaseQuickMatchNoticeKey(payload.requestNo),
     },
