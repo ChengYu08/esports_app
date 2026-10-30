@@ -89,7 +89,39 @@ type ApiClubDetail = {
   clubGames?: { id: number; clubId: number; gameId: number; gameName?: string; iconUrl?: string; backgroundUrl?: string; gameCategory?: number; status?: number }[];
 };
 type ApiMode = { id: number; clubId?: number; gameId?: number; modeName?: string; status?: number };
-type ApiCompanion = { profileId: number; userId?: number; nickname?: string; headImage?: string; sex?: number; signature?: string; voiceUrl?: string; voiceDurationSeconds?: number; orderCount?: number; onlineStatus?: number; gameStatus?: number; price?: number };
+type ApiCompanion = {
+  profileId: number;
+  userId?: number;
+  nickname?: string;
+  headImage?: string;
+  sex?: number;
+  age?: number | string;
+  signature?: string;
+  voiceUrl?: string;
+  voiceDurationSeconds?: number;
+  orderCount?: number;
+  onlineStatus?: number;
+  gameStatus?: number;
+  price?: number;
+  gameId?: number;
+  gameName?: string;
+  /** 卡内陪玩标签（明星/魔王pro 等），背景色由后台配置下发 */
+  tagId?: number;
+  tagName?: string;
+  tagIconUrl?: string;
+  tagBackgroundColor?: string;
+  tagMobileBackgroundColor?: string;
+  gameModeId?: number;
+  /** 游戏模式，如 大乱斗 */
+  modeName?: string;
+  gameLevelId?: number;
+  /** 游戏等级/段位，如 星耀 */
+  levelName?: string;
+  clubGameServiceId?: number;
+  /** 服务类型，如 陪玩 */
+  clubGameServiceName?: string;
+  companionServiceId?: number;
+};
 type ApiCompanionPage = { page?: number; totalPages?: number; records?: ApiCompanion[] };
 type ApiPriceConfig = { linkName?: string; groupId?: string; tabs?: { menuTitle?: string; imageUrl?: string; sortNo?: number }[] };
 type ApiResponse<T> = ApiEnvelope<T>;
@@ -132,7 +164,31 @@ export async function fetchCompanionPage(filters: CompanionFilters, page = 1, pa
     method: "POST", body: { page, pageSize, action: { ...filters, clubId: Number(filters.clubId), gameId: Number(filters.gameId) } }, signal,
   });
   const data = requireSuccess(response, "陪玩列表加载失败");
-  return { items: (data.records ?? []).map((item) => ({ profileId: item.profileId, userId: item.userId ?? item.profileId, nickname: item.nickname || "未命名陪玩", headImage: item.headImage, sex: item.sex, signature: item.signature, voiceUrl: item.voiceUrl, voiceDurationSeconds: item.voiceDurationSeconds, orderCount: item.orderCount ?? 0, onlineStatus: item.onlineStatus ?? 0, gameStatus: item.gameStatus ?? 0, price: item.price ?? 0 })), hasMore: (data.page ?? page) < (data.totalPages ?? page), nextPage: page + 1 };
+  return {
+    items: (data.records ?? []).map((item) => ({
+      profileId: item.profileId,
+      userId: item.userId ?? item.profileId,
+      nickname: item.nickname || "未命名陪玩",
+      headImage: item.headImage,
+      sex: item.sex,
+      age: item.age != null && item.age !== "" ? Number(item.age) : null,
+      signature: item.signature || "",
+      voiceUrl: item.voiceUrl,
+      voiceDurationSeconds: item.voiceDurationSeconds,
+      orderCount: item.orderCount ?? 0,
+      onlineStatus: item.onlineStatus ?? 0,
+      gameStatus: item.gameStatus ?? 0,
+      price: item.price ?? 0,
+      gameName: item.gameName || "",
+      tagName: item.tagName || "",
+      tagColor: item.tagMobileBackgroundColor || item.tagBackgroundColor || "",
+      modeName: item.modeName || "",
+      levelName: item.levelName || "",
+      serviceName: item.clubGameServiceName || "",
+    })),
+    hasMore: (data.page ?? page) < (data.totalPages ?? page),
+    nextPage: page + 1,
+  };
 }
 
 export async function fetchGames(signal?: AbortSignal): Promise<Game[]> {

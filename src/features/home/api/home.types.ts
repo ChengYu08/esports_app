@@ -94,13 +94,23 @@ export type Companion = {
   nickname: string;
   headImage?: string;
   sex?: number;
-  signature?: string;
+  age: number | null;
+  signature: string;
   voiceDurationSeconds?: number;
   voiceUrl?: string;
   orderCount: number;
   onlineStatus: number;
   gameStatus: number;
   price: number;
+  gameName: string;
+  /** 卡内陪玩标签名（明星/魔王pro 等），空表示不展示标签 */
+  tagName: string;
+  /** 标签背景色：优先移动端色值，后台未配置时由 UI 兜底 */
+  tagColor: string;
+  /** 卡片第三行斜杠文本三要素：游戏模式 / 游戏等级 / 服务 */
+  modeName: string;
+  levelName: string;
+  serviceName: string;
 };
 
 export type CompanionFilters = {

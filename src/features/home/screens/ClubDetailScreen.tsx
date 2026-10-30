@@ -2,10 +2,10 @@ import { ChevronLeft24Regular, Headset24Regular, Search24Regular } from "@fluent
 import { useAuthStore } from "@esports/auth";
 import { useQuery } from "@tanstack/react-query";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
-import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
 import { EmptyState, ErrorState } from "@/shared/ui/AsyncStates";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import { CompanionCard } from "@/shared/ui/CompanionCard";
 import { fetchClubGameLevels } from "@/features/match/api/match.api";
 import {
   ClubDetailMemberSkeletonList,
@@ -17,7 +17,7 @@ import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-serv
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Easing,
@@ -46,12 +46,7 @@ const NAV_BAR_CONTENT_HEIGHT = 44;
 const tabCornerIcon = require("../../../../assets/home/club-detail/tab-corner.svg");
 const arrowDownIcon = require("../../../../assets/home/club-detail/arrow-fill-down-new.svg");
 const arrowUpRedIcon = require("../../../../assets/home/club-detail/arrow-fill-up-red.svg");
-const statusPlayingIcon = require("../../../../assets/home/club-detail/status-playing-new.svg");
-const statusIdleIcon = require("../../../../assets/home/club-detail/status-idle-new.svg");
 const introToggleIcon = require("../../../../assets/home/club-detail/intro-toggle.svg");
-const maleIcon = require("../../../../assets/home/club-detail/male.svg");
-const femaleIcon = require("../../../../assets/home/club-detail/female.svg");
-const diamondIcon = require("../../../../assets/home/club-detail/icon-diamond.svg");
 const emptyStateIllustration = require("../../../../assets/coms/empty-state-illustration.svg");
 
 // 设计稿色板
@@ -80,8 +75,6 @@ const filterDefinitions: { key: FilterKey; label: string }[] = [
   { key: "gender", label: "性别" },
   { key: "advanced", label: "筛选" },
 ];
-
-type MemberStatus = "playing" | "idle";
 
 const memberKeyExtractor = (member: Companion) => String(member.profileId);
 
@@ -156,28 +149,33 @@ export default function ClubDetailScreen() {
   );
   const renderMember = useCallback(
     ({ item }: { item: Companion }) => (
-      <MemberCard
-        clubId={clubId}
-        userId={item.userId}
-        image={item.headImage}
-        name={item.nickname}
-        description={item.signature}
-        gender={item.sex === 1 ? "male" : "female"}
+      <CompanionCard
+        nickname={item.nickname}
+        avatar={item.headImage ?? ""}
+        sex={item.sex ?? 0}
+        age={item.age ?? null}
+        tagName={item.tagName}
+        tagColor={item.tagColor}
+        // 列表本身按所选游戏过滤，接口记录不带图标时沿用所选游戏
+        gameName={item.gameName || selectedGameInfo?.name}
+        gameIconUrl={selectedGameInfo?.iconUrl}
+        modeName={item.modeName}
+        levelName={item.levelName}
+        serviceName={item.serviceName}
+        signature={item.signature}
+        onlineStatus={item.onlineStatus}
+        gameStatus={item.gameStatus}
         price={item.price}
         orderCount={item.orderCount}
-        voiceDuration={item.voiceDurationSeconds}
-        voiceUrl={item.voiceUrl}
-        voicePlaying={voicePlayer.playingUrl === item.voiceUrl}
+        voiceUrl={item.voiceUrl ?? null}
+        voiceDurationSeconds={item.voiceDurationSeconds ?? null}
+        voicePlayingUrl={voicePlayer.playingUrl}
         onToggleVoice={voicePlayer.toggle}
-        // 游戏角标跟列表所选游戏一致（列表本身按该游戏过滤）
-        gameName={selectedGameInfo?.name}
-        gameIconUrl={selectedGameInfo?.iconUrl}
-        status={
-          item.gameStatus === 1
-            ? "playing"
-            : item.onlineStatus === 1
-              ? "idle"
-              : undefined
+        onPress={() =>
+          router.push({
+            pathname: "/profile",
+            params: { clubId, userId: String(item.userId) },
+          })
         }
       />
     ),
@@ -391,6 +389,7 @@ export default function ClubDetailScreen() {
         data={members}
         keyExtractor={memberKeyExtractor}
         renderItem={renderMember}
+        ItemSeparatorComponent={MemberCardSeparator}
         initialNumToRender={8}
         maxToRenderPerBatch={8}
         windowSize={7}
@@ -774,28 +773,6 @@ function GameTab({
 }
 
 /** 成员状态标签：游戏中（橙）/ 空闲中（绿） */
-function StatusTag({ status }: { status: MemberStatus }) {
-  const playing = status === "playing";
-  return (
-    <View
-      style={[styles.statusTag, playing ? styles.statusTagPlaying : styles.statusTagIdle]}
-    >
-      <Image
-        source={playing ? statusPlayingIcon : statusIdleIcon}
-        style={styles.statusTagIcon}
-      />
-      <Text
-        style={[
-          styles.statusTagText,
-          { color: playing ? COLORS.orangeText : COLORS.greenText },
-        ]}
-      >
-        {playing ? "游戏中" : "空闲中"}
-      </Text>
-    </View>
-  );
-}
-
 function FilterOption({
   label,
   selected,
@@ -825,119 +802,10 @@ function FilterOption({
   );
 }
 
-const MemberCard = memo(function MemberCard({
-  clubId,
-  userId,
-  image,
-  name,
-  description,
-  gender,
-  price,
-  orderCount,
-  voiceDuration,
-  voiceUrl,
-  voicePlaying,
-  onToggleVoice,
-  status,
-  gameName,
-  gameIconUrl,
-}: {
-  clubId: string;
-  userId: number;
-  image?: string;
-  name: string;
-  description?: string;
-  gender: "male" | "female";
-  price: number;
-  orderCount: number;
-  voiceDuration?: number;
-  voiceUrl?: string;
-  voicePlaying: boolean;
-  onToggleVoice: (voiceUrl: string) => void;
-  status?: MemberStatus;
-  gameName?: string;
-  gameIconUrl?: string;
-}) {
-  return (
-    <Pressable
-      style={styles.memberCard}
-      onPress={() =>
-        router.push({
-          pathname: "/profile",
-          params: { clubId, userId: String(userId) },
-        })
-      }
-    >
-      <View style={styles.memberLeft}>
-        <CachedImage
-          source={image ? { uri: image } : undefined}
-          contentFit="cover"
-          style={styles.memberAvatar}
-        />
-        {voiceUrl ? (
-          <View style={styles.memberVoicePill}>
-            <VoicePlayButton
-              tone="pill"
-              duration={voiceDuration}
-              onToggleVoice={onToggleVoice}
-              playingUrl={voicePlaying ? voiceUrl : null}
-              url={voiceUrl}
-            />
-          </View>
-        ) : null}
-      </View>
-      <View style={styles.memberBody}>
-        <View style={styles.memberContent}>
-          <View style={styles.memberTitleRow}>
-            <View style={styles.memberNameGroup}>
-              <Text numberOfLines={1} style={styles.memberName}>
-                {name}
-              </Text>
-              <Image
-                source={gender === "male" ? maleIcon : femaleIcon}
-                style={styles.memberGenderIcon}
-              />
-            </View>
-            {status ? <StatusTag status={status} /> : null}
-          </View>
-          {gameName ? (
-            <View style={styles.memberGameTag}>
-              <View style={styles.memberGameTagIcon}>
-                {gameIconUrl ? (
-                  <CachedImage
-                    source={{ uri: gameIconUrl }}
-                    style={styles.memberGameTagIconImage}
-                  />
-                ) : (
-                  <View style={styles.gameTabIconFallback} />
-                )}
-              </View>
-              <Text numberOfLines={1} style={styles.memberGameTagText}>
-                {gameName}
-              </Text>
-            </View>
-          ) : null}
-          <View style={styles.memberSubtitleRow}>
-            <Text numberOfLines={1} style={styles.memberSubtitle}>
-              {description || "暂无个人简介"}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.memberPriceRow}>
-          <View style={styles.memberPrice}>
-            <Text style={styles.memberPriceText}>{price}</Text>
-            <Image source={diamondIcon} style={styles.memberDiamondIcon} />
-          </View>
-          <View style={styles.memberSales}>
-            <Text style={styles.memberSalesLabel}>销量</Text>
-            <Text style={styles.memberSalesValue}>{orderCount}</Text>
-          </View>
-        </View>
-      </View>
-      <View style={styles.memberDivider} pointerEvents="none" />
-    </Pressable>
-  );
-});
+/** 成员卡片分割线：原卡片内绝对定位分割线改为列表分隔符 */
+function MemberCardSeparator() {
+  return <View style={styles.memberSeparator} />;
+}
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.white },
@@ -1253,175 +1121,11 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   memberEmpty: { alignSelf: "center", marginTop: 24 },
-  // 陪玩介绍卡片（设计稿 696:122217）
-  memberCard: {
-    minHeight: 132,
-    flexDirection: "row",
-    gap: 12,
-    padding: 16,
-    backgroundColor: COLORS.white,
-  },
-  memberLeft: {
-    width: 100,
-    height: 100,
-  },
-  memberAvatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 8,
-    backgroundColor: "#F5F6F7",
-  },
-  memberVoicePill: {
-    position: "absolute",
-    left: 6,
-    bottom: 7,
-    zIndex: 1,
-  },
-  memberBody: {
-    flex: 1,
-    minWidth: 0,
-    justifyContent: "space-between",
-  },
-  memberContent: {
-    gap: 6,
-  },
-  memberTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 24,
-  },
-  memberNameGroup: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  memberName: {
-    flexShrink: 1,
-    color: COLORS.textDark,
-    fontFamily: SYSTEM_FONT,
-    fontSize: 14,
-    fontWeight: "600",
-    lineHeight: 22,
-  },
-  memberGenderIcon: {
-    width: 12,
-    height: 12,
-  },
-  statusTag: {
-    flexShrink: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    paddingHorizontal: 3,
-    borderRadius: 3,
-  },
-  statusTagPlaying: {
-    backgroundColor: COLORS.orangeBg,
-  },
-  statusTagIdle: {
-    backgroundColor: COLORS.greenBg,
-  },
-  statusTagIcon: {
-    width: 10,
-    height: 10,
-  },
-  statusTagText: {
-    fontFamily: SYSTEM_FONT,
-    fontSize: 10,
-    lineHeight: 14,
-    fontWeight: "500",
-  },
-  memberGameTag: {
-    alignSelf: "flex-start",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingRight: 4,
-    backgroundColor: COLORS.orangeBg,
-    borderRadius: 3,
-  },
-  memberGameTagIcon: {
-    width: 16,
-    height: 16,
-    borderRadius: 3,
-    overflow: "hidden",
-  },
-  memberGameTagIconImage: {
-    width: 16,
-    height: 16,
-    borderRadius: 3,
-  },
-  memberGameTagText: {
-    flexShrink: 1,
-    color: COLORS.gameTagText,
-    fontFamily: SYSTEM_FONT,
-    fontSize: 10,
-    lineHeight: 14,
-    fontWeight: "500",
-  },
-  memberSubtitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  memberSubtitle: {
-    flexShrink: 1,
-    color: COLORS.textTertiary,
-    fontFamily: SYSTEM_FONT,
-    fontSize: 11,
-    lineHeight: 16,
-    fontWeight: "400",
-  },
-  memberPriceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-  memberPrice: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 4,
-  },
-  memberPriceText: {
-    color: COLORS.brand,
-    fontFamily: SYSTEM_FONT,
-    fontSize: 20,
-    fontWeight: "600",
-    lineHeight: 24,
-  },
-  memberDiamondIcon: {
-    width: 15,
-    height: 15,
-    marginBottom: 3,
-  },
-  memberSales: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  memberSalesLabel: {
-    color: COLORS.textTertiary,
-    fontFamily: SYSTEM_FONT,
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: "400",
-  },
-  memberSalesValue: {
-    color: COLORS.textQuaternary,
-    fontFamily: SYSTEM_FONT,
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: "400",
-  },
-  memberDivider: {
-    position: "absolute",
-    left: 16,
-    right: 16,
-    bottom: 0,
+  // 成员卡片分隔符（对齐大神列表 hairline 分割线）
+  memberSeparator: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: COLORS.border,
+    marginHorizontal: 16,
   },
   // 暂无价目表弹窗
   priceEmptyBackdrop: {
