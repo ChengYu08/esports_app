@@ -24,6 +24,9 @@ import {
 import { saveCoolingRecord } from "@/features/auth/cancellation-cooling-store";
 import { clearAuthSession } from "@/features/auth/session-persistence";
 import { messageStore } from "@/features/message/message-store";
+import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
+import { leaveVoiceChatRoom } from "@/features/voice-room/voice-room-rongcloud";
+import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
 import { colors } from "@/shared/theme/tokens";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { openExternalLink } from "@/shared/navigation/open-external-link";
@@ -132,9 +135,25 @@ export default function AccountCancellationScreen() {
         coolingDays,
       );
       await saveCoolingRecord(record);
+      // 注销等于强制登出,顺序对齐 PC forceLogout:先解绑实时资源,再清凭证。
+      const { activeRoom, joiningRoom, clearActiveRoom } =
+        useVoiceRoomSessionStore.getState();
+      clearActiveRoom();
+      if (activeRoom || joiningRoom) {
+        await leaveVoiceRtc().catch(() => undefined);
+        const chatroomIds = new Set([
+          activeRoom?.rongChatroomId,
+          joiningRoom?.rongChatroomId,
+        ]);
+        await Promise.allSettled(
+          [...chatroomIds]
+            .filter((id): id is string => Boolean(id))
+            .map((id) => leaveVoiceChatRoom(id)),
+        );
+      }
+      await messageStore.getState().reset().catch(() => undefined);
       await clearAuthSession().catch(() => undefined);
       clearSession();
-      await messageStore.getState().reset().catch(() => undefined);
       showToast(
         `已进入${coolingDays}天冷静期，账号将于 ${formatCoolEndTime(record.coolEndTime)} 完成注销`,
         { duration: toastDurations.LONG },
