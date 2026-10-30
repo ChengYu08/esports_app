@@ -1,7 +1,6 @@
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
-  Headset24Regular,
   Search24Regular,
   Star16Filled,
   Star16Regular,
@@ -75,6 +74,7 @@ const maleIcon = require("../../../../assets/home/club-detail/male.svg");
 const femaleIcon = require("../../../../assets/mine/figma/mine-female.svg");
 const backIcon = require("../../../../assets/mine/figma/profile-back.svg");
 const settingsIcon = require("../../../../assets/mine/figma/mine-settings.svg");
+const customerIcon = require("../../../../assets/coms/customer.svg");
 const arrowDownIcon = require("../../../../assets/mine/figma/profile-arrow-down.svg");
 const diamondIcon = require("../../../../assets/home/club-detail/icon-diamond.svg");
 const idleStatusIcon = require("../../../../assets/home/club-detail/status-idle.svg");
@@ -666,9 +666,13 @@ export default function ProfileScreen() {
                   accessibilityState={{ busy: enteringCS }}
                   hitSlop={12}
                   onPress={() => void openCustomerService()}
-                  style={styles.navActionButton}
+                  style={[styles.navActionButton, { marginTop: 3 }]}
                 >
-                  <Headset24Regular color="#fff" width={24} height={24} />
+                  <Image
+                    source={customerIcon}
+                    style={styles.navActionIcon}
+                    contentFit="contain"
+                  />
                 </Pressable>
               </>
             )}
