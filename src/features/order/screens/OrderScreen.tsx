@@ -4,6 +4,7 @@ import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { useAuthStore } from "@esports/auth";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FlatList,
@@ -305,18 +306,21 @@ export default function OrderScreen() {
   };
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <OrderHeader title={isCompanion ? "派单中心" : "订单"} />
-      {isCompanion ? (
-        <OrderScopeTabs
-          value={scope}
-          onChange={(nextScope) => {
-            setSelectedScope(nextScope);
-            setFilter(nextScope === "dispatch" ? "grabbing" : "all");
-          }}
-        />
-      ) : null}
-      <OrderTabs scope={scope} onChange={setFilter} value={visibleFilter} />
+    <View style={styles.screen}>
+      <StatusBar style="dark" />
+      <View style={[styles.stickyHeader, { paddingTop: insets.top }]}>
+        {isCompanion ? null : <OrderHeader />}
+        {isCompanion ? (
+          <OrderScopeTabs
+            value={scope}
+            onChange={(nextScope) => {
+              setSelectedScope(nextScope);
+              setFilter(nextScope === "dispatch" ? "grabbing" : "all");
+            }}
+          />
+        ) : null}
+        <OrderTabs scope={scope} onChange={setFilter} value={visibleFilter} />
+      </View>
       <FlatList
         contentContainerStyle={[
           styles.content,
@@ -666,6 +670,7 @@ function OrderSeparator() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F7F7" },
+  stickyHeader: { backgroundColor: "#FFFFFF" },
   content: { flexGrow: 1, paddingTop: 8 },
   separator: { height: 8 },
   empty: {
