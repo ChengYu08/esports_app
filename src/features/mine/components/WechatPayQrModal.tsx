@@ -16,6 +16,8 @@ import { captureRef } from "react-native-view-shot";
 
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 
+const appIcon = require("../../../../assets/images/icon.png");
+
 type SaveStatus = "idle" | "saving" | "failed";
 
 export function WechatPayQrModal({
@@ -113,7 +115,16 @@ export function WechatPayQrModal({
             ¥{moneyAmount} 充值 {starAmount} 星钻
           </Text>
           <View ref={qrCardRef} collapsable={false} style={styles.qrCard}>
-            <QRCodeSvg value={qrCode} size={200} backgroundColor="#FFFFFF" />
+            <QRCodeSvg
+              value={qrCode}
+              size={200}
+              backgroundColor="#FFFFFF"
+              logo={appIcon}
+              logoSize={44}
+              logoBackgroundColor="#FFFFFF"
+              logoMargin={4}
+              logoBorderRadius={8}
+            />
           </View>
           <Pressable
             accessibilityRole="button"
