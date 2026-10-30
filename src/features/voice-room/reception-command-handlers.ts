@@ -3,7 +3,7 @@
  * - CUSTOMER_SERVICE_INVITE：接待邀请 → 全局 ActionNotice 抢单条（到期自动消失）
  * - QUICK_MATCH_CREATED：接待代发创建 → 写入 quickMatchCreated 场景标记
  */
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 
 import { markCsInviteClaimed, markCsInviteUnclaimed } from "@/features/message/cs-invite-claim-state";
 import type { RongCommand } from "@/features/message/rongcloud-command";
@@ -71,7 +71,7 @@ export function handleCustomerServiceInvite(command: RongCommand) {
         if (result.status === "cancelled") return;
         if (result.status === "failed") {
           markCsInviteUnclaimed(roomId, roomVersion, expireAtSec);
-          Toast.show(result.message, { duration: Toast.durations.SHORT });
+          showToast(result.message);
           return;
         }
         markCsInviteClaimed(roomId, roomVersion, expireAtSec, false);

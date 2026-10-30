@@ -2,8 +2,6 @@ import { useAuthStore } from "@esports/auth";
 import * as Clipboard from "expo-clipboard";
 import { router } from "expo-router";
 import { useState } from "react";
-import Toast from "react-native-root-toast";
-
 import { buildAfterSalePayload } from "@/features/order/after-sale-card";
 import { computeFreeStarAmount } from "@/features/order/free-amount";
 import {
@@ -30,6 +28,7 @@ import type {
 } from "@/features/order/order.types";
 import { requireLogin } from "@/shared/navigation/require-login";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
+import { showToast } from "@/shared/ui/app-toast";
 
 type OrderDetailScope = "accept" | "place";
 
@@ -104,9 +103,9 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
     const orderNumber = order.orderNo ?? order.id;
     try {
       await Clipboard.setStringAsync(orderNumber);
-      Toast.show("订单编号已复制", { duration: Toast.durations.SHORT });
+      showToast("订单编号已复制");
     } catch {
-      Toast.show("复制失败，请稍后重试", { duration: Toast.durations.SHORT });
+      showToast("复制失败，请稍后重试");
     }
   };
 
@@ -125,7 +124,7 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
       if (action === "accept") await acceptOrder(order.id, token);
       if (action === "start") await startOrderService(order.id, token);
       await syncAfterMutation();
-      Toast.show("操作成功", { duration: Toast.durations.SHORT });
+      showToast("操作成功");
     } catch (error) {
       setPrompt({
         title: "订单操作失败",
@@ -152,7 +151,7 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
       await freeOrderService(order.id, starAmount, token);
       setActionPrompt(null);
       await syncAfterMutation();
-      Toast.show("免单成功", { duration: Toast.durations.SHORT });
+      showToast("免单成功");
     } catch (error) {
       setPrompt({
         title: "免单失败",
@@ -243,7 +242,7 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
       await completeOrder(order.id, token);
       setCompletePromptVisible(false);
       await syncAfterMutation();
-      Toast.show("服务已完成", { duration: Toast.durations.SHORT });
+      showToast("服务已完成");
     } catch (error) {
       setPrompt({
         title: "完成订单失败",
@@ -262,7 +261,7 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
     void rejectOrder(order.id, token)
       .then(async () => {
         await syncAfterMutation();
-        Toast.show("操作成功", { duration: Toast.durations.SHORT });
+        showToast("操作成功");
       })
       .catch((error) =>
         setPrompt({

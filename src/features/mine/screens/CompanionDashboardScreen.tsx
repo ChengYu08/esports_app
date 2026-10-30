@@ -18,7 +18,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
@@ -96,9 +96,7 @@ export default function CompanionDashboardScreen() {
       );
       await managed.invalidate();
     } catch (error) {
-      Toast.show(error instanceof Error ? error.message : "服务状态更新失败", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast(error instanceof Error ? error.message : "服务状态更新失败");
     } finally {
       pendingIds.current.delete(id);
       setUpdatingIds(new Set(pendingIds.current));

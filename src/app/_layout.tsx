@@ -5,7 +5,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RootSiblingParent } from "react-native-root-siblings";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -107,9 +107,7 @@ export default function RootLayout() {
     if (!needsLoginRedirect.current || !sessionReady || accessToken) return;
     needsLoginRedirect.current = false;
     router.replace("/login");
-    Toast.show("登录状态已失效，请重新登录", {
-      duration: Toast.durations.SHORT,
-    });
+    showToast("登录状态已失效，请重新登录");
   }, [accessToken, sessionReady]);
 
   useEffect(() => {

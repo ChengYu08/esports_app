@@ -12,7 +12,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { companionManagementApi as api } from "../api/companion-management.api";
 import type { ManagedImage } from "../api/companion-management.contract";
@@ -58,9 +58,7 @@ export default function CompanionGalleryScreen() {
       return;
     }
     if (images.length >= MAX_IMAGES) {
-      Toast.show(`最多上传${MAX_IMAGES}张截图`, {
-        position: Toast.positions.CENTER,
-      });
+      showToast(`最多上传${MAX_IMAGES}张截图`);
       return;
     }
     busyRef.current = true;
@@ -79,7 +77,7 @@ export default function CompanionGalleryScreen() {
         })),
       );
       if (warnings.length) {
-        Toast.show(warnings.join("\n"), { position: Toast.positions.CENTER });
+        showToast(warnings.join("\n"));
       }
       if (!accepted.length) {
         return;
@@ -89,11 +87,8 @@ export default function CompanionGalleryScreen() {
         ...current,
       ]);
     } catch (error) {
-      Toast.show(
+      showToast(
         error instanceof Error ? error.message : "选择图片失败，请重试",
-        {
-          position: Toast.positions.CENTER,
-        },
       );
     } finally {
       busyRef.current = false;
@@ -169,10 +164,7 @@ export default function CompanionGalleryScreen() {
       setSaving(false);
     }
     if (success) {
-      Toast.show("保存成功", {
-        duration: Toast.durations.SHORT,
-        position: Toast.positions.CENTER,
-      });
+      showToast("保存成功");
       router.back();
     }
   };

@@ -15,7 +15,7 @@ import {
   Text,
   View,
 } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { queryClient } from "@/core/query/query-client";
@@ -86,13 +86,10 @@ export default function BasicSettingsScreen() {
         }
         queryClient.clear();
         setCacheSize(readCacheSize());
-        Toast.show("清理完成，可重新下载的缓存已清除", {
-          duration: Toast.durations.SHORT,
-        });
+        showToast("清理完成，可重新下载的缓存已清除");
       } catch (error) {
-        Toast.show(
+        showToast(
           `清理失败，${error instanceof Error ? error.message : "请稍后重试"}`,
-          { duration: Toast.durations.SHORT },
         );
         setCacheSize(readCacheSize());
       } finally {

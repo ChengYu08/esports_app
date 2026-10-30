@@ -2,7 +2,7 @@ import { useAuthStore } from "@esports/auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 
 import {
   cancelQuickMatch,
@@ -235,11 +235,11 @@ export function useQuickMatchSession(
     endedRef.current = true;
     generationRef.current += 1;
     if (reason === "cancelled") {
-      Toast.show(message || "派单已取消", { duration: Toast.durations.SHORT });
+      showToast(message || "派单已取消");
     } else if (reason === "expired") {
-      Toast.show(message || "派单已超时自动取消", { duration: Toast.durations.SHORT });
+      showToast(message || "派单已超时自动取消");
     } else {
-      Toast.show(message || "该派单已结束", { duration: Toast.durations.SHORT });
+      showToast(message || "该派单已结束");
     }
     onEndedRef.current?.(reason);
   }, []);
@@ -380,9 +380,7 @@ export function useQuickMatchSession(
       await endMatching("cancelled", "已取消派单");
       return true;
     } catch (error) {
-      Toast.show(error instanceof Error ? error.message : "取消派单失败，请稍后重试", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast(error instanceof Error ? error.message : "取消派单失败，请稍后重试");
       void pollGrabList();
       return false;
     } finally {
@@ -410,7 +408,7 @@ export function useQuickMatchSession(
         return prev.filter((id) => id !== grabId);
       }
       if (prev.length >= MAX_GRAB_SELECT) {
-        Toast.show("最多选择3名陪玩", { duration: Toast.durations.SHORT });
+        showToast("最多选择3名陪玩");
         return prev;
       }
       return [...prev, grabId];

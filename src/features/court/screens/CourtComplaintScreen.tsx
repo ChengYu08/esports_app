@@ -42,7 +42,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast, toastDurations } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Mode = "court" | "ticket" | "evidence" | "appeal";
@@ -274,30 +274,25 @@ export default function CourtComplaintScreen() {
       return;
     }
     if (!content.trim()) {
-      Toast.show("请填写投诉内容", { duration: Toast.durations.SHORT });
+      showToast("请填写投诉内容");
       return;
     }
     if (
       mode === "court" &&
       (!caseType || !selectedSource || !claim.trim() || !agree)
     ) {
-      Toast.show("请完整填写评审信息并同意使用守则", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast("请完整填写评审信息并同意使用守则");
       return;
     }
     if (mode === "ticket") {
       const error = ticketDraftError(ticketDraft);
       if (error) {
-        Toast.show(error, {
-          duration: Toast.durations.SHORT,
-          position: Toast.positions.CENTER,
-        });
+        showToast(error);
         return;
       }
     }
     if ((mode === "appeal" || mode === "evidence") && !params.caseId) {
-      Toast.show("案件信息缺失", { duration: Toast.durations.SHORT });
+      showToast("案件信息缺失");
       return;
     }
     submissionRef.current = true;
@@ -351,18 +346,12 @@ export default function CourtComplaintScreen() {
           params: { ticketSubmitted: "1" },
         });
       } else {
-        Toast.show("提交成功", {
-          duration: Toast.durations.SHORT,
-          position: Toast.positions.CENTER,
-        });
+        showToast("提交成功");
         router.back();
       }
     } catch (error) {
       if (mountedRef.current) {
-        Toast.show(error instanceof Error ? error.message : "提交失败", {
-          duration: Toast.durations.SHORT,
-          position: Toast.positions.CENTER,
-        });
+        showToast(error instanceof Error ? error.message : "提交失败");
       }
     } finally {
       submissionRef.current = false;
@@ -558,9 +547,8 @@ export default function CourtComplaintScreen() {
             <Text
               accessibilityRole="link"
               onPress={() =>
-                Toast.show("小法庭用户使用守则请关注平台公告", {
-                  duration: Toast.durations.LONG,
-                  position: Toast.positions.CENTER,
+                showToast("小法庭用户使用守则请关注平台公告", {
+                  duration: toastDurations.LONG,
                 })
               }
               style={[styles.agreementText, styles.agreementLink]}

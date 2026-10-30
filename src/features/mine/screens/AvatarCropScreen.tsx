@@ -12,7 +12,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import Svg, { Path } from "react-native-svg";
@@ -187,7 +187,7 @@ export default function AvatarCropScreen() {
       // 回到编辑资料页：弹出裁剪页与相册页两层
       router.dismiss(2);
     } catch {
-      Toast.show("图片处理失败，请重试", { duration: Toast.durations.SHORT });
+      showToast("图片处理失败，请重试");
       setSaving(false);
     }
   };

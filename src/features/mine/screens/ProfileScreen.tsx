@@ -65,7 +65,7 @@ import { requireLogin } from "@/shared/navigation/require-login";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { EmptyState } from "@/shared/ui/AsyncStates";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 
 const fallbackAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const background = require("../../../../assets/mine/figma/profile-bg.png");
@@ -213,13 +213,9 @@ export default function ProfileScreen() {
         token: session.accessToken,
         viewerUserId: session.user.id,
       });
-      Toast.show(state.followed ? "关注成功" : "已取消关注", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast(state.followed ? "关注成功" : "已取消关注");
     } catch (error) {
-      Toast.show(error instanceof Error ? error.message : "操作失败", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast(error instanceof Error ? error.message : "操作失败");
     }
   };
 
@@ -229,9 +225,7 @@ export default function ProfileScreen() {
 
     try {
       if (await isUserBlacklisted(profile.userId)) {
-        Toast.show("该用户已在黑名单中，无法发起聊天", {
-          duration: Toast.durations.SHORT,
-        });
+        showToast("该用户已在黑名单中，无法发起聊天");
         return;
       }
 
@@ -245,9 +239,7 @@ export default function ProfileScreen() {
         }),
       });
     } catch {
-      Toast.show("黑名单状态读取失败，请稍后重试", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast("黑名单状态读取失败，请稍后重试");
     } finally {
       chatCheckPendingRef.current = false;
     }
@@ -742,9 +734,7 @@ export default function ProfileScreen() {
             },
             useAuthStore.getState().accessToken ?? "",
           ).then(() => {
-            Toast.show("加入黑名单成功", {
-              duration: Toast.durations.SHORT,
-            });
+            showToast("加入黑名单成功");
           });
         }}
       />
@@ -839,16 +829,12 @@ export default function ProfileScreen() {
     if (!requireLogin()) return;
     try {
       if (await isUserBlacklisted(profile.userId)) {
-        Toast.show("该用户已在黑名单中，无法下单", {
-          duration: Toast.durations.SHORT,
-        });
+        showToast("该用户已在黑名单中，无法下单");
         return;
       }
       setOrderCard(card);
     } catch {
-      Toast.show("黑名单状态读取失败，请稍后重试", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast("黑名单状态读取失败，请稍后重试");
     }
   }
 }

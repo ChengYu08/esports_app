@@ -7,7 +7,7 @@ import {
   Swipeable,
 } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 import { useAuthStore } from "@esports/auth";
 
 import {
@@ -42,9 +42,7 @@ export default function BlacklistScreen() {
       await removeFromBlacklist(userId, token);
       setEntries((current) => current.filter((entry) => entry.userId !== userId));
     } catch (error) {
-      Toast.show(error instanceof Error ? error.message : "操作失败", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast(error instanceof Error ? error.message : "操作失败");
     }
   };
 

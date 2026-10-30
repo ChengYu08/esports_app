@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 import { companionManagementApi as api } from "../api/companion-management.api";
 import { COMPANION_INTRO_MAX_LENGTH } from "../api/companion-management.contract";
 import { CompanionDashboardHeader } from "../components/CompanionDashboardHeader";
@@ -42,12 +42,10 @@ export default function CompanionIntroScreen() {
       await api.updateIntro(managed.context, managed.token, value.trim());
       await managed.invalidate();
       Keyboard.dismiss();
-      Toast.show("能力介绍已保存", { duration: Toast.durations.SHORT });
+      showToast("能力介绍已保存");
       router.back();
     } catch (error) {
-      Toast.show(error instanceof Error ? error.message : "保存失败，请重试", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast(error instanceof Error ? error.message : "保存失败，请重试");
     } finally {
       busy.current = false;
       setSaving(false);

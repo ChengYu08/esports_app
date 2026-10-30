@@ -13,7 +13,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 import { useAuthStore } from "@esports/auth";
 
 import { submitReport } from "@/features/mine/api/report.api";
@@ -44,12 +44,12 @@ export default function ReportScreen() {
   async function handleSubmit() {
     if (!canSubmit) return;
     if (!reportedUserId) {
-      Toast.show("缺少举报对象", { duration: Toast.durations.SHORT });
+      showToast("缺少举报对象");
       return;
     }
     const token = useAuthStore.getState().accessToken;
     if (!token) {
-      Toast.show("请先登录", { duration: Toast.durations.SHORT });
+      showToast("请先登录");
       return;
     }
     setSubmitting(true);
@@ -62,13 +62,11 @@ export default function ReportScreen() {
         },
         token,
       );
-      Toast.show("举报成功", { duration: Toast.durations.SHORT });
+      showToast("举报成功");
       router.back();
     } catch (error) {
       setSubmitting(false);
-      Toast.show(error instanceof Error ? error.message : "举报失败", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast(error instanceof Error ? error.message : "举报失败");
     }
   }
 

@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import type { CsInviteCardMessage } from "../chat-message";
@@ -55,11 +55,11 @@ export const CsInviteCard = memo(function CsInviteCard({ item }: { item: CsInvit
       if (result.status === "cancelled") return;
       if (result.status === "failed") {
         markCsInviteUnclaimed(item.roomId, item.roomVersion, item.expireAt);
-        Toast.show(result.message, { duration: Toast.durations.SHORT });
+        showToast(result.message);
         return;
       }
       markCsInviteClaimed(item.roomId, item.roomVersion, item.expireAt, false);
-      Toast.show("接单成功，已进入房间", { duration: Toast.durations.SHORT });
+      showToast("接单成功，已进入房间");
     } finally {
       setClaiming(false);
     }

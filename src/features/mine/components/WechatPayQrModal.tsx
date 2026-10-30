@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 import QRCodeSvg from "react-native-qrcode-svg";
-import Toast from "react-native-root-toast";
+import { showToast, toastDurations } from "@/shared/ui/app-toast";
 import { captureRef } from "react-native-view-shot";
 
 import { DOUYIN_SANS } from "@/shared/theme/typography";
@@ -76,8 +76,8 @@ export function WechatPayQrModal({
       }
       resetState();
       onClose();
-      Toast.show("已保存到相册，请打开微信扫一扫，从相册选取二维码完成支付", {
-        duration: Toast.durations.LONG,
+      showToast("已保存到相册，请打开微信扫一扫，从相册选取二维码完成支付", {
+        duration: toastDurations.LONG,
       });
     } catch {
       setStatus("failed");

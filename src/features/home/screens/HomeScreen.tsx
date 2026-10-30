@@ -23,7 +23,7 @@ import {
   useAnimatedValue,
   type LayoutChangeEvent,
 } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast, toastDurations } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
@@ -102,13 +102,12 @@ export default function HomeScreen() {
           reviewerApplied: undefined,
           ticketSubmitted: undefined,
         });
-        Toast.show(
+        showToast(
           ticketSubmitted === "1"
             ? "提交成功"
             : "申请成功，请等待平台通知审核结果",
           {
-            duration: Toast.durations.LONG,
-            position: Toast.positions.CENTER,
+            duration: toastDurations.LONG,
           },
         );
       }, 0);

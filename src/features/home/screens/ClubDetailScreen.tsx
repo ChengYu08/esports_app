@@ -29,7 +29,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Companion, CompanionFilters, GameKey } from "../api/home.types";
 import {
@@ -691,7 +691,7 @@ export default function ClubDetailScreen() {
           style={styles.matchButton}
           onPress={() => {
             if (!accessToken) {
-              Toast.show("请先登录", { duration: Toast.durations.SHORT });
+              showToast("请先登录");
               return;
             }
             setQuickMatchVisible(true);

@@ -25,7 +25,7 @@ import {
 } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { BackHandler, Platform } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 
 export default function LoginRoute() {
   const params = useLocalSearchParams<{ mode?: string; phone?: string }>();
@@ -114,17 +114,14 @@ export default function LoginRoute() {
         onSendCode={async (phone) => {
           if (!ensureNotCooling()) return;
           if (!adapter) {
-            Toast.show("验证码发送失败，请先配置 SSO client secret。", {
-              duration: Toast.durations.SHORT,
-            });
+            showToast("验证码发送失败，请先配置 SSO client secret。");
             throw new Error("SSO client secret is not configured");
           }
           try {
             await adapter.sendCode(phone);
           } catch (error) {
-            Toast.show(
+            showToast(
               `验证码发送失败，${error instanceof Error ? error.message : "请稍后重试"}`,
-              { duration: Toast.durations.SHORT },
             );
             throw error;
           }
@@ -167,9 +164,7 @@ export default function LoginRoute() {
             console.warn(
               "[DEBUG-QUICK-LOGIN] stopped: SSO client secret is not configured",
             );
-            Toast.show("暂无法一键登录，请先配置 SSO client secret。", {
-              duration: Toast.durations.SHORT,
-            });
+            showToast("暂无法一键登录，请先配置 SSO client secret。");
             return;
           }
           try {
@@ -187,18 +182,15 @@ export default function LoginRoute() {
               name: error instanceof Error ? error.name : "UnknownError",
               message: error instanceof Error ? error.message : String(error),
             });
-            Toast.show(
+            showToast(
               `一键登录不可用，${error instanceof Error ? error.message : "请使用验证码登录"}`,
-              { duration: Toast.durations.SHORT },
             );
           }
         }}
         onLogin={async (payload) => {
           if (!ensureNotCooling()) return;
           if (!adapter) {
-            Toast.show("登录失败，请先配置 SSO client secret。", {
-              duration: Toast.durations.SHORT,
-            });
+            showToast("登录失败，请先配置 SSO client secret。");
             return;
           }
           try {
@@ -212,9 +204,8 @@ export default function LoginRoute() {
             );
             router.replace("/");
           } catch (error) {
-            Toast.show(
+            showToast(
               `登录失败，${error instanceof Error ? error.message : "请检查手机号和验证码"}`,
-              { duration: Toast.durations.SHORT },
             );
           }
         }}

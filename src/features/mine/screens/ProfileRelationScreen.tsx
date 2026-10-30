@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 
 import {
   type UserFollowType,
@@ -91,12 +91,10 @@ export default function ProfileRelationScreen() {
       });
       if (result.followed) {
         setFollowedBackIds((current) => new Set(current).add(user.userId));
-        Toast.show("已回关", { duration: Toast.durations.SHORT });
+        showToast("已回关");
       }
     } catch (error) {
-      Toast.show(error instanceof Error ? error.message : "回关失败", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast(error instanceof Error ? error.message : "回关失败");
     }
   };
 

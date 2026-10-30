@@ -4,7 +4,7 @@
  */
 import { useAuthStore } from "@esports/auth";
 import { router } from "expo-router";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 
 import { fetchActiveQuickMatch } from "@/features/match/api/match.api";
 import {
@@ -84,9 +84,7 @@ async function canSwitchFromCurrentRoom(
 ): Promise<boolean> {
   const selfId = String(useAuthStore.getState().user?.id || "");
   if (String(current.serviceUserId ?? "") === selfId) {
-    Toast.show("你正在当前房间接待，请先结束当前接待后再抢单", {
-      duration: Toast.durations.SHORT,
-    });
+    showToast("你正在当前房间接待，请先结束当前接待后再抢单");
     return false;
   }
   if (String(current.creatorUserId ?? "") !== selfId) return true;
@@ -101,9 +99,7 @@ async function canSwitchFromCurrentRoom(
     ) {
       return true;
     }
-    Toast.show("当前语聊房关联了你正在进行的派单，请先取消该派单后再抢单", {
-      duration: Toast.durations.SHORT,
-    });
+    showToast("当前语聊房关联了你正在进行的派单，请先取消该派单后再抢单");
     return false;
   } catch {
     return true;
@@ -232,11 +228,11 @@ export async function grabQuickMatchAndEnterAudition(
     grabbed = true;
 
     if (!hasAuditionRoom(detail)) {
-      Toast.show("抢单成功", { duration: Toast.durations.SHORT });
+      showToast("抢单成功");
       return { status: "grabbed" };
     }
 
-    Toast.show("抢单成功，正在进入试音房…", { duration: Toast.durations.SHORT });
+    showToast("抢单成功，正在进入试音房…");
     const room = await switchToAuditionRoom(detail, confirmedCurrent, accessToken);
     router.push({
       pathname: "/voice-room/[id]",
@@ -247,11 +243,10 @@ export async function grabQuickMatchAndEnterAudition(
     return { status: "entered" };
   } catch (error) {
     if (grabbed) {
-      Toast.show(
+      showToast(
         error instanceof Error && error.message
           ? `抢单已成功，但${error.message}`
           : "抢单已成功，但暂时无法进入试音房，请从抢单记录重试",
-        { duration: Toast.durations.SHORT },
       );
       return { status: "grabbed" };
     }
