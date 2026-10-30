@@ -9,6 +9,7 @@ export type OrderStatus =
   | "waitingService"
   | "inService"
   | "completed"
+  | "partiallyRefunded"
   | "cancelled"
   | "refunded";
 
@@ -56,6 +57,8 @@ export type OrderItemModel = {
   unitPrice: string;
   quantity: number;
   totalPrice: string;
+  /** 已免单的星钻金额，来自订单退款信息 */
+  freeAmount?: string;
   remark?: string;
   createTime?: string;
   paidTime?: string;

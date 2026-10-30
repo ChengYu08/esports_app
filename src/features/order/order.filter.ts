@@ -4,7 +4,9 @@ export function filterOrders(
   items: readonly OrderItemModel[],
   filter: OrderFilter,
 ) {
-  if (filter === "all") return items;
+  if (filter === "all") {
+    return items;
+  }
 
   if (filter === "inProgress") {
     return items.filter(
@@ -20,5 +22,9 @@ export function filterOrders(
     return items.filter(({ status }) => status === "cancelled" || status === "refunded");
   }
 
-  return items.filter(({ status }) => status === filter);
+  if (filter === "completed") {
+    return items.filter(({ status }) => status === "completed" || status === "partiallyRefunded");
+  }
+
+  return [];
 }
