@@ -74,6 +74,7 @@ type ApiClub = {
   intro?: string;
   followCount?: number;
   memberCount?: number;
+  onlineCount?: number;
   orderNoticeUrl?: string;
   clubGames?: { gameId: number; gameName?: string; iconUrl?: string; status?: number }[];
 };
@@ -233,7 +234,7 @@ export async function fetchClubPage(filters: ClubFilters, page: number, pageSize
       name: club.clubName || '未命名俱乐部',
       description: club.intro || '暂无俱乐部简介',
       coverUrl: club.logoUrl,
-      onlineCount: club.followCount ?? 0,
+      onlineCount: club.onlineCount ?? 0,
       memberCount: club.memberCount ?? 0,
       clubCode: String(club.id),
       isSelfOperated: club.clubName?.includes('自营') ?? false,
