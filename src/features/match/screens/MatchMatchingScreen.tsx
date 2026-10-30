@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { selectAndCreateOrder } from "@/features/match/api/match.api";
 import type { MatchGame } from "@/features/match/api/match.types";
+import { isMultiCompanionRequest } from "@/features/match/api/match.types";
 import { MatchLinearGradient } from "@/features/match/components/MatchLinearGradient";
 import { MatchPaySheet } from "@/features/match/components/MatchPaySheet";
 import { MatchingGrabListView } from "@/features/match/components/MatchingGrabListView";
@@ -162,6 +163,7 @@ export default function MatchMatchingScreen({
             candidates={session.candidates}
             selectedGrabIds={session.selectedGrabIds}
             submitting={session.submitting}
+            multiCompanion={isMultiCompanionRequest(session.detail)}
             onSelect={session.toggleGrab}
             onConfirm={() => void handleSelectAndOrder()}
           />

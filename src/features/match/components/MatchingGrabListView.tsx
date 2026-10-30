@@ -17,11 +17,16 @@ const PUBLISH_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
 const FOOTER_CONTENT_BOTTOM = 22;
 const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
 
+/** 一陪多单：每个陪玩卡片下方的提示文案 */
+const MULTI_COMPANION_TIP = "仅需选定1位陪玩下单，剩余人员由接单陪玩选定队友。";
+
 type MatchingGrabListViewProps = {
   countdownText: string;
   candidates: QuickMatchGrabItem[];
   selectedGrabIds: string[];
   submitting: boolean;
+  /** 技能类型为一陪多单时展示选人提示文案 */
+  multiCompanion?: boolean;
   onSelect: (grabId: string) => void;
   onConfirm: () => void;
 };
@@ -49,6 +54,7 @@ export function MatchingGrabListView({
   candidates,
   selectedGrabIds,
   submitting,
+  multiCompanion,
   onSelect,
   onConfirm,
 }: MatchingGrabListViewProps) {
@@ -91,6 +97,11 @@ export function MatchingGrabListView({
                     </Text>
                     <GenderAge sex={item.sex} />
                   </View>
+                  {multiCompanion ? (
+                    <Text style={styles.multiCompanionTip}>
+                      {MULTI_COMPANION_TIP}
+                    </Text>
+                  ) : null}
                   {item.remark ? (
                     <Text style={styles.signature} numberOfLines={1}>
                       {item.remark}
@@ -208,6 +219,12 @@ const styles = StyleSheet.create({
   },
   female: {
     color: "#FF42A1",
+  },
+  multiCompanionTip: {
+    fontFamily: DOUYIN_SANS,
+    fontSize: 11,
+    lineHeight: 16,
+    color: "#FFFFFF",
   },
   signature: {
     fontFamily: DOUYIN_SANS,
