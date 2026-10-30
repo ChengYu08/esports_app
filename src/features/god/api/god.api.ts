@@ -30,8 +30,24 @@ type ApiGodRecord = {
   signature?: string;
   onlineStatus?: number | null;
   gameStatus?: number | null;
+  gameId?: number;
   gameName?: string;
+  /** 卡内陪玩标签（明星/魔王pro 等），背景色由后台配置下发 */
+  tagId?: number;
+  tagName?: string;
+  tagIconUrl?: string;
+  tagBackgroundColor?: string;
+  tagMobileBackgroundColor?: string;
+  gameModeId?: number;
+  /** 游戏模式，如 大乱斗 */
+  modeName?: string;
+  gameLevelId?: number;
+  /** 游戏等级/段位，如 星耀 */
   levelName?: string;
+  clubGameServiceId?: number;
+  /** 服务类型，如 陪玩 */
+  clubGameServiceName?: string;
+  companionServiceId?: number;
   price?: number | string;
   orderCount?: number;
   voiceUrl?: string | null;
@@ -47,7 +63,14 @@ export type GodListItem = {
   age: number | null;
   signature: string;
   gameName: string;
+  /** 卡内陪玩标签名（明星/魔王pro 等），空表示不展示标签 */
+  tagName: string;
+  /** 标签背景色：优先移动端色值，后台未配置时由 UI 兜底 */
+  tagColor: string;
+  /** 卡片第三行斜杠文本三要素：游戏模式 / 游戏等级 / 服务 */
+  modeName: string;
   levelName: string;
+  serviceName: string;
   onlineStatus: number;
   gameStatus: number;
   price: number;
@@ -100,7 +123,11 @@ export async function fetchGodPage(params: {
     age: row.age != null && row.age !== "" ? Number(row.age) : null,
     signature: row.signature || "",
     gameName: row.gameName || "",
+    tagName: row.tagName || "",
+    tagColor: row.tagMobileBackgroundColor || row.tagBackgroundColor || "",
+    modeName: row.modeName || "",
     levelName: row.levelName || "",
+    serviceName: row.clubGameServiceName || "",
     onlineStatus: row.onlineStatus ?? 0,
     gameStatus: row.gameStatus ?? 0,
     price: Number(row.price) || 0,

@@ -337,11 +337,14 @@ function GamePill({
   );
 }
 
-/** 卡片等级标签颜色：与设计稿色板一致 */
+/** 标签兜底配色：后台未下发移动端背景色时使用（对齐设计稿 Tag/陪玩 组件色板 node 1126-176457） */
 function levelTagColor(levelName: string) {
+  // 注意顺序：魔王pro 要先于 魔王 判断
+  if (levelName.includes("魔王pro")) return "#BB3EFA";
   if (levelName.includes("颜值")) return "#3DA5FF";
   if (levelName.includes("人气")) return "#13AEBD";
-  if (levelName.includes("魔王")) return "#BB3EFA";
+  if (levelName.includes("大神")) return "#8BAD23";
+  if (levelName.includes("魔王")) return "#FF42A1";
   if (levelName.includes("顶尖")) return "#FE4267";
   if (levelName.includes("明星")) return "#7D47FC";
   if (levelName.includes("金")) return "#D19643";
@@ -364,6 +367,11 @@ function GodCard({
 }) {
   const online = item.onlineStatus === 1;
   const busy = item.gameStatus === 1;
+  // 第三行文案：模式 / 等级 / 服务 斜杠分割纯文本，接口未配置时兜底个性签名
+  const introLine =
+    [item.modeName, item.levelName, item.serviceName].filter(Boolean).join(" / ") ||
+    item.signature ||
+    "保持一点神秘感...";
   return (
     <Pressable
       accessibilityRole="button"
@@ -434,13 +442,18 @@ function GodCard({
             </View>
           ) : null}
           <View style={styles.introRow}>
-            {item.levelName ? (
-              <View style={[styles.levelTag, { backgroundColor: levelTagColor(item.levelName) }]}>
-                <Text style={styles.levelTagText}>{item.levelName}</Text>
+            {item.tagName ? (
+              <View
+                style={[
+                  styles.levelTag,
+                  { backgroundColor: item.tagColor || levelTagColor(item.tagName) },
+                ]}
+              >
+                <Text style={styles.levelTagText}>{item.tagName}</Text>
               </View>
             ) : null}
             <Text numberOfLines={1} style={styles.introText}>
-              {item.signature || "保持一点神秘感..."}
+              {introLine}
             </Text>
           </View>
         </View>
@@ -633,19 +646,27 @@ const styles = StyleSheet.create({
   gameTagText: { color: "#B25C15", fontSize: 10, lineHeight: 14, fontWeight: "500" },
   introRow: {
     flexDirection: "row",
+    // 标签与右侧文案垂直居中对齐，间距与卡内其他行一致为 4
     alignItems: "center",
     gap: 4,
   },
   levelTag: {
+    // 设计稿 Tag/陪玩：水平 padding 2、圆角 2，高度较 14 增加 1 单位
     borderRadius: 2,
     paddingHorizontal: 2,
-    // 文字 lineHeight 13 + 中文字形下沉，14 高会贴住底边；抬高到 16 并
-    // 额外给 1 底边距，视觉重心略微上提
-    height: 16,
-    paddingBottom: 1,
+    height: 15,
     justifyContent: "center",
+    alignItems: "center",
   },
-  levelTagText: { color: "#FFF", fontSize: 10, lineHeight: 13, fontWeight: "500" },
+  // 关闭 Android 字体额外 padding，保证 10/13 文字在 15 高标签内垂直居中
+  levelTagText: {
+    color: "#FFF",
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: "500",
+    includeFontPadding: false,
+    textAlignVertical: "center",
+  },
   introText: {
     flex: 1,
     color: "#979799",
