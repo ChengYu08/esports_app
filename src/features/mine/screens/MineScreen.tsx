@@ -11,7 +11,6 @@ import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
 import { type ReactNode, useCallback, useMemo, useState } from "react";
 import {
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -24,8 +23,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { fetchStarBalance } from "@/features/mine/api/companion-order.api";
-import { useUserFollowCount } from "@/features/mine/hooks/use-user-follow";
 import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
+import { useUserFollowCount } from "@/features/mine/hooks/use-user-follow";
 import {
   resolveVoiceRoomId,
   voiceRoomApi,
@@ -40,6 +39,7 @@ const settingsIcon = require("../../../../assets/mine/figma/mine-settings.svg");
 const maleIcon = require("../../../../assets/home/club-detail/male.svg");
 const femaleIcon = require("../../../../assets/home/club-detail/female.svg");
 const companionEntryQrCode = require("../../../../assets/coms/qrcode-pws.png");
+const clubEntryQrCode = require("../../../../assets/coms/qrcode-jlb.png");
 const menuRoomIcon = require("../../../../assets/mine/figma/mine-menu-room.svg");
 const menuCompanionIcon = require("../../../../assets/mine/figma/mine-menu-companion.svg");
 
@@ -63,8 +63,10 @@ export default function MineScreen() {
     user?.id,
   );
   const [qrCodeVisible, setQrCodeVisible] = useState(false);
+  const [clubQrCodeVisible, setClubQrCodeVisible] = useState(false);
   const [openingVoiceRoom, setOpeningVoiceRoom] = useState(false);
-  const { entering: enteringCustomerService, openCustomerService } = useCustomerServiceEntry();
+  const { entering: enteringCustomerService, openCustomerService } =
+    useCustomerServiceEntry();
 
   const userId = user?.id;
 
@@ -185,13 +187,25 @@ export default function MineScreen() {
     {
       key: "room",
       title: openingVoiceRoom ? "正在进入房间" : "我的房间",
-      icon: <Image source={menuRoomIcon} contentFit="contain" style={styles.menuIcon} />,
+      icon: (
+        <Image
+          source={menuRoomIcon}
+          contentFit="contain"
+          style={styles.menuIcon}
+        />
+      ),
       onPress: () => void openMyRoom(),
     },
     {
       key: "companion",
       title: isCompanion ? "陪玩管理" : "成为陪玩师",
-      icon: <Image source={menuCompanionIcon} contentFit="contain" style={styles.menuIcon} />,
+      icon: (
+        <Image
+          source={menuCompanionIcon}
+          contentFit="contain"
+          style={styles.menuIcon}
+        />
+      ),
       onPress: () =>
         isCompanion
           ? router.push("/companion-dashboard")
@@ -200,9 +214,14 @@ export default function MineScreen() {
     {
       key: "club-apply",
       title: "俱乐部入驻",
-      icon: <Image source={menuClubIcon} contentFit="contain" style={styles.menuIcon} />,
-      onPress: () =>
-        Alert.alert("提示", "俱乐部入驻功能暂未开放，敬请期待"),
+      icon: (
+        <Image
+          source={menuClubIcon}
+          contentFit="contain"
+          style={styles.menuIcon}
+        />
+      ),
+      onPress: () => setClubQrCodeVisible(true),
     },
     {
       key: "settings",
@@ -341,7 +360,58 @@ export default function MineScreen() {
         visible={qrCodeVisible}
         onClose={() => setQrCodeVisible(false)}
       />
+      <ClubQrModal
+        visible={clubQrCodeVisible}
+        onClose={() => setClubQrCodeVisible(false)}
+      />
     </View>
+  );
+}
+
+function ClubQrModal({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <Modal
+      animationType="fade"
+      transparent
+      visible={visible}
+      onRequestClose={onClose}
+    >
+      <View style={styles.qrModalBackdrop}>
+        <Pressable
+          accessibilityLabel="关闭二维码弹窗"
+          onPress={onClose}
+          style={StyleSheet.absoluteFill}
+        />
+        <View accessibilityViewIsModal style={styles.qrModalCard}>
+          <View style={styles.qrModalHeader}>
+            <Text style={styles.qrModalTitle}>俱乐部入驻</Text>
+            <Pressable
+              accessibilityLabel="关闭"
+              hitSlop={10}
+              onPress={onClose}
+              style={styles.qrModalClose}
+            >
+              <Dismiss24Regular color="#999999" height={20} width={20} />
+            </Pressable>
+          </View>
+          <Image
+            accessibilityLabel="俱乐部入驻二维码"
+            contentFit="contain"
+            source={clubEntryQrCode}
+            style={styles.qrCode}
+          />
+          <Text style={styles.qrModalHint}>
+            扫码联系工作人员，申请俱乐部入驻
+          </Text>
+        </View>
+      </View>
+    </Modal>
   );
 }
 

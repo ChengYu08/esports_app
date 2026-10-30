@@ -14,6 +14,7 @@ import Toast from "react-native-root-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { APP_LINKS } from "@/core/config/links";
+import { useAppUpgradeStore } from "@/features/app-upgrade/app-upgrade.store";
 import { fetchLatestDesktopVersion } from "@/features/mine/api/desktop-version.api";
 import { compareVersionNos } from "@/features/mine/utils/version-compare";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
@@ -41,11 +42,20 @@ export default function AboutScreen() {
     setUpdateStatus("检查中...");
     void (async () => {
       try {
-        const platform = Platform.OS === "ios" ? "IOS" : "ANDROID";
-        const latest = await fetchLatestDesktopVersion(
-          platform,
-          LOCAL_VERSION,
-        );
+        if (Platform.OS === "android") {
+          const hasUpdate = await useAppUpgradeStore.getState().checkNow();
+          if (!hasUpdate) {
+            setUpdateStatus("已是最新版本");
+            Toast.show("当前已是最新版本", {
+              duration: Toast.durations.SHORT,
+            });
+            return;
+          }
+          setUpdateStatus("发现新版本");
+          return;
+        }
+
+        const latest = await fetchLatestDesktopVersion("IOS", LOCAL_VERSION);
         // 无启用版本视为无更新
         if (
           latest === null ||
@@ -60,6 +70,11 @@ export default function AboutScreen() {
         });
       } catch {
         setUpdateStatus("检查更新失败");
+        if (Platform.OS === "android") {
+          Toast.show("检查失败，请稍后重试", {
+            duration: Toast.durations.SHORT,
+          });
+        }
       } finally {
         setChecking(false);
       }
