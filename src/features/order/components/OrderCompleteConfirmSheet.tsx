@@ -1,7 +1,7 @@
 import { Dismiss16Regular } from "@fluentui/react-native-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useMemo, useState, type ReactNode } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -48,6 +48,7 @@ export function OrderCompleteConfirmSheet({
   onConfirm,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const isFree = mode === "free";
   const [hoursText, setHoursText] = useState("");
   const freeHours = parseHoursLive(hoursText);
@@ -131,7 +132,7 @@ export function OrderCompleteConfirmSheet({
       onClose={onClose}
       dismissOnBackdropPress={!loading}
       backdropStyle={styles.backdrop}
-      contentStyle={styles.frame}
+      contentStyle={[styles.frame, { height: windowHeight * 0.65 }]}
     >
       <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 12) + 12 }]}>
         <ScrollView
@@ -315,17 +316,19 @@ function DetailRow({
 
 const styles = StyleSheet.create({
   backdrop: { backgroundColor: "rgba(0, 0, 0, 0.7)" },
-  frame: { flex: 1, justifyContent: "flex-end" },
-  sheet: {
-    maxHeight: "92%",
+  frame: {
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
-    backgroundColor: "#FFFFFF",
+    overflow: "hidden",
+  },
+  sheet: {
+    // 抽屉外层限制高度，内容滚动，确认按钮固定在底部
+    flex: 1,
     paddingHorizontal: 16,
     paddingTop: 8,
   },
   content: { paddingBottom: 4 },
-  scroll: { flexShrink: 1 },
+  scroll: { flex: 1 },
   header: { minHeight: 32, flexDirection: "row", alignItems: "center" },
   title: { flex: 1, color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 16, fontWeight: "600" },
   closeButton: {
@@ -416,7 +419,7 @@ const styles = StyleSheet.create({
   qtyUnit: { color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 14 },
   freeStars: { flexDirection: "row", alignItems: "center", gap: 4 },
   freeStarsText: { color: "#FE1F4C", fontFamily: DOUYIN_SANS, fontSize: 16, fontWeight: "500" },
-  confirmButton: { height: 42, marginTop: 16, overflow: "hidden", borderRadius: 8 },
+  confirmButton: { height: 42, flexShrink: 0, marginTop: 16, overflow: "hidden", borderRadius: 8 },
   confirmButtonDisabled: { opacity: 0.7 },
   confirmGradient: {
     flex: 1,
