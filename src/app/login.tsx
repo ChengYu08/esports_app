@@ -188,6 +188,15 @@ export default function LoginRoute() {
             );
             router.replace(resolvePostLoginRoute(String(profile.id), login.register));
           } catch (error) {
+            // 用户在一键登录授权页主动返回：原生侧用 USER_CANCELLED 标记，静默即可
+            if (
+              error &&
+              typeof error === "object" &&
+              "code" in error &&
+              (error as { code?: unknown }).code === "USER_CANCELLED"
+            ) {
+              return;
+            }
             console.error("[DEBUG-QUICK-LOGIN] failed", {
               name: error instanceof Error ? error.name : "UnknownError",
               message: error instanceof Error ? error.message : String(error),
