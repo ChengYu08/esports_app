@@ -15,7 +15,7 @@ import {
   Text,
   View,
 } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
@@ -47,9 +47,7 @@ export default function CourtReviewerScreen() {
         setStatus(latest);
       }
     } catch (error) {
-      Toast.show(error instanceof Error ? error.message : "评审员信息加载失败", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast(error instanceof Error ? error.message : "评审员信息加载失败");
     } finally {
       if (request === requestRef.current) {
         setLoading(false);
@@ -81,9 +79,7 @@ export default function CourtReviewerScreen() {
       await courtApi.applyReviewer();
       router.dismissTo({ pathname: "/(tabs)", params: { reviewerApplied: "1" } });
     } catch (error) {
-      Toast.show(error instanceof Error ? error.message : "申请失败", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast(error instanceof Error ? error.message : "申请失败");
     } finally {
       submittingRef.current = false;
       setSubmitting(false);

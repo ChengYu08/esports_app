@@ -1,5 +1,5 @@
-import { Dismiss16Regular } from "@fluentui/react-native-icons";
 import { useAuthStore } from "@esports/auth";
+import { Dismiss16Regular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -13,7 +13,15 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import Toast from "react-native-root-toast";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -30,15 +38,51 @@ import {
   useMatchForm,
 } from "@/features/match/hooks/use-match-form";
 import { exitVoiceRoom } from "@/features/voice-room/exit-voice-room";
-import { resolveVoiceRoomId } from "@/features/voice-room/voice-room.api";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
+import { resolveVoiceRoomId } from "@/features/voice-room/voice-room.api";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
+import { showToast } from "@/shared/ui/app-toast";
 
 const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
 
 const PUBLISH_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
+
+/** 发布按钮内的三个跳动小点 */
+function PublishingDots() {
+  return (
+    <View style={styles.publishingDots}>
+      {[0, 1, 2].map((i) => (
+        <PublishingDot key={i} delay={i * 160} />
+      ))}
+    </View>
+  );
+}
+
+function PublishingDot({ delay }: { delay: number }) {
+  const opacity = useSharedValue(0.3);
+
+  useEffect(() => {
+    opacity.value = withDelay(
+      delay,
+      withRepeat(
+        withSequence(
+          withTiming(1, { duration: 320, easing: Easing.inOut(Easing.ease) }),
+          withTiming(0.3, { duration: 480, easing: Easing.inOut(Easing.ease) }),
+        ),
+        -1,
+        false,
+      ),
+    );
+  }, [delay, opacity]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
+
+  return <Animated.View style={[styles.publishingDot, animatedStyle]} />;
+}
 
 type ClubQuickMatchSheetProps = {
   visible: boolean;
@@ -249,20 +293,19 @@ export function ClubQuickMatchSheet({
             ...(options?.expireTime ? { expireTime: options.expireTime } : {}),
             ...(game?.id && game.name
               ? {
-                gameId: game.id,
-                gameName: game.name,
-                ...(game.iconUrl ? { gameIconUrl: game.iconUrl } : {}),
-              }
+                  gameId: game.id,
+                  gameName: game.name,
+                  ...(game.iconUrl ? { gameIconUrl: game.iconUrl } : {}),
+                }
               : {}),
           },
         });
         return true;
       } catch (error) {
-        Toast.show(
+        showToast(
           error instanceof Error
             ? `派单已发布，但${error.message}`
             : "派单已发布，但暂时无法进入试音房，请稍后重试",
-          { duration: Toast.durations.SHORT },
         );
         return false;
       }
@@ -297,29 +340,27 @@ export function ClubQuickMatchSheet({
 
   const runPublish = useCallback(async () => {
     if (!form.token) {
-      Toast.show("请先登录", { duration: Toast.durations.SHORT });
+      showToast("请先登录");
       return;
     }
     if (!form.club?.id) {
-      Toast.show("请先选择俱乐部", { duration: Toast.durations.SHORT });
+      showToast("请先选择俱乐部");
       return;
     }
     if (!form.gameId || !form.modeId || !form.levelId || !form.serviceId) {
-      Toast.show("请完整选择服务模式", { duration: Toast.durations.SHORT });
+      showToast("请完整选择服务模式");
       return;
     }
     if (form.showCompanionPreference && !form.companionPreference) {
-      Toast.show("请选择单陪或双陪", { duration: Toast.durations.SHORT });
+      showToast("请选择单陪或双陪");
       return;
     }
     if (form.remarkOverLimit) {
-      Toast.show(`备注最多${MATCH_REMARK_MAX}字`, {
-        duration: Toast.durations.SHORT,
-      });
+      showToast(`备注最多${MATCH_REMARK_MAX}字`);
       return;
     }
     if (isReception && !buyerUserId) {
-      Toast.show("未识别到下单老板，请重试", { duration: Toast.durations.SHORT });
+      showToast("未识别到下单老板，请重试");
       return;
     }
     if (submitting) return;
@@ -354,7 +395,7 @@ export function ClubQuickMatchSheet({
       );
 
       if (isReception) {
-        Toast.show("已为老板发起派单", { duration: Toast.durations.SHORT });
+        showToast("已为老板发起派单");
         onClose();
         return;
       }
@@ -369,9 +410,7 @@ export function ClubQuickMatchSheet({
         goMatching(result.requestNo, result.expireTime, selectedGame ?? null);
       }
     } catch (error) {
-      Toast.show(error instanceof Error ? error.message : "发布失败，请重试", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast(error instanceof Error ? error.message : "发布失败，请重试");
     } finally {
       setSubmitting(false);
     }
@@ -429,7 +468,11 @@ export function ClubQuickMatchSheet({
             style={styles.closeButton}
           >
             <View style={styles.closeIcon}>
-              <Dismiss16Regular color="rgba(0, 0, 0, 0.2)" width={13} height={13} />
+              <Dismiss16Regular
+                color="rgba(0, 0, 0, 0.2)"
+                width={13}
+                height={13}
+              />
             </View>
           </Pressable>
         </View>
@@ -604,9 +647,7 @@ export function ClubQuickMatchSheet({
             </View>
           </View>
           {form.remarkOverLimit ? (
-            <Text style={styles.remarkError}>
-              备注最多{MATCH_REMARK_MAX}字
-            </Text>
+            <Text style={styles.remarkError}>备注最多{MATCH_REMARK_MAX}字</Text>
           ) : null}
 
           <View style={[styles.field, styles.fieldCenter]}>
@@ -631,7 +672,8 @@ export function ClubQuickMatchSheet({
             onPress={handlePublish}
             style={({ pressed }) => [
               styles.publishWrap,
-              pressed && styles.pressed,
+              pressed && !submitting && styles.pressed,
+              submitting && styles.publishWrapBusy,
             ]}
           >
             <MatchLinearGradient
@@ -643,13 +685,17 @@ export function ClubQuickMatchSheet({
                 (submitting || form.remarkOverLimit) && styles.publishDisabled,
               ]}
             >
-              <Text style={styles.publishText}>
-                {submitting
-                  ? "发布中..."
-                  : isReception
-                    ? "为老板发起派单"
-                    : "立即发布，匹配陪玩"}
-              </Text>
+              {submitting ? (
+                <View style={styles.publishBusyRow}>
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <Text style={styles.publishText}>发布中</Text>
+                  <PublishingDots />
+                </View>
+              ) : (
+                <Text style={styles.publishText}>
+                  {isReception ? "为老板发起派单" : "立即发布，匹配陪玩"}
+                </Text>
+              )}
             </MatchLinearGradient>
           </Pressable>
         </View>
@@ -948,6 +994,26 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontWeight: "500",
     color: "#FFFFFF",
+  },
+  publishWrapBusy: {
+    transform: [{ scale: 0.98 }],
+  },
+  publishBusyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  publishingDots: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    marginLeft: 2,
+  },
+  publishingDot: {
+    width: 3.5,
+    height: 3.5,
+    borderRadius: 2,
+    backgroundColor: "#FFFFFF",
   },
   pressed: {
     opacity: 0.85,

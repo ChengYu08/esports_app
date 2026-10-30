@@ -1,6 +1,6 @@
 import { createAudioPlayer } from "expo-audio";
 import { useEffect, useRef, useState } from "react";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 import { companionManagementApi as api } from "../api/companion-management.api";
 import { pickCompanionAudio } from "../companion-document-picker";
 import { uploadCompanionMedia } from "../companion-upload";
@@ -11,9 +11,7 @@ import {
 import type { useManagedGame } from "./use-companion-management";
 
 function showUploadMessage(message: string) {
-  Toast.show(message, {
-    duration: Toast.durations.SHORT,
-    position: Toast.positions.CENTER,
+  showToast(message, {
     backgroundColor: "#000",
     textColor: "#FFF",
     opacity: 0.8,

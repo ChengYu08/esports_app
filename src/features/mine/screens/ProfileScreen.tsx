@@ -1,7 +1,8 @@
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
-  Edit24Regular,
+  Headset24Regular,
+  Search24Regular,
   Star16Filled,
   Star16Regular,
 } from "@fluentui/react-native-icons";
@@ -49,6 +50,7 @@ import {
   useProfileGameDetail,
   useProfileReviews,
 } from "@/features/mine/hooks/use-profile-data";
+import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
 import {
   useToggleUserFollow,
   useUserFollowState,
@@ -65,15 +67,15 @@ import { requireLogin } from "@/shared/navigation/require-login";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { EmptyState } from "@/shared/ui/AsyncStates";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 
 const fallbackAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const background = require("../../../../assets/mine/figma/profile-bg.png");
 const maleIcon = require("../../../../assets/home/club-detail/male.svg");
 const femaleIcon = require("../../../../assets/mine/figma/mine-female.svg");
-const clubIcon = require("../../../../assets/mine/figma/mine-club-flag.svg");
 const backIcon = require("../../../../assets/mine/figma/profile-back.svg");
 const settingsIcon = require("../../../../assets/mine/figma/mine-settings.svg");
+const arrowDownIcon = require("../../../../assets/mine/figma/profile-arrow-down.svg");
 const diamondIcon = require("../../../../assets/home/club-detail/icon-diamond.svg");
 const idleStatusIcon = require("../../../../assets/home/club-detail/status-idle.svg");
 const playingStatusIcon = require("../../../../assets/home/club-detail/status-playing.svg");
@@ -94,6 +96,7 @@ export default function ProfileScreen() {
   const headerFade = useMemo(() => new Animated.Value(0), []);
   const [compactActive, setCompactActive] = useState(false);
   const [selectedGameId, setSelectedGameId] = useState("");
+  const [introExpanded, setIntroExpanded] = useState(false);
   const [orderCard, setOrderCard] = useState<ProfileSkillCard | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [paymentOrder, setPaymentOrder] = useState<{
@@ -112,6 +115,7 @@ export default function ProfileScreen() {
   );
   const paymentCancelingRef = useRef(false);
   const chatCheckPendingRef = useRef(false);
+  const { entering: enteringCS, openCustomerService } = useCustomerServiceEntry();
   const detailQuery = useProfileDetail(routeParams);
   const detail = detailQuery.data;
   const followStateQuery = useUserFollowState(
@@ -213,13 +217,9 @@ export default function ProfileScreen() {
         token: session.accessToken,
         viewerUserId: session.user.id,
       });
-      Toast.show(state.followed ? "关注成功" : "已取消关注", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast(state.followed ? "关注成功" : "已取消关注");
     } catch (error) {
-      Toast.show(error instanceof Error ? error.message : "操作失败", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast(error instanceof Error ? error.message : "操作失败");
     }
   };
 
@@ -229,9 +229,7 @@ export default function ProfileScreen() {
 
     try {
       if (await isUserBlacklisted(profile.userId)) {
-        Toast.show("该用户已在黑名单中，无法发起聊天", {
-          duration: Toast.durations.SHORT,
-        });
+        showToast("该用户已在黑名单中，无法发起聊天");
         return;
       }
 
@@ -245,9 +243,7 @@ export default function ProfileScreen() {
         }),
       });
     } catch {
-      Toast.show("黑名单状态读取失败，请稍后重试", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast("黑名单状态读取失败，请稍后重试");
     } finally {
       chatCheckPendingRef.current = false;
     }
@@ -278,9 +274,14 @@ export default function ProfileScreen() {
       {(["技能", "评价"] as ProfileTab[]).map((item) => (
         <Pressable
           key={item}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: tab === item }}
           onPress={() => setTab(item)}
           style={styles.tabButton}
         >
+          {tab === item && (
+            <Image source={fallbackAvatar} style={styles.tabAvatar} />
+          )}
           <Text style={[styles.tabText, tab === item && styles.tabTextActive]}>
             {item}
           </Text>
@@ -295,15 +296,6 @@ export default function ProfileScreen() {
     inputRange: [0, 1],
     outputRange: [1, 0],
   });
-
-  const profileTabs = (
-    <Animated.View
-      pointerEvents="box-none"
-      style={[styles.tabsBar, { opacity: tabsInverseFade }]}
-    >
-      {tabsContent}
-    </Animated.View>
-  );
 
   const profileCover = (
     <View
@@ -379,9 +371,32 @@ export default function ProfileScreen() {
           <Text style={styles.headerStatLabel}>粉丝</Text>
         </Pressable>
       </View>
-      <Text numberOfLines={2} ellipsizeMode="tail" style={styles.headerIntro}>
-        {profile.signature || "暂无个人简介"}
-      </Text>
+      <View style={styles.introBlock}>
+        <Text
+          numberOfLines={introExpanded ? undefined : 2}
+          ellipsizeMode="tail"
+          style={styles.headerIntro}
+        >
+          {profile.signature || "暂无个人简介"}
+        </Text>
+        {profile.signature ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={introExpanded ? "收起简介" : "展开简介"}
+            hitSlop={6}
+            onPress={() => setIntroExpanded((prev) => !prev)}
+            style={styles.introToggle}
+          >
+            <Image
+              source={arrowDownIcon}
+              style={[
+                styles.introToggleIcon,
+                introExpanded && styles.introToggleIconUp,
+              ]}
+            />
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 
@@ -612,21 +627,52 @@ export default function ProfileScreen() {
               {profile.nickname}
             </Text>
           </Animated.View>
-          {isMine ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="设置"
-              hitSlop={12}
-              onPress={() => router.push("/edit-profile")}
-              style={styles.navSettingsButton}
-            >
-              <Image
-                source={settingsIcon}
-                style={styles.navSettingsIcon}
-                contentFit="contain"
-              />
-            </Pressable>
-          ) : null}
+          <View style={styles.navActions}>
+            {isMine ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="设置"
+                hitSlop={12}
+                onPress={() => router.push("/edit-profile")}
+                style={styles.navActionButton}
+              >
+                <Image
+                  source={settingsIcon}
+                  style={styles.navActionIcon}
+                  contentFit="contain"
+                />
+              </Pressable>
+            ) : (
+              <>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="搜索"
+                  hitSlop={12}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/search",
+                      params: routeParams?.clubId
+                        ? { type: "user", clubId: routeParams.clubId }
+                        : { type: "user" },
+                    })
+                  }
+                  style={styles.navActionButton}
+                >
+                  <Search24Regular color="#fff" width={24} height={24} />
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="在线客服"
+                  accessibilityState={{ busy: enteringCS }}
+                  hitSlop={12}
+                  onPress={() => void openCustomerService()}
+                  style={styles.navActionButton}
+                >
+                  <Headset24Regular color="#fff" width={24} height={24} />
+                </Pressable>
+              </>
+            )}
+          </View>
         </View>
         <Animated.View
           pointerEvents={compactActive ? "box-none" : "none"}
@@ -742,9 +788,7 @@ export default function ProfileScreen() {
             },
             useAuthStore.getState().accessToken ?? "",
           ).then(() => {
-            Toast.show("加入黑名单成功", {
-              duration: Toast.durations.SHORT,
-            });
+            showToast("加入黑名单成功");
           });
         }}
       />
@@ -839,16 +883,12 @@ export default function ProfileScreen() {
     if (!requireLogin()) return;
     try {
       if (await isUserBlacklisted(profile.userId)) {
-        Toast.show("该用户已在黑名单中，无法下单", {
-          duration: Toast.durations.SHORT,
-        });
+        showToast("该用户已在黑名单中，无法下单");
         return;
       }
       setOrderCard(card);
     } catch {
-      Toast.show("黑名单状态读取失败，请稍后重试", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast("黑名单状态读取失败，请稍后重试");
     }
   }
 }
@@ -934,10 +974,14 @@ function ProfileIdentity({
           ) : null}
         </View>
         <View style={styles.clubLine}>
-          <Image source={clubIcon} style={styles.clubIcon} />
-          <Text numberOfLines={1} style={styles.club}>
-            {profile.clubName}
-          </Text>
+          <View style={styles.clubInfo}>
+            <Text style={styles.clubLabel}>成员</Text>
+            <Text style={styles.clubValue}>{profile.followCount}人</Text>
+          </View>
+          <View style={styles.clubInfo}>
+            <Text style={styles.clubLabel}>俱乐部ID</Text>
+            <Text style={styles.clubValue}>{profile.clubId || "暂无"}</Text>
+          </View>
         </View>
       </View>
     </View>
@@ -1281,7 +1325,30 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
     textAlign: "left",
+  },
+  introBlock: {
+    position: "relative",
+    paddingRight: 30,
     marginTop: 12,
+  },
+  introToggle: {
+    position: "absolute",
+    right: 0,
+    bottom: 0,
+    width: 20,
+    height: 16,
+    borderRadius: 4,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  introToggleIcon: {
+    width: 8,
+    height: 4.5,
+    tintColor: "#fff",
+  },
+  introToggleIconUp: {
+    transform: [{ rotate: "180deg" }],
   },
   navbarOverlay: {
     position: "absolute",
@@ -1361,16 +1428,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  navSettingsButton: {
-    position: "absolute",
-    right: 12,
-    top: 10,
+  navActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  navActionButton: {
     width: 24,
     height: 24,
     alignItems: "center",
     justifyContent: "center",
   },
-  navSettingsIcon: { width: 24, height: 24, tintColor: "#FFFFFF" },
+  navActionIcon: { width: 24, height: 24, tintColor: "#FFFFFF" },
   backIcon: { width: 24, height: 24, tintColor: "#fff" },
   identity: {
     flexDirection: "row",
@@ -1379,16 +1448,16 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 1,
-    borderColor: "#fff",
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+    borderWidth: 0.5,
+    borderColor: "rgba(255,255,255,0.6)",
   },
   avatarButton: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 56,
+    height: 56,
+    borderRadius: 8,
     overflow: "hidden",
   },
   identityCopy: { flex: 1, minWidth: 0, gap: 6 },
@@ -1396,8 +1465,8 @@ const styles = StyleSheet.create({
   name: {
     flexShrink: 1,
     color: "#fff",
-    fontSize: 18,
-    lineHeight: 26,
+    fontSize: 20,
+    lineHeight: 28,
     fontWeight: "600",
   },
   blacklistTag: {
@@ -1446,13 +1515,19 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: "500",
   },
-  clubLine: { flexDirection: "row", alignItems: "center", gap: 6 },
-  clubIcon: { width: 14, height: 14, tintColor: "#D7DCE2" },
-  club: {
-    flexShrink: 1,
-    color: "#C9CED4",
+  clubLine: { flexDirection: "row", alignItems: "center", gap: 12 },
+  clubInfo: { flexDirection: "row", alignItems: "center", gap: 2 },
+  clubLabel: {
+    color: "rgba(255,255,255,0.6)",
     fontFamily: DOUYIN_SANS,
     fontSize: 12,
+    lineHeight: 18,
+  },
+  clubValue: {
+    color: "#FFFFFF",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 12,
+    lineHeight: 18,
   },
   scrollIntro: {
     marginTop: -1,
@@ -1520,33 +1595,39 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
   },
-  tabs: { flexDirection: "row", gap: 28, height: 48, alignItems: "flex-end" },
+  tabs: { flexDirection: "row", gap: 28, height: 48, alignItems: "center" },
   tabButton: {
-    height: 42,
-    minWidth: 36,
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 4,
+    minWidth: 36,
     position: "relative",
   },
+  tabAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+  },
   tabText: {
-    color: "#656566",
+    color: "#999",
     fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
   tabTextActive: {
-    color: "#0D0D0F",
-    fontWeight: "600",
+    color: "#1a1a1a",
+    fontWeight: "700",
     fontSize: 16,
     lineHeight: 22,
   },
   tabIndicator: {
     position: "absolute",
-    bottom: 0,
-    width: 12,
-    height: 3,
+    bottom: -6,
+    left: 3,
+    right: 3,
+    height: 6,
     borderRadius: 2,
-    backgroundColor: "#FE1F4C",
+    backgroundColor: "#FFC2C6",
   },
   gameTags: { flexDirection: "row", gap: 10, marginTop: 12, paddingRight: 16 },
   gameTag: {

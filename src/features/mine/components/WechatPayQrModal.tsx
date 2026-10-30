@@ -11,10 +11,12 @@ import {
   View,
 } from "react-native";
 import QRCodeSvg from "react-native-qrcode-svg";
-import Toast from "react-native-root-toast";
+import { showToast, toastDurations } from "@/shared/ui/app-toast";
 import { captureRef } from "react-native-view-shot";
 
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+
+const appIcon = require("../../../../assets/images/icon.png");
 
 type SaveStatus = "idle" | "saving" | "failed";
 
@@ -74,8 +76,8 @@ export function WechatPayQrModal({
       }
       resetState();
       onClose();
-      Toast.show("已保存到相册，请打开微信扫一扫，从相册选取二维码完成支付", {
-        duration: Toast.durations.LONG,
+      showToast("已保存到相册，请打开微信扫一扫，从相册选取二维码完成支付", {
+        duration: toastDurations.LONG,
       });
     } catch {
       setStatus("failed");
@@ -113,7 +115,16 @@ export function WechatPayQrModal({
             ¥{moneyAmount} 充值 {starAmount} 星钻
           </Text>
           <View ref={qrCardRef} collapsable={false} style={styles.qrCard}>
-            <QRCodeSvg value={qrCode} size={200} backgroundColor="#FFFFFF" />
+            <QRCodeSvg
+              value={qrCode}
+              size={200}
+              backgroundColor="#FFFFFF"
+              logo={appIcon}
+              logoSize={44}
+              logoBackgroundColor="#FFFFFF"
+              logoMargin={4}
+              logoBorderRadius={8}
+            />
           </View>
           <Pressable
             accessibilityRole="button"

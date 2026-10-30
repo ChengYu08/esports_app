@@ -129,6 +129,13 @@ export type QuickMatchAuditionRoom = {
   creatorUserId?: string | number;
 };
 
+/** 一陪多单：发布多陪服务时不带单/双陪偏好，详情中该字段为空即视为一陪多单 */
+export function isMultiCompanionRequest(
+  detail: QuickMatchRequestDetail | null | undefined,
+): boolean {
+  return detail != null && detail.companionPreference == null;
+}
+
 export function isQuickMatchActive(request: QuickMatchRequestDetail | null): boolean {
   if (!request || request.status !== "MATCHING") return false;
   if (!request.expireTime) return true;

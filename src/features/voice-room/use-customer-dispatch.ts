@@ -7,7 +7,7 @@
 import { useAuthStore } from "@esports/auth";
 import { router } from "expo-router";
 import { useCallback, useRef } from "react";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 
@@ -21,7 +21,7 @@ export function useCustomerDispatch() {
   const dispatch = useCallback(async (options?: { clubId?: string | number | null }) => {
     const { accessToken, user } = useAuthStore.getState();
     if (!accessToken) {
-      Toast.show("请先登录", { duration: Toast.durations.SHORT });
+      showToast("请先登录");
       return;
     }
     if (dispatchingRef.current) return;
@@ -64,9 +64,8 @@ export function useCustomerDispatch() {
         },
       });
     } catch (error) {
-      Toast.show(
+      showToast(
         error instanceof Error ? error.message : "接待派单失败，请稍后重试",
-        { duration: Toast.durations.SHORT },
       );
     } finally {
       dispatchingRef.current = false;

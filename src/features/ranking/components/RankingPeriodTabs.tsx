@@ -1,5 +1,4 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { colors } from "@/shared/theme/tokens";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import type { RankingPeriod } from "../api/ranking.types";
 import { RANKING_PERIODS } from "../ranking.config";
@@ -26,9 +25,9 @@ export function RankingPeriodTabs({ value, onChange }: { value: RankingPeriod; o
 }
 
 const styles = StyleSheet.create({
-  tabs: { flexDirection: "row", padding: 3, backgroundColor: "#F3F3F5", borderRadius: 12 },
-  tab: { minWidth: 58, minHeight: 38, paddingHorizontal: 12, justifyContent: "center", alignItems: "center", borderRadius: 9 },
-  tabSelected: { backgroundColor: colors.surface },
-  label: { fontFamily: DOUYIN_SANS, fontSize: 12, color: colors.textMuted },
-  labelSelected: { color: colors.text, fontWeight: "600" },
+  tabs: { flexDirection: "row", padding: 3, backgroundColor: "#F5F5F7", borderRadius: 6 },
+  tab: { minWidth: 58, height: 32, paddingHorizontal: 12, justifyContent: "center", alignItems: "center", borderRadius: 4 },
+  tabSelected: { backgroundColor: "#FE1F4C" },
+  label: { fontFamily: DOUYIN_SANS, fontSize: 12, color: "#656566", lineHeight: 18 },
+  labelSelected: { color: "#FFF", fontWeight: "500" },
 });

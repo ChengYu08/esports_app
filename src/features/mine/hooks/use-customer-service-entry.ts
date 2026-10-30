@@ -1,7 +1,7 @@
 import { useAuthStore } from "@esports/auth";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 
 import {
   createCustomerServiceChatParams,
@@ -46,7 +46,7 @@ export function useCustomerServiceEntry() {
       });
     } catch (error) {
       if (mounted.current && useAuthStore.getState().accessToken === token) {
-        Toast.show(resolveCustomerServiceError(error), { duration: Toast.durations.SHORT });
+        showToast(resolveCustomerServiceError(error));
       }
     } finally {
       pending.current = false;

@@ -18,7 +18,7 @@ import {
   Text,
   View,
 } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { clientAuthApi } from "@/features/auth/client-auth.api";
@@ -155,11 +155,8 @@ export default function MineScreen() {
       if (!roomId) throw new Error("房间信息不完整，请稍后重试");
       router.push({ pathname: "/voice-room/[id]", params: { id: roomId } });
     } catch (error) {
-      Toast.show(
+      showToast(
         error instanceof Error ? error.message : "进入语聊房失败，请稍后重试",
-        {
-          duration: Toast.durations.SHORT,
-        },
       );
     } finally {
       setOpeningVoiceRoom(false);

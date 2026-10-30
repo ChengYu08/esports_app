@@ -1,7 +1,11 @@
+import { Copy16Regular } from "@fluentui/react-native-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Clipboard from "expo-clipboard";
 import { memo, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import Toast from "react-native-root-toast";
 
+import { formatOrderTime } from "@/features/order/order-detail-format";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import type {
@@ -36,6 +40,15 @@ export const OrderCard = memo(function OrderCard({
   onPress,
   actionPending = false,
 }: OrderCardProps) {
+  const copyOrderNo = async () => {
+    const orderNo = item.orderNo ?? item.id;
+    try {
+      await Clipboard.setStringAsync(orderNo);
+      Toast.show("订单编号已复制", { duration: Toast.durations.SHORT });
+    } catch {
+      Toast.show("复制失败，请稍后重试", { duration: Toast.durations.SHORT });
+    }
+  };
   return (
     <View style={styles.card}>
       <Pressable
@@ -50,19 +63,28 @@ export const OrderCard = memo(function OrderCard({
               source={item.sellerAvatar}
               style={styles.avatar}
             />
-            <Text numberOfLines={1} style={styles.sellerName}>
-              {item.sellerName}
-            </Text>
-            {item.voiceTag ? (
-              <Text
-                style={[
-                  styles.voiceTag,
-                  item.voiceTag === "需试音" && styles.voiceTagRequired,
-                ]}
-              >
-                {item.voiceTag}
-              </Text>
-            ) : null}
+            <View style={styles.sellerMeta}>
+              <View style={styles.sellerNameRow}>
+                <Text numberOfLines={1} style={styles.sellerName}>
+                  {item.sellerName}
+                </Text>
+                {item.voiceTag ? (
+                  <Text
+                    style={[
+                      styles.voiceTag,
+                      item.voiceTag === "需试音" && styles.voiceTagRequired,
+                    ]}
+                  >
+                    {item.voiceTag}
+                  </Text>
+                ) : null}
+              </View>
+              {item.clubName ? (
+                <Text numberOfLines={1} style={styles.clubName}>
+                  {item.clubName}
+                </Text>
+              ) : null}
+            </View>
           </View>
           <Text
             style={[
@@ -100,18 +122,37 @@ export const OrderCard = memo(function OrderCard({
                 </Text>
               </View>
             </OrderDetailRow>
+            <OrderDetailRow label="时间">
+              <Text style={styles.detailValue}>
+                {formatOrderTime(item.createTime)}
+              </Text>
+            </OrderDetailRow>
             <OrderDetailRow label="单价">
               <Text style={styles.detailValue}>
                 {item.unitPrice}星钻/{item.billingUnitName ?? "小时"}
               </Text>
             </OrderDetailRow>
-            {item.remark ? (
-              <OrderDetailRow label="备注">
-                <Text numberOfLines={2} style={styles.detailValue}>
-                  {item.remark}
+            <OrderDetailRow label="订单号">
+              <View style={styles.orderNoValue}>
+                <Text numberOfLines={1} style={styles.detailValue}>
+                  {item.orderNo ?? item.id}
                 </Text>
-              </OrderDetailRow>
-            ) : null}
+                <Pressable
+                  accessibilityLabel="复制订单号"
+                  accessibilityRole="button"
+                  hitSlop={6}
+                  onPress={copyOrderNo}
+                  style={styles.copyButton}
+                >
+                  <Copy16Regular color="#999999" width={14} height={14} />
+                </Pressable>
+              </View>
+            </OrderDetailRow>
+            <OrderDetailRow label="备注">
+              <Text numberOfLines={2} style={styles.detailValue}>
+                {item.remark || "-"}
+              </Text>
+            </OrderDetailRow>
           </View>
           <View style={styles.totalRow}>
             <View style={styles.quantitySummary}>
@@ -235,14 +276,30 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
+  sellerMeta: {
+    flex: 1,
+    minWidth: 0,
+    gap: 1,
+  },
+  sellerNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
   avatar: { width: 24, height: 24, borderRadius: 12 },
   sellerName: {
-    flex: 1,
+    flexShrink: 1,
     fontFamily: SYSTEM_FONT,
     color: "#0A0A0A",
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "500",
+  },
+  clubName: {
+    fontFamily: SYSTEM_FONT,
+    color: "#999999",
+    fontSize: 11,
+    lineHeight: 14,
   },
   status: {
     marginLeft: 12,
@@ -293,6 +350,13 @@ const styles = StyleSheet.create({
   },
   gameValue: { flexDirection: "row", alignItems: "center", gap: 6 },
   gameIcon: { width: 14, height: 14 },
+  orderNoValue: { flexDirection: "row", alignItems: "center", gap: 4 },
+  copyButton: {
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   quantitySummary: { flexDirection: "row", alignItems: "center", gap: 4 },
   totalValue: { flexDirection: "row", alignItems: "center", gap: 4 },
   quantity: {

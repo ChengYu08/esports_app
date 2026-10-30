@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { AppState, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 import { MessageHeader } from "../components/MessageHeader";
 import { MessageListItem } from "../components/MessageListItem";
 import {
@@ -40,7 +40,7 @@ export default function MessageScreen() {
 
   const handleClear = async () => {
     await clearAllUnread();
-    Toast.show("清理完成", { duration: Toast.durations.SHORT });
+    showToast("清理完成");
   };
 
   useFocusEffect(

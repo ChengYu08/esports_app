@@ -3,7 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "@esports/auth";
 
@@ -67,7 +67,7 @@ export function DispatchDetailScreen({ requestNo }: { requestNo: string }) {
       setGrabbedLocally(true);
       await queryClient.invalidateQueries({ queryKey: ["orders", "dispatch"] });
       await detail.refetch();
-      Toast.show("抢单成功", { duration: Toast.durations.SHORT });
+      showToast("抢单成功");
     } catch (error) {
       setPrompt({ title: "抢单失败", message: error instanceof Error ? error.message : "请稍后重试" });
     } finally {

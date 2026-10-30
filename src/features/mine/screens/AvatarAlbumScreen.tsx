@@ -15,7 +15,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import {
@@ -80,9 +80,7 @@ export default function AvatarAlbumScreen() {
       setHasNextPage(page.hasNextPage);
     } catch {
       if (seq === requestSeq.current) {
-        Toast.show("照片加载失败，请稍后重试", {
-          duration: Toast.durations.SHORT,
-        });
+        showToast("照片加载失败，请稍后重试");
       }
     } finally {
       if (seq === requestSeq.current) {
@@ -112,9 +110,7 @@ export default function AvatarAlbumScreen() {
             })),
         );
       } catch {
-        Toast.show("照片读取失败，请检查相册权限后重试", {
-          duration: Toast.durations.SHORT,
-        });
+        showToast("照片读取失败，请检查相册权限后重试");
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

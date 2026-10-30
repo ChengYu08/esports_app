@@ -15,7 +15,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CourtSourceCard } from "../components/CourtSourceCard";
 import { useCourtSourceSelection } from "../court-source-selection";
@@ -152,9 +152,8 @@ function CourtSourcePickerScreen({ step }: { step: "orders" | "reviews" }) {
       router.dismiss(isReview ? 2 : 1);
     } catch (error) {
       if (focusedRef.current) {
-        Toast.show(
+        showToast(
           error instanceof Error ? error.message : "选择失败，请重试",
-          { duration: Toast.durations.SHORT, position: Toast.positions.CENTER },
         );
       }
     } finally {

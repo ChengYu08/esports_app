@@ -3,7 +3,7 @@
  */
 import { useAuthStore } from "@esports/auth";
 import { router } from "expo-router";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 
@@ -54,9 +54,7 @@ function confirmRoomSwitch(current: VoiceRoomDetail, resumed: boolean): Promise<
 async function canSwitchFromCurrentRoom(current: VoiceRoomDetail): Promise<boolean> {
   const selfId = String(useAuthStore.getState().user?.id || "");
   if (String(current.serviceUserId ?? "") === selfId) {
-    Toast.show("你正在当前房间接待，请先结束当前接待后再抢单", {
-      duration: Toast.durations.SHORT,
-    });
+    showToast("你正在当前房间接待，请先结束当前接待后再抢单");
     return false;
   }
   return true;

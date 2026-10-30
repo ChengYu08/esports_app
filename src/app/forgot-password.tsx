@@ -4,7 +4,7 @@ import { SsoClient } from "@esports/sso-sdk";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useMemo } from "react";
 import { Platform } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 
 function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
@@ -38,17 +38,14 @@ export default function ForgotPasswordRoute() {
         onSendCode={async (phone) => {
           if (!adapter) {
             const error = new Error("请先配置 SSO client secret。");
-            Toast.show(`验证码发送失败，${error.message}`, {
-              duration: Toast.durations.SHORT,
-            });
+            showToast(`验证码发送失败，${error.message}`);
             throw error;
           }
           try {
             await adapter.sendResetCode(phone);
           } catch (error) {
-            Toast.show(
+            showToast(
               `验证码发送失败，${getErrorMessage(error, "发送验证码失败")}`,
-              { duration: Toast.durations.SHORT },
             );
             throw error;
           }
@@ -56,24 +53,19 @@ export default function ForgotPasswordRoute() {
         onSubmit={async (payload) => {
           if (!adapter) {
             const error = new Error("请先配置 SSO client secret。");
-            Toast.show(`密码重置失败，${error.message}`, {
-              duration: Toast.durations.SHORT,
-            });
+            showToast(`密码重置失败，${error.message}`);
             throw error;
           }
           try {
             await adapter.forgetPassword(payload);
-            Toast.show("密码重置成功，请使用新密码登录。", {
-              duration: Toast.durations.SHORT,
-            });
+            showToast("密码重置成功，请使用新密码登录。");
             router.replace({
               pathname: "/login",
               params: { mode: "password", phone: payload.phone },
             });
           } catch (error) {
-            Toast.show(
+            showToast(
               `密码重置失败，${getErrorMessage(error, "密码重置失败")}`,
-              { duration: Toast.durations.SHORT },
             );
             throw error;
           }

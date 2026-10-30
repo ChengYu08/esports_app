@@ -27,10 +27,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  View,
   useWindowDimensions,
+  View,
 } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Companion, CompanionFilters, GameKey } from "../api/home.types";
 import {
@@ -122,6 +122,8 @@ export default function ClubDetailScreen() {
             priceSort,
             sex: selectedSex,
             gameStatus: selectedStatus,
+            // 空闲中=gameStatus 0 且必须在线；离线用户仅在状态不限时展示。
+            onlineOnly: selectedStatus === 0 ? true : undefined,
             gameModeId: selectedMode,
             gameLevelId: selectedLevel,
           }
@@ -705,7 +707,7 @@ export default function ClubDetailScreen() {
           style={styles.matchButton}
           onPress={() => {
             if (!accessToken) {
-              Toast.show("请先登录", { duration: Toast.durations.SHORT });
+              showToast("请先登录");
               return;
             }
             setQuickMatchVisible(true);

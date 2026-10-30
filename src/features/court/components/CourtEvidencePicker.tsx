@@ -13,7 +13,7 @@ import {
   Text,
   View,
 } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast, toastDurations } from "@/shared/ui/app-toast";
 
 export type UploadItem = {
   uri: string;
@@ -91,18 +91,13 @@ export function useEvidenceImages(
       checkAccountRef.current();
       setImages((current) => [...current, ...picked].slice(0, MAX_IMAGES));
       if (failed > 0) {
-        Toast.show(`${failed}张图片无法读取或转换，请重新选择或截图后上传`, {
-          duration: Toast.durations.LONG,
-          position: Toast.positions.CENTER,
+        showToast(`${failed}张图片无法读取或转换，请重新选择或截图后上传`, {
+          duration: toastDurations.LONG,
         });
       }
     } catch (error) {
-      Toast.show(
+      showToast(
         error instanceof Error ? error.message : "图片选择失败，请重试",
-        {
-          duration: Toast.durations.SHORT,
-          position: Toast.positions.CENTER,
-        },
       );
     } finally {
       pickingImagesRef.current = false;

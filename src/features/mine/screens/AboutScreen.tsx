@@ -10,7 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast, toastDurations } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { APP_LINKS } from "@/core/config/links";
@@ -46,9 +46,7 @@ export default function AboutScreen() {
           const hasUpdate = await useAppUpgradeStore.getState().checkNow();
           if (!hasUpdate) {
             setUpdateStatus("已是最新版本");
-            Toast.show("当前已是最新版本", {
-              duration: Toast.durations.SHORT,
-            });
+            showToast("当前已是最新版本");
             return;
           }
           setUpdateStatus("发现新版本");
@@ -65,15 +63,13 @@ export default function AboutScreen() {
           return;
         }
         setUpdateStatus(`发现新版本 v${latest.versionNo}`);
-        Toast.show("发现新版本，请前往应用中心下载更新", {
-          duration: Toast.durations.LONG,
+        showToast("发现新版本，请前往应用中心下载更新", {
+          duration: toastDurations.LONG,
         });
       } catch {
         setUpdateStatus("检查更新失败");
         if (Platform.OS === "android") {
-          Toast.show("检查失败，请稍后重试", {
-            duration: Toast.durations.SHORT,
-          });
+          showToast("检查失败，请稍后重试");
         }
       } finally {
         setChecking(false);

@@ -1,8 +1,10 @@
 import { queryClient } from "@/core/query/query-client";
+import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { useAuthStore } from "@esports/auth";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FlatList,
@@ -12,7 +14,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -29,8 +30,12 @@ import { OrderReviewSheet } from "../components/OrderReviewSheet";
 import { OrderScopeTabs } from "../components/OrderScopeTabs";
 import { OrderTabs } from "../components/OrderTabs";
 import { grabDispatchRequest } from "../dispatch.api";
+import { computeFreeStarAmount } from "../free-amount";
 import { useOrderPage } from "../hooks/use-order-page";
-import { invalidateOrderQueries, refreshOrderAfterAction } from "../order-query";
+import {
+  invalidateOrderQueries,
+  refreshOrderAfterAction,
+} from "../order-query";
 import {
   acceptOrder,
   cancelOrder as cancelOrderRequest,
@@ -114,6 +119,7 @@ export default function OrderScreen() {
   const [reviewDetail, setReviewDetail] = useState<OrderReview | null>(null);
   const [payTarget, setPayTarget] = useState<OrderItemModel | null>(null);
   const [freeTarget, setFreeTarget] = useState<OrderItemModel | null>(null);
+  const [freeSubmitting, setFreeSubmitting] = useState(false);
   const [prompt, setPrompt] = useState<{
     title: string;
     message: string;
@@ -229,7 +235,12 @@ export default function OrderScreen() {
     setCancelTarget(null);
     try {
       await cancelOrderRequest(target.id, token);
-      await invalidateOrderQueries(target.id);
+      if (currentUser?.id) {
+        // 取消后列表接口可能仍返回旧状态，以详情为准就地替换该单卡片。
+        await refreshOrderAfterAction(target.id, token, currentUser.id);
+      } else {
+        await invalidateOrderQueries(target.id);
+      }
     } catch (error) {
       setPrompt({
         title: "取消订单失败",
@@ -262,19 +273,54 @@ export default function OrderScreen() {
     }
   };
 
+  const confirmFree = async (freeHours?: number) => {
+    if (!freeTarget || !token || freeSubmitting) {
+      return;
+    }
+    if (freeHours == null) {
+      return;
+    }
+    const target = freeTarget;
+    const starAmount = computeFreeStarAmount(target, freeHours);
+    if (starAmount == null || starAmount <= 0) {
+      return;
+    }
+    setFreeSubmitting(true);
+    try {
+      await freeOrderService(target.id, starAmount, token);
+      setFreeTarget(null);
+      if (currentUser?.id) {
+        // 免单后状态变为退款，以详情为准就地刷新缓存中的该单。
+        await refreshOrderAfterAction(target.id, token, currentUser.id);
+      } else {
+        await invalidateOrderQueries(target.id);
+      }
+    } catch (error) {
+      setPrompt({
+        title: "免单失败",
+        message: error instanceof Error ? error.message : "请稍后重试",
+      });
+    } finally {
+      setFreeSubmitting(false);
+    }
+  };
+
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <OrderHeader title={isCompanion ? "派单中心" : "订单"} />
-      {isCompanion ? (
-        <OrderScopeTabs
-          value={scope}
-          onChange={(nextScope) => {
-            setSelectedScope(nextScope);
-            setFilter(nextScope === "dispatch" ? "grabbing" : "all");
-          }}
-        />
-      ) : null}
-      <OrderTabs scope={scope} onChange={setFilter} value={visibleFilter} />
+    <View style={styles.screen}>
+      <StatusBar style="dark" />
+      <View style={[styles.stickyHeader, { paddingTop: insets.top }]}>
+        {isCompanion ? null : <OrderHeader />}
+        {isCompanion ? (
+          <OrderScopeTabs
+            value={scope}
+            onChange={(nextScope) => {
+              setSelectedScope(nextScope);
+              setFilter(nextScope === "dispatch" ? "grabbing" : "all");
+            }}
+          />
+        ) : null}
+        <OrderTabs scope={scope} onChange={setFilter} value={visibleFilter} />
+      </View>
       <FlatList
         contentContainerStyle={[
           styles.content,
@@ -374,7 +420,16 @@ export default function OrderScreen() {
             current ? { ...current, reviewExists: true } : current,
           );
           setReviewDetail({ rating, content });
-          await orders.refetch();
+          if (currentUser?.id) {
+            // 评价后列表卡片需换成「已评价」，同样以详情为准就地刷新。
+            await refreshOrderAfterAction(
+              reviewTarget.id,
+              token,
+              currentUser.id,
+            );
+          } else {
+            await orders.refetch();
+          }
         }}
       />
       <AppPrompt
@@ -414,38 +469,37 @@ export default function OrderScreen() {
           onConfirm={() => void confirmComplete()}
         />
       ) : null}
-      <AppPrompt
-        visible={Boolean(freeTarget)}
-        title="确认免单"
-        message={`确认免单 ${freeTarget?.totalPrice ?? "0"} 星钻吗？`}
-        cancelText="取消"
-        confirmText="确认"
-        onCancel={() => setFreeTarget(null)}
-        onConfirm={() => {
-          const target = freeTarget;
-          setFreeTarget(null);
-          if (!target || !token) return;
-          void freeOrderService(
-            target.id,
-            Number(target.totalPrice) || 0,
-            token,
+      {freeTarget ? (
+        <OrderCompleteConfirmSheet
+          mode="free"
+          visible
+          order={freeTarget}
+          companionName={
+            freeTarget.receiverName || currentUser?.nickname || "陪玩师"
+          }
+          companionAvatar={
+            freeTarget.receiverAvatar ??
+            (currentUser?.headImage
+              ? { uri: currentUser.headImage }
+              : undefined)
+          }
+          serviceTime={(
+            freeTarget.serviceStartTime ||
+            freeTarget.serviceEndTime ||
+            freeTarget.createTime ||
+            "-"
           )
-            .then(async () => {
-              if (currentUser?.id) {
-                // 免单后状态变为退款，以详情为准就地刷新缓存中的该单。
-                await refreshOrderAfterAction(target.id, token, currentUser.id);
-              } else {
-                await invalidateOrderQueries(target.id);
-              }
-            })
-            .catch((error) =>
-              setPrompt({
-                title: "免单失败",
-                message: error instanceof Error ? error.message : "请稍后重试",
-              }),
-            );
-        }}
-      />
+            .replace("T", " ")
+            .slice(0, 19)}
+          loading={freeSubmitting}
+          onClose={() => {
+            if (!freeSubmitting) setFreeTarget(null);
+          }}
+          onConfirm={(freeHours) => {
+            void confirmFree(freeHours);
+          }}
+        />
+      ) : null}
       <StarPaymentPrompt
         key={payTarget?.id ?? "none"}
         item={payTarget}
@@ -458,7 +512,12 @@ export default function OrderScreen() {
           cancelingPaymentRef.current = true;
           void cancelOrderRequest(target.id, token)
             .then(async () => {
-              await invalidateOrderQueries(target.id);
+              if (currentUser?.id) {
+                // 关闭支付即取消：取消后以详情为准就地刷新该单卡片。
+                await refreshOrderAfterAction(target.id, token, currentUser.id);
+              } else {
+                await invalidateOrderQueries(target.id);
+              }
             })
             .catch((error) =>
               setPrompt({
@@ -473,7 +532,12 @@ export default function OrderScreen() {
         onPaid={() => {
           const paid = payTarget;
           setPayTarget(null);
-          void orders.refetch();
+          if (paid?.id && token && currentUser?.id) {
+            // 支付成功后以详情为准就地刷新该单卡片，避免列表接口延迟仍显示待支付。
+            void refreshOrderAfterAction(paid.id, token, currentUser.id);
+          } else {
+            void orders.refetch();
+          }
           if (paid?.receiverUserId) {
             router.push({
               pathname: "/chat/[id]",
@@ -606,6 +670,7 @@ function OrderSeparator() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F7F7" },
+  stickyHeader: { backgroundColor: "#FFFFFF" },
   content: { flexGrow: 1, paddingTop: 8 },
   separator: { height: 8 },
   empty: {

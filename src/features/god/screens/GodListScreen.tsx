@@ -8,6 +8,7 @@ import {
   FlatList,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -110,7 +111,7 @@ function FilterMenu({
           style={styles.menuOverlayPress}
         />
       </Animated.View>
-      <Animated.View style={[styles.menuPanel, { opacity: progress, transform: [{ translateY }] }]}>
+      <Animated.View style={[styles.menuPanel, { transform: [{ translateY }] }]}>
         <View style={styles.menuOptions}>
           {options.map((option) => {
             const selected = option.value === value;
@@ -236,7 +237,12 @@ export default function GodListScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.gameBar}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.gameBar}
+        contentContainerStyle={styles.gameBarContent}
+      >
         <GamePill
           label="全部"
           iconUrl={null}
@@ -252,7 +258,7 @@ export default function GodListScreen() {
             onPress={() => setGameKey(String(game.id))}
           />
         ))}
-      </View>
+      </ScrollView>
       <View style={styles.listSheet}>
         <View style={styles.filterBar}>
           {FILTER_DEFS.map((def) => {
@@ -365,6 +371,9 @@ function GamePill({
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F5F6F7" },
   gameBar: {
+    flexGrow: 0,
+  },
+  gameBarContent: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
