@@ -28,7 +28,7 @@ import {
   Text,
   View,
 } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 
 type DetailTab = "原告举证" | "被告举证" | "判决流程";
 
@@ -64,9 +64,7 @@ export default function CourtDetailScreen() {
       if (requestId !== loadRequestRef.current) {
         return;
       }
-      Toast.show(error instanceof Error ? error.message : "案件加载失败", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast(error instanceof Error ? error.message : "案件加载失败");
     } finally {
       if (requestId === loadRequestRef.current) {
         setLoading(false);
@@ -92,15 +90,9 @@ export default function CourtDetailScreen() {
     }
     try {
       await Clipboard.setStringAsync(String(item.caseNo || item.caseId));
-      Toast.show("案件ID已复制", {
-        duration: Toast.durations.SHORT,
-        position: Toast.positions.CENTER,
-      });
+      showToast("案件ID已复制");
     } catch {
-      Toast.show("复制失败，请稍后重试", {
-        duration: Toast.durations.SHORT,
-        position: Toast.positions.CENTER,
-      });
+      showToast("复制失败，请稍后重试");
     }
   }
   const evidence =
@@ -135,16 +127,10 @@ export default function CourtDetailScreen() {
       setItem((current) => current && String(current.caseId) === String(item.caseId)
         ? { ...current, myVoteResult: side }
         : current);
-      Toast.show("支持成功", {
-        duration: Toast.durations.SHORT,
-        position: Toast.positions.CENTER,
-      });
+      showToast("支持成功");
       await load();
     } catch (error) {
-      Toast.show(error instanceof Error ? error.message : "投票失败", {
-        duration: Toast.durations.SHORT,
-        position: Toast.positions.CENTER,
-      });
+      showToast(error instanceof Error ? error.message : "投票失败");
     } finally {
       voteInFlight.current = false;
       setPendingAction(null);
@@ -172,15 +158,9 @@ export default function CourtDetailScreen() {
           favoriteCount: result.favoriteCount ?? current.favoriteCount,
         };
       });
-      Toast.show(result.favorited ? "收藏成功" : "已取消收藏", {
-        duration: Toast.durations.SHORT,
-        position: Toast.positions.CENTER,
-      });
+      showToast(result.favorited ? "收藏成功" : "已取消收藏");
     } catch (error) {
-      Toast.show(error instanceof Error ? error.message : "收藏失败", {
-        duration: Toast.durations.SHORT,
-        position: Toast.positions.CENTER,
-      });
+      showToast(error instanceof Error ? error.message : "收藏失败");
     } finally {
       setPendingAction(null);
     }

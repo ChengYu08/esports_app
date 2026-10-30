@@ -10,7 +10,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { buildAfterSalePayload } from "@/features/order/after-sale-card";
@@ -212,9 +212,9 @@ export default function OrderDetailRoute() {
   const copyOrderNumber = async () => {
     try {
       await Clipboard.setStringAsync(orderNumber);
-      Toast.show("订单编号已复制", { duration: Toast.durations.SHORT });
+      showToast("订单编号已复制");
     } catch {
-      Toast.show("复制失败，请稍后重试", { duration: Toast.durations.SHORT });
+      showToast("复制失败，请稍后重试");
     }
   };
 
@@ -239,7 +239,7 @@ export default function OrderDetailRoute() {
         await invalidateOrderQueries(order.id);
       }
       await detail.refetch();
-      Toast.show("操作成功", { duration: Toast.durations.SHORT });
+      showToast("操作成功");
     } catch (error) {
       setPrompt({
         title: "订单操作失败",
@@ -650,7 +650,7 @@ export default function OrderDetailRoute() {
               await invalidateOrderQueries(order.id);
             }
             await detail.refetch();
-            Toast.show("服务已完成", { duration: Toast.durations.SHORT });
+            showToast("服务已完成");
           } catch (error) {
             setPrompt({
               title: "完成订单失败",
@@ -689,7 +689,7 @@ export default function OrderDetailRoute() {
                 await invalidateOrderQueries(order.id);
               }
               await detail.refetch();
-              Toast.show("操作成功", { duration: Toast.durations.SHORT });
+              showToast("操作成功");
             })
             .catch((error) =>
               setPrompt({

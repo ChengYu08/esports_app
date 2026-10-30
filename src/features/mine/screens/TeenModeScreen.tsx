@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import Toast from "react-native-root-toast";
+import { showToast, toastDurations } from "@/shared/ui/app-toast";
 import { useEffect, useRef, useState } from "react";
 import {
   Pressable,
@@ -109,9 +109,7 @@ export default function TeenModeScreen({
       try {
         if (phase === "setConfirm") {
           if (code !== firstPassword) {
-            Toast.show("前后两次密码不一致", {
-              duration: Toast.durations.SHORT,
-            });
+            showToast("前后两次密码不一致");
             setCode("");
             setFirstPassword("");
             setPhase("setFirst");
@@ -120,7 +118,7 @@ export default function TeenModeScreen({
           // 未设过密码：open 同时完成「设置密码 + 开启」
           applyStatus(await teenModeApi.open(token, code, code));
           setPhase("overview");
-          Toast.show("青少年模式已开启", { duration: Toast.durations.SHORT });
+          showToast("青少年模式已开启");
           return;
         }
         if (
@@ -128,9 +126,7 @@ export default function TeenModeScreen({
         ) {
           // 已设过密码：两次输入一致后，校验密码并开启
           if (code !== firstPassword) {
-            Toast.show("前后两次密码不一致", {
-              duration: Toast.durations.SHORT,
-            });
+            showToast("前后两次密码不一致");
             setCode("");
             setFirstPassword("");
             setPhase("openWithPassword");
@@ -138,21 +134,21 @@ export default function TeenModeScreen({
           }
           applyStatus(await teenModeApi.open(token, code));
           setPhase("overview");
-          Toast.show("青少年模式已开启", { duration: Toast.durations.SHORT });
+          showToast("青少年模式已开启");
           return;
         }
         if (phase === "disable") {
           // 关闭青少年模式：单次输入，密码正确性由服务端校验
           applyStatus(await teenModeApi.close(token, code));
           setPhase("overview");
-          Toast.show("青少年模式已关闭", { duration: Toast.durations.SHORT });
+          showToast("青少年模式已关闭");
           return;
         }
       } catch (error) {
         // 密码错误等信息需要用户明确看到，使用长时长提示
-        Toast.show(
+        showToast(
           error instanceof Error ? error.message : "操作失败，请稍后重试",
-          { duration: Toast.durations.LONG },
+          { duration: toastDurations.LONG },
         );
         setCode("");
       } finally {

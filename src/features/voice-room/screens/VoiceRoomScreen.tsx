@@ -34,7 +34,7 @@ import {
   Text,
   View,
 } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAppConfirm } from "@/shared/ui/app-confirm";
@@ -359,9 +359,8 @@ export default function VoiceRoomScreen() {
       if (!reason) return;
       clearAuditionSessionMarkers(roomId);
       clearQuickMatchCreatedSessionMarkers(roomId);
-      Toast.show(
+      showToast(
         reason === "expired" ? "派单已超时自动取消" : "派单已取消",
-        { duration: Toast.durations.SHORT },
       );
     };
     consumeEndSignal();
@@ -848,9 +847,7 @@ export default function VoiceRoomScreen() {
         setMicState({ roomId, muted: getVoiceRtcMuted() });
         setError(null);
         if (staleInvite) {
-          Toast.show("语聊房已重新开启，已为你进入最新房间", {
-        duration: Toast.durations.SHORT,
-      });
+          showToast("语聊房已重新开启，已为你进入最新房间");
         }
       } catch (cause) {
         await cleanupCancelledJoin();
@@ -887,9 +884,7 @@ export default function VoiceRoomScreen() {
       csTimeoutRef.current = null;
       setServiceCalling((calling) => {
         if (calling) {
-          Toast.show("当前无空闲接待，请稍后再试", {
-        duration: Toast.durations.SHORT,
-      });
+          showToast("当前无空闲接待，请稍后再试");
         }
         return false;
       });
@@ -899,9 +894,7 @@ export default function VoiceRoomScreen() {
   const callService = useCallback(async () => {
     if (!roomId || !accessToken || serviceCalling) return;
     if (!room?.clubId) {
-      Toast.show("当前房间暂未绑定俱乐部，无法呼叫接待", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast("当前房间暂未绑定俱乐部，无法呼叫接待");
       return;
     }
     if (room.serviceUserId) return;
@@ -914,15 +907,12 @@ export default function VoiceRoomScreen() {
         room.clubId,
         accessToken,
       );
-      Toast.show("已呼叫俱乐部接待，请稍候", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast("已呼叫俱乐部接待，请稍候");
     } catch (cause) {
       clearCsTimeout();
       setServiceCalling(false);
-      Toast.show(
+      showToast(
         cause instanceof Error ? cause.message : "呼叫接待失败，请稍后重试",
-        { duration: Toast.durations.SHORT },
       );
     }
   }, [
@@ -983,7 +973,7 @@ export default function VoiceRoomScreen() {
         ) {
           clearCsTimeout();
           setServiceCalling(false);
-          Toast.show("接待已接单", { duration: Toast.durations.SHORT });
+          showToast("接待已接单");
         }
       } catch {
         /* 反查失败静默，等下一次成员变更或超时兜底 */
@@ -994,18 +984,14 @@ export default function VoiceRoomScreen() {
 
   const onServiceDispatch = useCallback(async () => {
     if (!canServiceDispatch) {
-      Toast.show("只有当前房间绑定的接待客服可以派单", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast("只有当前房间绑定的接待客服可以派单");
       return;
     }
     if (!accessToken || !room) return;
     const clubId = room.clubId;
     const ownerId = room.creatorUserId;
     if (clubId == null || clubId === "" || ownerId == null || ownerId === "") {
-      Toast.show("房间信息不完整，无法派单", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast("房间信息不完整，无法派单");
       return;
     }
     if (receptionPreparing) return;
@@ -1029,15 +1015,12 @@ export default function VoiceRoomScreen() {
         if (confirmed) {
           try {
             await cancelQuickMatch(active.requestNo, accessToken);
-            Toast.show("已取消派单", {
-        duration: Toast.durations.SHORT,
-      });
+            showToast("已取消派单");
           } catch (error) {
-            Toast.show(
+            showToast(
               error instanceof Error
                 ? error.message
                 : "取消派单失败，请稍后重试",
-              { duration: Toast.durations.SHORT },
             );
           }
         }
@@ -1053,9 +1036,7 @@ export default function VoiceRoomScreen() {
       ]);
       if (!valid()) return;
       if (!detail) {
-        Toast.show("俱乐部信息获取失败，请稍后重试", {
-        duration: Toast.durations.SHORT,
-      });
+        showToast("俱乐部信息获取失败，请稍后重试");
         return;
       }
       setReceptionBuyerId(String(ownerId));
@@ -1065,9 +1046,8 @@ export default function VoiceRoomScreen() {
       setReceptionVisible(true);
     } catch (error) {
       if (valid()) {
-        Toast.show(
+        showToast(
           error instanceof Error ? error.message : "派单准备失败，请重试",
-          { duration: Toast.durations.SHORT },
         );
       }
     } finally {
@@ -1259,13 +1239,9 @@ export default function VoiceRoomScreen() {
           item.userId === currentUser?.id ? { ...item, micOpen: !next } : item,
         ),
       );
-      Toast.show(next ? "已闭麦" : "已开麦", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast(next ? "已闭麦" : "已开麦");
     } catch {
-      Toast.show("麦克风不可用，当前可以听到房间语音，请检查设备或权限", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast("麦克风不可用，当前可以听到房间语音，请检查设备或权限");
     } finally {
       setMicChanging(false);
     }
@@ -1273,9 +1249,7 @@ export default function VoiceRoomScreen() {
 
   const getInviteLink = () => {
     if (!roomId || !room) {
-      Toast.show("房间信息加载中，请稍后再试", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast("房间信息加载中，请稍后再试");
       return null;
     }
     return `https://djpc.jlgkj.top/chat?type=chat-room&id=${encodeURIComponent(roomId)}&v=${encodeURIComponent(String(room.roomVersion ?? "1"))}`;
@@ -1285,30 +1259,26 @@ export default function VoiceRoomScreen() {
     const inviteLink = getInviteLink();
     if (!inviteLink) return;
     if (!accessToken) {
-      Toast.show("请先登录", { duration: Toast.durations.SHORT });
+      showToast("请先登录");
       return;
     }
     try {
       await messageStore.getState().initialize(accessToken);
       const state = messageStore.getState();
       if (state.connectionState !== "ready") {
-        Toast.show("消息服务未连接，请稍后再试", {
-        duration: Toast.durations.SHORT,
-      });
+        showToast("消息服务未连接，请稍后再试");
         return;
       }
       await state.sendText(peerId, inviteLink);
       // sendText 内部 catch 错误后通过 set() 更新 store，必须重新 getState() 才能读到最新 lastError
       const failed = messageStore.getState().lastError;
       if (failed) {
-        Toast.show(failed, { duration: Toast.durations.SHORT });
+        showToast(failed);
         return;
       }
-      Toast.show("邀请已发送", { duration: Toast.durations.SHORT });
+      showToast("邀请已发送");
     } catch {
-      Toast.show("邀请发送失败，请稍后再试", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast("邀请发送失败，请稍后再试");
     }
   };
 

@@ -1,7 +1,7 @@
 import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import Toast from "react-native-root-toast";
+import { showToast, toastDurations } from "@/shared/ui/app-toast";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -111,9 +111,8 @@ export default function AccountCancellationScreen() {
       await clientAuthApi.sendAccountCancellationSms(token);
       setCountdown(60);
     } catch (error) {
-      Toast.show(
+      showToast(
         `验证码发送失败，${error instanceof Error ? error.message : "请稍后重试"}`,
-        { duration: Toast.durations.SHORT },
       );
     } finally {
       setSendingCode(false);
@@ -136,9 +135,9 @@ export default function AccountCancellationScreen() {
       await clearAuthSession().catch(() => undefined);
       clearSession();
       await messageStore.getState().reset().catch(() => undefined);
-      Toast.show(
+      showToast(
         `已进入${coolingDays}天冷静期，账号将于 ${formatCoolEndTime(record.coolEndTime)} 完成注销`,
-        { duration: Toast.durations.LONG },
+        { duration: toastDurations.LONG },
       );
       router.replace("/");
     } catch (error) {

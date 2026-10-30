@@ -10,7 +10,7 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 
 import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { toAuthUser } from "@/features/auth/client-auth-flow";
@@ -87,11 +87,10 @@ export default function EditProfileScreen() {
       const profile = await clientAuthApi.updateProfile(token, { birth });
       await applyProfile(profile);
       setBirthPickerVisible(false);
-      Toast.show("保存成功", { duration: Toast.durations.SHORT });
+      showToast("保存成功");
     } catch (error) {
-      Toast.show(
+      showToast(
         error instanceof Error ? error.message : "保存失败，请稍后重试",
-        { duration: Toast.durations.SHORT },
       );
     } finally {
       setBirthSaving(false);
@@ -109,9 +108,8 @@ export default function EditProfileScreen() {
       await applyProfile(profile);
       setEditing(null);
     } catch (error) {
-      Toast.show(
+      showToast(
         error instanceof Error ? error.message : "保存失败，请稍后重试",
-        { duration: Toast.durations.SHORT },
       );
     } finally {
       setGenderSaving(false);
@@ -141,11 +139,10 @@ export default function EditProfileScreen() {
         headImage: imageUrl,
       });
       await applyProfile(profile);
-      Toast.show("头像已更新", { duration: Toast.durations.SHORT });
+      showToast("头像已更新");
     } catch (error) {
-      Toast.show(
+      showToast(
         error instanceof Error ? error.message : "头像更新失败，请稍后重试",
-        { duration: Toast.durations.SHORT },
       );
     } finally {
       setAvatarUploading(false);

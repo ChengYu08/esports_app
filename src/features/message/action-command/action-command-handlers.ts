@@ -1,6 +1,6 @@
 import { useAuthStore } from "@esports/auth";
 import { router } from "expo-router";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 
 import type { RongCommand } from "@/features/message/rongcloud-command";
 import {
@@ -99,7 +99,7 @@ export function handleQuickMatchNotice(command: RongCommand, now = Date.now()) {
       onAction: async () => {
         const result = await grabQuickMatchAndEnterAudition(payload.requestNo);
         if (result.status === "failed") {
-          Toast.show(result.message, { duration: Toast.durations.SHORT });
+          showToast(result.message);
           return;
         }
         actionNotice.dismiss(noticeId);
@@ -132,18 +132,17 @@ export function handleOrderNotifyPopup(command: RongCommand, now = Date.now()) {
       onAction: async () => {
         const { accessToken } = useAuthStore.getState();
         if (!accessToken) {
-          Toast.show("请先登录", { duration: Toast.durations.SHORT });
+          showToast("请先登录");
           return;
         }
         try {
           await acceptOrder(payload.orderId, accessToken);
           actionNotice.dismiss(noticeId);
-          Toast.show("接单成功", { duration: Toast.durations.SHORT });
+          showToast("接单成功");
           router.push({ pathname: "/order/[id]", params: { id: payload.orderId } });
         } catch (error) {
-          Toast.show(
+          showToast(
             error instanceof Error && error.message ? error.message : "接单失败，请稍后重试",
-            { duration: Toast.durations.SHORT },
           );
         }
       },

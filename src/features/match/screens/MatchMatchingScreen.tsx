@@ -4,7 +4,7 @@ import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { selectAndCreateOrder } from "@/features/match/api/match.api";
@@ -64,7 +64,7 @@ export default function MatchMatchingScreen({
       return;
     }
     if (!session.selectedGrabIds.length) {
-      Toast.show("请先选择陪玩", { duration: Toast.durations.SHORT });
+      showToast("请先选择陪玩");
       return;
     }
     if (session.submitting) return;
@@ -89,9 +89,7 @@ export default function MatchMatchingScreen({
       setPayTotal(created.totalPrice);
       setPayVisible(true);
     } catch (error) {
-      Toast.show(error instanceof Error ? error.message : "创建订单失败", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast(error instanceof Error ? error.message : "创建订单失败");
     } finally {
       session.setSubmitting(false);
     }
@@ -101,7 +99,7 @@ export default function MatchMatchingScreen({
   // const closeAuditionRoom = session.closeAuditionRoom;
   const handlePaid = useCallback(() => {
     setPayVisible(false);
-    Toast.show("支付成功", { duration: Toast.durations.SHORT });
+    showToast("支付成功");
     // void (async () => {
     //   await closeAuditionRoom();
     //   leaveMatchFlow();

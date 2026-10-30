@@ -2,7 +2,7 @@ import { TICKET_REASONS } from "@/features/court/court-ticket";
 import type { CourtCase, PlatformTicket } from "@/features/court/court.api";
 import { courtApi } from "@/features/court/court.api";
 import { useEffect, useRef, useState } from "react";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 
 export function toUploadItems(evidence?: Record<string, string>) {
   return Object.entries(evidence ?? {}).map(([key, uri], index) => ({
@@ -38,9 +38,7 @@ export function useCaseDetail(caseId: string | undefined, onLoaded: (item: Court
         onLoadedRef.current(item);
       })
       .catch((error) =>
-        Toast.show(error instanceof Error ? error.message : "案件加载失败", {
-          duration: Toast.durations.SHORT,
-        }),
+        showToast(error instanceof Error ? error.message : "案件加载失败"),
       );
     return () => {
       active = false;

@@ -8,7 +8,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -34,11 +34,10 @@ function MessageNotificationScreenImpl() {
 
   useEffect(() => {
     if (isError) {
-      Toast.show(
+      showToast(
         error instanceof Error
           ? error.message
           : "短信通知设置加载失败，请刷新重试",
-        { duration: Toast.durations.SHORT },
       );
     }
   }, [isError, error]);
@@ -49,11 +48,10 @@ function MessageNotificationScreenImpl() {
     }
     updateSmsNotify.mutate(next, {
       onError: (mutationError) => {
-        Toast.show(
+        showToast(
           mutationError instanceof Error
             ? mutationError.message
             : "短信通知设置保存失败，请重试",
-          { duration: Toast.durations.SHORT },
         );
       },
     });

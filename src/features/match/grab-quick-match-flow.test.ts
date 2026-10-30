@@ -26,7 +26,11 @@ vi.mock("expo-router", () => ({
 }));
 
 vi.mock("react-native-root-toast", () => ({
-  default: { show: vi.fn(), durations: { SHORT: 2000 } },
+  default: {
+    show: vi.fn(),
+    durations: { SHORT: 2000, LONG: 3500 },
+    positions: { CENTER: 0 },
+  },
 }));
 
 vi.mock("@/features/order/dispatch.api", () => ({

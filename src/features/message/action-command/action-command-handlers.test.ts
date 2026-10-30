@@ -8,7 +8,11 @@ import {
 import type { RongCommand } from "@/features/message/rongcloud-command";
 
 vi.mock("react-native-root-toast", () => ({
-  default: { show: vi.fn(), durations: { SHORT: 2000 } },
+  default: {
+    show: vi.fn(),
+    durations: { SHORT: 2000, LONG: 3500 },
+    positions: { CENTER: 0 },
+  },
 }));
 
 vi.mock("@/shared/ui/action-notice/trade-notice-icon", () => ({

@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 
 import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { toAuthUser } from "@/features/auth/client-auth-flow";
@@ -44,7 +44,7 @@ export default function EditNicknameScreen() {
     }
     const ruleError = validateNickname(draft);
     if (ruleError) {
-      Toast.show(ruleError, { duration: Toast.durations.SHORT });
+      showToast(ruleError);
       return;
     }
     setSaving(true);
@@ -60,9 +60,8 @@ export default function EditNicknameScreen() {
       setSession(session);
       router.back();
     } catch (error) {
-      Toast.show(
+      showToast(
         error instanceof Error ? error.message : "保存失败，请稍后重试",
-        { duration: Toast.durations.SHORT },
       );
       setSaving(false);
     }

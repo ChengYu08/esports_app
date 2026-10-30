@@ -19,7 +19,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function CourtTicketDetailScreen() {
@@ -40,9 +40,7 @@ export default function CourtTicketDetailScreen() {
       setTicket(await courtApi.getTicketDetail(id, isMine));
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "工单加载失败");
-      Toast.show(error instanceof Error ? error.message : "工单加载失败", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast(error instanceof Error ? error.message : "工单加载失败");
     } finally {
       setLoading(false);
     }
@@ -62,12 +60,10 @@ export default function CourtTicketDetailScreen() {
     try {
       await courtApi.replyTicket(ticket.ticketId, reply.trim());
       setReply("");
-      Toast.show("补充内容已提交", { duration: Toast.durations.SHORT });
+      showToast("补充内容已提交");
       await load();
     } catch (error) {
-      Toast.show(error instanceof Error ? error.message : "提交失败", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast(error instanceof Error ? error.message : "提交失败");
     } finally {
       setSubmitting(false);
     }
@@ -92,9 +88,9 @@ export default function CourtTicketDetailScreen() {
     }
     try {
       await Clipboard.setStringAsync(ticketNumber);
-      Toast.show("案件 ID 已复制", { duration: Toast.durations.SHORT });
+      showToast("案件 ID 已复制");
     } catch {
-      Toast.show("复制失败，请重试", { duration: Toast.durations.SHORT });
+      showToast("复制失败，请重试");
     }
   }
 

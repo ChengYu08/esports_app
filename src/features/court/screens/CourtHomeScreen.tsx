@@ -28,7 +28,7 @@ import {
   Text,
   View,
 } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 
 const FEEDS: { key: CourtScope; label: string }[] = [
   { key: "ALL", label: "全部" },
@@ -128,9 +128,7 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
           setCases([]);
           setTickets([]);
         }
-        Toast.show(error instanceof Error ? error.message : "加载失败", {
-          duration: Toast.durations.SHORT,
-        });
+        showToast(error instanceof Error ? error.message : "加载失败");
       } finally {
         if (requestId === loadRequestRef.current) {
           setLoading(false);
@@ -243,16 +241,10 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
             : row,
         ),
       );
-      Toast.show("支持成功", {
-        duration: Toast.durations.SHORT,
-        position: Toast.positions.CENTER,
-      });
+      showToast("支持成功");
       await load();
     } catch (error) {
-      Toast.show(error instanceof Error ? error.message : "投票失败", {
-        duration: Toast.durations.SHORT,
-        position: Toast.positions.CENTER,
-      });
+      showToast(error instanceof Error ? error.message : "投票失败");
     } finally {
       voteInFlight.current = false;
       setPendingAction(null);
@@ -284,14 +276,9 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
               : row,
           ),
       );
-      Toast.show(result.favorited ? "收藏成功" : "已取消收藏", {
-        duration: Toast.durations.SHORT,
-        position: Toast.positions.CENTER,
-      });
+      showToast(result.favorited ? "收藏成功" : "已取消收藏");
     } catch (error) {
-      Toast.show(error instanceof Error ? error.message : "收藏失败", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast(error instanceof Error ? error.message : "收藏失败");
     } finally {
       setPendingAction(null);
     }

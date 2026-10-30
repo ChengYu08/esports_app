@@ -13,7 +13,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -258,11 +258,10 @@ export function ClubQuickMatchSheet({
         });
         return true;
       } catch (error) {
-        Toast.show(
+        showToast(
           error instanceof Error
             ? `派单已发布，但${error.message}`
             : "派单已发布，但暂时无法进入试音房，请稍后重试",
-          { duration: Toast.durations.SHORT },
         );
         return false;
       }
@@ -297,29 +296,27 @@ export function ClubQuickMatchSheet({
 
   const runPublish = useCallback(async () => {
     if (!form.token) {
-      Toast.show("请先登录", { duration: Toast.durations.SHORT });
+      showToast("请先登录");
       return;
     }
     if (!form.club?.id) {
-      Toast.show("请先选择俱乐部", { duration: Toast.durations.SHORT });
+      showToast("请先选择俱乐部");
       return;
     }
     if (!form.gameId || !form.modeId || !form.levelId || !form.serviceId) {
-      Toast.show("请完整选择服务模式", { duration: Toast.durations.SHORT });
+      showToast("请完整选择服务模式");
       return;
     }
     if (form.showCompanionPreference && !form.companionPreference) {
-      Toast.show("请选择单陪或双陪", { duration: Toast.durations.SHORT });
+      showToast("请选择单陪或双陪");
       return;
     }
     if (form.remarkOverLimit) {
-      Toast.show(`备注最多${MATCH_REMARK_MAX}字`, {
-        duration: Toast.durations.SHORT,
-      });
+      showToast(`备注最多${MATCH_REMARK_MAX}字`);
       return;
     }
     if (isReception && !buyerUserId) {
-      Toast.show("未识别到下单老板，请重试", { duration: Toast.durations.SHORT });
+      showToast("未识别到下单老板，请重试");
       return;
     }
     if (submitting) return;
@@ -354,7 +351,7 @@ export function ClubQuickMatchSheet({
       );
 
       if (isReception) {
-        Toast.show("已为老板发起派单", { duration: Toast.durations.SHORT });
+        showToast("已为老板发起派单");
         onClose();
         return;
       }
@@ -369,9 +366,7 @@ export function ClubQuickMatchSheet({
         goMatching(result.requestNo, result.expireTime, selectedGame ?? null);
       }
     } catch (error) {
-      Toast.show(error instanceof Error ? error.message : "发布失败，请重试", {
-        duration: Toast.durations.SHORT,
-      });
+      showToast(error instanceof Error ? error.message : "发布失败，请重试");
     } finally {
       setSubmitting(false);
     }
