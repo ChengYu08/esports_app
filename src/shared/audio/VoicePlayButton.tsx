@@ -12,8 +12,8 @@ type VoicePlayButtonProps = {
   onToggleVoice: (url: string) => void;
   inline?: boolean;
   compact?: boolean;
-  /** solid：粉底白字胶囊；light：透明底品牌色图标文字，用于头像左下角试听标签 */
-  tone?: "solid" | "light";
+  /** solid：粉底白字胶囊；light：透明底品牌色图标文字；pill：浅白毛玻璃胶囊（俱乐部详情试听标签） */
+  tone?: "solid" | "light" | "pill";
 };
 
 export function VoicePlayButton({
@@ -26,7 +26,8 @@ export function VoicePlayButton({
   tone = "solid",
 }: VoicePlayButtonProps) {
   const playing = playingUrl === url;
-  const light = tone === "light";
+  const light = tone === "light" || tone === "pill";
+  const pill = tone === "pill";
 
   return (
     <Pressable
@@ -42,6 +43,7 @@ export function VoicePlayButton({
         inline || light ? styles.inlineButton : styles.overlayButton,
         compact && styles.compactButton,
         light && styles.lightButton,
+        pill && styles.pillButton,
       ]}
     >
       <View
@@ -75,7 +77,14 @@ export function VoicePlayButton({
         )}
       </View>
       {light && !playing ? null : <VoiceWaveform playing={playing} compact={compact} />}
-      <Text style={[styles.duration, compact && styles.compactDuration, light && styles.lightDuration]}>
+      <Text
+        style={[
+          styles.duration,
+          compact && styles.compactDuration,
+          light && styles.lightDuration,
+          pill && styles.pillDuration,
+        ]}
+      >
         {duration ?? 0}
         {light ? "''" : '"'}
       </Text>
@@ -112,6 +121,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     gap: 3,
   },
+  // 俱乐部详情头像左下角试听胶囊：浅白底 + 白描边 + 品牌色图标文字（设计稿 490:79197）
+  pillButton: {
+    height: 22,
+    backgroundColor: "rgba(255, 255, 255, 0.75)",
+    borderWidth: 0.5,
+    borderColor: "#FFFFFF",
+    borderRadius: 99,
+    paddingVertical: 3,
+    paddingLeft: 4,
+    paddingRight: 6,
+    gap: 3,
+  },
   iconCircle: {
     width: 22,
     height: 22,
@@ -146,4 +167,5 @@ const styles = StyleSheet.create({
   duration: { color: "#fff", fontSize: 12, lineHeight: 22, fontWeight: "700" },
   compactDuration: { fontSize: 10, lineHeight: 18 },
   lightDuration: { color: "#FE4267", fontSize: 10, lineHeight: 14 },
+  pillDuration: { color: "#FE4267", fontSize: 12, lineHeight: 14 },
 });
