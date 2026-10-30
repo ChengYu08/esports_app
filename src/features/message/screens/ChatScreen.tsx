@@ -34,6 +34,7 @@ import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import { enterRoomFromInvite } from "@/features/voice-room/enter-room-from-invite";
 import { CsInviteCard } from "../components/CsInviteCard";
 import { MarkdownMessage } from "../components/MarkdownMessage";
 import { OrderNotifyCard } from "../components/OrderNotifyCard";
@@ -306,12 +307,9 @@ export default function ChatScreen() {
           myAvatar={myAvatar}
           peerName={conversation?.title || title || "用户"}
           myName={myNickname || "我"}
-          onEnterRoomInvite={(roomId, roomVersion) =>
-            router.push({
-          pathname: "/voice-room/[id]",
-          params: { id: roomId, v: roomVersion },
-        })
-          }
+          onEnterRoomInvite={(roomId, roomVersion) => {
+            void enterRoomFromInvite(roomId, roomVersion);
+          }}
           onRetry={handleRetryMessage}
           onOpenProfile={canViewProfile ? openProfile : undefined}
           onOpenOrder={isOrderAssistant ? openOrderDetail : undefined}
