@@ -43,6 +43,7 @@ import { VoiceRoomConversationsSheet } from "../components/VoiceRoomConversation
 import { VoiceRoomExitDialog } from "../components/VoiceRoomExitDialog";
 import { VoiceRoomMemberSheet } from "../components/VoiceRoomMemberSheet";
 import { VoiceRoomMicBadge } from "../components/VoiceRoomMicrophone";
+import { VoiceRoomSpeakingHalo } from "../components/VoiceRoomSpeakingHalo";
 import { VoiceRoomSpeakingWaves } from "../components/VoiceRoomSpeakingWaves";
 import { VoiceRoomToolbar } from "../components/VoiceRoomToolbar";
 import { exitVoiceRoom } from "../exit-voice-room";
@@ -213,6 +214,14 @@ export default function VoiceRoomScreen() {
   const kickedRef = useRef(false);
   const focusedRef = useRef(false);
   const [rtcReadyRoomId, setRtcReadyRoomId] = useState<string | null>(null);
+  // 独立于 members 的说话人 uid 集合，声网音量回调高频更新。
+  // 之所以不放在 members 属性里，是规避 React Compiler 对深层对象属性更新
+  // 追踪失灵导致的高频更新不重渲染问题（远端说话时 members 变了但麦位不刷新）
+  const [speakingUserIds, setSpeakingUserIds] = useState<string[]>([]);
+  // 每个说话人最后一次检测到说话的时间戳，用于迟滞判断
+  const speakingLastAtRef = useRef<Record<string, number>>({});
+  // 迟滞定时器，说话停止后延迟移除
+  const speakingTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const [micState, setMicState] = useState<{
     roomId: string;
     muted: boolean;
@@ -824,17 +833,46 @@ export default function VoiceRoomScreen() {
             },
             onSpeakingChanged: (uids) => {
               uids.forEach(ensureRtcMember);
+              const selfId = String(currentUser?.id ?? "");
+              // 声网音量回调里本地说话人的 uid 恒为 "0"（Agora AudioVolumeInfo 约定），
+              // 命中即自己在说话；远端说话人按真实 userId 匹配
+              const speakingIds = uids.map((uid) =>
+                uid === "0" ? selfId : uid,
+              );
+              const now = Date.now();
+              // 记录每个说话人最后一次检测到说话的时间
+              speakingIds.forEach((id) => {
+                speakingLastAtRef.current[id] = now;
+              });
+              // 迟滞判断：500ms 内检测到说话即视为持续发言，避免 200ms 音量震荡导致光环闪烁
+              const activeIds = Object.entries(speakingLastAtRef.current)
+                .filter(([, lastAt]) => now - lastAt < 500)
+                .map(([id]) => id);
+              // 内容不变时不更新，避免 200ms 高频回调触发无效重渲染
+              setSpeakingUserIds((prev) =>
+                prev.length === activeIds.length &&
+                prev.every((id) => activeIds.includes(id))
+                  ? prev
+                  : activeIds,
+              );
+              // 为刚停止说话的人安排延迟清理
+              Object.keys(speakingLastAtRef.current).forEach((id) => {
+                const lastAt = speakingLastAtRef.current[id];
+                if (now - lastAt < 500) return;
+                if (speakingTimersRef.current[id]) return;
+                speakingTimersRef.current[id] = setTimeout(() => {
+                  delete speakingTimersRef.current[id];
+                  delete speakingLastAtRef.current[id];
+                  setSpeakingUserIds((prev) => prev.filter((v) => v !== id));
+                }, 500);
+              });
+              // 远端说话人必然开着麦，兜底纠正进房前漏掉的 mute 状态
               setMembers((items) =>
-                items.map((item) => ({
-                  ...item,
-                  speaking: uids.includes(item.userId),
-                  // 正在说话的远端用户必然开着麦，兜底纠正进房前漏掉的 mute 状态
-                  micOpen:
-                    item.userId !== currentUser?.id &&
-                    uids.includes(item.userId)
-                      ? true
-                      : item.micOpen,
-                })),
+                items.map((item) =>
+                  item.userId !== selfId && speakingIds.includes(item.userId) && !item.micOpen
+                    ? { ...item, micOpen: true }
+                    : item,
+                ),
               );
             },
           },
@@ -861,6 +899,11 @@ export default function VoiceRoomScreen() {
     return () => {
       active = false;
       if (joining) useVoiceRoomSessionStore.getState().cancelRoomJoin(joining);
+      // 清理迟滞定时器和说话人状态
+      Object.values(speakingTimersRef.current).forEach(clearTimeout);
+      speakingTimersRef.current = {};
+      speakingLastAtRef.current = {};
+      setSpeakingUserIds([]);
     };
   }, [
     accessToken,
@@ -1341,7 +1384,10 @@ export default function VoiceRoomScreen() {
               (member.userId === String(currentUser?.id)
                 ? !muted
                 : Boolean(member.micOpen));
-            const speaking = micOpen && Boolean(member.speaking);
+            // speaking 来自独立的 speakingUserIds（声网音量回调高频更新的原子 state），
+            // 能说话即代表已开麦，不再用可能滞后的 micOpen 二次短路
+            const speaking =
+              rtcReady && speakingUserIds.includes(member.userId);
             return (
               <Pressable
                 key={`${member.userId}-${index}`}
@@ -1370,6 +1416,9 @@ export default function VoiceRoomScreen() {
                 }
               >
                 <View style={styles.avatarWrap}>
+                  {!invite ? (
+                    <VoiceRoomSpeakingHalo active={speaking} />
+                  ) : null}
                   {ring ? <Image source={ring} style={styles.ring} /> : null}
                   {invite ? (
                     <Image source={ringInvite} style={styles.inviteRing} />
@@ -1528,12 +1577,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     rowGap: 12,
   },
-  memberSlot: { alignItems: "center", minHeight: 103 },
+  memberSlot: { alignItems: "center", minHeight: 103, overflow: "visible" },
   avatarWrap: {
     width: 58,
     height: 58,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "visible",
   },
   avatar: { width: 48, height: 48, borderRadius: 24 },
   ring: { position: "absolute", width: 58, height: 58 },
