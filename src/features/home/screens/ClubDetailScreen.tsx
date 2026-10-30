@@ -154,8 +154,9 @@ export default function ClubDetailScreen() {
         avatar={item.headImage ?? ""}
         sex={item.sex ?? 0}
         age={item.age ?? null}
-        tagName={item.tagName}
-        tagColor={item.tagColor}
+        // 第三行标签对齐 PC 端大神列表：tagName + tagBackgroundColor（PC colorWithAlpha 缺省色）
+        introTagText={item.tagName}
+        introTagColor={item.tagBackgroundColor || "#474748"}
         // 列表本身按所选游戏过滤，接口记录不带图标时沿用所选游戏
         gameName={item.gameName || selectedGameInfo?.name}
         gameIconUrl={selectedGameInfo?.iconUrl}

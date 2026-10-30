@@ -105,8 +105,8 @@ export type Companion = {
   gameName: string;
   /** 卡内陪玩标签名（明星/魔王pro 等），空表示不展示标签 */
   tagName: string;
-  /** 标签背景色：优先移动端色值，后台未配置时由 UI 兜底 */
-  tagColor: string;
+  /** 标签通用背景色（对齐 PC 端 tagBackgroundColor），后台未配置时为空串由 UI 兜底 */
+  tagBackgroundColor: string;
   /** 卡片第三行斜杠文本三要素：游戏模式 / 游戏等级 / 服务 */
   modeName: string;
   levelName: string;

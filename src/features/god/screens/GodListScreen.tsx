@@ -134,6 +134,21 @@ function FilterMenu({
   );
 }
 
+/** 标签兜底配色：后台未下发移动端背景色时使用（对齐设计稿 Tag/陪玩 组件色板 node 1126-176457） */
+function levelTagColor(tagName: string) {
+  // 注意顺序：魔王pro 要先于 魔王 判断
+  if (tagName.includes("魔王pro")) return "#BB3EFA";
+  if (tagName.includes("颜值")) return "#3DA5FF";
+  if (tagName.includes("人气")) return "#13AEBD";
+  if (tagName.includes("大神")) return "#8BAD23";
+  if (tagName.includes("魔王")) return "#FF42A1";
+  if (tagName.includes("顶尖")) return "#FE4267";
+  if (tagName.includes("明星")) return "#7D47FC";
+  if (tagName.includes("金")) return "#D19643";
+  if (tagName.includes("娱乐")) return "#477BFE";
+  return "#C0C4CC";
+}
+
 export default function GodListScreen() {
   const insets = useSafeAreaInsets();
   const voicePlayer = useVoicePlayer();
@@ -190,8 +205,8 @@ export default function GodListScreen() {
       avatar={item.avatar}
       sex={item.sex}
       age={item.age}
-      tagName={item.tagName}
-      tagColor={item.tagColor}
+      introTagText={item.tagName}
+      introTagColor={item.tagColor || levelTagColor(item.tagName)}
       gameName={item.gameName}
       gameIconUrl={gameIconByName.get(item.gameName)}
       modeName={item.modeName}

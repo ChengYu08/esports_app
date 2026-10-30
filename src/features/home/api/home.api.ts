@@ -181,7 +181,7 @@ export async function fetchCompanionPage(filters: CompanionFilters, page = 1, pa
       price: item.price ?? 0,
       gameName: item.gameName || "",
       tagName: item.tagName || "",
-      tagColor: item.tagMobileBackgroundColor || item.tagBackgroundColor || "",
+      tagBackgroundColor: item.tagBackgroundColor || "",
       modeName: item.modeName || "",
       levelName: item.levelName || "",
       serviceName: item.clubGameServiceName || "",

@@ -16,8 +16,10 @@ export type CompanionCardProps = {
   avatar: string;
   sex: number;
   age: number | null;
-  tagName: string;
-  tagColor: string;
+  /** 第三行标签文案：空则不渲染标签，取值由业务侧决定 */
+  introTagText?: string;
+  /** 第三行标签背景色：由业务侧传入（大神：后端移动端色值/色板兜底；俱乐部：后台通用色值） */
+  introTagColor?: string;
   gameName?: string;
   gameIconUrl?: string;
   modeName?: string;
@@ -35,29 +37,14 @@ export type CompanionCardProps = {
   onPress: () => void;
 };
 
-/** 标签兜底配色：后台未下发移动端背景色时使用（对齐设计稿 Tag/陪玩 组件色板 node 1126-176457） */
-function levelTagColor(tagName: string) {
-  // 注意顺序：魔王pro 要先于 魔王 判断
-  if (tagName.includes("魔王pro")) return "#BB3EFA";
-  if (tagName.includes("颜值")) return "#3DA5FF";
-  if (tagName.includes("人气")) return "#13AEBD";
-  if (tagName.includes("大神")) return "#8BAD23";
-  if (tagName.includes("魔王")) return "#FF42A1";
-  if (tagName.includes("顶尖")) return "#FE4267";
-  if (tagName.includes("明星")) return "#7D47FC";
-  if (tagName.includes("金")) return "#D19643";
-  if (tagName.includes("娱乐")) return "#477BFE";
-  return "#C0C4CC";
-}
-
-/** 陪玩师卡片（大神列表 / 俱乐部主页共用）：纯 UI 组件，跳转与语音播放由父级注入 */
+/** 陪玩师卡片（大神列表 / 俱乐部主页共用）：纯 UI 组件，跳转、语音播放与第三行标签的文案取色均由父级注入 */
 export const CompanionCard = memo(function CompanionCard({
   nickname,
   avatar,
   sex,
   age,
-  tagName,
-  tagColor,
+  introTagText,
+  introTagColor,
   gameName,
   gameIconUrl,
   modeName,
@@ -143,11 +130,11 @@ export const CompanionCard = memo(function CompanionCard({
             </View>
           ) : null}
           <View style={styles.introRow}>
-            {tagName ? (
+            {introTagText ? (
               <View
-                style={[styles.levelTag, { backgroundColor: tagColor || levelTagColor(tagName) }]}
+                style={[styles.levelTag, { backgroundColor: introTagColor || "#C0C4CC" }]}
               >
-                <Text style={styles.levelTagText}>{tagName}</Text>
+                <Text style={styles.levelTagText}>{introTagText}</Text>
               </View>
             ) : null}
             <Text numberOfLines={1} style={styles.introText}>
@@ -253,14 +240,14 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   levelTag: {
-    // 设计稿 Tag/陪玩：水平 padding 2、圆角 2，高度较 14 增加 1 单位
+    // 设计稿 Tag/陪玩：水平 padding 2、圆角 2，高度较 14 增加 2 单位
     borderRadius: 2,
     paddingHorizontal: 2,
-    height: 15,
+    height: 16,
     justifyContent: "center",
     alignItems: "center",
   },
-  // 关闭 Android 字体额外 padding，保证 10/13 文字在 15 高标签内垂直居中
+  // 关闭 Android 字体额外 padding，保证 10/13 文字在 16 高标签内垂直居中
   levelTagText: {
     color: "#FFF",
     fontSize: 10,

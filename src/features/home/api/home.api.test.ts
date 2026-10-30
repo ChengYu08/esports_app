@@ -192,7 +192,7 @@ describe("俱乐部陪玩列表字段映射", () => {
 
     expect(page.items[0]).toMatchObject({
       tagName: "明星",
-      tagColor: "#FE4267",
+      tagBackgroundColor: "#138666",
       gameName: "三角洲行动手游",
       modeName: "大乱斗",
       levelName: "星耀",
@@ -204,7 +204,7 @@ describe("俱乐部陪玩列表字段映射", () => {
     });
     expect(page.items[1]).toMatchObject({
       tagName: "",
-      tagColor: "",
+      tagBackgroundColor: "",
       gameName: "",
       modeName: "",
       levelName: "",
@@ -215,20 +215,28 @@ describe("俱乐部陪玩列表字段映射", () => {
     });
   });
 
-  it("标签颜色优先移动端色值，未下发移动端色值时回退通用色值", async () => {
+  it("标签背景色直接使用后台通用色值，未下发时兜底空字符串", async () => {
     vi.mocked(apiClient).mockResolvedValue({
       code: "SUCCESS",
       data: {
         page: 1,
         totalPages: 1,
         records: [
-          { profileId: 1, nickname: "甲", tagName: "魔王pro", tagBackgroundColor: "#8F4033" },
+          {
+            profileId: 1,
+            nickname: "甲",
+            tagName: "魔王pro",
+            tagBackgroundColor: "#8F4033",
+            tagMobileBackgroundColor: "#FE4267",
+          },
+          { profileId: 2, nickname: "乙", tagName: "明星" },
         ],
       },
     });
 
     const page = await fetchCompanionPage({ clubId: "1000006", gameId: "11" });
 
-    expect(page.items[0]).toMatchObject({ tagName: "魔王pro", tagColor: "#8F4033" });
+    expect(page.items[0]).toMatchObject({ tagName: "魔王pro", tagBackgroundColor: "#8F4033" });
+    expect(page.items[1]).toMatchObject({ tagName: "明星", tagBackgroundColor: "" });
   });
 });
