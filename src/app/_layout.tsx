@@ -32,6 +32,7 @@ import { VoiceRoomKickListener } from "@/features/voice-room/components/VoiceRoo
 import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
 import { leaveVoiceChatRoom } from "@/features/voice-room/voice-room-rongcloud";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
+import { VoiceRoomJoinedSyncHost } from "@/features/voice-room/use-sync-joined-voice-room";
 import { PushyUpdateHost } from "@/features/ota/PushyUpdateHost";
 import { AppUpgradeHost } from "@/features/app-upgrade/AppUpgradeHost";
 import { TeenModeGate } from "@/features/mine/components/TeenModeGate";
@@ -273,6 +274,7 @@ export default function RootLayout() {
             <InAppNotificationBanner visible={!pathname.startsWith("/voice-room/")} />
             <ActionNoticeHost />
             <VoiceRoomMiniPlayer />
+            <VoiceRoomJoinedSyncHost enabled={privacyAccepted} />
             <VoiceRoomKickListener />
             <RongCommandHost />
             <OrderNotifySyncHost />
