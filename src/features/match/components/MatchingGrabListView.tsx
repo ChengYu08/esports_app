@@ -1,11 +1,16 @@
 import { Image } from "expo-image";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { useEffect } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import Animated, {
+  Easing,
+  FadeInDown,
+  interpolate,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { QuickMatchGrabItem } from "@/features/match/api/match.types";
@@ -17,12 +22,22 @@ const PUBLISH_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
 const FOOTER_CONTENT_BOTTOM = 22;
 const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
 
-/** 一陪多单：每个陪玩卡片下方的提示文案 */
-const MULTI_COMPANION_TIP = "仅需选定1位陪玩下单，剩余人员由接单陪玩选定队友。";
+/** UI 默认入场缓动（强 ease-out） */
+const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
+/** 卡片入场间隔（错峰） */
+const CARD_STAGGER_MS = 70;
+/** 单卡入场时长 */
+const CARD_ENTER_MS = 260;
+/** 新候选人金色光晕停留 + 淡出总时长 */
+const GLOW_LINGER_MS = 400;
+const GLOW_FADE_MS = 600;
 
 type MatchingGrabListViewProps = {
   countdownText: string;
+  countdownSec: number;
   candidates: QuickMatchGrabItem[];
+  /** 最近一次轮询中新出现的候选人 id（用于一次性发光提示） */
+  newCandidateIds?: ReadonlySet<string>;
   selectedGrabIds: string[];
   submitting: boolean;
   /** 技能类型为一陪多单时展示选人提示文案 */
@@ -43,15 +58,111 @@ function GenderAge({ sex }: { sex: 0 | 1 | 2 }) {
   );
 }
 
-function formatConfirmLabel(selectedCount: number, submitting: boolean): string {
+function formatConfirmLabel(
+  selectedCount: number,
+  submitting: boolean,
+): string {
   if (submitting) return "处理中...";
   if (selectedCount === 0) return "选TA下单";
   return `选TA下单（${selectedCount}）`;
 }
 
+/** 单个候选人卡片：错峰入场 + 按压回弹 + 新陪玩一次性金色描边 */
+function AnimatedGrabCard({
+  item,
+  index,
+  isNew,
+  selected,
+  onSelect,
+}: {
+  item: QuickMatchGrabItem;
+  index: number;
+  isNew: boolean;
+  selected: boolean;
+  onSelect: (grabId: string) => void;
+}) {
+  const reducedMotion = useReducedMotion();
+  const pressScale = useSharedValue(1);
+  const glow = useSharedValue(0);
+
+  // 新陪玩出现：金色描边亮一下停留 400ms 后淡出（一次性）
+  useEffect(() => {
+    if (!isNew || reducedMotion) return;
+    glow.set(
+      withTiming(1, { duration: 200, easing: EASE_OUT }, (finished) => {
+        if (!finished) return;
+        glow.set(
+          withTiming(0, {
+            duration: GLOW_LINGER_MS + GLOW_FADE_MS,
+            easing: EASE_OUT,
+          }),
+        );
+      }),
+    );
+  }, [glow, isNew, reducedMotion]);
+
+  const pressStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pressScale.value }],
+  }));
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(glow.value, [0, 1], [0, 1]),
+  }));
+
+  return (
+    <Animated.View
+      entering={FadeInDown.delay(60 + index * CARD_STAGGER_MS)
+        .duration(CARD_ENTER_MS)
+        .easing(EASE_OUT)}
+      style={pressStyle}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ selected }}
+        onPress={() => onSelect(item.id)}
+        onPressIn={() => {
+          pressScale.set(withSpring(0.97, { duration: 200, dampingRatio: 1 }));
+        }}
+        onPressOut={() => {
+          pressScale.set(withSpring(1, { duration: 200, dampingRatio: 1 }));
+        }}
+        pressRetentionOffset={8}
+        style={[styles.card, selected && styles.cardSelected]}
+      >
+        <Image
+          source={item.headImage ? { uri: item.headImage } : defaultAvatar}
+          style={styles.avatar}
+          contentFit="cover"
+        />
+        <View style={styles.meta}>
+          <View style={styles.nameRow}>
+            <Text style={styles.name} numberOfLines={1}>
+              {item.nickname}
+            </Text>
+            <GenderAge sex={item.sex} />
+          </View>
+          {item.remark ? (
+            <Text style={styles.signature} numberOfLines={1}>
+              {item.remark}
+            </Text>
+          ) : null}
+        </View>
+        {isNew ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, styles.cardGlow, glowStyle]}
+          />
+        ) : null}
+      </Pressable>
+    </Animated.View>
+  );
+}
+
 export function MatchingGrabListView({
   countdownText,
+  countdownSec,
   candidates,
+  newCandidateIds,
   selectedGrabIds,
   submitting,
   multiCompanion,
@@ -71,55 +182,41 @@ export function MatchingGrabListView({
       >
         <View style={styles.textBlock}>
           <Text style={styles.title}>选择你的陪玩大神</Text>
-          <MatchingCountdownText countdownText={countdownText} />
+          <MatchingCountdownText
+            countdownText={countdownText}
+            seconds={countdownSec}
+          />
         </View>
 
         <View style={styles.list}>
-          {candidates.map((item) => {
-            const selected = selectedGrabIds.includes(item.id);
-            return (
-              <Pressable
-                key={item.id}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                onPress={() => onSelect(item.id)}
-                style={[styles.card, selected && styles.cardSelected]}
-              >
-                <Image
-                  source={item.headImage ? { uri: item.headImage } : defaultAvatar}
-                  style={styles.avatar}
-                  contentFit="cover"
-                />
-                <View style={styles.meta}>
-                  <View style={styles.nameRow}>
-                    <Text style={styles.name} numberOfLines={1}>
-                      {item.nickname}
-                    </Text>
-                    <GenderAge sex={item.sex} />
-                  </View>
-                  {multiCompanion ? (
-                    <Text style={styles.multiCompanionTip}>
-                      {MULTI_COMPANION_TIP}
-                    </Text>
-                  ) : item.remark ? (
-                    <Text style={styles.signature} numberOfLines={1}>
-                      {item.remark}
-                    </Text>
-                  ) : null}
-                </View>
-              </Pressable>
-            );
-          })}
+          {candidates.map((item, index) => (
+            <AnimatedGrabCard
+              key={item.id}
+              item={item}
+              index={index}
+              isNew={Boolean(newCandidateIds?.has(item.id))}
+              selected={selectedGrabIds.includes(item.id)}
+              onSelect={onSelect}
+            />
+          ))}
         </View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + FOOTER_CONTENT_BOTTOM }]}>
+      <View
+        style={[
+          styles.footer,
+          { paddingBottom: insets.bottom + FOOTER_CONTENT_BOTTOM },
+        ]}
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={confirmLabel}
           disabled={submitting}
           onPress={onConfirm}
-          style={({ pressed }) => [styles.confirmWrap, pressed && styles.pressed]}
+          style={({ pressed }) => [
+            styles.confirmWrap,
+            pressed && styles.pressed,
+          ]}
         >
           <MatchLinearGradient
             colors={PUBLISH_GRADIENT}
@@ -178,6 +275,12 @@ const styles = StyleSheet.create({
   },
   cardSelected: {
     borderColor: "#FE4267",
+  },
+  cardGlow: {
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: "rgba(255, 199, 0, 0.9)",
+    backgroundColor: "rgba(255, 199, 0, 0.12)",
   },
   avatar: {
     width: 36,

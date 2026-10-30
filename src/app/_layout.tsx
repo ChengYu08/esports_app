@@ -13,6 +13,7 @@ import { setAuthExpiredHandler } from "@/core/network/api-client";
 import { queryClient } from "@/core/query/query-client";
 import { toAuthUser } from "@/features/auth/client-auth-flow";
 import { clientAuthApi } from "@/features/auth/client-auth.api";
+import { useOnboardingStore } from "@/features/auth/onboarding-store";
 import {
   clearAuthSession,
   readAuthSession,
@@ -75,6 +76,11 @@ export default function RootLayout() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const initializeMessages = useMessageStore((state) => state.initialize);
   const resetMessages = useMessageStore((state) => state.reset);
+  const onboardingHydrated = useOnboardingStore((state) => state.hydrated);
+  const shouldShowOnboarding = useOnboardingStore(
+    (state) => state.shouldShowProfileOnboarding,
+  );
+  const onboardingChecked = useRef(false);
 
   useEffect(() => {
     return setAuthExpiredHandler(async (_error, requestToken) => {
@@ -136,6 +142,9 @@ export default function RootLayout() {
   useEffect(() => {
     let active = true;
     void (async () => {
+      // 先恢复 onboarding 状态
+      await useOnboardingStore.getState().hydrate();
+
       const hasPrivacyConsent = await withStartupTimeout(
         readPrivacyConsent(),
         false,
@@ -186,6 +195,22 @@ export default function RootLayout() {
     };
   }, [clearSession, setSession]);
 
+  // 已登录用户启动 app 时，检查是否需要显示资料完善页
+  useEffect(() => {
+    if (
+      !onboardingHydrated ||
+      !sessionReady ||
+      !accessToken ||
+      onboardingChecked.current
+    ) return;
+
+    const user = useAuthStore.getState().user;
+    if (user?.id && shouldShowOnboarding(user.id)) {
+      onboardingChecked.current = true;
+      router.replace("/onboarding");
+    }
+  }, [onboardingHydrated, sessionReady, accessToken, shouldShowOnboarding]);
+
   useEffect(
     () => () => {
       void messageStore.getState().reset();
@@ -218,6 +243,10 @@ export default function RootLayout() {
                   }}
                 >
                   <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  <Stack.Screen
+                    name="onboarding"
+                    options={{ headerShown: false, gestureEnabled: false }}
+                  />
                   <Stack.Screen
                     name="image-preview"
                     options={{ headerShown: false }}

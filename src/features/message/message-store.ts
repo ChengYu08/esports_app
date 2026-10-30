@@ -105,6 +105,8 @@ export type MessageStoreState = {
 };
 
 const unavailableMessage = '当前版本暂不支持即时消息';
+// 自动重连上限：达到后停止调度，避免连接不可用时无限请求 im/token。
+const MAX_RECONNECT_ATTEMPTS = 10;
 let clientSequence = 0;
 
 function now() {
@@ -300,8 +302,20 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
 
     const scheduleReconnect = () => {
       if (reconnectTimer || !onlineStatusToken) return;
+      if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        logger.warn('RongCloud auto reconnect attempts exhausted', {
+          stage: 'reconnect-schedule',
+          attempts: reconnectAttempts,
+        });
+        return;
+      }
       const delayMs = Math.min(1_000 * 2 ** Math.min(reconnectAttempts, 5), 30_000);
       reconnectAttempts += 1;
+      logger.info('RongCloud auto reconnect scheduled', {
+        stage: 'reconnect-schedule',
+        attempt: reconnectAttempts,
+        delayMs,
+      });
       reconnectTimer = setTimeout(() => {
         reconnectTimer = undefined;
         const token = onlineStatusToken;
@@ -334,7 +348,15 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         }
         if (signal === 'timeout') {
           if (get().connectionState === 'idle' || get().connectionState === 'unavailable') return;
+          // 连接失败且已达上限时重置 attempts，让用户点重试/下次进入时重新计数。
           set({ connectionState: 'error', lastError: '即时消息连接超时，正在自动重连' });
+          if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+            logger.warn('RongCloud reconnect limit reached after timeout', {
+              stage: 'reconnect-timeout',
+              attempts: reconnectAttempts,
+            });
+            return;
+          }
           scheduleReconnect();
           return;
         }
@@ -444,6 +466,10 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         set({ connectionState: 'connecting', lastError: null });
         initializeInProgress = true;
         conversationSyncPending = false;
+        logger.info('RongCloud initialize starting', {
+          stage: 'message-store-initialize',
+          attempt: reconnectAttempts,
+        });
         try {
           const ready = await adapter.initialize(token);
           if (initializationRevision !== lifecycleRevision) return;
@@ -451,6 +477,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
             initializeInProgress = false;
             logger.warn('Instant messaging adapter initialization returned false', {
               stage: 'adapter-initialize',
+              attempt: reconnectAttempts,
             });
             set({ connectionState: 'error', lastError: '即时消息连接失败，请稍后重试' });
             return;
@@ -473,6 +500,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           initializeInProgress = false;
           logger.warn('Instant messaging initialization threw an error', {
             stage: 'message-store-initialize',
+            attempt: reconnectAttempts,
             errorName: error instanceof Error ? error.name : typeof error,
           });
           set({ connectionState: 'error', lastError: error instanceof Error ? error.message : '即时消息连接失败，请稍后重试' });

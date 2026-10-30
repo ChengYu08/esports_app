@@ -18,7 +18,6 @@ import {
   requestRecordingPermissionsAsync,
 } from "expo-audio";
 import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -39,10 +38,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 
+import { VoiceRoomBackground, VOICE_ROOM_BG_BASE } from "../components/VoiceRoomBackground";
 import { VoiceRoomConversationsSheet } from "../components/VoiceRoomConversationsSheet";
 import { VoiceRoomExitDialog } from "../components/VoiceRoomExitDialog";
 import { VoiceRoomMemberSheet } from "../components/VoiceRoomMemberSheet";
 import { VoiceRoomMicBadge } from "../components/VoiceRoomMicrophone";
+import { VoiceRoomSpeakingWaves } from "../components/VoiceRoomSpeakingWaves";
 import { VoiceRoomToolbar } from "../components/VoiceRoomToolbar";
 import { exitVoiceRoom } from "../exit-voice-room";
 import {
@@ -72,7 +73,6 @@ import type {
 /** 呼叫接待超时（秒），对齐 PC CS_CALL_TIMEOUT_SECONDS */
 const CS_CALL_TIMEOUT_SECONDS = 60;
 
-const BG_GRADIENT = ["#0C0C2E", "#120D2B"] as const;
 const closeIcon = require("../../../../assets/voice-room/navbar-exit.svg");
 const inviteIcon = require("../../../../assets/voice-room/invite.svg");
 const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
@@ -1289,12 +1289,7 @@ export default function VoiceRoomScreen() {
       keyboardVerticalOffset={0}
     >
       <StatusBar style="light" />
-      <LinearGradient
-        colors={BG_GRADIENT}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
+      <VoiceRoomBackground />
       <View style={[styles.safe, { paddingTop: insets.top }]}>
         <View style={styles.header}>
           <Pressable
@@ -1374,9 +1369,7 @@ export default function VoiceRoomScreen() {
                       }
                 }
               >
-                <View
-                  style={[styles.avatarWrap, speaking && styles.avatarSpeaking]}
-                >
+                <View style={styles.avatarWrap}>
                   {ring ? <Image source={ring} style={styles.ring} /> : null}
                   {invite ? (
                     <Image source={ringInvite} style={styles.inviteRing} />
@@ -1386,6 +1379,9 @@ export default function VoiceRoomScreen() {
                       style={styles.avatar}
                     />
                   )}
+                  {!invite ? (
+                    <VoiceRoomSpeakingWaves active={speaking} />
+                  ) : null}
                   {!invite ? (
                     <VoiceRoomMicBadge muted={!micOpen} speaking={speaking} />
                   ) : null}
@@ -1502,7 +1498,7 @@ export default function VoiceRoomScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#0C0C2E" },
+  screen: { flex: 1, backgroundColor: VOICE_ROOM_BG_BASE },
   safe: { flex: 1 },
   header: {
     height: 52,
@@ -1538,18 +1534,6 @@ const styles = StyleSheet.create({
     height: 58,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 29,
-    borderWidth: 1.5,
-    borderColor: "transparent",
-  },
-  avatarSpeaking: {
-    backgroundColor: "rgba(57,200,120,0.18)",
-    borderColor: "#39C878",
-    shadowColor: "#39C878",
-    shadowOpacity: 0.6,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 6,
   },
   avatar: { width: 48, height: 48, borderRadius: 24 },
   ring: { position: "absolute", width: 58, height: 58 },
