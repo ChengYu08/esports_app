@@ -10,19 +10,16 @@ import { OrderAfterSaleSheet } from "@/features/order/components/OrderAfterSaleS
 import { OrderCompleteConfirmSheet } from "@/features/order/components/OrderCompleteConfirmSheet";
 import { OrderDetailBottomBar } from "@/features/order/components/OrderDetailBottomBar";
 import { OrderDetailInfoBlocks } from "@/features/order/components/OrderDetailInfoBlocks";
-import { OrderProgressSteps } from "@/features/order/components/OrderProgressSteps";
 import { OrderDetailStatusBar } from "@/features/order/components/OrderDetailStatusBar";
+import { OrderFreeConfirmFlow } from "@/features/order/components/OrderFreeConfirmFlow";
+import { OrderProgressSteps } from "@/features/order/components/OrderProgressSteps";
 import { OrderReviewSheet } from "@/features/order/components/OrderReviewSheet";
-import { formatOrderTime } from "@/features/order/order-detail-format";
-import { getOrderDetailAction } from "@/features/order/order-detail-actions";
+import { formatOrderFreeSummary } from "@/features/order/free-amount";
 import { useOrderDetailActions } from "@/features/order/hooks/use-order-detail-actions";
-import {
-  orderDetailQueryKey,
-} from "@/features/order/order-query";
-import {
-  fetchOrderDetail,
-  mapOrder,
-} from "@/features/order/order.api";
+import { getOrderDetailAction } from "@/features/order/order-detail-actions";
+import { formatOrderTime } from "@/features/order/order-detail-format";
+import { orderDetailQueryKey } from "@/features/order/order-query";
+import { fetchOrderDetail, mapOrder } from "@/features/order/order.api";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 
@@ -67,31 +64,43 @@ export function OrderDetailScreen({
   const [clock, setClock] = useState(() => Date.now());
   const dispatchDeadline = detail.data?.dispatchDeadline;
   useEffect(() => {
-    if (scope !== "accept" || !dispatchDeadline) return;
+    if (scope !== "accept" || !dispatchDeadline) {
+      return;
+    }
     const timer = setInterval(() => setClock(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [dispatchDeadline, scope]);
-  if (detail.isLoading)
+  if (detail.isLoading) {
     return (
       <View style={styles.center}>
         <Text style={styles.muted}>订单详情加载中...</Text>
       </View>
     );
-  if (detail.isError || !detail.data)
+  }
+  if (detail.isError || !detail.data) {
     return (
       <View style={styles.center}>
         <Text style={styles.muted}>订单详情加载失败</Text>
-        <Pressable onPress={() => void detail.refetch()}>
+        <Pressable
+          onPress={() => {
+            detail.refetch();
+          }}
+        >
           <Text style={styles.retry}>点击重试</Text>
         </Pressable>
       </View>
     );
+  }
   const order = detail.data;
+  const isCompleted =
+    order.status === "completed" || order.status === "partiallyRefunded";
   const detailAction = getOrderDetailAction(order.actions);
   const detailActions =
     scope === "accept"
-      ? order.actions
-      : order.status === "completed"
+      ? isCompleted
+        ? []
+        : order.actions
+      : isCompleted
         ? order.actions.filter((item) =>
             ["afterSales", "review", "reorder"].includes(item.key),
           )
@@ -99,7 +108,6 @@ export function OrderDetailScreen({
           ? order.actions.filter((item) => item.key === detailAction)
           : [];
   const isPending = order.status === "pendingPayment";
-  const isCompleted = order.status === "completed";
   const isCancelled =
     order.status === "cancelled" || order.status === "refunded";
   const statusTitle =
@@ -124,31 +132,38 @@ export function OrderDetailScreen({
     : undefined;
   const showDispatchCountdown =
     scope === "accept" &&
-    (order.status === "paid" || order.status === "waitingService") &&
+    (order.status === "paid" ||
+      order.status === "waitingService" ||
+      order.status === "inService") &&
     dispatchCountdown !== undefined;
   const orderNumber = order.orderNo ?? order.id;
+  const freeSummary = formatOrderFreeSummary(order);
   const statusHint =
-    scope === "accept"
-      ? order.status === "paid"
-        ? "老板已支付，请及时处理订单"
-        : order.status === "waitingService"
-          ? "请按约定时间开始服务"
-          : order.status === "inService"
-            ? "服务进行中"
-            : isCompleted
-              ? ""
-              : isCancelled
-                ? "订单已取消"
-                : "订单状态已更新"
-      : isPending
-        ? "请在剩余时间内完成支付"
-        : isCompleted
-          ? "感谢你的支持"
-          : isCancelled
-            ? "订单已取消"
+    order.status === "refunded" || order.status === "partiallyRefunded"
+      ? freeSummary
+        ? `已免${freeSummary}`
+        : "退款已完成"
+      : scope === "accept"
+        ? order.status === "paid"
+          ? "老板已支付，请及时处理订单"
+          : order.status === "waitingService"
+            ? "请按约定时间开始服务"
             : order.status === "inService"
               ? "服务进行中"
-              : "陪玩确认后开始服务";
+              : isCompleted
+                ? ""
+                : isCancelled
+                  ? "订单已取消"
+                  : "订单状态已更新"
+        : isPending
+          ? "请在剩余时间内完成支付"
+          : isCompleted
+            ? "感谢你的支持"
+            : isCancelled
+              ? "订单已取消"
+              : order.status === "inService"
+                ? "服务进行中"
+                : "陪玩确认后开始服务";
 
   return (
     <View style={[styles.screen, scope === "accept" && styles.acceptScreen]}>
@@ -170,9 +185,10 @@ export function OrderDetailScreen({
         <View style={styles.headerSlot} />
       </View>
       <ScrollView
+        style={styles.scroll}
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: (detailActions.length ? 148 : 24) + insets.bottom },
+          { paddingBottom: detailActions.length ? 8 : 24 + insets.bottom },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -183,12 +199,14 @@ export function OrderDetailScreen({
           showDispatchCountdown={showDispatchCountdown}
           dispatchCountdown={dispatchCountdown}
         />
-        {!isCancelled && <OrderProgressSteps status={order.status} scope={scope} />}
+        {scope === "place" && !isCancelled ? (
+          <OrderProgressSteps status={order.status} scope={scope} />
+        ) : null}
         <OrderDetailInfoBlocks
           order={order}
           scope={scope}
           orderNumber={orderNumber}
-          onCopy={() => void actions.copyOrderNumber()}
+          onCopy={actions.copyOrderNumber}
           onChat={actions.handleChat}
         />
       </ScrollView>
@@ -196,7 +214,7 @@ export function OrderDetailScreen({
         scope={scope}
         actions={detailActions}
         pending={actions.actionPending}
-        onAction={(action) => void actions.handleDetailAction(action)}
+        onAction={actions.handleDetailAction}
       />
       <AppPrompt
         visible={actions.cancelPromptVisible}
@@ -243,7 +261,9 @@ export function OrderDetailScreen({
         )}
         loading={actions.actionPending}
         onClose={() => {
-          if (!actions.actionPending) actions.setCompletePromptVisible(false);
+          if (!actions.actionPending) {
+            actions.setCompletePromptVisible(false);
+          }
         }}
         onConfirm={actions.confirmCompleteAccept}
       />
@@ -257,25 +277,24 @@ export function OrderDetailScreen({
         onConfirm={actions.confirmRejectOrder}
       />
       {actions.actionPrompt === "free" ? (
-        <OrderCompleteConfirmSheet
-          mode="free"
-          visible
+        <OrderFreeConfirmFlow
           order={order}
-          companionName={order.receiverName || currentUser?.nickname || "陪玩师"}
+          companionName={
+            order.receiverName || currentUser?.nickname || "陪玩师"
+          }
           companionAvatar={
             order.receiverAvatar ??
-            (currentUser?.headImage ? { uri: currentUser.headImage } : undefined)
+            (currentUser?.headImage
+              ? { uri: currentUser.headImage }
+              : undefined)
           }
-          serviceTime={formatOrderTime(
-            order.serviceStartTime || order.serviceEndTime || order.createTime,
-          )}
           loading={actions.actionPending}
           onClose={() => {
-            if (!actions.actionPending) actions.setActionPrompt(null);
+            if (!actions.actionPending) {
+              actions.setActionPrompt(null);
+            }
           }}
-          onConfirm={(freeHours) => {
-            void actions.runFreeOrder(freeHours);
-          }}
+          onConfirm={actions.runFreeOrder}
         />
       ) : null}
       <AppPrompt
@@ -299,19 +318,23 @@ const styles = StyleSheet.create({
   },
   retry: { color: "#FF3158", fontSize: 15 },
   header: {
-    minHeight: 88,
     backgroundColor: "#FFF",
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingHorizontal: 12,
   },
-  back: { width: 32, alignItems: "flex-start" },
+  back: {
+    width: 32,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   backIcon: { width: 24, height: 24 },
   headerTitle: { width: 32 },
   headerSlot: { width: 32 },
-  content: { paddingBottom: 148 },
+  scroll: { flex: 1 },
+  content: { paddingBottom: 8 },
   muted: { color: "#999", fontFamily: DOUYIN_SANS, fontSize: 13 },
   acceptScreen: { backgroundColor: "#F7F7F7" },
 });

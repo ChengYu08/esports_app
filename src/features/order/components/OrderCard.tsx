@@ -1,10 +1,15 @@
 import { Copy16Regular } from "@fluentui/react-native-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import * as Clipboard from "expo-clipboard";
+import { LinearGradient } from "expo-linear-gradient";
 import { memo, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Toast from "react-native-root-toast";
 
+import {
+  computeOrderPayableStars,
+  formatOrderFreeSummary,
+  formatStar,
+} from "@/features/order/free-amount";
 import { formatOrderTime } from "@/features/order/order-detail-format";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
@@ -23,6 +28,7 @@ const STATUS_COLORS: Record<OrderStatus, string> = {
   waitingService: "#FF943D",
   inService: "#FF943D",
   completed: "#808080",
+  partiallyRefunded: "#808080",
   cancelled: "#808080",
   refunded: "#808080",
 };
@@ -40,6 +46,7 @@ export const OrderCard = memo(function OrderCard({
   onPress,
   actionPending = false,
 }: OrderCardProps) {
+  const freeSummary = formatOrderFreeSummary(item);
   const copyOrderNo = async () => {
     const orderNo = item.orderNo ?? item.id;
     try {
@@ -153,6 +160,13 @@ export const OrderCard = memo(function OrderCard({
                 {item.remark || "-"}
               </Text>
             </OrderDetailRow>
+            {freeSummary ? (
+              <OrderDetailRow label="免单">
+                <Text style={[styles.detailValue, styles.freeSummary]}>
+                  {freeSummary}
+                </Text>
+              </OrderDetailRow>
+            ) : null}
           </View>
           <View style={styles.totalRow}>
             <View style={styles.quantitySummary}>
@@ -164,8 +178,17 @@ export const OrderCard = memo(function OrderCard({
               </Text>
             </View>
             <View style={styles.totalValue}>
-              <Text style={styles.totalLabel}>合计</Text>
-              <Text style={styles.totalPrice}>{item.totalPrice}</Text>
+              <Text style={styles.totalLabel}>
+                {freeSummary ? "免单后" : "合计"}
+              </Text>
+              {freeSummary ? (
+                <Text style={styles.originalTotal}>{item.totalPrice}</Text>
+              ) : null}
+              <Text style={styles.totalPrice}>
+                {freeSummary
+                  ? formatStar(computeOrderPayableStars(item))
+                  : item.totalPrice}
+              </Text>
               <CachedImage
                 source={require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png")}
                 contentFit="contain"
@@ -358,7 +381,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   quantitySummary: { flexDirection: "row", alignItems: "center", gap: 4 },
-  totalValue: { flexDirection: "row", alignItems: "center", gap: 4 },
+  totalValue: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 4,
+  },
+  originalTotal: {
+    fontFamily: SYSTEM_FONT,
+    color: "#999999",
+    fontSize: 12,
+    lineHeight: 18,
+    textDecorationLine: "line-through",
+  },
+  freeSummary: { color: "#FE1F4C" },
   quantity: {
     fontFamily: SYSTEM_FONT,
     color: "#999999",
@@ -367,6 +404,7 @@ const styles = StyleSheet.create({
   },
   totalRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "flex-end",
     alignItems: "center",
     gap: 4,

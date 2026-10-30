@@ -2,6 +2,7 @@ import { queryClient } from "@/core/query/query-client";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
+import { showToast } from "@/shared/ui/app-toast";
 import { useAuthStore } from "@esports/auth";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -24,12 +25,13 @@ import { buildAfterSalePayload } from "../after-sale-card";
 import { OrderAfterSaleSheet } from "../components/OrderAfterSaleSheet";
 import { OrderCard } from "../components/OrderCard";
 import { OrderCompleteConfirmSheet } from "../components/OrderCompleteConfirmSheet";
+import { OrderFreeConfirmFlow } from "../components/OrderFreeConfirmFlow";
 import { OrderHeader } from "../components/OrderHeader";
 import { OrderReviewSheet } from "../components/OrderReviewSheet";
 import { OrderScopeTabs } from "../components/OrderScopeTabs";
 import { OrderTabs } from "../components/OrderTabs";
 import { grabDispatchRequest } from "../dispatch.api";
-import { computeFreeStarAmount } from "../free-amount";
+import { computeFreeStarAmount, computeOrderPayableStars } from "../free-amount";
 import { useOrderPage } from "../hooks/use-order-page";
 import {
   invalidateOrderQueries,
@@ -249,9 +251,13 @@ export default function OrderScreen() {
   };
 
   const confirmComplete = async () => {
-    if (!completeTarget || !token || completing) return;
+    if (!completeTarget || !token || completing) {
+      return;
+    }
     const target = completeTarget;
-    if (scope !== "accept") setCompletePromptVisible(false);
+    if (scope !== "accept") {
+      setCompletePromptVisible(false);
+    }
     setCompleting(true);
     try {
       await completeOrderRequest(target.id, token);
@@ -262,6 +268,7 @@ export default function OrderScreen() {
       } else {
         await invalidateOrderQueries(target.id);
       }
+      showToast("订单已完成");
     } catch (error) {
       setPrompt({
         title: "完成订单失败",
@@ -281,7 +288,7 @@ export default function OrderScreen() {
     }
     const target = freeTarget;
     const starAmount = computeFreeStarAmount(target, freeHours);
-    if (starAmount == null || starAmount <= 0) {
+    if (starAmount == null || starAmount <= 0 || freeHours > target.quantity || starAmount > computeOrderPayableStars(target)) {
       return;
     }
     setFreeSubmitting(true);
@@ -289,11 +296,12 @@ export default function OrderScreen() {
       await freeOrderService(target.id, starAmount, token);
       setFreeTarget(null);
       if (currentUser?.id) {
-        // 免单后状态变为退款，以详情为准就地刷新缓存中的该单。
+        // 全额免单与部分免单的状态不同，以详情为准就地刷新缓存中的该单。
         await refreshOrderAfterAction(target.id, token, currentUser.id);
       } else {
         await invalidateOrderQueries(target.id);
       }
+      showToast("免单成功");
     } catch (error) {
       setPrompt({
         title: "免单失败",
@@ -435,7 +443,7 @@ export default function OrderScreen() {
         cancelText="取消"
         confirmText="确认"
         onCancel={() => setCompletePromptVisible(false)}
-        onConfirm={() => void confirmComplete()}
+        onConfirm={confirmComplete}
       />
       {completeTarget ? (
         <OrderCompleteConfirmSheet
@@ -460,40 +468,28 @@ export default function OrderScreen() {
             .slice(0, 19)}
           loading={completing}
           onClose={() => {
-            if (!completing) setCompletePromptVisible(false);
+            if (!completing) {
+              setCompletePromptVisible(false);
+            }
           }}
-          onConfirm={() => void confirmComplete()}
+          onConfirm={confirmComplete}
         />
       ) : null}
       {freeTarget ? (
-        <OrderCompleteConfirmSheet
-          mode="free"
-          visible
+        <OrderFreeConfirmFlow
           order={freeTarget}
-          companionName={
-            freeTarget.receiverName || currentUser?.nickname || "陪玩师"
-          }
+          companionName={freeTarget.receiverName || currentUser?.nickname || "陪玩师"}
           companionAvatar={
             freeTarget.receiverAvatar ??
-            (currentUser?.headImage
-              ? { uri: currentUser.headImage }
-              : undefined)
+            (currentUser?.headImage ? { uri: currentUser.headImage } : undefined)
           }
-          serviceTime={(
-            freeTarget.serviceStartTime ||
-            freeTarget.serviceEndTime ||
-            freeTarget.createTime ||
-            "-"
-          )
-            .replace("T", " ")
-            .slice(0, 19)}
           loading={freeSubmitting}
           onClose={() => {
-            if (!freeSubmitting) setFreeTarget(null);
+            if (!freeSubmitting) {
+              setFreeTarget(null);
+            }
           }}
-          onConfirm={(freeHours) => {
-            void confirmFree(freeHours);
-          }}
+          onConfirm={confirmFree}
         />
       ) : null}
       <StarPaymentPrompt
