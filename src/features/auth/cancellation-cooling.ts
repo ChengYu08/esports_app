@@ -19,6 +19,15 @@ export function buildCoolingRecord(
   };
 }
 
+/** 解析服务端下发的冷静期截止时间（yyyy-MM-dd HH:mm:ss），无效返回 null */
+export function parseCoolEndTime(raw: string | null | undefined) {
+  if (!raw) {
+    return null;
+  }
+  const timestamp = new Date(raw.replace(" ", "T")).getTime();
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
 export function formatCoolEndTime(timestamp: number) {
   const date = new Date(timestamp);
   return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日${date.getHours()}时${String(date.getMinutes()).padStart(2, "0")}分`;
