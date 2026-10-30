@@ -29,8 +29,8 @@ export function ClubCard({
   };
 
   // 游戏图标行布局：≤4 平铺，>4 重叠且总宽不超过 4 个平铺宽度，最多 8 个
-  const gamesLayout = computeGameIconLayout(club.clubGames?.length ?? 0);
-  const games = (club.clubGames ?? []).slice(0, gamesLayout.shown);
+  const gamesLayout = computeGameIconLayout(club.games?.length ?? 0);
+  const games = (club.games ?? []).slice(0, gamesLayout.shown);
 
   return (
     <Pressable
