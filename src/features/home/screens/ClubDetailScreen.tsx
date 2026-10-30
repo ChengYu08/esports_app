@@ -1,18 +1,19 @@
-import { ChevronLeft24Regular, Search24Regular } from "@fluentui/react-native-icons";
+import { ChevronLeft24Regular, Headset24Regular, Search24Regular } from "@fluentui/react-native-icons";
 import { useAuthStore } from "@esports/auth";
+import { useQuery } from "@tanstack/react-query";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { SYSTEM_FONT } from "@/shared/theme/typography";
 import { EmptyState, ErrorState } from "@/shared/ui/AsyncStates";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import { fetchClubGameLevels } from "@/features/match/api/match.api";
 import {
   ClubDetailMemberSkeletonList,
   ClubDetailSkeleton,
 } from "@/features/home/components/ClubDetailSkeleton";
 import { ClubQuickMatchSheet } from "@/features/match/components/ClubQuickMatchSheet";
-import { useCustomerDispatch } from "@/features/voice-room/use-customer-dispatch";
+import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
 import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -37,24 +38,47 @@ import {
   useClubGameModes,
 } from "../hooks/use-home-data";
 
-const tabLeftCorner = require("../../../../assets/home/h_tab_left.svg");
-const tabRightCorner = require("../../../../assets/home/h_tab_right.svg");
+// 切图资源（新设计稿：俱乐部主页 455-68151 / 490-84520 / 557-88105）
+const bgClubImage = require("../../../../assets/home/club-detail/bg-club.png");
+const tabCornerIcon = require("../../../../assets/home/club-detail/tab-corner.svg");
+const arrowDownIcon = require("../../../../assets/home/club-detail/arrow-fill-down-new.svg");
+const arrowUpRedIcon = require("../../../../assets/home/club-detail/arrow-fill-up-red.svg");
+const statusPlayingIcon = require("../../../../assets/home/club-detail/status-playing-new.svg");
+const statusIdleIcon = require("../../../../assets/home/club-detail/status-idle-new.svg");
+const introToggleIcon = require("../../../../assets/home/club-detail/intro-toggle.svg");
 const maleIcon = require("../../../../assets/home/club-detail/male.svg");
 const femaleIcon = require("../../../../assets/home/club-detail/female.svg");
-const memberIcon = require("../../../../assets/coms/user.svg");
-const filterArrowIcon = require("../../../../assets/home/club-detail/arrow-fill-down.svg");
-const idleIcon = require("../../../../assets/home/club-detail/status-idle.svg");
-const playingIcon = require("../../../../assets/home/club-detail/status-playing.svg");
 const diamondIcon = require("../../../../assets/home/club-detail/icon-diamond.svg");
 const emptyStateIllustration = require("../../../../assets/coms/empty-state-illustration.svg");
 
-type FilterKey = "gender" | "mode" | "status" | "price";
+// 设计稿色板
+const COLORS = {
+  brand: "#FE1F4C",
+  brandLight: "#FE4267",
+  textDark: "#0D0D0F",
+  textTitle: "#0A0A0A",
+  textSecondary: "#656566",
+  textTertiary: "#979799",
+  textQuaternary: "#7F7F80",
+  white: "#FFFFFF",
+  white60: "rgba(255, 255, 255, 0.6)",
+  orangeBg: "#FFF4EB",
+  orangeText: "#F5821D",
+  gameTagText: "#B25C15",
+  greenBg: "#E6FAEF",
+  greenText: "#14A357",
+  border: "#E9E9EB",
+} as const;
+
+type FilterKey = "mode" | "level" | "gender" | "advanced";
 const filterDefinitions: { key: FilterKey; label: string }[] = [
-  { key: "gender", label: "性别" },
   { key: "mode", label: "模式" },
-  { key: "status", label: "状态" },
-  { key: "price", label: "价格" },
+  { key: "level", label: "等级" },
+  { key: "gender", label: "性别" },
+  { key: "advanced", label: "筛选" },
 ];
+
+type MemberStatus = "playing" | "idle";
 
 const memberKeyExtractor = (member: Companion) => String(member.profileId);
 
@@ -63,26 +87,34 @@ export default function ClubDetailScreen() {
   const { height: windowHeight } = useWindowDimensions();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const [game, setGame] = useState<GameKey>("");
+  // 简介展开状态：默认收起两行，点击右下角按钮切换
+  const [introExpanded, setIntroExpanded] = useState(false);
   const [openFilter, setOpenFilter] = useState<FilterKey | null>(null);
   const [isFilterSheetVisible, setFilterSheetVisible] = useState(false);
   const [showPriceEmptyModal, setShowPriceEmptyModal] = useState(false);
   const [quickMatchVisible, setQuickMatchVisible] = useState(false);
   const accessToken = useAuthStore((state) => state.accessToken);
-  const { dispatch: dispatchReception } = useCustomerDispatch();
+  const { openCustomerService } = useCustomerServiceEntry();
   const [priceSort, setPriceSort] =
     useState<CompanionFilters["priceSort"]>("DEFAULT");
   const [selectedSex, setSelectedSex] = useState<CompanionFilters["sex"]>();
   const [selectedStatus, setSelectedStatus] =
     useState<CompanionFilters["gameStatus"]>();
   const [selectedMode, setSelectedMode] = useState<number>();
+  const [selectedLevel, setSelectedLevel] = useState<number>();
   const clubQuery = useClubDetail(id);
   const club = clubQuery.data;
   const games = club?.games ?? [];
   const selectedGame = game || String(games[0]?.id ?? "");
+  const selectedGameInfo = games.find((item) => String(item.id) === selectedGame);
   const modesQuery = useClubGameModes(selectedGame);
-  const selectedModeLabel = modesQuery.data?.find(
-    (mode) => mode.id === selectedMode,
-  )?.modeName;
+  // 等级列表依赖已选模式（接口按 gameModeId 查询），且需要登录态
+  const levelsQuery = useQuery({
+    queryKey: ["club-game-levels", selectedMode, accessToken],
+    queryFn: ({ signal }) =>
+      fetchClubGameLevels(String(selectedMode), accessToken as string, signal),
+    enabled: Boolean(selectedMode && accessToken),
+  });
   const companionFilters = useMemo<CompanionFilters | null>(
     () =>
       club && selectedGame
@@ -95,9 +127,18 @@ export default function ClubDetailScreen() {
             // 空闲中=gameStatus 0 且必须在线；离线用户仅在状态不限时展示。
             onlineOnly: selectedStatus === 0 ? true : undefined,
             gameModeId: selectedMode,
+            gameLevelId: selectedLevel,
           }
         : null,
-    [club, priceSort, selectedGame, selectedMode, selectedSex, selectedStatus],
+    [
+      club,
+      priceSort,
+      selectedGame,
+      selectedLevel,
+      selectedMode,
+      selectedSex,
+      selectedStatus,
+    ],
   );
   const companionsQuery = useClubCompanions(companionFilters);
   const members = useMemo(
@@ -107,11 +148,8 @@ export default function ClubDetailScreen() {
   const voicePlayer = useVoicePlayer();
   const clubId = club?.id ?? "";
   const quickMatchClub = useMemo(
-    () =>
-      club
-        ? { id: club.id, name: club.name }
-        : { id: "", name: "" },
-    [club?.id, club?.name],
+    () => (club ? { id: club.id, name: club.name } : { id: "", name: "" }),
+    [club],
   );
   const renderMember = useCallback(
     ({ item }: { item: Companion }) => (
@@ -128,23 +166,19 @@ export default function ClubDetailScreen() {
         voiceUrl={item.voiceUrl}
         voicePlaying={voicePlayer.playingUrl === item.voiceUrl}
         onToggleVoice={voicePlayer.toggle}
+        // 游戏角标跟列表所选游戏一致（列表本身按该游戏过滤）
+        gameName={selectedGameInfo?.name}
+        gameIconUrl={selectedGameInfo?.iconUrl}
         status={
           item.gameStatus === 1
-            ? "游戏中"
+            ? "playing"
             : item.onlineStatus === 1
-              ? "空闲中"
-              : undefined
-        }
-        statusColor={
-          item.gameStatus === 1
-            ? "#1e5eff"
-            : item.onlineStatus === 1
-              ? "#16c978"
+              ? "idle"
               : undefined
         }
       />
     ),
-    [clubId, voicePlayer.playingUrl, voicePlayer.toggle],
+    [clubId, selectedGameInfo?.iconUrl, selectedGameInfo?.name, voicePlayer.playingUrl, voicePlayer.toggle],
   );
   const [filterBackdropOpacity] = useState(() => new Animated.Value(0));
   const [filterSheetTranslateY] = useState(
@@ -153,8 +187,9 @@ export default function ClubDetailScreen() {
   const isFilterSheetClosing = useRef(false);
 
   useEffect(() => {
-    if (!isFilterSheetVisible) return;
-
+    if (!isFilterSheetVisible) {
+      return;
+    }
     filterBackdropOpacity.setValue(0);
     filterSheetTranslateY.setValue(windowHeight);
     const animation = Animated.parallel([
@@ -182,14 +217,18 @@ export default function ClubDetailScreen() {
   ]);
 
   function openFilterSheet(filter: FilterKey) {
-    if (isFilterSheetVisible) return;
+    if (isFilterSheetVisible) {
+      return;
+    }
     isFilterSheetClosing.current = false;
     setOpenFilter(filter);
     setFilterSheetVisible(true);
   }
 
   function closeFilterSheet() {
-    if (!isFilterSheetVisible || isFilterSheetClosing.current) return;
+    if (!isFilterSheetVisible || isFilterSheetClosing.current) {
+      return;
+    }
     isFilterSheetClosing.current = true;
     Animated.parallel([
       Animated.timing(filterBackdropOpacity, {
@@ -205,149 +244,202 @@ export default function ClubDetailScreen() {
         useNativeDriver: true,
       }),
     ]).start(({ finished }) => {
-      if (!finished) return;
+      if (!finished) {
+        return;
+      }
       setFilterSheetVisible(false);
       setOpenFilter(null);
       isFilterSheetClosing.current = false;
     });
   }
 
-  if (clubQuery.isLoading)
+  function handleSelectGame(nextGameId: string) {
+    setGame(nextGameId);
+    // 切换游戏后模式/等级需要重新选择
+    setSelectedMode(undefined);
+    setSelectedLevel(undefined);
+  }
+
+  if (clubQuery.isLoading) {
     return (
       <ClubDetailSkeleton
         topInset={insets.top}
         bottomInset={insets.bottom}
       />
     );
-  if (clubQuery.isError || !club)
+  }
+  if (clubQuery.isError || !club) {
     return <ErrorState onRetry={() => void clubQuery.refetch()} />;
+  }
   return (
     <View style={styles.screen}>
       <StatusBar style="light" />
-      <LinearGradient
-        colors={["#3b6f75", "#2a6681"]}
-        end={{ x: 1, y: 0.8 }}
-        start={{ x: 0, y: 0 }}
-        style={[styles.header, { paddingTop: insets.top }]}
-      >
-        <View style={[styles.nav, { height: 44 }]}>
+      {/* 顶部整屏背景切图（设计稿 top bg-club） */}
+      <Image
+        source={bgClubImage}
+        style={[styles.background, { height: windowHeight }]}
+        contentFit="cover"
+        pointerEvents="none"
+      />
+      {/* 导航栏：返回 + 搜索 + 客服 */}
+      <View style={[styles.nav, { paddingTop: insets.top }]}>
+        <Pressable
+          accessibilityLabel="返回"
+          hitSlop={10}
+          onPress={() => router.back()}
+        >
+          <ChevronLeft24Regular color={COLORS.white} width={24} height={24} />
+        </Pressable>
+        <View style={styles.navActions}>
           <Pressable
-            accessibilityLabel="返回"
+            accessibilityLabel="搜索"
             hitSlop={10}
-            onPress={() => router.back()}
+            onPress={() =>
+              router.push({
+                pathname: "/search",
+                params: { type: "user", clubId: club.id },
+              })
+            }
           >
-            <ChevronLeft24Regular color="white" width={24} height={24} style={styles.navIconImage} />
+            <Search24Regular color={COLORS.white} width={24} height={24} />
           </Pressable>
-          <View style={styles.navTitleSpacer} />
-          <View style={styles.navActions}>
-            <Pressable
-              accessibilityLabel="搜索"
-              hitSlop={10}
-              onPress={() =>
-                router.push({
-                  pathname: "/search",
-                  params: { type: "user", clubId: club.id },
-                })
-              }
-            >
-              <Search24Regular color="white" width={24} height={24} style={styles.navIconImage} />
-            </Pressable>
-          </View>
+          <Pressable
+            accessibilityLabel="在线客服"
+            hitSlop={10}
+            onPress={openCustomerService}
+          >
+            <Headset24Regular color={COLORS.white} width={24} height={24} />
+          </Pressable>
         </View>
-        <View style={styles.clubInfo}>
+      </View>
+      {/* 俱乐部信息区（毛玻璃面板，圆角 12 顶部） */}
+      <View style={styles.infoSection}>
+        <View style={styles.infoMain}>
           <CachedImage
             source={club.logoUrl ? { uri: club.logoUrl } : undefined}
             style={styles.clubLogo}
             contentFit="cover"
           />
           <View style={styles.clubCopy}>
-            <View style={styles.titleLine}>
+            <View style={styles.clubTitleRow}>
               <Text numberOfLines={1} style={styles.clubName}>
                 {club.name}
               </Text>
               <Text style={styles.selfTag}>自营</Text>
-              <View style={styles.clubMeta}>
-                <Image source={memberIcon} style={styles.clubMetaIcon} />
-                <Text style={styles.metaText}>{club.memberCount}</Text>
+            </View>
+            <View style={styles.clubMetaRow}>
+              <View style={styles.clubMetaItem}>
+                <Text style={styles.clubMetaLabel}>成员</Text>
+                <Text style={styles.clubMetaValue}>{club.memberCount}人</Text>
+              </View>
+              <View style={styles.clubMetaItem}>
+                <Text style={styles.clubMetaLabel}>俱乐部ID</Text>
+                <Text style={styles.clubMetaValue}>{club.id}</Text>
               </View>
             </View>
-
-            <Text numberOfLines={1} style={styles.clubDescription}>
-              {club.intro}
-            </Text>
           </View>
         </View>
+        <View style={styles.introBlock}>
+          <Text
+            numberOfLines={introExpanded ? undefined : 2}
+            style={styles.introText}
+          >
+            {club.intro}
+          </Text>
+          <Pressable
+            accessibilityLabel={introExpanded ? "收起简介" : "展开简介"}
+            hitSlop={6}
+            style={styles.introToggle}
+            onPress={() => setIntroExpanded(!introExpanded)}
+          >
+            <Image
+              source={introToggleIcon}
+              style={[
+                styles.introToggleIcon,
+                introExpanded && styles.introToggleIconExpanded,
+              ]}
+            />
+          </Pressable>
+        </View>
+      </View>
+      {/* 游戏页签 */}
+      <View style={styles.gameTabBar}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={styles.gameTabs}
-          contentContainerStyle={styles.gameTabsContent}
+          contentContainerStyle={styles.gameTabBarContent}
         >
-          {games.map((item, index) => (
+          {games.map((item) => (
             <GameTab
               key={item.id}
               label={item.name}
               iconUrl={item.iconUrl}
-              first={index === 0}
               active={selectedGame === String(item.id)}
-              onPress={() => {
-                setGame(String(item.id));
-                setSelectedMode(undefined);
-              }}
+              onPress={() => handleSelectGame(String(item.id))}
             />
           ))}
         </ScrollView>
-      </LinearGradient>
-      <View style={styles.filterRow}>
-        {filterDefinitions.map(({ key, label }) => {
-          const displayLabel =
-            key === "gender"
-              ? selectedSex === 1
-                ? "男"
-                : selectedSex === 2
-                  ? "女"
-                  : label
-              : key === "mode"
-                ? selectedModeLabel || label
-                : key === "status"
-                  ? selectedStatus === 0
-                    ? "空闲中"
-                    : selectedStatus === 1
-                      ? "游戏中"
-                      : label
-                  : priceSort === "ASC"
-                    ? "从低到高"
-                    : priceSort === "DESC"
-                      ? "从高到低"
-                      : label;
-          const hasSelection = displayLabel !== label;
-          const filterDisplay = hasSelection
-            ? `${label} ${displayLabel}`
-            : label;
-          return (
-            <Pressable
-              key={key}
-              accessibilityLabel={`筛选${label}`}
-              style={[
-                styles.filterItem,
-                openFilter === key && styles.filterItemActive,
-              ]}
-              onPress={() => openFilterSheet(key)}
-            >
-              <Text
-                numberOfLines={1}
-                style={[
-                  styles.filterText,
-                  hasSelection && styles.filterTextSelected,
-                ]}
-              >
-                {filterDisplay}
-              </Text>
-              <Image source={filterArrowIcon} style={styles.filterArrowIcon} />
-            </Pressable>
-          );
-        })}
       </View>
+      {/* 成员列表（白色圆角面板：筛选栏 + 卡片） */}
+      <FlatList
+        data={members}
+        keyExtractor={memberKeyExtractor}
+        renderItem={renderMember}
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingBottom: 92 + insets.bottom },
+        ]}
+        style={styles.listScroll}
+        ListHeaderComponent={
+          <View style={styles.filterBar}>
+            {filterDefinitions.map(({ key, label }) => {
+              const hasSelection =
+                (key === "gender" && selectedSex !== undefined) ||
+                (key === "mode" && selectedMode !== undefined) ||
+                (key === "level" && selectedLevel !== undefined) ||
+                (key === "advanced" &&
+                  (selectedStatus !== undefined || priceSort !== "DEFAULT"));
+              const selecting = openFilter === key;
+              return (
+                <Pressable
+                  key={key}
+                  accessibilityLabel={`筛选${label}`}
+                  accessibilityState={{ selected: hasSelection }}
+                  style={styles.filterOption}
+                  onPress={() => openFilterSheet(key)}
+                >
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.filterOptionText,
+                      hasSelection && styles.filterOptionTextSelected,
+                      selecting && styles.filterOptionTextSelecting,
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                  <Image
+                    source={selecting ? arrowUpRedIcon : arrowDownIcon}
+                    style={styles.filterArrowIcon}
+                  />
+                </Pressable>
+              );
+            })}
+          </View>
+        }
+        ListEmptyComponent={
+          companionsQuery.isLoading ? (
+            <ClubDetailMemberSkeletonList />
+          ) : (
+            <EmptyState message="暂无大神" style={styles.memberEmpty} />
+          )
+        }
+      />
+      {/* 筛选底部弹窗 */}
       <Modal
         transparent
         visible={isFilterSheetVisible}
@@ -375,117 +467,156 @@ export default function ClubDetailScreen() {
                     ?.label
                 }
               </Text>
-              <Pressable onPress={closeFilterSheet}>
+              <Pressable accessibilityLabel="关闭" onPress={closeFilterSheet}>
                 <Text style={styles.filterClose}>×</Text>
               </Pressable>
             </View>
-            {openFilter === "gender" && (
-              <>
-                <FilterOption
-                  label="不限"
-                  selected={!selectedSex}
-                  onPress={() => {
-                    setSelectedSex(undefined);
-                    closeFilterSheet();
-                  }}
-                />
-                <FilterOption
-                  label="男"
-                  selected={selectedSex === 1}
-                  onPress={() => {
-                    setSelectedSex(1);
-                    closeFilterSheet();
-                  }}
-                />
-                <FilterOption
-                  label="女"
-                  selected={selectedSex === 2}
-                  onPress={() => {
-                    setSelectedSex(2);
-                    closeFilterSheet();
-                  }}
-                />
-              </>
-            )}
-            {openFilter === "mode" && (
-              <>
-                <FilterOption
-                  label="不限"
-                  selected={!selectedMode}
-                  onPress={() => {
-                    setSelectedMode(undefined);
-                    closeFilterSheet();
-                  }}
-                />
-                {modesQuery.data?.map((mode) => (
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              style={styles.filterSheetBody}
+            >
+              {openFilter === "gender" && (
+                <>
                   <FilterOption
-                    key={mode.id}
-                    label={mode.modeName}
-                    selected={selectedMode === mode.id}
+                    label="不限"
+                    selected={!selectedSex}
                     onPress={() => {
-                      setSelectedMode(mode.id);
+                      setSelectedSex(undefined);
                       closeFilterSheet();
                     }}
                   />
-                ))}
-              </>
-            )}
-            {openFilter === "status" && (
-              <>
-                <FilterOption
-                  label="不限"
-                  selected={selectedStatus === undefined}
-                  onPress={() => {
-                    setSelectedStatus(undefined);
-                    closeFilterSheet();
-                  }}
-                />
-                <FilterOption
-                  label="空闲中"
-                  selected={selectedStatus === 0}
-                  onPress={() => {
-                    setSelectedStatus(0);
-                    closeFilterSheet();
-                  }}
-                />
-                <FilterOption
-                  label="游戏中"
-                  selected={selectedStatus === 1}
-                  onPress={() => {
-                    setSelectedStatus(1);
-                    closeFilterSheet();
-                  }}
-                />
-              </>
-            )}
-            {openFilter === "price" && (
-              <>
-                <FilterOption
-                  label="默认排序"
-                  selected={priceSort === "DEFAULT"}
-                  onPress={() => {
-                    setPriceSort("DEFAULT");
-                    closeFilterSheet();
-                  }}
-                />
-                <FilterOption
-                  label="从高到低"
-                  selected={priceSort === "DESC"}
-                  onPress={() => {
-                    setPriceSort("DESC");
-                    closeFilterSheet();
-                  }}
-                />
-                <FilterOption
-                  label="从低到高"
-                  selected={priceSort === "ASC"}
-                  onPress={() => {
-                    setPriceSort("ASC");
-                    closeFilterSheet();
-                  }}
-                />
-              </>
-            )}
+                  <FilterOption
+                    label="男"
+                    selected={selectedSex === 1}
+                    onPress={() => {
+                      setSelectedSex(1);
+                      closeFilterSheet();
+                    }}
+                  />
+                  <FilterOption
+                    label="女"
+                    selected={selectedSex === 2}
+                    onPress={() => {
+                      setSelectedSex(2);
+                      closeFilterSheet();
+                    }}
+                  />
+                </>
+              )}
+              {openFilter === "mode" && (
+                <>
+                  <FilterOption
+                    label="不限"
+                    selected={!selectedMode}
+                    onPress={() => {
+                      setSelectedMode(undefined);
+                      setSelectedLevel(undefined);
+                      closeFilterSheet();
+                    }}
+                  />
+                  {modesQuery.data?.map((mode) => (
+                    <FilterOption
+                      key={mode.id}
+                      label={mode.modeName}
+                      selected={selectedMode === mode.id}
+                      onPress={() => {
+                        setSelectedMode(mode.id);
+                        // 模式变化后等级需重新选择
+                        setSelectedLevel(undefined);
+                        closeFilterSheet();
+                      }}
+                    />
+                  ))}
+                </>
+              )}
+              {openFilter === "level" && (
+                  !selectedMode ? (
+                    <Text style={styles.filterSheetHint}>
+                      请先选择「模式」后再选择等级
+                    </Text>
+                  ) : !accessToken ? (
+                    <Text style={styles.filterSheetHint}>
+                      登录后可选择等级
+                    </Text>
+                  ) : (
+                    <>
+                      <FilterOption
+                        label="不限"
+                        selected={!selectedLevel}
+                        onPress={() => {
+                          setSelectedLevel(undefined);
+                          closeFilterSheet();
+                        }}
+                      />
+                      {levelsQuery.data?.map((level) => (
+                        <FilterOption
+                          key={level.id}
+                          label={level.name}
+                          selected={selectedLevel === Number(level.id)}
+                          onPress={() => {
+                            setSelectedLevel(Number(level.id));
+                            closeFilterSheet();
+                          }}
+                        />
+                      ))}
+                    </>
+                  )
+              )}
+              {openFilter === "advanced" && (
+                <>
+                  <Text style={styles.filterSectionTitle}>状态</Text>
+                  <FilterOption
+                    label="不限"
+                    selected={selectedStatus === undefined}
+                    onPress={() => {
+                      setSelectedStatus(undefined);
+                      closeFilterSheet();
+                    }}
+                  />
+                  <FilterOption
+                    label="空闲中"
+                    selected={selectedStatus === 0}
+                    onPress={() => {
+                      setSelectedStatus(0);
+                      closeFilterSheet();
+                    }}
+                  />
+                  <FilterOption
+                    label="游戏中"
+                    selected={selectedStatus === 1}
+                    onPress={() => {
+                      setSelectedStatus(1);
+                      closeFilterSheet();
+                    }}
+                  />
+                  <Text style={styles.filterSectionTitle}>价格</Text>
+                  <FilterOption
+                    label="默认排序"
+                    selected={priceSort === "DEFAULT"}
+                    onPress={() => {
+                      setPriceSort("DEFAULT");
+                      closeFilterSheet();
+                    }}
+                  />
+                  <FilterOption
+                    label="从低到高"
+                    selected={priceSort === "ASC"}
+                    onPress={() => {
+                      setPriceSort("ASC");
+                      closeFilterSheet();
+                    }}
+                  />
+                  <FilterOption
+                    label="从高到低"
+                    selected={priceSort === "DESC"}
+                    onPress={() => {
+                      setPriceSort("DESC");
+                      closeFilterSheet();
+                    }}
+                  />
+                </>
+              )}
+            </ScrollView>
           </Animated.View>
         </Animated.View>
       </Modal>
@@ -534,28 +665,11 @@ export default function ClubDetailScreen() {
           </Pressable>
         </Pressable>
       </Modal>
-      <FlatList
-        data={members}
-        keyExtractor={memberKeyExtractor}
-        renderItem={renderMember}
-        initialNumToRender={8}
-        maxToRenderPerBatch={8}
-        windowSize={7}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 92 + insets.bottom }}
-        style={styles.listScroll}
-        ListEmptyComponent={
-          companionsQuery.isLoading ? (
-            <ClubDetailMemberSkeletonList />
-          ) : (
-            <EmptyState message="暂无大神" style={styles.memberEmpty} />
-          )
-        }
-      />
+      {/* 底部操作栏：价目表 + 一键匹配 */}
       <View
         style={[
           styles.bottomBar,
-          { paddingBottom: Math.max(insets.bottom, 12) },
+          { paddingBottom: Math.max(insets.bottom, 8) },
         ]}
       >
         <Pressable
@@ -571,18 +685,10 @@ export default function ClubDetailScreen() {
             });
           }}
         >
-          <Text style={styles.priceText}>价目表</Text>
+          <Text style={styles.priceButtonText}>价目表</Text>
         </Pressable>
         <Pressable
-          style={styles.actionButton}
-          onPress={() => {
-            void dispatchReception({ clubId: club?.id });
-          }}
-        >
-          <Text style={styles.actionButtonText}>接待派单</Text>
-        </Pressable>
-        <Pressable
-          style={styles.actionButton}
+          style={styles.matchButton}
           onPress={() => {
             if (!accessToken) {
               Toast.show("请先登录", { duration: Toast.durations.SHORT });
@@ -591,7 +697,7 @@ export default function ClubDetailScreen() {
             setQuickMatchVisible(true);
           }}
         >
-          <Text style={styles.actionButtonText}>一键匹配</Text>
+          <Text style={styles.matchButtonText}>一键匹配</Text>
         </Pressable>
       </View>
       <ClubQuickMatchSheet
@@ -609,55 +715,70 @@ export default function ClubDetailScreen() {
   );
 }
 
+/** 游戏页签：选中为白色圆角块 + 右侧反转角标，未选中透明白字 */
 function GameTab({
   label,
   iconUrl,
-  first,
   active,
   onPress,
 }: {
   label: string;
   iconUrl?: string;
-  first: boolean;
   active: boolean;
   onPress: () => void;
 }) {
   return (
     <Pressable
+      accessibilityLabel={label}
+      accessibilityState={{ selected: active }}
+      style={styles.gameTab}
       onPress={onPress}
-      style={[
-        styles.gameTab,
-        first && styles.gameTabFirst,
-        active && styles.gameTabActive,
-        active && !first && styles.gameTabActiveAfterFirst,
-      ]}
     >
-      <View style={styles.gameLogo}>
-        {iconUrl ? (
-          <CachedImage source={{ uri: iconUrl }} style={styles.gameIcon} />
-        ) : (
-          <Text style={styles.gameTriangle}>△</Text>
-        )}
+      <View
+        style={[styles.gameTabContent, active && styles.gameTabContentActive]}
+      >
+        <View style={styles.gameTabIcon}>
+          {iconUrl ? (
+            <CachedImage source={{ uri: iconUrl }} style={styles.gameTabIconImage} />
+          ) : (
+            <View style={styles.gameTabIconFallback} />
+          )}
+        </View>
+        <Text style={[styles.gameTabText, active && styles.gameTabTextActive]}>
+          {label}
+        </Text>
       </View>
-      <Text style={[styles.gameLabel, active && styles.gameLabelActive]}>
-        {label}
-      </Text>
-      {active && (
-        <>
-          <View style={styles.gameIndicator} />
-          <Image
-            source={tabLeftCorner}
-            style={[styles.tabCorner, styles.tabCornerLeft]}
-            pointerEvents="none"
-          />
-          <Image
-            source={tabRightCorner}
-            style={[styles.tabCorner, styles.tabCornerRight]}
-            pointerEvents="none"
-          />
-        </>
-      )}
+      {active ? (
+        <Image
+          source={tabCornerIcon}
+          style={styles.gameTabCorner}
+          pointerEvents="none"
+        />
+      ) : null}
     </Pressable>
+  );
+}
+
+/** 成员状态标签：游戏中（橙）/ 空闲中（绿） */
+function StatusTag({ status }: { status: MemberStatus }) {
+  const playing = status === "playing";
+  return (
+    <View
+      style={[styles.statusTag, playing ? styles.statusTagPlaying : styles.statusTagIdle]}
+    >
+      <Image
+        source={playing ? statusPlayingIcon : statusIdleIcon}
+        style={styles.statusTagIcon}
+      />
+      <Text
+        style={[
+          styles.statusTagText,
+          { color: playing ? COLORS.orangeText : COLORS.greenText },
+        ]}
+      >
+        {playing ? "游戏中" : "空闲中"}
+      </Text>
+    </View>
   );
 }
 
@@ -675,17 +796,17 @@ function FilterOption({
       accessibilityRole="radio"
       accessibilityState={{ selected }}
       onPress={onPress}
-      style={styles.filterOption}
+      style={styles.filterSheetOption}
     >
       <Text
         style={[
-          styles.filterOptionText,
-          selected && styles.filterOptionTextSelected,
+          styles.filterSheetOptionText,
+          selected && styles.filterSheetOptionTextSelected,
         ]}
       >
         {label}
       </Text>
-      {selected && <Text style={styles.filterCheck}>✓</Text>}
+      {selected && <Text style={styles.filterSheetCheck}>✓</Text>}
     </Pressable>
   );
 }
@@ -704,7 +825,8 @@ const MemberCard = memo(function MemberCard({
   voicePlaying,
   onToggleVoice,
   status,
-  statusColor,
+  gameName,
+  gameIconUrl,
 }: {
   clubId: string;
   userId: number;
@@ -718,10 +840,10 @@ const MemberCard = memo(function MemberCard({
   voiceUrl?: string;
   voicePlaying: boolean;
   onToggleVoice: (voiceUrl: string) => void;
-  status?: string;
-  statusColor?: string;
+  status?: MemberStatus;
+  gameName?: string;
+  gameIconUrl?: string;
 }) {
-  const isPlaying = status === "游戏中";
   return (
     <Pressable
       style={styles.memberCard}
@@ -732,225 +854,307 @@ const MemberCard = memo(function MemberCard({
         })
       }
     >
-      <View style={styles.avatarWrap}>
+      <View style={styles.memberLeft}>
         <CachedImage
           source={image ? { uri: image } : undefined}
           contentFit="cover"
-          style={styles.avatar}
+          style={styles.memberAvatar}
         />
         {voiceUrl ? (
-          <VoicePlayButton
-            compact
-            duration={voiceDuration}
-            onToggleVoice={onToggleVoice}
-            playingUrl={voicePlaying ? voiceUrl : null}
-            url={voiceUrl}
-          />
+          <View style={styles.memberVoicePill}>
+            <VoicePlayButton
+              tone="pill"
+              duration={voiceDuration}
+              onToggleVoice={onToggleVoice}
+              playingUrl={voicePlaying ? voiceUrl : null}
+              url={voiceUrl}
+            />
+          </View>
         ) : null}
       </View>
       <View style={styles.memberBody}>
-        <View style={styles.memberTitle}>
-          <Text numberOfLines={1} style={styles.memberName}>
-            {name}
-          </Text>
-          <View style={styles.genderGroup}>
-            <Image
-              source={gender === "male" ? maleIcon : femaleIcon}
-              style={styles.genderIcon}
-            />
-          </View>
-          {status && statusColor && (
-            <View
-              style={[styles.status, { backgroundColor: `${statusColor}20` }]}
-            >
+        <View style={styles.memberContent}>
+          <View style={styles.memberTitleRow}>
+            <View style={styles.memberNameGroup}>
+              <Text numberOfLines={1} style={styles.memberName}>
+                {name}
+              </Text>
               <Image
-                source={isPlaying ? playingIcon : idleIcon}
-                style={styles.statusIcon}
+                source={gender === "male" ? maleIcon : femaleIcon}
+                style={styles.memberGenderIcon}
               />
-              <Text
-                numberOfLines={1}
-                style={[styles.statusText, { color: statusColor }]}
-              >
-                {status}
+            </View>
+            {status ? <StatusTag status={status} /> : null}
+          </View>
+          {gameName ? (
+            <View style={styles.memberGameTag}>
+              <View style={styles.memberGameTagIcon}>
+                {gameIconUrl ? (
+                  <CachedImage
+                    source={{ uri: gameIconUrl }}
+                    style={styles.memberGameTagIconImage}
+                  />
+                ) : (
+                  <View style={styles.gameTabIconFallback} />
+                )}
+              </View>
+              <Text numberOfLines={1} style={styles.memberGameTagText}>
+                {gameName}
               </Text>
             </View>
-          )}
+          ) : null}
+          <View style={styles.memberSubtitleRow}>
+            <Text numberOfLines={1} style={styles.memberSubtitle}>
+              {description || "暂无个人简介"}
+            </Text>
+          </View>
         </View>
-        <Text numberOfLines={2} style={styles.memberDesc}>
-          {description || "暂无个人简介"}
-        </Text>
-        <View style={styles.priceRow}>
-          <Text style={styles.price}>{price}</Text>
-          <Image source={diamondIcon} style={styles.diamondIcon} />
-          <Text style={styles.orders}>{orderCount}订单</Text>
+        <View style={styles.memberPriceRow}>
+          <View style={styles.memberPrice}>
+            <Text style={styles.memberPriceText}>{price}</Text>
+            <Image source={diamondIcon} style={styles.memberDiamondIcon} />
+          </View>
+          <View style={styles.memberSales}>
+            <Text style={styles.memberSalesLabel}>销量</Text>
+            <Text style={styles.memberSalesValue}>{orderCount}</Text>
+          </View>
         </View>
       </View>
+      <View style={styles.memberDivider} pointerEvents="none" />
     </Pressable>
   );
 });
 
 const styles = StyleSheet.create({
-  state: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-    backgroundColor: "#fff",
-  },
-  stateText: {
-    color: "#999",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 14,
-    textAlign: "center",
-    padding: 24,
-  },
-  retryText: { color: "#ff3158", fontFamily: DOUYIN_SANS, fontSize: 14 },
-  gameTabsContent: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    paddingHorizontal: 4,
-  },
-  gameIcon: { width: 16, height: 16, borderRadius: 3 },
-  gameIndicator: {
+  screen: { flex: 1, backgroundColor: COLORS.white },
+  background: {
     position: "absolute",
+    top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
-    height: 3,
-    backgroundColor: "#fff",
+    width: "100%",
   },
-  tabCorner: { position: "absolute", width: 17, height: 17, bottom: -1 },
-  tabCornerLeft: { left: -15 },
-  tabCornerRight: { right: -15 },
-  navIconImage: { width: 24, height: 24 },
-  genderIcon: { width: 12, height: 12 },
-  genderGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    flexShrink: 0,
-  },
-  maleGender: { color: "#0095ee" },
-  statusIcon: { width: 12, height: 12 },
-  diamondIcon: { width: 15, height: 15, marginLeft: 4 },
-  screen: { flex: 1, backgroundColor: "#fff" },
-  header: { width: "100%" },
+  // 导航栏（叠加在背景图上）
   nav: {
-    paddingHorizontal: 16,
+    height: 44,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+  },
+  navActions: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: 12,
   },
-  back: { color: "#fff", fontSize: 44, fontWeight: "200", lineHeight: 38 },
-  navTitleSpacer: { flex: 1 },
-  navActions: { width: 32, alignItems: "flex-end" },
-  navIcon: { color: "#fff", fontSize: 29, lineHeight: 26 },
-  clubInfo: {
-    minHeight: 104,
-    paddingTop: 8,
-    paddingBottom: 24,
+  // 俱乐部信息区
+  infoSection: {
     paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
+    gap: 12,
+  },
+  infoMain: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
   },
   clubLogo: {
-    width: 40,
-    height: 40,
-    borderRadius: 6,
-    backgroundColor: "#162a36",
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+    borderWidth: 0.5,
+    borderColor: COLORS.white60,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
   },
-  clubCopy: { flex: 1, minWidth: 0, gap: 6 },
-  titleLine: {
+  clubCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 8,
+  },
+  clubTitleRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-  },
-  selfTag: {
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 3,
-    backgroundColor: "#ff3158",
-    color: "#fff",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 10,
-    fontWeight: "700",
+    gap: 4,
   },
   clubName: {
     flexShrink: 1,
-    color: "#fff",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 16,
+    color: COLORS.white,
+    fontFamily: SYSTEM_FONT,
+    fontSize: 20,
     fontWeight: "600",
+    lineHeight: 28,
   },
-  clubMeta: { flexDirection: "row", alignItems: "center", gap: 2 },
-  clubMetaIcon: { width: 14, height: 14, opacity: 0.65 },
-  metaText: {
-    color: "rgba(255,255,255,.6)",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 12,
-    lineHeight: 18,
+  selfTag: {
+    height: 16,
+    paddingHorizontal: 4,
+    textAlignVertical: "center",
+    color: COLORS.white,
+    fontFamily: SYSTEM_FONT,
+    fontSize: 10,
+    fontWeight: "600",
+    lineHeight: 13,
+    backgroundColor: COLORS.brandLight,
+    borderRadius: 3,
   },
-  clubDescription: {
-    color: "rgba(255,255,255,.6)",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  gameTabs: { height: 40, flexDirection: "row" },
-  gameTab: {
-    height: 40,
-    paddingHorizontal: 16,
+  clubMetaRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 7,
+    gap: 12,
+  },
+  clubMetaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  clubMetaLabel: {
+    color: COLORS.white60,
+    fontFamily: SYSTEM_FONT,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "400",
+  },
+  clubMetaValue: {
+    color: COLORS.white,
+    fontFamily: SYSTEM_FONT,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "400",
+  },
+  introBlock: {
+    position: "relative",
+    paddingRight: 30,
+  },
+  introText: {
+    color: COLORS.white60,
+    fontFamily: SYSTEM_FONT,
+    fontSize: 12,
+    lineHeight: 20,
+    fontWeight: "400",
+  },
+  introToggle: {
+    position: "absolute",
+    right: 0,
+    bottom: 0,
+    width: 20,
+    height: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 4,
+  },
+  introToggleIcon: {
+    width: 20,
+    height: 16,
+  },
+  introToggleIconExpanded: {
+    transform: [{ rotate: "180deg" }],
+  },
+  // 游戏页签
+  gameTabBar: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+  },
+  gameTabBarContent: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+  },
+  gameTab: {
+    alignItems: "flex-end",
+  },
+  gameTabContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
   },
-  gameTabFirst: { borderTopLeftRadius: 0 },
-  gameTabActive: { backgroundColor: "#fff" },
-  gameTabActiveAfterFirst: { borderTopLeftRadius: 12 },
-  gameLogo: {
+  gameTabContentActive: {
+    backgroundColor: COLORS.white,
+  },
+  gameTabIcon: {
     width: 16,
     height: 16,
     borderRadius: 3,
-    backgroundColor: "#082d35",
-    alignItems: "center",
-    justifyContent: "center",
+    overflow: "hidden",
   },
-  gameTriangle: { color: "#19e5a5", fontSize: 15, lineHeight: 16 },
-  gameLabel: {
+  gameTabIconImage: {
+    width: 16,
+    height: 16,
+    borderRadius: 3,
+  },
+  gameTabIconFallback: {
+    width: 16,
+    height: 16,
+    borderRadius: 3,
+    backgroundColor: "rgba(255, 255, 255, 0.25)",
+  },
+  gameTabText: {
     flexShrink: 0,
-    color: "#fff",
-    fontFamily: DOUYIN_SANS,
+    color: COLORS.white,
+    fontFamily: SYSTEM_FONT,
     fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "400",
   },
-  gameLabelActive: { color: "#111", fontWeight: "600" },
-  filterRow: {
-    height: 42,
+  gameTabTextActive: {
+    color: COLORS.textTitle,
+    fontWeight: "500",
+  },
+  gameTabCorner: {
+    position: "absolute",
+    right: -12,
+    bottom: 0,
+    width: 12,
+    height: 12,
+  },
+  // 成员列表面板
+  listScroll: { flex: 1 },
+  listContent: {
+    backgroundColor: COLORS.white,
+    borderTopRightRadius: 12,
+    paddingTop: 6,
+    minHeight: "100%",
+  },
+  // 筛选栏（三态：默认 / 选择中红色 / 已选深色）
+  filterBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
+    paddingHorizontal: 12,
   },
-  filterItem: {
+  filterOption: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 2,
-    minHeight: 34,
-    borderRadius: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     minWidth: 0,
-    paddingHorizontal: 4,
   },
-  filterItemActive: { backgroundColor: "#f5f5f5" },
-  filterText: {
+  filterOptionText: {
     flexShrink: 1,
-    color: "#666",
-    fontFamily: DOUYIN_SANS,
+    color: COLORS.textSecondary,
+    fontFamily: SYSTEM_FONT,
     fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "400",
   },
-  filterTextSelected: { color: "#0A0A0A", fontWeight: "600" },
-  filterArrowIcon: { width: 12, height: 12 },
+  filterOptionTextSelected: {
+    color: COLORS.textDark,
+    fontWeight: "500",
+  },
+  filterOptionTextSelecting: {
+    color: COLORS.brand,
+    fontWeight: "500",
+  },
+  filterArrowIcon: {
+    width: 12,
+    height: 12,
+  },
+  // 筛选底部弹窗
   filterBackdrop: {
     flex: 1,
     justifyContent: "flex-end",
@@ -959,7 +1163,7 @@ const styles = StyleSheet.create({
   filterSheet: {
     maxHeight: "65%",
     paddingBottom: 28,
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.white,
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
   },
@@ -970,31 +1174,233 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#ebebeb",
+    borderBottomColor: COLORS.border,
   },
   filterSheetTitle: {
-    color: "#111",
-    fontFamily: DOUYIN_SANS,
+    color: COLORS.textDark,
+    fontFamily: SYSTEM_FONT,
     fontSize: 16,
     fontWeight: "600",
   },
   filterClose: {
     width: 32,
-    color: "#666",
+    color: COLORS.textSecondary,
     fontSize: 26,
     lineHeight: 32,
     textAlign: "center",
   },
-  filterOption: {
+  filterSheetBody: {
+    flexGrow: 0,
+  },
+  filterSheetHint: {
+    paddingVertical: 24,
+    textAlign: "center",
+    color: COLORS.textTertiary,
+    fontFamily: SYSTEM_FONT,
+    fontSize: 14,
+  },
+  filterSectionTitle: {
+    marginTop: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 6,
+    color: COLORS.textTertiary,
+    fontFamily: SYSTEM_FONT,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  filterSheetOption: {
     height: 48,
     paddingHorizontal: 20,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  filterOptionText: { color: "#333", fontFamily: DOUYIN_SANS, fontSize: 14 },
-  filterOptionTextSelected: { color: "#ff3158", fontWeight: "600" },
-  filterCheck: { color: "#ff3158", fontSize: 17, fontWeight: "700" },
+  filterSheetOptionText: {
+    color: "#333",
+    fontFamily: SYSTEM_FONT,
+    fontSize: 14,
+  },
+  filterSheetOptionTextSelected: {
+    color: COLORS.brand,
+    fontWeight: "600",
+  },
+  filterSheetCheck: {
+    color: COLORS.brand,
+    fontSize: 17,
+    fontWeight: "700",
+  },
+  memberEmpty: { alignSelf: "center", marginTop: 24 },
+  // 陪玩介绍卡片（设计稿 696:122217）
+  memberCard: {
+    minHeight: 132,
+    flexDirection: "row",
+    gap: 12,
+    padding: 16,
+    backgroundColor: COLORS.white,
+  },
+  memberLeft: {
+    width: 100,
+    height: 100,
+  },
+  memberAvatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    backgroundColor: "#F5F6F7",
+  },
+  memberVoicePill: {
+    position: "absolute",
+    left: 6,
+    bottom: 7,
+    zIndex: 1,
+  },
+  memberBody: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: "space-between",
+  },
+  memberContent: {
+    gap: 6,
+  },
+  memberTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 24,
+  },
+  memberNameGroup: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  memberName: {
+    flexShrink: 1,
+    color: COLORS.textDark,
+    fontFamily: SYSTEM_FONT,
+    fontSize: 14,
+    fontWeight: "600",
+    lineHeight: 22,
+  },
+  memberGenderIcon: {
+    width: 12,
+    height: 12,
+  },
+  statusTag: {
+    flexShrink: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    paddingHorizontal: 3,
+    borderRadius: 3,
+  },
+  statusTagPlaying: {
+    backgroundColor: COLORS.orangeBg,
+  },
+  statusTagIdle: {
+    backgroundColor: COLORS.greenBg,
+  },
+  statusTagIcon: {
+    width: 10,
+    height: 10,
+  },
+  statusTagText: {
+    fontFamily: SYSTEM_FONT,
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: "500",
+  },
+  memberGameTag: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingRight: 4,
+    backgroundColor: COLORS.orangeBg,
+    borderRadius: 3,
+  },
+  memberGameTagIcon: {
+    width: 16,
+    height: 16,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  memberGameTagIconImage: {
+    width: 16,
+    height: 16,
+    borderRadius: 3,
+  },
+  memberGameTagText: {
+    flexShrink: 1,
+    color: COLORS.gameTagText,
+    fontFamily: SYSTEM_FONT,
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: "500",
+  },
+  memberSubtitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  memberSubtitle: {
+    flexShrink: 1,
+    color: COLORS.textTertiary,
+    fontFamily: SYSTEM_FONT,
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: "400",
+  },
+  memberPriceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  memberPrice: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 4,
+  },
+  memberPriceText: {
+    color: COLORS.brand,
+    fontFamily: SYSTEM_FONT,
+    fontSize: 20,
+    fontWeight: "600",
+    lineHeight: 24,
+  },
+  memberDiamondIcon: {
+    width: 15,
+    height: 15,
+    marginBottom: 3,
+  },
+  memberSales: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  memberSalesLabel: {
+    color: COLORS.textTertiary,
+    fontFamily: SYSTEM_FONT,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "400",
+  },
+  memberSalesValue: {
+    color: COLORS.textQuaternary,
+    fontFamily: SYSTEM_FONT,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "400",
+  },
+  memberDivider: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 0,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: COLORS.border,
+  },
+  // 暂无价目表弹窗
   priceEmptyBackdrop: {
     flex: 1,
     alignItems: "center",
@@ -1010,7 +1416,7 @@ const styles = StyleSheet.create({
     paddingTop: 28,
     paddingBottom: 24,
     borderRadius: 20,
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.white,
     shadowColor: "#101828",
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.18,
@@ -1037,7 +1443,7 @@ const styles = StyleSheet.create({
   priceEmptyIllustration: { width: 112, height: 112, marginBottom: 8 },
   priceEmptyTitle: {
     color: "#171a21",
-    fontFamily: DOUYIN_SANS,
+    fontFamily: SYSTEM_FONT,
     fontSize: 18,
     lineHeight: 26,
     fontWeight: "600",
@@ -1045,7 +1451,7 @@ const styles = StyleSheet.create({
   priceEmptyHint: {
     marginTop: 6,
     color: "#8b929e",
-    fontFamily: DOUYIN_SANS,
+    fontFamily: SYSTEM_FONT,
     fontSize: 13,
     lineHeight: 20,
     textAlign: "center",
@@ -1057,124 +1463,59 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 22,
-    backgroundColor: "#ff3158",
+    backgroundColor: COLORS.brand,
   },
   priceEmptyButtonPressed: { opacity: 0.82 },
   priceEmptyButtonText: {
-    color: "#fff",
-    fontFamily: DOUYIN_SANS,
+    color: COLORS.white,
+    fontFamily: SYSTEM_FONT,
     fontSize: 15,
     lineHeight: 22,
     fontWeight: "600",
   },
-  listScroll: { flex: 1 },
-  list: { paddingHorizontal: 0 },
-  memberEmpty: { alignSelf: "center", marginTop: 24 },
-  memberCard: {
-    minHeight: 124,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: "row",
-    gap: 12,
-  },
-  avatarWrap: { width: 100, height: 100, position: "relative" },
-  avatar: { width: 106, height: 106, borderRadius: 8 },
-  memberBody: { flex: 1, minWidth: 0, marginLeft: 8 },
-  memberTitle: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    minWidth: 0,
-  },
-  memberName: {
-    flexShrink: 1,
-    color: "#111",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  gender: {
-    flexShrink: 0,
-    color: "#ff4770",
-    fontSize: 12,
-    fontWeight: 500,
-  },
-  status: {
-    marginLeft: "auto",
-    flexShrink: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    minHeight: 18,
-    maxHeight: 18,
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderRadius: 3,
-  },
-  statusText: { fontFamily: DOUYIN_SANS, fontSize: 10, lineHeight: 14 },
-  memberDesc: {
-    marginTop: 4,
-    color: "#777",
-    fontSize: 14,
-    fontWeight: 400,
-    lineHeight: 19,
-  },
-  priceRow: { marginTop: 17, flexDirection: "row", alignItems: "center" },
-  price: {
-    color: "#ff3158",
-    fontFamily: DOUYIN_SANS,
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  diamond: { marginLeft: 5, color: "#ff3158", fontSize: 15 },
-  orders: {
-    marginLeft: "auto",
-    color: "#999",
-    fontSize: 12,
-    fontWeight: 400,
-  },
+  // 底部操作栏（次按钮 104 宽 + 主按钮撑满）
   bottomBar: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    minHeight: 76,
-    paddingHorizontal: 12,
     paddingTop: 8,
-    backgroundColor: "#fff",
+    paddingHorizontal: 16,
+    backgroundColor: COLORS.white,
     flexDirection: "row",
-    gap: 8,
+    alignItems: "center",
+    gap: 12,
   },
   priceButton: {
-    flex: 1,
+    width: 104,
     height: 42,
-    minWidth: 104,
     borderWidth: 1,
-    borderColor: "#e9e9eb",
+    borderColor: COLORS.border,
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.white,
   },
-  priceText: {
-    color: "#0D0D0F",
-    fontFamily: DOUYIN_SANS,
+  priceButtonText: {
+    color: COLORS.textDark,
+    fontFamily: SYSTEM_FONT,
     fontSize: 14,
     fontWeight: "500",
+    lineHeight: 22,
   },
-  actionButton: {
+  matchButton: {
     flex: 1,
     height: 42,
-    minWidth: 104,
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#fe1f4c",
+    backgroundColor: COLORS.brand,
   },
-  actionButtonText: {
-    color: "#fff",
-    fontFamily: DOUYIN_SANS,
+  matchButtonText: {
+    color: COLORS.white,
+    fontFamily: SYSTEM_FONT,
     fontSize: 14,
     fontWeight: "500",
+    lineHeight: 22,
   },
 });

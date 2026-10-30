@@ -1,5 +1,6 @@
 import type { Club } from "@/features/home/api/home.types";
-import { colors, radius, spacing } from "@/shared/theme/tokens";
+import { computeGameIconLayout } from "@/features/mine/utils/game-icons-layout";
+import { colors } from "@/shared/theme/tokens";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { Image } from "expo-image";
@@ -7,9 +8,10 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+
 const icons = {
   user: require("../../../../assets/home/h_user.svg"),
-  id: require("../../../../assets/home/h_id.svg"),
+  id: require("../../../../assets/home/club-id.svg"),
 };
 
 export function ClubCard({
@@ -25,6 +27,10 @@ export function ClubCard({
     onSelect?.(club);
     router.push({ pathname: "/club/[id]", params: { id: club.id } });
   };
+
+  // 游戏图标行布局：≤4 平铺，>4 重叠且总宽不超过 4 个平铺宽度，最多 8 个
+  const gamesLayout = computeGameIconLayout(club.games?.length ?? 0);
+  const games = (club.games ?? []).slice(0, gamesLayout.shown);
 
   return (
     <Pressable
@@ -43,17 +49,17 @@ export function ClubCard({
           <Text style={styles.coverText}>{club.name.slice(0, 1)}</Text>
         )}
         {club.clubTag && (
-          <LinearGradient
-            colors={["#FF8C6C", "#F92E7F"]}
-            locations={[0.0157, 0.9764]}
-            start={{ x: 0, y: 0.42 }}
-            end={{ x: 1, y: 0.58 }}
-            style={styles.tag}
-          >
+          <View style={styles.tag}>
+            <LinearGradient
+              colors={["#FF8C6C", "#F92E7F"]}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={StyleSheet.absoluteFill}
+            />
             <Text numberOfLines={1} style={styles.tagText}>
               {club.clubTag}
             </Text>
-          </LinearGradient>
+          </View>
         )}
       </View>
       <View style={styles.body}>
@@ -62,9 +68,12 @@ export function ClubCard({
           <Text numberOfLines={1} style={styles.name}>
             {club.name}
           </Text>
-          {/* <Text style={styles.online}>• {club.onlineCount}人</Text> */}
+          <View style={styles.online}>
+            <View style={styles.onlineDot} />
+            <Text style={styles.onlineText}>{club.onlineCount}人</Text>
+          </View>
         </View>
-        <Text numberOfLines={2} style={styles.desc}>
+        <Text numberOfLines={1} style={styles.desc}>
           {club.description}
         </Text>
         <View style={styles.metaRow}>
@@ -76,14 +85,17 @@ export function ClubCard({
             <Image source={icons.id} style={styles.metaIcon} />
             <Text style={styles.metaText}>{club.clubCode}</Text>
           </View>
-          {club.games?.length ? (
-            <View style={styles.gameIcons}>
-              {club.games.slice(0, 3).map((game) => (
-                <CachedImage
-                  key={game.id}
-                  accessibilityLabel={game.name}
-                  source={{ uri: game.iconUrl as string }}
-                  style={styles.gameIcon}
+          {/* 游戏图标：靠右，>4 个重叠展示（右侧图标在上层） */}
+          {games.length > 0 ? (
+            <View style={[styles.gameIcons, { width: gamesLayout.totalWidth }]}>
+              {games.map((game, index) => (
+                <Image
+                  key={`${game.iconUrl}-${index}`}
+                  source={{ uri: game.iconUrl }}
+                  style={[
+                    styles.gameIcon,
+                    { left: index * gamesLayout.step },
+                  ]}
                   contentFit="cover"
                 />
               ))}
@@ -91,21 +103,25 @@ export function ClubCard({
           ) : null}
         </View>
       </View>
+      <View style={styles.divider} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  // 设计稿：卡片全宽白底，pad 16/12/16/12，内容 gap 12，底部细分割线
   club: {
     minHeight: 104,
-    marginHorizontal: spacing.lg,
     flexDirection: "row",
-    gap: spacing.md,
+    gap: 12,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   cover: {
-    width: 84,
-    height: 84,
-    borderRadius: radius.md,
+    width: 80,
+    height: 80,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -115,19 +131,22 @@ const styles = StyleSheet.create({
     fontSize: 34,
     fontWeight: "800",
   },
-  coverImage: { width: "100%", height: "100%", borderRadius: radius.md },
+  coverImage: { width: "100%", height: "100%", borderRadius: 8 },
+  // 设计稿 L1 Tag/Emphasis：58x16，字 10/600/12，左上圆角 8、右下圆角 6，
+  // 渐变左→右 #FF8C6C → #F92E7F 叠加在底色 #FF4754 上（底色兼作渐变加载前的兜底）
   tag: {
     position: "absolute",
     top: 0,
     left: 0,
     maxWidth: "100%",
     height: 16,
-    paddingHorizontal: spacing.xs,
+    paddingHorizontal: 4,
     alignItems: "center",
     justifyContent: "center",
-    borderTopLeftRadius: radius.md,
+    borderTopLeftRadius: 8,
     borderBottomRightRadius: 6,
     overflow: "hidden",
+    backgroundColor: "#FF4754",
   },
   tagText: {
     fontFamily: DOUYIN_SANS,
@@ -137,57 +156,92 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
     color: colors.surface,
   },
-  body: { flex: 1, paddingTop: 1 },
+  body: { flex: 1 },
   titleRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    minHeight: 22,
+    gap: 4,
+    minHeight: 24,
   },
+  // 设计稿 L2 Tag/bold：浅粉底 #FFE5EB 红字 #FF42A1，600/10/14，pad 4/1/4/1
   self: {
     fontFamily: DOUYIN_SANS,
-    color: colors.surface,
-    backgroundColor: colors.brand,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
+    color: "#FF42A1",
+    backgroundColor: "#FFE5EB",
+    paddingHorizontal: 4,
+    paddingVertical: 1,
     borderRadius: 3,
     fontSize: 10,
-    fontWeight: "700",
+    fontWeight: "600",
+    lineHeight: 14,
+    includeFontPadding: false,
   },
   name: {
     fontFamily: DOUYIN_SANS,
-    color: "#0a0a0a",
-    fontSize: 14,
+    color: "#0A0A0A",
+    fontSize: 16,
+    lineHeight: 24,
     fontWeight: "500",
     flexShrink: 1,
   },
-  online: { fontFamily: DOUYIN_SANS, color: "#2fc273", fontSize: 12 },
-  desc: {
-    fontFamily: DOUYIN_SANS,
-    color: colors.textSecondary,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 3,
-  },
-  metaRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
-  gameIcons: {
-    marginLeft: "auto",
+  online: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    flexShrink: 0,
+  },
+  onlineDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: "#2FC273",
+  },
+  onlineText: {
+    fontFamily: DOUYIN_SANS,
+    color: "#2FC273",
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  desc: {
+    fontFamily: DOUYIN_SANS,
+    color: "#979799",
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 4,
+  },
+  gameIcons: {
+    marginLeft: "auto",
+    height: 14,
+    flexDirection: "row",
   },
   gameIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "#F2F2F2",
+    position: "absolute",
+    top: 0,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
   },
-  meta: { flexDirection: "row", alignItems: "center", gap: 3 },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 4,
+  },
+  meta: { flexDirection: "row", alignItems: "center", gap: 4 },
   metaText: {
     fontFamily: DOUYIN_SANS,
-    color: "#999",
+    color: "#7F7F80",
     fontSize: 11,
-    lineHeight: 14,
+    lineHeight: 16,
   },
-  metaIcon: { width: 12, height: 12 },
+  metaIcon: { width: 16, height: 16 },
+  divider: {
+    // 绝对定位：不参与行布局（行内分割线的 margin 会挤窄内容区，右侧出现大空白）
+    position: "absolute",
+    bottom: 0,
+    left: 16,
+    right: 16,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "#EBEBEB",
+  },
 });

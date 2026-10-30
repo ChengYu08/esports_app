@@ -16,12 +16,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { fetchStarBalance } from "@/features/mine/api/companion-order.api";
 import {
   createAppPayOrder,
+  createPayOrder,
   fetchRechargeConfig,
   type RechargeChannel,
   type RechargePlan,
 } from "@/features/mine/api/recharge.api";
 import { APP_LINKS } from "@/core/config/links";
 import { env } from "@/core/config/env";
+import { WechatPayQrModal } from "@/features/mine/components/WechatPayQrModal";
 import AlipayPayment from "../../../../modules/alipay-payment";
 import { openExternalLink } from "@/shared/navigation/open-external-link";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
@@ -104,6 +106,7 @@ export default function StarRechargeAndroidScreen() {
     message: string;
   } | null>(null);
   const [paying, setPaying] = useState(false);
+  const [wechatQrCode, setWechatQrCode] = useState<string | null>(null);
 
   useEffect(() => {
     // Official recommendation: register the merchant appId on the payment
@@ -190,7 +193,29 @@ export default function StarRechargeAndroidScreen() {
       return;
     }
     if (isWechatChannel(selectedChannel)) {
-      setPrompt({ title: "提示", message: "微信支付暂未接入，请选择支付宝支付。" });
+      setPaying(true);
+      try {
+        const order = await createPayOrder(token, {
+          payChannel: selectedChannel.payChannel,
+          payWay: selectedChannel.payWay,
+          payTypeEnum: selectedChannel.payTypeEnum,
+          moneyAmount: selectedMoney,
+          starAmount: selectedStar,
+        });
+        if (!order.qrCode) {
+          setPrompt({ title: "支付失败", message: "未获取到支付订单信息，请稍后再试。" });
+          return;
+        }
+        setWechatQrCode(order.qrCode);
+      } catch (error) {
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : "支付失败，请重试。";
+        setPrompt({ title: "支付失败", message });
+      } finally {
+        setPaying(false);
+      }
       return;
     }
     if (!AlipayPayment) {
@@ -438,6 +463,20 @@ export default function StarRechargeAndroidScreen() {
           </Text>
         </Pressable>
       </View>
+
+      <WechatPayQrModal
+        visible={wechatQrCode !== null}
+        qrCode={wechatQrCode ?? ""}
+        moneyAmount={selectedMoney}
+        starAmount={selectedStar}
+        onClose={() => {
+          setWechatQrCode(null);
+          if (!token) return;
+          void fetchStarBalance(token)
+            .then((nextBalance) => setBalance(nextBalance))
+            .catch(() => undefined);
+        }}
+      />
 
       <AppPrompt
         visible={prompt !== null}

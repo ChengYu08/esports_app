@@ -12,7 +12,8 @@
       "package": "com.esportsapp.apps",
       "permissions": [
         "android.permission.RECORD_AUDIO",
-        "android.permission.FOREGROUND_SERVICE"
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.REQUEST_INSTALL_PACKAGES"
       ],
       "blockedPermissions": ["android.permission.CAMERA"],
       "adaptiveIcon": {

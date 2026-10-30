@@ -66,7 +66,17 @@ export async function fetchBanners(signal?: AbortSignal): Promise<HomeBannerSlot
 type ApiEnvelope<T> = { success?: boolean; code?: string; info?: string; data?: T };
 type ApiGame = { id: number | string; gameName?: string; iconUrl?: string; backgroundUrl?: string; gameCategory?: number; gameCategoryId?: number | string };
 type ApiGameCategory = { id: number | string; name: string; iconUrl?: string | null };
-type ApiClub = { id: number | string; clubName?: string; clubTag?: string | null; logoUrl?: string; intro?: string; followCount?: number; memberCount?: number; orderNoticeUrl?: string; clubGames?: { gameId: number; gameName?: string; iconUrl?: string; status?: number }[] };
+type ApiClub = {
+  id: number | string;
+  clubName?: string;
+  clubTag?: string | null;
+  logoUrl?: string;
+  intro?: string;
+  followCount?: number;
+  memberCount?: number;
+  orderNoticeUrl?: string;
+  clubGames?: { gameId: number; gameName?: string; iconUrl?: string; status?: number }[];
+};
 type ApiClubPage = { page?: number; totalPages?: number; total?: number; records?: ApiClub[] };
 type ApiClubDetail = {
   id: number | string;
