@@ -3,7 +3,7 @@ import type { Club, ClubPage } from "@/features/home/api/home.types";
 
 type ApiEnvelope<T> = { code?: string; info?: string; data?: T };
 type ApiClubPage = { page?: number; totalPages?: number; records?: ApiClub[] };
-type ApiClub = { id: number | string; clubName?: string; logoUrl?: string; intro?: string; followCount?: number; memberCount?: number };
+type ApiClub = { id: number | string; clubName?: string; logoUrl?: string; intro?: string; followCount?: number; memberCount?: number; onlineCount?: number };
 export type SearchUser = {
   profileId: number;
   clubId: number;
@@ -31,7 +31,7 @@ export async function searchClubs(keyword: string, page = 1, pageSize = 20, sign
       name: club.clubName || "未命名俱乐部",
       description: club.intro || "暂无俱乐部简介",
       coverUrl: club.logoUrl,
-      onlineCount: club.followCount ?? 0,
+      onlineCount: club.onlineCount ?? 0,
       memberCount: club.memberCount ?? 0,
       clubCode: String(club.id),
       isSelfOperated: club.clubName?.includes("自营") ?? false,

@@ -1,3 +1,4 @@
+import { showToast } from "@/shared/ui/app-toast";
 import { ChevronRight16Regular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -18,7 +19,6 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";

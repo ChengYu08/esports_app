@@ -105,22 +105,3 @@ export function formatOrderFreeSummary(
   }
   return `${formatHours(freeAmount / unitPrice)}${order.billingUnitName || "小时"}（${amountText}）`;
 }
-
-/** 只生成待确认的免单预览，最终确认前不修改原订单或提交接口。 */
-export function createFreeOrderPreview(
-  order: OrderItemModel,
-  freeHours: number,
-): OrderItemModel | null {
-  const starAmount = computeFreeStarAmount(order, freeHours);
-  if (
-    starAmount == null ||
-    freeHours > order.quantity ||
-    starAmount > computeOrderPayableStars(order)
-  ) {
-    return null;
-  }
-  return {
-    ...order,
-    freeAmount: formatStar(Number(order.freeAmount ?? 0) + starAmount),
-  };
-}
