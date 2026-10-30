@@ -35,12 +35,17 @@ vi.mock("@/features/order/order.api", () => ({
   acceptOrder: vi.fn(),
 }));
 
+vi.mock("@/features/order/order-query", () => ({
+  refreshDispatchForRemoteChange: vi.fn(),
+}));
+
 const {
   handleOrderNotifyPopup,
   handleQuickMatchExpired,
   handleQuickMatchNotice,
   resetActionCommandDedupKeys,
 } = await import("./action-command-handlers");
+const { refreshDispatchForRemoteChange } = await import("@/features/order/order-query");
 
 const NOW = new Date("2026-10-20T12:00:00").getTime();
 const PLATFORM = "50000000";
@@ -51,6 +56,7 @@ function command(name: string, data: Record<string, unknown>, senderId = PLATFOR
 
 describe("handleQuickMatchNotice", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     resetActionCommandDedupKeys();
     resetActionNoticeStore();
   });
@@ -135,6 +141,37 @@ describe("handleQuickMatchNotice", () => {
     handleQuickMatchNotice(cmd, NOW);
     expect(useActionNoticeStore.getState().items).toHaveLength(1);
   });
+
+  it("合法抢单消息刷新派单中心", () => {
+    handleQuickMatchNotice(
+      command("QUICK_MATCH_NOTICE", {
+        requestNo: "QM1",
+        expireTime: "2026-10-20 12:30:00",
+      }),
+      NOW,
+    );
+    expect(refreshDispatchForRemoteChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("需求已过期仍刷新派单中心（列表可据此移除该需求）", () => {
+    handleQuickMatchNotice(
+      command("QUICK_MATCH_NOTICE", {
+        requestNo: "QM1",
+        expireTime: "2026-10-20 11:00:00",
+      }),
+      NOW,
+    );
+    expect(refreshDispatchForRemoteChange).toHaveBeenCalledTimes(1);
+    expect(useActionNoticeStore.getState().items).toHaveLength(0);
+  });
+
+  it("非平台发送方不刷新派单中心", () => {
+    handleQuickMatchNotice(
+      command("QUICK_MATCH_NOTICE", { requestNo: "QM1" }, "60000000"),
+      NOW,
+    );
+    expect(refreshDispatchForRemoteChange).not.toHaveBeenCalled();
+  });
 });
 
 describe("handleOrderNotifyPopup", () => {
@@ -198,10 +235,11 @@ describe("handleOrderNotifyPopup", () => {
 
 describe("handleQuickMatchExpired", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     resetActionCommandDedupKeys();
   });
 
-  it("写终止信号并撤对应抢单通知条", () => {
+  it("写终止信号并撤对应抢单通知条，同时刷新派单中心", () => {
     const notifyEnded = vi.fn();
     const dismissQuickMatchBar = vi.fn();
     handleQuickMatchExpired(command("QUICK_MATCH_EXPIRED", { requestNo: "QM1" }), {
@@ -210,6 +248,7 @@ describe("handleQuickMatchExpired", () => {
     });
     expect(notifyEnded).toHaveBeenCalledWith("QM1", "expired");
     expect(dismissQuickMatchBar).toHaveBeenCalledWith("QM1");
+    expect(refreshDispatchForRemoteChange).toHaveBeenCalledTimes(1);
   });
 
   it("QUICK_MATCH_CANCELLED 映射为 cancelled", () => {
@@ -239,6 +278,7 @@ describe("handleQuickMatchExpired", () => {
     );
     expect(notifyEnded).not.toHaveBeenCalled();
     expect(dismissQuickMatchBar).not.toHaveBeenCalled();
+    expect(refreshDispatchForRemoteChange).not.toHaveBeenCalled();
   });
 
   it("其它命令名忽略", () => {
@@ -250,5 +290,6 @@ describe("handleQuickMatchExpired", () => {
     });
     expect(notifyEnded).not.toHaveBeenCalled();
     expect(dismissQuickMatchBar).not.toHaveBeenCalled();
+    expect(refreshDispatchForRemoteChange).not.toHaveBeenCalled();
   });
 });
