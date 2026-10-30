@@ -1,4 +1,5 @@
 import { queryClient } from "@/core/query/query-client";
+import { showToast } from "@/shared/ui/app-toast";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
@@ -21,6 +22,7 @@ import {
   payCompanionOrder,
 } from "@/features/mine/api/companion-order.api";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
+import { grabQuickMatchAndEnterAudition } from "@/features/match/grab-quick-match-flow";
 import { buildAfterSalePayload } from "../after-sale-card";
 import { OrderAfterSaleSheet } from "../components/OrderAfterSaleSheet";
 import { OrderCard } from "../components/OrderCard";
@@ -29,7 +31,6 @@ import { OrderHeader } from "../components/OrderHeader";
 import { OrderReviewSheet } from "../components/OrderReviewSheet";
 import { OrderScopeTabs } from "../components/OrderScopeTabs";
 import { OrderTabs } from "../components/OrderTabs";
-import { grabDispatchRequest } from "../dispatch.api";
 import { computeFreeStarAmount } from "../free-amount";
 import { useOrderPage } from "../hooks/use-order-page";
 import {
@@ -151,14 +152,16 @@ export default function OrderScreen() {
     }
     if (action === "free") setFreeTarget(item);
     if (action === "grab" && item.requestNo && token) {
+      if (pendingOrderRef.current) return;
+      pendingOrderRef.current = item.id;
+      setPendingOrderId(item.id);
       try {
-        await grabDispatchRequest(item.requestNo, token);
-        await orders.refetch();
-      } catch (error) {
-        setPrompt({
-          title: "抢单失败",
-          message: error instanceof Error ? error.message : "请稍后重试",
-        });
+        // 与抢单条同一条流程：需要试音的订单抢单成功后直接进试音房
+        const result = await grabQuickMatchAndEnterAudition(item.requestNo);
+        if (result.status === "failed") showToast(result.message);
+      } finally {
+        pendingOrderRef.current = null;
+        setPendingOrderId(null);
       }
     }
     if (

@@ -3,7 +3,7 @@
  * 预取详情 → 有试音房则抢单前确认切房 → grab → 无试音只 Toast；有试音再切房进入
  */
 import { useAuthStore } from "@esports/auth";
-import { router } from "expo-router";
+import { router, type Href } from "expo-router";
 import { showToast } from "@/shared/ui/app-toast";
 
 import { fetchActiveQuickMatch } from "@/features/match/api/match.api";
@@ -12,7 +12,9 @@ import {
   fetchDispatchDetail,
   grabDispatchRequest,
 } from "@/features/order/dispatch.api";
+import { refreshDispatchAfterGrabAttempt, refreshDispatchDetail } from "@/features/order/order-query";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
+import { actionNotice } from "@/shared/ui/action-notice/action-notice-store";
 import { exitVoiceRoom } from "@/features/voice-room/exit-voice-room";
 import { resolveVoiceRoomId, voiceRoomApi } from "@/features/voice-room/voice-room.api";
 import type { VoiceRoomDetail } from "@/features/voice-room/voice-room.types";
@@ -191,8 +193,19 @@ export function resetGrabQuickMatchPending() {
   pendingRequestNos.clear();
 }
 
+/**
+ * 一次抢单结算（成功或失败）：撤掉该需求的抢单条，并让派单中心列表与详情重新拉取，
+ * 避免三个抢单入口的状态不一致。取消切房等未发生的抢单不算结算。
+ */
+function settleGrab(requestNo: string) {
+  actionNotice.dismiss(`qm:${requestNo}`);
+  void refreshDispatchAfterGrabAttempt();
+  void refreshDispatchDetail(requestNo);
+}
+
 export async function grabQuickMatchAndEnterAudition(
   requestNo: string,
+  options: { replaceRoom?: boolean } = {},
 ): Promise<QuickMatchGrabFlowResult> {
   if (pendingRequestNos.has(requestNo)) return { status: "cancelled" };
   pendingRequestNos.add(requestNo);
@@ -226,6 +239,7 @@ export async function grabQuickMatchAndEnterAudition(
 
     const detail = await grabWithRecovery(requestNo, accessToken);
     grabbed = true;
+    settleGrab(requestNo);
 
     if (!hasAuditionRoom(detail)) {
       showToast("抢单成功");
@@ -234,12 +248,14 @@ export async function grabQuickMatchAndEnterAudition(
 
     showToast("抢单成功，正在进入试音房…");
     const room = await switchToAuditionRoom(detail, confirmedCurrent, accessToken);
-    router.push({
+    const roomHref = {
       pathname: "/voice-room/[id]",
       params: room.roomVersion
         ? { id: room.id, v: room.roomVersion }
         : { id: room.id },
-    });
+    } satisfies Href;
+    if (options.replaceRoom) router.replace(roomHref);
+    else router.push(roomHref);
     return { status: "entered" };
   } catch (error) {
     if (grabbed) {
@@ -250,6 +266,7 @@ export async function grabQuickMatchAndEnterAudition(
       );
       return { status: "grabbed" };
     }
+    settleGrab(requestNo);
     return { status: "failed", message: errorMessage(error, "抢单失败，请稍后重试") };
   } finally {
     pendingRequestNos.delete(requestNo);

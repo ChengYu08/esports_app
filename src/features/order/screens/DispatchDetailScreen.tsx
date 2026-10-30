@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -7,9 +7,9 @@ import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "@esports/auth";
 
-import { grabDispatchRequest, fetchDispatchDetail } from "../dispatch.api";
+import { fetchDispatchDetail } from "../dispatch.api";
+import { grabQuickMatchAndEnterAudition } from "@/features/match/grab-quick-match-flow";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
-import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { CachedImage } from "@/shared/ui/CachedImage";
 
 const DEFAULT_AVATAR = require("../../../../assets/order/order-seller-avatar.svg");
@@ -20,12 +20,10 @@ type GrabStatus = "GRABBED" | "SUCCESS" | "FAILED";
 
 export function DispatchDetailScreen({ requestNo }: { requestNo: string }) {
   const insets = useSafeAreaInsets();
-  const queryClient = useQueryClient();
   const token = useAuthStore((state) => state.accessToken);
   const gender = useAuthStore((state) => state.user?.gender ?? 2);
   const [grabbing, setGrabbing] = useState(false);
   const [grabbedLocally, setGrabbedLocally] = useState(false);
-  const [prompt, setPrompt] = useState<{ title: string; message: string } | null>(null);
   const detail = useQuery({
     queryKey: ["dispatch-detail", requestNo],
     queryFn: ({ signal }) => fetchDispatchDetail(requestNo, token as string, signal),
@@ -63,13 +61,17 @@ export function DispatchDetailScreen({ requestNo }: { requestNo: string }) {
     if (!canGrab || !request.requestNo || !token || grabbing) return;
     setGrabbing(true);
     try {
-      await grabDispatchRequest(request.requestNo, token);
+      // 与抢单条同一条流程；replace 进房后从语聊房返回直接回派单中心
+      const result = await grabQuickMatchAndEnterAudition(request.requestNo, {
+        replaceRoom: true,
+      });
+      if (result.status === "failed") {
+        showToast(result.message);
+        return;
+      }
+      if (result.status !== "grabbed") return;
       setGrabbedLocally(true);
-      await queryClient.invalidateQueries({ queryKey: ["orders", "dispatch"] });
       await detail.refetch();
-      showToast("抢单成功");
-    } catch (error) {
-      setPrompt({ title: "抢单失败", message: error instanceof Error ? error.message : "请稍后重试" });
     } finally {
       setGrabbing(false);
     }
@@ -135,7 +137,6 @@ export function DispatchDetailScreen({ requestNo }: { requestNo: string }) {
           )}
         </Pressable>
       </View>
-      <AppPrompt visible={Boolean(prompt)} title={prompt?.title} message={prompt?.message ?? ""} onConfirm={() => setPrompt(null)} />
     </View>
   );
 }
