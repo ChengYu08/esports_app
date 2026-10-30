@@ -1,9 +1,19 @@
 import { Dismiss16Regular } from "@fluentui/react-native-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import type { ReactNode } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useMemo, useState, type ReactNode } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import {
+  computeFreeStarAmount,
+  computeFreeUnitPrice,
+  formatHours,
+  formatStar,
+  FREE_STEP,
+  parseHoursLive,
+  roundStar,
+  sanitizeHoursText,
+} from "@/features/order/free-amount";
 import type { OrderItemModel } from "@/features/order/order.types";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
@@ -19,8 +29,11 @@ type Props = {
   companionAvatar?: OrderItemModel["receiverAvatar"];
   serviceTime: string;
   loading: boolean;
+  /** complete：完成订单；free：免单（同壳 + 免单时长步进器） */
+  mode?: "complete" | "free";
   onClose: () => void;
-  onConfirm: () => void;
+  /** free 模式携带免单时长 */
+  onConfirm: (freeHours?: number) => void;
 };
 
 export function OrderCompleteConfirmSheet({
@@ -30,10 +43,87 @@ export function OrderCompleteConfirmSheet({
   companionAvatar,
   serviceTime,
   loading,
+  mode = "complete",
   onClose,
   onConfirm,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const isFree = mode === "free";
+  const [hoursText, setHoursText] = useState("");
+  const freeHours = parseHoursLive(hoursText);
+  const orderTotalStars = Number(order.totalPrice) || 0;
+  const freeStarAmount = isFree ? computeFreeStarAmount(order, freeHours ?? 0) : null;
+  const freeValid =
+    freeStarAmount != null && freeStarAmount > 0 && freeStarAmount <= orderTotalStars;
+
+  /** 免单时长上限：不超过订单时长，且金额不超过订单总价 */
+  const maxFreeHours = useMemo(() => {
+    const price = computeFreeUnitPrice(order);
+    const orderHours = Math.max(FREE_STEP, Number(order.quantity) || 1);
+    let cap = orderHours;
+    if (price > 0) {
+      const byAmount = Math.floor((orderTotalStars / price) * 10) / 10;
+      if (Number.isFinite(byAmount) && byAmount > 0) {
+        cap = Math.min(cap, byAmount);
+      }
+      while (roundStar(cap * price) > orderTotalStars && cap > FREE_STEP) {
+        cap = Number((cap - FREE_STEP).toFixed(1));
+      }
+    }
+    return cap;
+  }, [order, orderTotalStars]);
+
+  const canDecFreeHours =
+    freeHours != null && Number((freeHours - FREE_STEP).toFixed(1)) > 0;
+  const canIncFreeHours = (() => {
+    const next = Number(((freeHours ?? 0) + FREE_STEP).toFixed(1));
+    if (next > maxFreeHours) {
+      return false;
+    }
+    const stars = computeFreeStarAmount(order, next);
+    return stars != null && stars <= orderTotalStars;
+  })();
+
+  const handleHoursChange = (raw: string) => {
+    const safe = sanitizeHoursText(raw);
+    const parsed = parseHoursLive(safe);
+    // 超限时自动回退到最大允许值，避免提交时被静默禁用
+    if (parsed != null && parsed > maxFreeHours) {
+      setHoursText(formatHours(maxFreeHours));
+      return;
+    }
+    setHoursText(safe);
+  };
+
+  const decFreeHours = () => {
+    if (loading || freeHours == null) {
+      return;
+    }
+    const next = Number((freeHours - FREE_STEP).toFixed(1));
+    if (next <= 0) {
+      return;
+    }
+    setHoursText(formatHours(next));
+  };
+
+  const incFreeHours = () => {
+    if (loading || !canIncFreeHours) {
+      return;
+    }
+    const next = Number(((freeHours ?? 0) + FREE_STEP).toFixed(1));
+    setHoursText(formatHours(next));
+  };
+
+  const handleConfirm = () => {
+    if (isFree) {
+      if (!freeValid || freeHours == null) {
+        return;
+      }
+      onConfirm(freeHours);
+      return;
+    }
+    onConfirm();
+  };
 
   return (
     <BottomSheet
@@ -51,7 +141,7 @@ export function OrderCompleteConfirmSheet({
           style={styles.scroll}
         >
           <View style={styles.header}>
-            <Text accessibilityRole="header" style={styles.title}>确认完成订单</Text>
+            <Text accessibilityRole="header" style={styles.title}>{isFree ? "免单" : "确认完成订单"}</Text>
             <Pressable
               accessibilityLabel="关闭确认完成订单弹窗"
               accessibilityRole="button"
@@ -109,14 +199,68 @@ export function OrderCompleteConfirmSheet({
               <CachedImage source={diamondIcon} style={styles.diamondIcon} />
             </View>
           </DetailRow>
+          {isFree ? (
+            <View style={styles.freeRow}>
+              <Text style={styles.freeLabel}>免单</Text>
+              <View style={styles.qtyBox}>
+                <Pressable
+                  accessibilityLabel="减少免单时长"
+                  accessibilityRole="button"
+                  disabled={loading || !canDecFreeHours}
+                  hitSlop={4}
+                  onPress={decFreeHours}
+                  style={[
+                    styles.qtyBtn,
+                    (loading || !canDecFreeHours) && styles.qtyBtnDisabled,
+                  ]}
+                >
+                  <Text style={styles.qtyBtnText}>−</Text>
+                </Pressable>
+                <View style={styles.qtyInputBox}>
+                  <TextInput
+                    accessibilityLabel="免单时长"
+                    editable={!loading}
+                    keyboardType="decimal-pad"
+                    maxLength={8}
+                    onChangeText={handleHoursChange}
+                    style={styles.qtyInput}
+                    value={hoursText}
+                  />
+                  <Text style={styles.qtyUnit}>{order.billingUnitName || "小时"}</Text>
+                </View>
+                <Pressable
+                  accessibilityLabel="增加免单时长"
+                  accessibilityRole="button"
+                  disabled={loading || !canIncFreeHours}
+                  hitSlop={4}
+                  onPress={incFreeHours}
+                  style={[
+                    styles.qtyBtn,
+                    (loading || !canIncFreeHours) && styles.qtyBtnDisabled,
+                  ]}
+                >
+                  <Text style={styles.qtyBtnText}>+</Text>
+                </Pressable>
+              </View>
+              {freeStarAmount != null ? (
+                <View style={styles.freeStars}>
+                  <Text style={styles.freeStarsText}>{formatStar(freeStarAmount)}</Text>
+                  <CachedImage source={diamondIcon} style={styles.diamondIcon} />
+                </View>
+              ) : null}
+            </View>
+          ) : null}
         </ScrollView>
 
         <Pressable
           accessibilityRole="button"
-          accessibilityState={{ disabled: loading }}
-          disabled={loading}
-          onPress={onConfirm}
-          style={[styles.confirmButton, loading && styles.confirmButtonDisabled]}
+          accessibilityState={{ disabled: loading || (isFree && !freeValid) }}
+          disabled={loading || (isFree && !freeValid)}
+          onPress={handleConfirm}
+          style={[
+            styles.confirmButton,
+            (loading || (isFree && !freeValid)) && styles.confirmButtonDisabled,
+          ]}
         >
           <LinearGradient
             colors={["#FF2145", "#FF3158"]}
@@ -124,7 +268,9 @@ export function OrderCompleteConfirmSheet({
             start={{ x: 0, y: 0 }}
             style={styles.confirmGradient}
           >
-            <Text style={styles.confirmText}>{loading ? "处理中..." : "确认完成"}</Text>
+            <Text style={styles.confirmText}>
+              {loading ? "处理中..." : isFree ? "确认免单" : "确认完成"}
+            </Text>
           </LinearGradient>
         </Pressable>
       </View>
@@ -234,6 +380,42 @@ const styles = StyleSheet.create({
   totalValue: { flexDirection: "row", alignItems: "center", gap: 4 },
   total: { color: "#FE1F4C", fontFamily: DOUYIN_SANS, fontSize: 14, fontWeight: "500", lineHeight: 22 },
   diamondIcon: { width: 14, height: 11 },
+  freeRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10, minHeight: 40 },
+  freeLabel: { width: 40, color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 14, fontWeight: "500", lineHeight: 22 },
+  qtyBox: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 4 },
+  qtyBtn: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+    backgroundColor: "#F7F7F7",
+  },
+  qtyBtnDisabled: { backgroundColor: "transparent", borderWidth: 1, borderColor: "#F0F0F0" },
+  qtyBtnText: { color: "#0A0A0A", fontSize: 17, lineHeight: 20 },
+  qtyInputBox: {
+    flex: 1,
+    minWidth: 0,
+    height: 32,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: "#F7F7F7",
+  },
+  qtyInput: {
+    flex: 1,
+    minWidth: 0,
+    padding: 0,
+    color: "#0A0A0A",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  qtyUnit: { color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  freeStars: { flexDirection: "row", alignItems: "center", gap: 4 },
+  freeStarsText: { color: "#FE1F4C", fontFamily: DOUYIN_SANS, fontSize: 16, fontWeight: "500" },
   confirmButton: { height: 42, marginTop: 16, overflow: "hidden", borderRadius: 8 },
   confirmButtonDisabled: { opacity: 0.7 },
   confirmGradient: {
