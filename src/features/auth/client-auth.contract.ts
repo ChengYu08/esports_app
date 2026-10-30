@@ -122,7 +122,8 @@ export function createClientAuthContract(requester: AuthRequester) {
       }));
     },
     async cancelAccount(token: string, smsCode: string) {
-      return unwrap(await requester<unknown>('/client/v1/user/cancellation/verify', {
+      // 返回冷静期截止时间（yyyy-MM-dd HH:mm:ss）；token 随后吊销无法再查，须以此展示
+      return requireData(await requester<string>('/client/v1/user/cancellation/verify', {
         method: 'POST', token,
         body: { action: { code: smsCode } },
       }));
