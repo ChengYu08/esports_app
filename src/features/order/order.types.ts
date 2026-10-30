@@ -42,6 +42,7 @@ export type OrderItemModel = {
   receiverName?: string;
   receiverAvatar?: ImageSource;
   clubId?: number;
+  clubName?: string;
   reviewId?: number;
   reviewExists?: boolean;
   sellerAvatar: ImageSource | number;

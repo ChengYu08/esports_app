@@ -98,6 +98,10 @@ export function mapOrder(
     receiverName: stringValue(item, "receiverNickname", "companionName"),
     receiverAvatar: receiverAvatar ? { uri: receiverAvatar } : undefined,
     clubId: numberValue(item, "companionClubId", "clubId", "receiverClubId"),
+    // 俱乐部名仅在下单侧展示（接单侧对端是老板，无俱乐部概念）
+    clubName: scope === "accept"
+      ? undefined
+      : stringValue(item, "companionClubName", "clubName"),
     reviewId,
     reviewExists,
     sellerName: scope === "accept"
