@@ -1,8 +1,14 @@
 package expo.modules.pz.oneclick
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.GradientDrawable
 import android.util.Log
+import android.view.View
 import org.json.JSONObject
 import com.mobile.auth.gatewayauth.PhoneNumberAuthHelper
 import com.mobile.auth.gatewayauth.ResultCode
@@ -152,26 +158,88 @@ class PzOneClickModule : Module() {
 
   private fun authUIConfig(): com.mobile.auth.gatewayauth.AuthUIConfig {
     val density = appContext.reactContext?.resources?.displayMetrics?.density ?: 1f
+    // Figma 设计稿色板
+    val brandPrimary = Color.rgb(254, 31, 76)        // #FE1F4C
+    val gray1 = Color.rgb(26, 26, 26)                // #1A1A1A
+    val gray3 = Color.rgb(153, 153, 153)             // #999999
+    val gray9 = Color.rgb(128, 128, 128)             // #808080
+    val linkBlue = Color.rgb(27, 106, 224)           // #1B6AE0
+
+    // Figma 按钮：高 42、圆角 8、红 #FE1F4C
     val loginButton = GradientDrawable().apply {
-      setColor(Color.rgb(224, 27, 40))
+      setColor(brandPrimary)
       cornerRadius = 8f * density
     }
     return com.mobile.auth.gatewayauth.AuthUIConfig.Builder()
     .setNavHidden(false)
-    .setLightColor(true)
-    .setNavColor(Color.rgb(255, 229, 231))
-    .setStatusBarColor(Color.rgb(255, 229, 231))
+    // setLightColor(true) 表示「浅色状态栏图标」，配白底会让文字看不见。
+    // 改为 setStatusBarUIFlag 强制深色图标（SYSTEM_UI_FLAG_LIGHT_STATUS_BAR），文字才能显示。
+    .setLightColor(false)
+    .setStatusBarUIFlag(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR)
+    .setNavColor(Color.WHITE)
+    .setStatusBarColor(Color.WHITE)
+    .setNavReturnImgDrawable(makeBackArrowDrawable(gray1))
     .setLogoHidden(true)
+    // 掩码手机号 32dp semibold #1A1A1A
+    .setNumberColor(gray1)
+    .setNumberSizeDp(32)
+    // slogan 不自定义文案，让 SDK 按当前 SIM 卡显示「中国xx提供认证服务」
+    .setSloganTextColor(gray9)
+    .setSloganTextSizeDp(14)
+    // 一键登录主按钮
     .setLogBtnText("一键登录")
     .setLogBtnTextSizeDp(14)
     .setLogBtnHeight(42)
+    .setLogBtnMarginLeftAndRight((32f * density).toInt())
     .setLogBtnBackgroundDrawable(loginButton)
-    .setNumberColor(Color.rgb(26, 26, 26))
+    // 「暂不登录，先去逛逛」：12dp #999999
+    .setSwitchAccHidden(false)
+    .setSwitchAccText("暂不登录，先去逛逛")
+    .setSwitchAccTextColor(gray3)
+    .setSwitchAccTextSizeDp(12)
+    // 协议：默认勾选 false
+    .setPrivacyState(false)
     .setPrivacyBefore("已阅读并同意")
+    // 运营商协议是 SDK 内置占位符（点击会跳到对应运营商页面），
+    // 通过 vendorPrivacyPrefix/Suffix 控制显示文字
+    .setVendorPrivacyPrefix("《运营商协议》")
+    .setVendorPrivacySuffix("")
+    // 我们自己的协议放 privacyOne/Two
     .setAppPrivacyOne("《用户协议》", USER_AGREEMENT_URL)
     .setAppPrivacyTwo("《隐私政策》", PRIVACY_POLICY_URL)
-    .setAppPrivacyColor(Color.rgb(128, 128, 128), Color.rgb(27, 106, 224))
+    .setAppPrivacyColor(gray9, linkBlue)
+    // 协议 WebView 的安全区：导航栏 + 状态栏都用白色，避免顶部被状态栏遮挡
+    .setWebViewStatusBarColor(Color.WHITE)
+    .setWebNavColor(Color.WHITE)
+    .setWebNavTextColor(gray1)
+    .setWebNavTextSizeDp(18)
     .create()
+  }
+
+  /// 24×24 黑色左箭头 Drawable，与二级页面 ChevronLeft24Regular 视觉一致。
+  private fun makeBackArrowDrawable(color: Int): BitmapDrawable {
+    val density = appContext.reactContext?.resources?.displayMetrics?.density ?: 1f
+    val size = (24f * density).toInt().coerceAtLeast(24)
+    val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val stroke = 1.75f * density
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+      this.color = color
+      style = Paint.Style.STROKE
+      strokeWidth = stroke
+      strokeCap = Paint.Cap.ROUND
+      strokeJoin = Paint.Join.ROUND
+    }
+    // 中心箭头朝左：M15.5 4.5 L8 12 L15.5 19.5（24 视口坐标）
+    val scale = size / 24f
+    val path = Path().apply {
+      moveTo(15.5f * scale, 4.5f * scale)
+      lineTo(8f * scale, 12f * scale)
+      lineTo(15.5f * scale, 19.5f * scale)
+    }
+    canvas.drawPath(path, paint)
+    val resources = appContext.reactContext?.resources
+    return BitmapDrawable(resources, bitmap)
   }
 
   private fun parseResult(result: String): TokenRet? = try {

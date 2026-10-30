@@ -428,8 +428,27 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       },
 
       initialize: async (token) => {
+        // 同步闸门：在任何 await 之前先占位，避免 useEffect / 多个调用方重入。
+        // 否则在 await readBlacklist 期间,RootLayout 的 effect 可能再次触发 initialize,
+        // 形成 initialize → set('connecting') → React 重渲染 → effect 重跑 → initialize 的死循环。
+        if (initializeInProgress) return;
+        if (get().connectionState === 'connecting' || get().connectionState === 'ready') return;
+        if (!token) return;
+        if (!adapter.available()) {
+          set({ connectionState: 'unavailable', lastError: unavailableMessage });
+          return;
+        }
+
         const initializationRevision = lifecycleRevision;
         onlineStatusToken = token || null;
+        initializeInProgress = true;
+        conversationSyncPending = false;
+        set({ connectionState: 'connecting', lastError: null });
+        logger.info('RongCloud initialize starting', {
+          stage: 'message-store-initialize',
+          attempt: reconnectAttempts,
+        });
+
         ensureNotificationSettingsLoaded().catch(() => undefined);
         if (!stopBlacklistSubscription) {
           stopBlacklistSubscription = subscribeBlacklist((entries) => {
@@ -438,15 +457,19 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           });
         }
         const revision = blacklistRevision;
-        const entries = await readBlacklist();
-        if (initializationRevision !== lifecycleRevision) return;
-        if (revision === blacklistRevision) applyBlacklist(entries);
-        if (!token) return;
-        if (get().connectionState === 'connecting' || get().connectionState === 'ready') return;
-        if (!adapter.available()) {
-          set({ connectionState: 'unavailable', lastError: unavailableMessage });
+        let entries: BlacklistEntry[] = [];
+        try {
+          entries = await readBlacklist();
+        } catch {
+          initializeInProgress = false;
+          set({ connectionState: 'error', lastError: '即时消息初始化失败，请稍后重试' });
           return;
         }
+        if (initializationRevision !== lifecycleRevision) {
+          initializeInProgress = false;
+          return;
+        }
+        if (revision === blacklistRevision) applyBlacklist(entries);
         watchConnectionStatus();
         if (!stopMessageSubscription) stopMessageSubscription = adapter.subscribeMessages(receiveMessage);
         if (!stopConversationSyncSubscription) {
@@ -463,16 +486,12 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
             });
           });
         }
-        set({ connectionState: 'connecting', lastError: null });
-        initializeInProgress = true;
-        conversationSyncPending = false;
-        logger.info('RongCloud initialize starting', {
-          stage: 'message-store-initialize',
-          attempt: reconnectAttempts,
-        });
         try {
           const ready = await adapter.initialize(token);
-          if (initializationRevision !== lifecycleRevision) return;
+          if (initializationRevision !== lifecycleRevision) {
+            initializeInProgress = false;
+            return;
+          }
           if (!ready) {
             initializeInProgress = false;
             logger.warn('Instant messaging adapter initialization returned false', {
@@ -485,18 +504,27 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           // List restoration can fail while the IM connection remains usable.
           // Keep live messaging available and expose the list error separately.
           await syncConversations(initializationRevision).catch(() => undefined);
-          if (initializationRevision !== lifecycleRevision) return;
+          if (initializationRevision !== lifecycleRevision) {
+            initializeInProgress = false;
+            return;
+          }
           if (conversationSyncPending) {
             // Offline messages can finish syncing after the first read started.
             conversationSyncPending = false;
             await syncConversations(initializationRevision).catch(() => undefined);
-            if (initializationRevision !== lifecycleRevision) return;
+            if (initializationRevision !== lifecycleRevision) {
+              initializeInProgress = false;
+              return;
+            }
           }
           hasInitialized = true;
           initializeInProgress = false;
           set({ connectionState: 'ready', lastError: null });
         } catch (error) {
-          if (initializationRevision !== lifecycleRevision) return;
+          if (initializationRevision !== lifecycleRevision) {
+            initializeInProgress = false;
+            return;
+          }
           initializeInProgress = false;
           logger.warn('Instant messaging initialization threw an error', {
             stage: 'message-store-initialize',

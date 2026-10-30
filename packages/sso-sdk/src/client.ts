@@ -59,7 +59,9 @@ export class SsoClient {
       this.config.timeoutMs ?? 15_000,
     );
 
-    const parseBody = (raw: unknown): Record<string, unknown> | null | undefined => {
+    const parseBody = (
+      raw: unknown,
+    ): Record<string, unknown> | null | undefined => {
       if (raw === undefined || raw === null || raw === "") return {};
       if (typeof raw === "string") {
         try {
@@ -77,6 +79,8 @@ export class SsoClient {
     try {
       const headers = {
         ...createSignature(data, method, this.config),
+        // 必须带 Referer，否则会命中 WAF 被拦截
+        Referer: this.config.referer ?? "https://dj.panzhi.com/",
         AUTHORIZATION: `basic ${this.config.clientSecret}`,
         ...(options.headers ?? {}),
       };
@@ -119,14 +123,18 @@ export class SsoClient {
       });
       if (status < 200 || status >= 300)
         throw new SsoError(
-          readString(body?.info) ?? readString(body?.message) ?? `请求失败: ${status}`,
+          readString(body?.info) ??
+            readString(body?.message) ??
+            `请求失败: ${status}`,
           status,
           readString(body?.code),
         );
       if (path.includes("/oauth2/token")) {
         if (!body?.access_token)
           throw new SsoError(
-            readString(body?.info) ?? readString(body?.message) ?? "获取 token 失败",
+            readString(body?.info) ??
+              readString(body?.message) ??
+              "获取 token 失败",
             status,
             readString(body?.code),
           );
@@ -238,7 +246,7 @@ export class SsoClient {
       {
         data: {
           code: result.spToken,
-          grant_type: "ali_h5_one_key",
+          grant_type: "ali_app_one_key",
           scope: "openid",
         },
       },

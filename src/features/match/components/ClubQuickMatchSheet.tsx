@@ -24,11 +24,9 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import {
-  ensureAuditionRoom,
-  publishQuickMatch,
-} from "@/features/match/api/match.api";
+import { publishQuickMatch } from "@/features/match/api/match.api";
 import type { MatchGame } from "@/features/match/api/match.types";
+import { openAuditionRoom } from "@/features/match/enter-audition-room";
 import { MatchLinearGradient } from "@/features/match/components/MatchLinearGradient";
 import {
   MATCH_COMPANION_PREFERENCE_OPTIONS,
@@ -39,7 +37,6 @@ import {
 } from "@/features/match/hooks/use-match-form";
 import { exitVoiceRoom } from "@/features/voice-room/exit-voice-room";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
-import { resolveVoiceRoomId } from "@/features/voice-room/voice-room.api";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
@@ -278,37 +275,8 @@ export function ClubQuickMatchSheet({
       },
     ) => {
       if (!form.token) return false;
-      try {
-        const room = await ensureAuditionRoom(requestNo, form.token);
-        const roomId = resolveVoiceRoomId(room) || room.id;
-        if (!roomId) throw new Error("试音房信息不存在");
-        const game = options?.game;
-        onClose();
-        router.replace({
-          pathname: "/voice-room/[id]",
-          params: {
-            id: roomId,
-            scene: "audition",
-            requestNo,
-            ...(options?.expireTime ? { expireTime: options.expireTime } : {}),
-            ...(game?.id && game.name
-              ? {
-                  gameId: game.id,
-                  gameName: game.name,
-                  ...(game.iconUrl ? { gameIconUrl: game.iconUrl } : {}),
-                }
-              : {}),
-          },
-        });
-        return true;
-      } catch (error) {
-        showToast(
-          error instanceof Error
-            ? `派单已发布，但${error.message}`
-            : "派单已发布，但暂时无法进入试音房，请稍后重试",
-        );
-        return false;
-      }
+      onClose();
+      return openAuditionRoom(requestNo, form.token, options);
     },
     [form.token, onClose],
   );

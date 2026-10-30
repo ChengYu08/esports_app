@@ -261,10 +261,14 @@ export default function ProfileScreen() {
 
   if (routeParams && (detailQuery.isError || !detail)) {
     return (
-      <ProfileState
-        text="个人主页加载失败"
-        actionLabel="重试"
-        onAction={() => void detailQuery.refetch()}
+      <ProfileErrorState
+        topInset={insets.top}
+        message={
+          detailQuery.error instanceof Error && detailQuery.error.message
+            ? detailQuery.error.message
+            : "个人主页加载失败"
+        }
+        onRetry={() => void detailQuery.refetch()}
       />
     );
   }
@@ -1192,23 +1196,34 @@ function ReviewCard({ review }: { review: ProfileReview }) {
   );
 }
 
-function ProfileState({
-  text,
-  actionLabel,
-  onAction,
+function ProfileErrorState({
+  topInset,
+  message,
+  onRetry,
 }: {
-  text: string;
-  actionLabel?: string;
-  onAction?: () => void;
+  topInset: number;
+  message: string;
+  onRetry: () => void;
 }) {
   return (
     <View style={styles.state}>
-      <Text style={styles.stateText}>{text}</Text>
-      {actionLabel && onAction ? (
-        <Pressable onPress={onAction}>
-          <Text style={styles.retryText}>{actionLabel}</Text>
+      <View style={[styles.errorNavbar, { paddingTop: topInset + 12 }]}>
+        <Pressable
+          accessibilityLabel="返回"
+          accessibilityRole="button"
+          hitSlop={12}
+          onPress={() => router.back()}
+          style={styles.navButton}
+        >
+          <Image source={backIcon} style={styles.errorBackIcon} />
         </Pressable>
-      ) : null}
+      </View>
+      <View style={styles.errorBody}>
+        <Text style={styles.stateText}>{message}</Text>
+        <Pressable accessibilityRole="button" onPress={onRetry}>
+          <Text style={styles.retryText}>重试</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -1277,6 +1292,20 @@ const styles = StyleSheet.create({
     gap: 12,
     backgroundColor: "#fff",
   },
+  errorNavbar: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 12,
+    alignItems: "flex-start",
+  },
+  errorBody: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  errorBackIcon: { width: 24, height: 24, tintColor: "#0D0D0F" },
   stateText: {
     color: "#999",
     fontFamily: DOUYIN_SANS,

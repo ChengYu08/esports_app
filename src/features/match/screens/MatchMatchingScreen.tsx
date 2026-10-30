@@ -173,15 +173,16 @@ export default function MatchMatchingScreen({
             {hasCandidates ? "选择陪玩" : "一键匹配"}
           </Animated.Text>
           {hasCandidates ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="取消"
-              hitSlop={12}
-              onPress={openCancelPrompt}
-              style={styles.navRight}
-            >
-              <Text style={styles.navCancel}>取消</Text>
-            </Pressable>
+            <View style={styles.navRight}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="取消"
+                hitSlop={12}
+                onPress={openCancelPrompt}
+              >
+                <Text style={styles.navCancel}>取消</Text>
+              </Pressable>
+            </View>
           ) : (
             <View style={styles.navRight} />
           )}
