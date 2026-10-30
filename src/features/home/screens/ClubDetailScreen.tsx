@@ -12,6 +12,7 @@ import {
   ClubDetailSkeleton,
 } from "@/features/home/components/ClubDetailSkeleton";
 import { ClubQuickMatchSheet } from "@/features/match/components/ClubQuickMatchSheet";
+import { useCustomerDispatch } from "@/features/voice-room/use-customer-dispatch";
 import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
@@ -40,6 +41,8 @@ import {
 
 // 切图资源（新设计稿：俱乐部主页 455-68151 / 490-84520 / 557-88105）
 const bgClubImage = require("../../../../assets/home/club-detail/bg-club.png");
+// 设计稿导航栏内容行高度 44（不含状态栏，状态栏高度由安全区 insets 提供）
+const NAV_BAR_CONTENT_HEIGHT = 44;
 const tabCornerIcon = require("../../../../assets/home/club-detail/tab-corner.svg");
 const arrowDownIcon = require("../../../../assets/home/club-detail/arrow-fill-down-new.svg");
 const arrowUpRedIcon = require("../../../../assets/home/club-detail/arrow-fill-up-red.svg");
@@ -95,6 +98,8 @@ export default function ClubDetailScreen() {
   const [quickMatchVisible, setQuickMatchVisible] = useState(false);
   const accessToken = useAuthStore((state) => state.accessToken);
   const { openCustomerService } = useCustomerServiceEntry();
+  // 俱乐部「接待派单」流程（创建/切换语聊房并自动呼叫接待）
+  const { dispatch: dispatchReception } = useCustomerDispatch();
   const [priceSort, setPriceSort] =
     useState<CompanionFilters["priceSort"]>("DEFAULT");
   const [selectedSex, setSelectedSex] = useState<CompanionFilters["sex"]>();
@@ -280,7 +285,7 @@ export default function ClubDetailScreen() {
         pointerEvents="none"
       />
       {/* 导航栏：返回 + 搜索 + 客服 */}
-      <View style={[styles.nav, { paddingTop: insets.top }]}>
+      <View style={[styles.nav, { paddingTop: insets.top, height: insets.top + NAV_BAR_CONTENT_HEIGHT }]}>
         <Pressable
           accessibilityLabel="返回"
           hitSlop={10}
@@ -304,6 +309,7 @@ export default function ClubDetailScreen() {
           <Pressable
             accessibilityLabel="在线客服"
             hitSlop={10}
+            style={styles.navActionCustomer}
             onPress={openCustomerService}
           >
             <Headset24Regular color={COLORS.white} width={24} height={24} />
@@ -323,7 +329,9 @@ export default function ClubDetailScreen() {
               <Text numberOfLines={1} style={styles.clubName}>
                 {club.name}
               </Text>
-              <Text style={styles.selfTag}>自营</Text>
+              <View style={styles.selfTag}>
+                <Text style={styles.selfTagText}>自营</Text>
+              </View>
             </View>
             <View style={styles.clubMetaRow}>
               <View style={styles.clubMetaItem}>
@@ -663,7 +671,7 @@ export default function ClubDetailScreen() {
           </Pressable>
         </Pressable>
       </Modal>
-      {/* 底部操作栏：价目表 + 一键匹配 */}
+      {/* 底部操作栏：价目表 + 接待派单 + 一键匹配 */}
       <View
         style={[
           styles.bottomBar,
@@ -684,6 +692,14 @@ export default function ClubDetailScreen() {
           }}
         >
           <Text style={styles.priceButtonText}>价目表</Text>
+        </Pressable>
+        <Pressable
+          style={styles.matchButton}
+          onPress={() => {
+            void dispatchReception({ clubId: club?.id });
+          }}
+        >
+          <Text style={styles.matchButtonText}>接待派单</Text>
         </Pressable>
         <Pressable
           style={styles.matchButton}
@@ -934,7 +950,8 @@ const styles = StyleSheet.create({
   },
   // 导航栏（叠加在背景图上）
   nav: {
-    height: 44,
+    // 导航行内容高度 44（设计稿），加上状态栏高度由动态 style 传入
+    height: NAV_BAR_CONTENT_HEIGHT,
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
@@ -944,6 +961,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+  },
+  // 客服图标相对搜索图标视觉下移 1pt，对齐设计稿
+  navActionCustomer: {
+    marginTop: 1,
   },
   // 俱乐部信息区
   infoSection: {
@@ -984,16 +1005,20 @@ const styles = StyleSheet.create({
     lineHeight: 28,
   },
   selfTag: {
-    height: 16,
+    height: 17,
     paddingHorizontal: 4,
-    textAlignVertical: "center",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: COLORS.brandLight,
+    borderRadius: 3,
+  },
+  selfTagText: {
     color: COLORS.white,
     fontFamily: SYSTEM_FONT,
     fontSize: 10,
     fontWeight: "600",
     lineHeight: 13,
-    backgroundColor: COLORS.brandLight,
-    borderRadius: 3,
+    includeFontPadding: false,
   },
   clubMetaRow: {
     flexDirection: "row",
