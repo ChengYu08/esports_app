@@ -31,6 +31,17 @@ const cameraIcon = require("../../../../assets/onboarding/icon-camera.svg");
 
 const NICKNAME_MAX_LENGTH = 18;
 
+// Figma 设计稿颜色
+const COLOR_BRAND = "#FE1F4C";
+const COLOR_ERROR = "#FE4267";
+const COLOR_TEXT = "#333333";
+const COLOR_PLACEHOLDER = "#CCCCCC";
+const COLOR_INPUT_BG = "#F7F7F7";
+const COLOR_BORDER = "#EBEBEB";
+const COLOR_GENDER_SELECTED_BG = "#EBF3FF";
+const COLOR_GENDER_SELECTED_BORDER = "#70A9FF";
+const COLOR_TITLE_UNDERLINE = "#FFC2C6";
+
 type Gender = 0 | 1;
 
 export default function ProfileOnboardingScreen() {
@@ -157,7 +168,7 @@ export default function ProfileOnboardingScreen() {
 
   return (
     <View style={styles.screen}>
-      {/* 顶部渐变背景 */}
+      {/* 顶部渐变背景：粉 → 浅蓝 */}
       <LinearGradient
         colors={["#FFEBEC", "#EBFDFF"]}
         start={{ x: 0, y: 0 }}
@@ -178,7 +189,7 @@ export default function ProfileOnboardingScreen() {
           }
           showsVerticalScrollIndicator={false}
         >
-          {/* 状态栏占位 + 导航占位 */}
+          {/* 状态栏占位 */}
           <View style={{ height: insets.top + 44 }} />
 
           {/* 内容区 */}
@@ -231,13 +242,15 @@ export default function ProfileOnboardingScreen() {
                   value={nickname}
                   onChangeText={handleNicknameChange}
                   placeholder="起个好听的名字吧"
-                  placeholderTextColor="#ccc"
+                  placeholderTextColor={COLOR_PLACEHOLDER}
                   maxLength={NICKNAME_MAX_LENGTH}
                   autoCapitalize="none"
                   autoCorrect={false}
                   returnKeyType="done"
                   onSubmitEditing={handleSubmit}
                   editable={!submitting}
+                  selectionColor={COLOR_BRAND}
+                  cursorColor={COLOR_BRAND}
                 />
                 <View style={styles.counterBox}>
                   <Text style={styles.counterText}>
@@ -261,10 +274,7 @@ export default function ProfileOnboardingScreen() {
                   ]}
                   onPress={() => setGender(1)}
                 >
-                  <Image
-                    source={genderMaleIcon}
-                    style={styles.genderIcon}
-                  />
+                  <Image source={genderMaleIcon} style={styles.genderIcon} />
                   <Text style={styles.genderLabel}>男</Text>
                 </Pressable>
                 <View style={{ width: 12 }} />
@@ -275,10 +285,7 @@ export default function ProfileOnboardingScreen() {
                   ]}
                   onPress={() => setGender(0)}
                 >
-                  <Image
-                    source={genderFemaleIcon}
-                    style={styles.genderIcon}
-                  />
+                  <Image source={genderFemaleIcon} style={styles.genderIcon} />
                   <Text style={styles.genderLabel}>女</Text>
                 </Pressable>
               </View>
@@ -344,7 +351,7 @@ const styles = StyleSheet.create({
     fontFamily: SYSTEM_FONT,
     fontSize: 22,
     fontWeight: "600",
-    color: "#333",
+    color: COLOR_TEXT,
     lineHeight: 30,
   },
   titleUnderline: {
@@ -353,7 +360,7 @@ const styles = StyleSheet.create({
     left: 2,
     width: 58,
     height: 6,
-    backgroundColor: "#FFC2C6",
+    backgroundColor: COLOR_TITLE_UNDERLINE,
     borderRadius: 3,
   },
   subtitle: {
@@ -361,7 +368,7 @@ const styles = StyleSheet.create({
     fontFamily: SYSTEM_FONT,
     fontSize: 14,
     fontWeight: "400",
-    color: "#333",
+    color: COLOR_TEXT,
     lineHeight: 22,
     letterSpacing: 0.7,
   },
@@ -420,7 +427,7 @@ const styles = StyleSheet.create({
     fontFamily: SYSTEM_FONT,
     fontSize: 14,
     fontWeight: "400",
-    color: "#333",
+    color: COLOR_TEXT,
     lineHeight: 22,
     marginBottom: 12,
   },
@@ -428,33 +435,32 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     height: 46,
-    backgroundColor: "#f7f7f7",
+    backgroundColor: COLOR_INPUT_BG,
     borderRadius: 8,
     paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: "transparent",
   },
   inputBoxError: {
-    borderColor: "#fe4267",
-    backgroundColor: "#fff",
+    borderColor: COLOR_ERROR,
   },
   input: {
     flex: 1,
     fontFamily: SYSTEM_FONT,
     fontSize: 14,
     fontWeight: "400",
-    color: "#333",
+    color: COLOR_TEXT,
     lineHeight: 22,
     paddingVertical: 0,
   },
   counterBox: {
-    marginLeft: 8,
+    marginLeft: 16,
   },
   counterText: {
     fontFamily: SYSTEM_FONT,
     fontSize: 14,
     fontWeight: "400",
-    color: "#ccc",
+    color: COLOR_PLACEHOLDER,
     lineHeight: 22,
   },
   errorText: {
@@ -463,7 +469,7 @@ const styles = StyleSheet.create({
     fontFamily: SYSTEM_FONT,
     fontSize: 12,
     fontWeight: "400",
-    color: "#fe4267",
+    color: COLOR_ERROR,
     lineHeight: 18,
   },
   genderRow: {
@@ -476,14 +482,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 16,
-    backgroundColor: "#f7f7f7",
+    backgroundColor: COLOR_INPUT_BG,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "transparent",
   },
   genderOptionSelected: {
-    backgroundColor: "#ebf3ff",
-    borderColor: "#70a9ff",
+    backgroundColor: COLOR_GENDER_SELECTED_BG,
+    borderColor: COLOR_GENDER_SELECTED_BORDER,
   },
   genderIcon: {
     width: 24,
@@ -493,7 +499,7 @@ const styles = StyleSheet.create({
     fontFamily: SYSTEM_FONT,
     fontSize: 14,
     fontWeight: "600",
-    color: "#333",
+    color: COLOR_TEXT,
     lineHeight: 22,
   },
   footer: {
@@ -511,7 +517,7 @@ const styles = StyleSheet.create({
     height: 42,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#ebebeb",
+    borderColor: COLOR_BORDER,
     backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
@@ -520,14 +526,14 @@ const styles = StyleSheet.create({
     fontFamily: SYSTEM_FONT,
     fontSize: 14,
     fontWeight: "400",
-    color: "#333",
+    color: COLOR_TEXT,
     lineHeight: 22,
   },
   submitButton: {
     flex: 1,
     height: 42,
     borderRadius: 8,
-    backgroundColor: "#fe1f4c",
+    backgroundColor: COLOR_BRAND,
     alignItems: "center",
     justifyContent: "center",
   },
