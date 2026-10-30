@@ -1,22 +1,32 @@
-import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { useAuthStore } from "@esports/auth";
+import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { showToast } from "@/shared/ui/app-toast";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { selectAndCreateOrder } from "@/features/match/api/match.api";
-import type { MatchGame } from "@/features/match/api/match.types";
-import { isMultiCompanionRequest } from "@/features/match/api/match.types";
+import {
+  isMultiCompanionRequest,
+  type MatchGame,
+} from "@/features/match/api/match.types";
+import { MatchCelebrationOverlay } from "@/features/match/components/MatchCelebrationOverlay";
 import { MatchLinearGradient } from "@/features/match/components/MatchLinearGradient";
 import { MatchPaySheet } from "@/features/match/components/MatchPaySheet";
 import { MatchingGrabListView } from "@/features/match/components/MatchingGrabListView";
 import { MatchingWaitingView } from "@/features/match/components/MatchingWaitingView";
 import { useQuickMatchSession } from "@/features/match/hooks/use-quick-match-session";
-import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { AppPrompt } from "@/shared/ui/AppPrompt";
+import { showToast } from "@/shared/ui/app-toast";
 
 const BG_GRADIENT = ["#0C0C2E", "#120D2B"] as const;
 
@@ -32,11 +42,16 @@ export default function MatchMatchingScreen({
   game,
 }: MatchMatchingScreenProps) {
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
   const token = useAuthStore((state) => state.accessToken);
   const [payVisible, setPayVisible] = useState(false);
   const [payTotal, setPayTotal] = useState(0);
   const [paidOrderId, setPaidOrderId] = useState<string | null>(null);
   const [cancelPromptVisible, setCancelPromptVisible] = useState(false);
+  /** 首位候选人出现的短暂庆祝动效 */
+  const [celebrating, setCelebrating] = useState(false);
+  /** 已经触发过庆祝，避免轮询追加候选人重复播 */
+  const celebratedRef = useRef(false);
 
   /** 按路由栈返回进入匹配前的页面；无可返回时回 tabs */
   const leaveMatchFlow = useCallback(() => {
@@ -54,6 +69,16 @@ export default function MatchMatchingScreen({
   });
 
   const hasCandidates = session.candidates.length > 0;
+
+  // 首个陪玩出现时短暂播一段庆祝动效（一次性）
+  useEffect(() => {
+    if (!hasCandidates || celebratedRef.current) return;
+    celebratedRef.current = true;
+    setCelebrating(true);
+    const timer = setTimeout(() => setCelebrating(false), 900);
+    return () => clearTimeout(timer);
+  }, [hasCandidates]);
+
   const openCancelPrompt = useCallback(() => {
     setCancelPromptVisible(true);
   }, []);
@@ -133,11 +158,20 @@ export default function MatchMatchingScreen({
             onPress={leaveMatchFlow}
             style={styles.backButton}
           >
-            <ChevronLeft24Regular color="white" width={24} height={24} style={styles.backIcon} />
+            <ChevronLeft24Regular
+              color="white"
+              width={24}
+              height={24}
+              style={styles.backIcon}
+            />
           </Pressable>
-          <Text style={styles.navTitle}>
+          <Animated.Text
+            key={hasCandidates ? "grab" : "waiting"}
+            entering={FadeIn.duration(220)}
+            style={styles.navTitle}
+          >
             {hasCandidates ? "选择陪玩" : "一键匹配"}
-          </Text>
+          </Animated.Text>
           {hasCandidates ? (
             <Pressable
               accessibilityRole="button"
@@ -158,7 +192,9 @@ export default function MatchMatchingScreen({
         {hasCandidates ? (
           <MatchingGrabListView
             countdownText={session.countdownText}
+            countdownSec={session.countdownSec}
             candidates={session.candidates}
+            newCandidateIds={session.newCandidateIds}
             selectedGrabIds={session.selectedGrabIds}
             submitting={session.submitting}
             multiCompanion={isMultiCompanionRequest(session.detail)}
@@ -168,11 +204,18 @@ export default function MatchMatchingScreen({
         ) : (
           <MatchingWaitingView
             countdownText={session.countdownText}
+            countdownSec={session.countdownSec}
             game={game}
             onCancel={openCancelPrompt}
           />
         )}
       </View>
+
+      {celebrating ? (
+        <MatchCelebrationOverlay
+          centeredOn={{ x: width / 2, y: (insets.top + 44 + height) * 0.45 }}
+        />
+      ) : null}
 
       <MatchPaySheet
         visible={payVisible}

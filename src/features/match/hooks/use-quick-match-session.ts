@@ -202,6 +202,10 @@ export function useQuickMatchSession(
   const [selectedGrabIds, setSelectedGrabIds] = useState<string[]>([]);
   const [countdownSec, setCountdownSec] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  /** 最近一次轮询中新出现的候选人 id（一次性的金色描边提示） */
+  const [newCandidateIds, setNewCandidateIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   /** 建单后支付中：迟到的超时/结束信令不得清会话 */
   const [orderPending, setOrderPending] = useState(false);
 
@@ -213,6 +217,10 @@ export function useQuickMatchSession(
   const onEndedRef = useRef(onEnded);
   const endedRef = useRef(false);
   const detailRef = useRef<QuickMatchRequestDetail | null>(null);
+  /** 上一次轮询的候选人 id，用于 diff 出新出现的 */
+  const prevGrabIdsRef = useRef<Set<string>>(new Set());
+  /** 清「新陪玩」标记的延时器，切换 requestNo/支付时取消 */
+  const clearNewMarkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     requestNoRef.current = requestNo;
@@ -278,8 +286,14 @@ export function useQuickMatchSession(
     setCountdownSec(sec);
     setCandidates([]);
     setSelectedGrabIds([]);
+    setNewCandidateIds(new Set());
     setDetail(null);
     setOrderPending(false);
+    prevGrabIdsRef.current = new Set();
+    if (clearNewMarkTimerRef.current) {
+      clearTimeout(clearNewMarkTimerRef.current);
+      clearNewMarkTimerRef.current = null;
+    }
     if (sec <= 0) {
       void endMatching("expired");
     }
@@ -327,6 +341,24 @@ export function useQuickMatchSession(
       }
       setCandidates(list);
       setSelectedGrabIds((prev) => prev.filter((id) => list.some((item) => item.id === id)));
+
+      // diff 出本次新出现的候选人，触发一次性金色描边
+      const prevIds = prevGrabIdsRef.current;
+      const arrivedIds = list.filter((item) => !prevIds.has(item.id)).map((item) => item.id);
+      prevGrabIdsRef.current = new Set(list.map((item) => item.id));
+      if (clearNewMarkTimerRef.current) {
+        clearTimeout(clearNewMarkTimerRef.current);
+        clearNewMarkTimerRef.current = null;
+      }
+      if (arrivedIds.length > 0) {
+        setNewCandidateIds(new Set(arrivedIds));
+        clearNewMarkTimerRef.current = setTimeout(() => {
+          clearNewMarkTimerRef.current = null;
+          setNewCandidateIds(new Set());
+        }, 1500);
+      } else {
+        setNewCandidateIds(new Set());
+      }
     } catch {
       // 网络失败保留视图，等待下次轮询
     } finally {
@@ -419,6 +451,7 @@ export function useQuickMatchSession(
     requestNo,
     detail,
     candidates,
+    newCandidateIds,
     selectedGrabIds,
     countdownSec,
     countdownText: formatCountdown(countdownSec),
