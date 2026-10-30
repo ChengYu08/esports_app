@@ -1,6 +1,6 @@
 import { useAuthStore } from "@esports/auth";
 import { router } from "expo-router";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -47,9 +47,11 @@ export function VoiceRoomConversationsSheet({
   const refreshConversations = useMessageStore((state) => state.refreshConversations);
 
   // Reuse the message store session; refresh silently when opening.
-  if (visible && accessToken && connectionState === "idle") {
-    void refreshConversations(accessToken);
-  }
+  useEffect(() => {
+    if (visible && accessToken && connectionState === "idle") {
+      void refreshConversations(accessToken);
+    }
+  }, [visible, accessToken, connectionState, refreshConversations]);
 
   const items = useMemo<MessageListItemModel[]>(
     () =>
