@@ -77,7 +77,7 @@ const COLORS = {
   border: "#E9E9EB",
 } as const;
 
-type FilterKey = "mode" | "level" | "gender" | "status" | "price";
+type FilterKey = "mode" | "level" | "gender" | "advanced" | "status" | "price";
 
 type ClubFilterDef = {
   key: FilterKey;
@@ -248,6 +248,8 @@ export default function ClubDetailScreen() {
       mode: selectedMode != null ? String(selectedMode) : "",
       level: selectedLevel != null ? String(selectedLevel) : "",
       gender: selectedSex === 1 ? "male" : selectedSex === 2 ? "female" : "",
+      // 「筛选」聚合维度自身无单值，取值看 status / price
+      advanced: "",
       status: selectedStatus === 0 ? "online" : selectedStatus === 1 ? "busy" : "",
       price:
         priceSort === "ASC" ? "asc" : priceSort === "DESC" ? "desc" : "",
@@ -282,8 +284,13 @@ export default function ClubDetailScreen() {
         ],
       },
       GENDER_FILTER,
-      STATUS_FILTER,
-      PRICE_FILTER,
+      {
+        // 设计稿第 4 维「筛选」：聚合状态 + 价格，不直接对应某个选项
+        key: "advanced",
+        label: "筛选",
+        arrow: "down",
+        options: [],
+      },
     ],
     [levelsQuery.data, modesQuery.data],
   );
@@ -331,7 +338,10 @@ export default function ClubDetailScreen() {
         break;
       }
     }
-    closeFilterMenu();
+    // 「筛选」面板内的状态/价格选择保持面板打开，便于连续设置，点蒙层关闭
+    if (key !== "status" && key !== "price") {
+      closeFilterMenu();
+    }
   }
 
   function handleSelectGame(nextGameId: string) {
@@ -484,7 +494,11 @@ export default function ClubDetailScreen() {
           <View style={styles.filterBar}>
             {filterDefs.map((def) => {
               const value = filterValues[def.key];
-              const active = Boolean(value);
+              // 「筛选」聚合状态+价格，只要任一有值即高亮
+              const active =
+                def.key === "advanced"
+                  ? Boolean(filterValues.status || filterValues.price)
+                  : Boolean(value);
               const selectedOption = def.options.find(
                 (option) => option.value === value,
               );
@@ -505,9 +519,11 @@ export default function ClubDetailScreen() {
                         open && styles.filterChipTextOpen,
                       ]}
                     >
-                      {active
-                        ? `${def.label}·${selectedOption?.label ?? ""}`
-                        : def.label}
+                      {def.key === "advanced"
+                        ? def.label
+                        : active
+                          ? `${def.label}·${selectedOption?.label ?? ""}`
+                          : def.label}
                     </Text>
                     <Image
                       source={def.arrow === "sort" ? arrowUpDownIcon : arrowDownIcon}
@@ -542,6 +558,53 @@ export default function ClubDetailScreen() {
             <Text style={styles.filterHint}>请先选择「模式」后再选择等级</Text>
           ) : activeFilterDef.key === "level" && !accessToken ? (
             <Text style={styles.filterHint}>登录后可选择等级</Text>
+          ) : activeFilterDef.key === "advanced" ? (
+            <View style={styles.filterMenuOptions}>
+              <Text style={styles.filterGroupLabel}>状态</Text>
+              {STATUS_FILTER.options.map((option) => {
+                const selected = option.value === filterValues.status;
+                return (
+                  <Pressable
+                    key={option.value || "all"}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    onPress={() => handleFilterSelect("status", option.value)}
+                    style={[styles.filterMenuOption, selected && styles.filterMenuOptionSelected]}
+                  >
+                    <Text
+                      style={[
+                        styles.filterMenuOptionText,
+                        selected && styles.filterMenuOptionTextSelected,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+              <Text style={styles.filterGroupLabel}>价格</Text>
+              {PRICE_FILTER.options.map((option) => {
+                const selected = option.value === filterValues.price;
+                return (
+                  <Pressable
+                    key={option.value || "all"}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    onPress={() => handleFilterSelect("price", option.value)}
+                    style={[styles.filterMenuOption, selected && styles.filterMenuOptionSelected]}
+                  >
+                    <Text
+                      style={[
+                        styles.filterMenuOptionText,
+                        selected && styles.filterMenuOptionTextSelected,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           ) : (
             <View style={styles.filterMenuOptions}>
               {activeFilterDef.options.map((option) => {
@@ -1088,6 +1151,14 @@ const styles = StyleSheet.create({
     color: COLORS.textTertiary,
     fontFamily: SYSTEM_FONT,
     fontSize: 14,
+  },
+  // 「筛选」面板内分组标题（状态 / 价格）
+  filterGroupLabel: {
+    color: COLORS.textTertiary,
+    fontFamily: SYSTEM_FONT,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "500",
   },
   memberEmpty: { alignSelf: "center", marginTop: 24 },
   // 成员卡片分隔符（对齐大神列表 hairline 分割线）
