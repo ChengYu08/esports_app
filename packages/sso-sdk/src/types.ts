@@ -31,6 +31,8 @@ export type SsoClientConfig = {
   os?: "Android" | "iOS" | "Harmony" | "Unknown";
   /** Backend application source identifier sent with every auth request. */
   sourceType?: SsoSourceType;
+  /** Referer header sent with every auth request; required, otherwise the request is blocked by WAF. */
+  referer?: string;
   /** Optional diagnostic hook. It never receives request bodies or credentials. */
   onRequestLog?: (log: SsoRequestLog) => void;
   /** Optional Axios transport override for host apps and deterministic callers. */

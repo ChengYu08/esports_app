@@ -9,5 +9,7 @@ export const apiAxios = axiosCreate({
   headers: {
     Accept: "application/json",
     "Content-Type": "application/json",
+    // 必须带 Referer，否则会命中 WAF 被拦截
+    Referer: "https://dj.panzhi.com/",
   },
 });
