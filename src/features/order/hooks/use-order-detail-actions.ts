@@ -1,9 +1,9 @@
-import { useAuthStore } from "@esports/auth";
-import * as Clipboard from "expo-clipboard";
-import { router } from "expo-router";
-import { useState } from "react";
 import { buildAfterSalePayload } from "@/features/order/after-sale-card";
-import { computeFreeStarAmount } from "@/features/order/free-amount";
+import {
+  computeFreeStarAmount,
+  computeOrderPayableStars,
+} from "@/features/order/free-amount";
+import { imageSourceUri } from "@/features/order/order-detail-format";
 import {
   invalidateOrderQueries,
   refreshOrderAfterAction,
@@ -21,14 +21,14 @@ import {
   type AfterSaleMember,
   type OrderReview,
 } from "@/features/order/order.api";
-import { imageSourceUri } from "@/features/order/order-detail-format";
-import type {
-  OrderAction,
-  OrderItemModel,
-} from "@/features/order/order.types";
+import type { OrderAction, OrderItemModel } from "@/features/order/order.types";
 import { requireLogin } from "@/shared/navigation/require-login";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { showToast } from "@/shared/ui/app-toast";
+import { useAuthStore } from "@esports/auth";
+import * as Clipboard from "expo-clipboard";
+import { router } from "expo-router";
+import { useState } from "react";
 
 type OrderDetailScope = "accept" | "place";
 
@@ -143,7 +143,12 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
       return;
     }
     const starAmount = computeFreeStarAmount(order, freeHours);
-    if (starAmount == null || starAmount <= 0) {
+    if (
+      starAmount == null ||
+      starAmount <= 0 ||
+      freeHours > order.quantity ||
+      starAmount > computeOrderPayableStars(order)
+    ) {
       return;
     }
     setActionPending(true);
@@ -242,7 +247,7 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
       await completeOrder(order.id, token);
       setCompletePromptVisible(false);
       await syncAfterMutation();
-      showToast("服务已完成");
+      showToast("订单已完成");
     } catch (error) {
       setPrompt({
         title: "完成订单失败",

@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { OrderAction } from "@/features/order/order.types";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { SYSTEM_FONT } from "@/shared/theme/typography";
 
 const ACTION_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
 const ACTION_GRADIENT_START = { x: 0, y: 0 } as const;
@@ -36,12 +36,15 @@ export function OrderDetailBottomBar({
       {actions.map((action) => (
         <Pressable
           key={action.key}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: pending }}
           disabled={pending}
           onPress={() => onAction(action)}
           style={[
             styles.outlineButton,
             scope === "accept" && styles.acceptOutlineButton,
             actions.length > 1 && styles.bottomAction,
+            scope === "accept" && actions.length > 1 && action.variant === "secondary" && styles.acceptSecondaryButton,
             action.variant === "primary" && styles.primaryButton,
             action.variant === "primary" &&
               scope === "accept" &&
@@ -93,9 +96,10 @@ const styles = StyleSheet.create({
     borderTopWidth: 14,
     borderTopColor: "#F7F7F7",
   },
-  acceptBottom: { borderTopWidth: 0, paddingTop: 8 },
+  acceptBottom: { borderTopWidth: 0, paddingTop: 8, gap: 12 },
   // 多按钮均分一行时收紧内边距，保证窄屏（<360pt）下四字按钮不换行。
   bottomAction: { flex: 1, width: undefined, minWidth: 0, paddingHorizontal: 8 },
+  acceptSecondaryButton: { flexGrow: 0, flexShrink: 0, flexBasis: 104, width: 104 },
   outlineButton: {
     width: "100%",
     height: 42,
@@ -106,11 +110,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  acceptOutlineButton: { height: 42, borderRadius: 8 },
+  acceptOutlineButton: { height: 42, borderRadius: 8, borderColor: "#EBEBEB" },
   acceptPrimaryButton: { borderRadius: 8, overflow: "hidden" },
   outlineText: {
     color: "#111",
-    fontFamily: DOUYIN_SANS,
+    fontFamily: SYSTEM_FONT,
     fontSize: 17,
     fontWeight: "600",
   },
@@ -129,9 +133,9 @@ const styles = StyleSheet.create({
   },
   primaryText: {
     color: "#FFF",
-    fontFamily: DOUYIN_SANS,
+    fontFamily: SYSTEM_FONT,
     fontSize: 17,
     fontWeight: "600",
   },
-  acceptActionText: { fontSize: 14 },
+  acceptActionText: { fontSize: 14, fontWeight: "500", lineHeight: 22 },
 });
