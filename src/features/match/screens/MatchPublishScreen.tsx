@@ -684,8 +684,10 @@ const styles = StyleSheet.create({
     fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
+    height: 32,
     color: "#FFFFFF",
     padding: 0,
+    textAlignVertical: "center",
   },
   remarkError: {
     marginLeft: 56,

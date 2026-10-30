@@ -319,10 +319,11 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    height: 46,
+    minHeight: 48,
     padding: 0,
     color: "#333",
     fontSize: 14,
+    textAlignVertical: "center",
   },
   divider: { width: 1, height: 16, backgroundColor: "#ddd" },
   sendCode: { color: "#e01b28", fontFamily: DOUYIN_SANS, fontSize: 14 },
