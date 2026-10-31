@@ -1,5 +1,4 @@
 import { useAuthStore } from "@esports/auth";
-import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
@@ -22,6 +21,7 @@ import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { useOnboardingStore } from "@/features/auth/onboarding-store";
 import { uploadClientObject } from "@/features/auth/oss-upload";
 import { saveAuthSession } from "@/features/auth/session-persistence";
+import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
 
 const avatarPlaceholder = require("../../../../assets/onboarding/avatar-panda.svg");
@@ -65,28 +65,14 @@ export default function ProfileOnboardingScreen() {
 
   const handlePickAvatar = async () => {
     if (!token || avatarUploading) return;
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Toast.show("请在系统设置中允许访问照片", {
-        duration: Toast.durations.SHORT,
-      });
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.9,
-    });
-    if (result.canceled || !result.assets[0]) return;
-    const selected = result.assets[0];
-    if (selected.fileSize && selected.fileSize > 2 * 1024 * 1024) {
-      Toast.show("头像图片不能超过 2MB", { duration: Toast.durations.SHORT });
-      return;
-    }
+    // 进入相册选择 → 裁剪，裁剪结果经会话桥接回传（权限在相册页内处理）
+    const pickPending = beginMediaPick();
+    router.push({ pathname: "/media-picker", params: { crop: "1", max: "1" } });
+    const croppedUri = (await pickPending)?.[0];
+    if (!croppedUri) return;
     setAvatarUploading(true);
     try {
-      const fileName = selected.fileName || `avatar-${Date.now()}.jpg`;
+      const fileName = `avatar-${Date.now()}.jpg`;
       let imageUrl = "";
       let lastError: unknown;
       for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -94,7 +80,7 @@ export default function ProfileOnboardingScreen() {
           const sts = await clientAuthApi.getOssSts(token, "101", [fileName]);
           const objectKey = sts.objectList?.[0];
           if (!objectKey) throw new Error("上传凭证无效");
-          imageUrl = await uploadClientObject(sts, objectKey, selected);
+          imageUrl = await uploadClientObject(sts, objectKey, { uri: croppedUri });
           break;
         } catch (error) {
           lastError = error;

@@ -13,9 +13,10 @@ import {
   View,
 } from "react-native";
 import { Image } from "expo-image";
-import * as ImagePicker from "expo-image-picker";
+import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import type { OrderReview } from "../order.api";
@@ -81,26 +82,15 @@ export function OrderReviewSheet({
 
   const pickImages = async () => {
     if (readonly || submitting || images.length >= MAX_IMAGES) return;
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      void useAppConfirm.getState().confirm({
-        title: "需要相册权限",
-        message: "允许访问相册后才能添加评价图片",
-      });
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsMultipleSelection: true,
-      selectionLimit: MAX_IMAGES - images.length,
-      quality: 0.85,
+    // 相册选择页内部处理权限，选图结果经会话桥接回传
+    const pickPending = beginMediaPick();
+    router.push({
+      pathname: "/media-picker",
+      params: { max: String(MAX_IMAGES - images.length) },
     });
-    if (!result.canceled) {
-      setImages((current) => [
-        ...current,
-        ...result.assets.map((asset) => asset.uri),
-      ].slice(0, MAX_IMAGES));
-    }
+    const picked = await pickPending;
+    if (!picked?.length) return;
+    setImages((current) => [...current, ...picked].slice(0, MAX_IMAGES));
   };
 
   return (

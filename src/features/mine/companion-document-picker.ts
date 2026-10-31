@@ -7,12 +7,3 @@ export function pickCompanionAudio() {
     copyToCacheDirectory: true,
   });
 }
-
-export function pickCompanionImageFiles() {
-  return getDocumentAsync({
-    type: ["image/*"],
-    multiple: true,
-    copyToCacheDirectory: true,
-    base64: false,
-  });
-}
