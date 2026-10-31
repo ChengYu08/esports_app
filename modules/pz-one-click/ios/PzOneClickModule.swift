@@ -174,11 +174,11 @@ public class PzOneClickModule: Module {
     }.resizableImage(withCapInsets: UIEdgeInsets(top: 0, left: 8, bottom: 0, right: 8), resizingMode: .stretch)
     model.loginBtnBgImgs = [buttonImage, buttonImage, buttonImage]
     // 左右边距 15pt
-    model.loginBtnFrameBlock = { percentOriginX, percentOriginY, buttonWidth, buttonHeight, phoneNumberFrame, sloganFrame in
+    model.loginBtnFrameBlock = { screenSize, superViewSize, frame in
       let margin = CGFloat(15)
       let x = margin
       let width = UIScreen.main.bounds.width - margin * 2
-      return CGRect(x: x, y: percentOriginY, width: width, height: buttonHeight)
+      return CGRect(x: x, y: frame.origin.y, width: width, height: frame.size.height)
     }
     model.privacyPreText = "已阅读并同意"
     // 运营商协议走 SDK 内置占位符（点击跳到对应运营商官方页面），

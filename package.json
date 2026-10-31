@@ -4,6 +4,11 @@
   "version": "1.0.0",
   "expo": {
     "autolinking": {
+      "android": {
+        "exclude": [
+          "expo-store-review"
+        ]
+      },
       "ios": {
         "exclude": [
           "react-native-update"

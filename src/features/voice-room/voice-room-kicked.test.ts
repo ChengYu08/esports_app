@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { handleVoiceRoomKicked, handleVoiceRoomBlocked } from './voice-room-kicked';
+import { handleVoiceRoomKicked, handleVoiceRoomBlocked, handleVoiceRoomDestroyed } from './voice-room-kicked';
 import { useVoiceRoomSessionStore, type ActiveVoiceRoom } from './voice-room-session';
+import { markVoiceRoomIntentionalExit } from './voice-room-session';
 import { leaveVoiceRtc } from './voice-room-rtc';
 import { leaveVoiceChatRoom } from './voice-room-rongcloud';
 import { voiceRoomApi } from './voice-room.api';
@@ -104,5 +105,58 @@ describe('being removed from a voice room', () => {
     useVoiceRoomSessionStore.getState().clearActiveRoom(room.roomId);
     expect(useVoiceRoomSessionStore.getState().completeRoomJoin(room)).toBe(false);
     expect(useVoiceRoomSessionStore.getState().activeRoom).toBeNull();
+  });
+});
+
+describe('when the voice room chatroom is destroyed', () => {
+  it('clears the session, leaves both SDKs and notifies for the current room', async () => {
+    const notify = vi.fn();
+    await handleVoiceRoomDestroyed('voice_12_3', notify);
+    expect(useVoiceRoomSessionStore.getState()).toMatchObject({ activeRoom: null, microphoneMuted: true, lastKickedRoom: room });
+    expect(leaveVoiceRtc).toHaveBeenCalledTimes(1);
+    expect(leaveVoiceChatRoom).toHaveBeenCalledWith('voice_12_3');
+    expect(voiceRoomApi.leave).not.toHaveBeenCalled();
+    expect(voiceRoomApi.destroy).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels a pending join so its late completion cannot restore the destroyed session', async () => {
+    useVoiceRoomSessionStore.setState({ activeRoom: null, joiningRoom: room });
+    await handleVoiceRoomDestroyed('voice_12_3', vi.fn());
+    expect(useVoiceRoomSessionStore.getState().completeRoomJoin(room)).toBe(false);
+    expect(useVoiceRoomSessionStore.getState()).toMatchObject({ activeRoom: null, joiningRoom: null });
+  });
+
+  it.each(['', 'voice_12_2', 'voice_13_3'])('ignores empty or unrelated chatroom ids: %s', async (chatroomId) => {
+    const notify = vi.fn();
+    await handleVoiceRoomDestroyed(chatroomId, notify);
+    expect(useVoiceRoomSessionStore.getState().activeRoom).toBe(room);
+    expect(notify).not.toHaveBeenCalled();
+    expect(leaveVoiceRtc).not.toHaveBeenCalled();
+  });
+
+  it('does not notify twice for repeated destroy events', async () => {
+    const notify = vi.fn();
+    await handleVoiceRoomDestroyed('voice_12_3', notify);
+    await handleVoiceRoomDestroyed('voice_12_3', notify);
+    expect(notify).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores the destroy event when the owner exit marked the instance as intentional', async () => {
+    markVoiceRoomIntentionalExit(room);
+    const notify = vi.fn();
+    await handleVoiceRoomDestroyed('voice_12_3', notify);
+    expect(notify).not.toHaveBeenCalled();
+    expect(leaveVoiceRtc).not.toHaveBeenCalled();
+    expect(useVoiceRoomSessionStore.getState().activeRoom).toBe(room);
+  });
+
+  it('still notifies a new room instance reopened after an intentional exit', async () => {
+    markVoiceRoomIntentionalExit(room);
+    const nextRoom = { ...room, roomVersion: '4', rongChatroomId: 'voice_12_4' };
+    useVoiceRoomSessionStore.setState({ activeRoom: nextRoom });
+    const notify = vi.fn();
+    await handleVoiceRoomDestroyed('voice_12_4', notify);
+    expect(notify).toHaveBeenCalledTimes(1);
   });
 });

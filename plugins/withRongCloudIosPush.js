@@ -62,7 +62,7 @@ ${LAUNCH_OPTIONS_CAPTURE}
 // 3c. Handle notification tap → save targetId for JS to read on next launch
 const NOTIFICATION_TAP_HANDLER = `
   ${MARKER} handle notification tap
-  public override func userNotificationCenter(
+  @objc public func userNotificationCenter(
     _ center: UNUserNotificationCenter,
     didReceive response: UNNotificationResponse,
     withCompletionHandler completionHandler: @escaping () -> Void
@@ -128,6 +128,12 @@ function withRongCloudIosPush(config) {
 
     // 3a. Add UserNotifications import at the very top (before all other imports)
     mod.modResults.contents = IMPORT_SNIPPET + mod.modResults.contents;
+
+    // 3a-2. Add UNUserNotificationCenterDelegate conformance to AppDelegate class
+    mod.modResults.contents = mod.modResults.contents.replace(
+      /class AppDelegate: ExpoAppDelegate \{/,
+      'class AppDelegate: ExpoAppDelegate, UNUserNotificationCenterDelegate {',
+    );
 
     // 3b. Insert authorization request after factory.startReactNative(...) call
     mod.modResults.contents = mod.modResults.contents.replace(

@@ -1,12 +1,13 @@
 import type { RongCommand } from '@/features/message/rongcloud-command';
 import { leaveVoiceRtc } from './voice-room-rtc';
 import { leaveVoiceChatRoom } from './voice-room-rongcloud';
-import { useVoiceRoomSessionStore, type ActiveVoiceRoom } from './voice-room-session';
+import { isVoiceRoomIntentionalExit, useVoiceRoomSessionStore, type ActiveVoiceRoom } from './voice-room-session';
 
 async function dismissKickedRoom(room: ActiveVoiceRoom, notify: () => void) {
-  // The server already removed membership. Do not call leave/destroy again.
-  // Start both SDK cleanups before navigation; consume the session immediately
-  // so a second kick event or a late join cannot restore it or show another alert.
+  // The server already removed membership or destroyed the chatroom. Do not
+  // call leave/destroy again. Start both SDK cleanups before navigation;
+  // consume the session immediately so a second event or a late join cannot
+  // restore it or show another alert.
   const cleanup = Promise.allSettled([leaveVoiceRtc(), leaveVoiceChatRoom(room.rongChatroomId)]);
   useVoiceRoomSessionStore.setState({ activeRoom: null, joiningRoom: null, lastKickedRoom: room, microphoneMuted: true });
   notify();
@@ -37,5 +38,20 @@ export async function handleVoiceRoomBlocked(
   const { activeRoom, joiningRoom } = useVoiceRoomSessionStore.getState();
   const room = joiningRoom || activeRoom;
   if (!room || room.rongChatroomId !== event.chatroomId) return;
+  await dismissKickedRoom(room, notify);
+}
+
+export async function handleVoiceRoomDestroyed(chatroomId: string, notify: () => void) {
+  if (!chatroomId) {
+    return;
+  }
+  const { activeRoom, joiningRoom } = useVoiceRoomSessionStore.getState();
+  const room = joiningRoom || activeRoom;
+  if (!room || room.rongChatroomId !== chatroomId) {
+    return;
+  }
+  if (isVoiceRoomIntentionalExit(room)) {
+    return;
+  }
   await dismissKickedRoom(room, notify);
 }

@@ -18,7 +18,6 @@ import {
 import { appUpgradeApi } from "./app-upgrade.api";
 import type { AppUpgradePlatform, AppVersionVO } from "./app-upgrade.contract";
 import { decideAppUpgrade } from "./app-upgrade-gate";
-import { openAppStoreReview } from "./ios-store-review";
 
 export type AppUpgradeDownloadPhase =
   | "idle"
@@ -156,7 +155,9 @@ export const useAppUpgradeStore = create<AppUpgradeState>(() => ({
     }
 
     // iOS 无 APK 下载/安装流程，直接跳 App Store
+    // 动态 import：Android 已 exclude expo-store-review 原生模块，静态 import 会在启动时报错
     if (Platform.OS === "ios") {
+      const { openAppStoreReview } = await import("./ios-store-review");
       await openAppStoreReview();
       return;
     }

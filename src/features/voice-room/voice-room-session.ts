@@ -37,6 +37,18 @@ type VoiceRoomSessionState = {
   clearActiveRoom: (roomId?: string) => void;
 };
 
+// 房主主动解散的实例标记：destroy 请求触发的融云销毁事件可能先于 HTTP 响应到达，
+// 命中标记的销毁事件是本人操作的结果，不弹「语聊房已关闭」（对齐 PC intentionalRoomExitInstances）
+const intentionalExitInstanceKeys = new Set<string>();
+
+export function markVoiceRoomIntentionalExit(room: { roomId: string; roomVersion: string | number }) {
+  intentionalExitInstanceKeys.add(`${room.roomId}:${room.roomVersion}`);
+}
+
+export function isVoiceRoomIntentionalExit(room: { roomId: string; roomVersion: string | number }) {
+  return intentionalExitInstanceKeys.has(`${room.roomId}:${room.roomVersion}`);
+}
+
 export const useVoiceRoomSessionStore = create<VoiceRoomSessionState>((set, get) => ({
   activeRoom: null,
   joiningRoom: null,

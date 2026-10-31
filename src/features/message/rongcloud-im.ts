@@ -42,6 +42,7 @@ const chatRoomMessageListeners = new Set<ChatRoomMessageListener>();
 const chatRoomMemberListeners = new Set<ChatRoomMemberListener>();
 const commandListeners = new Set<(command: RongCommand) => void>();
 const chatRoomBlockedListeners = new Set<(event: RCIMIWChatRoomMemberBlockEvent) => void>();
+const chatRoomDestroyedListeners = new Set<(chatroomId: string) => void>();
 
 function getRuntimeConfig() {
   try {
@@ -380,6 +381,13 @@ function installListeners() {
       chatRoomBlockedListeners.forEach((listener) => listener(event));
     }
   });
+  engine.setOnChatRoomStatusChangedListener((targetId, status) => {
+    const sdk = loadSdk();
+    // 服务端手动销毁聊天室（DESTROY_MANUAL），PC 端以同一事件作为房间关闭的唯一感知渠道
+    if (sdk && status === sdk.RCIMIWChatRoomStatus.DESTROY_MANUAL) {
+      chatRoomDestroyedListeners.forEach((listener) => listener(targetId));
+    }
+  });
   engine.setOnConversationReadStatusSyncMessageReceivedListener((type, targetId, timestamp) => {
     const sdk = loadSdk();
     const currentEngine = engine;
@@ -406,6 +414,11 @@ export function subscribeRongCommands(listener: (command: RongCommand) => void) 
 export function subscribeRongChatRoomBlocked(listener: (event: RCIMIWChatRoomMemberBlockEvent) => void) {
   chatRoomBlockedListeners.add(listener);
   return () => { chatRoomBlockedListeners.delete(listener); };
+}
+
+export function subscribeRongChatRoomDestroyed(listener: (chatroomId: string) => void) {
+  chatRoomDestroyedListeners.add(listener);
+  return () => { chatRoomDestroyedListeners.delete(listener); };
 }
 
 export function subscribeRongChatRoomMessages(listener: ChatRoomMessageListener) {
