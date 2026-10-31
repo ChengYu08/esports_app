@@ -3,20 +3,17 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { showToast, toastDurations } from "@/shared/ui/app-toast";
+import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { APP_LINKS } from "@/core/config/links";
 import { useAppUpgradeStore } from "@/features/app-upgrade/app-upgrade.store";
-import { fetchLatestDesktopVersion } from "@/features/mine/api/desktop-version.api";
-import { compareVersionNos } from "@/features/mine/utils/version-compare";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { openExternalLink } from "@/shared/navigation/open-external-link";
 
@@ -25,7 +22,6 @@ const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const arrowIcon = require("../../../../assets/mine/figma/mine-arrow-right.svg");
 
 const VERSION = `v${Constants.expoConfig?.version ?? "1.0.0"}`;
-const LOCAL_VERSION = Constants.expoConfig?.version ?? "1.0.0";
 
 export default function AboutScreen() {
   const insets = useSafeAreaInsets();
@@ -42,35 +38,16 @@ export default function AboutScreen() {
     setUpdateStatus("检查中...");
     void (async () => {
       try {
-        if (Platform.OS === "android") {
-          const hasUpdate = await useAppUpgradeStore.getState().checkNow();
-          if (!hasUpdate) {
-            setUpdateStatus("已是最新版本");
-            showToast("当前已是最新版本");
-            return;
-          }
-          setUpdateStatus("发现新版本");
-          return;
-        }
-
-        const latest = await fetchLatestDesktopVersion("IOS", LOCAL_VERSION);
-        // 无启用版本视为无更新
-        if (
-          latest === null ||
-          compareVersionNos(LOCAL_VERSION, latest.versionNo) >= 0
-        ) {
+        const hasUpdate = await useAppUpgradeStore.getState().checkNow();
+        if (!hasUpdate) {
           setUpdateStatus("已是最新版本");
+          showToast("当前已是最新版本");
           return;
         }
-        setUpdateStatus(`发现新版本 v${latest.versionNo}`);
-        showToast("发现新版本，请前往应用中心下载更新", {
-          duration: toastDurations.LONG,
-        });
+        setUpdateStatus("发现新版本");
       } catch {
         setUpdateStatus("检查更新失败");
-        if (Platform.OS === "android") {
-          showToast("检查失败，请稍后重试");
-        }
+        showToast("检查失败，请稍后重试");
       } finally {
         setChecking(false);
       }

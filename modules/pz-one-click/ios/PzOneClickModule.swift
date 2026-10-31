@@ -165,7 +165,7 @@ public class PzOneClickModule: Module {
         .font: UIFont.systemFont(ofSize: 14, weight: .semibold),
       ]
     )
-    // Figma 按钮：高 42、圆角 8、红 #FE1F4C
+    // Figma 按钮：高 42、圆角 8、红 #FE1F4C，左右边距 15pt
     let buttonImage = UIGraphicsImageRenderer(size: CGSize(width: 16, height: 42)).image { context in
       let path = UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: 16, height: 42), cornerRadius: 8)
       brandPrimary.setFill()
@@ -173,6 +173,13 @@ public class PzOneClickModule: Module {
       _ = context
     }.resizableImage(withCapInsets: UIEdgeInsets(top: 0, left: 8, bottom: 0, right: 8), resizingMode: .stretch)
     model.loginBtnBgImgs = [buttonImage, buttonImage, buttonImage]
+    // 左右边距 15pt
+    model.loginBtnFrameBlock = { percentOriginX, percentOriginY, buttonWidth, buttonHeight, phoneNumberFrame, sloganFrame in
+      let margin = CGFloat(15)
+      let x = margin
+      let width = UIScreen.main.bounds.width - margin * 2
+      return CGRect(x: x, y: percentOriginY, width: width, height: buttonHeight)
+    }
     model.privacyPreText = "已阅读并同意"
     // 运营商协议走 SDK 内置占位符（点击跳到对应运营商官方页面），
     // 不要占用 privacyOne/Two/Three —— 那些槽位塞运营商协议会被 SDK 用自家 URL 覆盖，导致点击不生效
