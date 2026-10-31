@@ -14,6 +14,7 @@ import type {
   QuickMatchPayable,
   QuickMatchPublishResult,
   QuickMatchRequestDetail,
+  PayPreview,
 } from "./match.types";
 
 type ApiEnvelope<T> = { success?: boolean; code?: string; info?: string; data?: T };
@@ -89,6 +90,15 @@ type ApiRequestDetail = {
   buyerUserId?: number | string;
   buyerNickname?: string;
   dispatcherUserId?: number | string;
+  /** 以下为活动需求新增字段，普通需求不输出 */
+  publishSource?: string;
+  activityId?: number | string;
+  activityCode?: string;
+  activityType?: string;
+  cardItems?: { label?: string; value?: { text?: string } }[];
+  discountAmount?: number | string;
+  realPayAmount?: number | string;
+  maxSelectableCount?: number | string;
 };
 
 type ApiPayable = {
@@ -103,7 +113,29 @@ type ApiCreatedOrder = {
 
 type ApiCreatedOrders = {
   totalPrice?: number | string;
+  discountAmount?: number | string;
+  realPayAmount?: number | string;
   orders?: ApiCreatedOrder[];
+};
+
+type ApiPayPreviewCoupon = {
+  userCouponId?: number | string;
+  couponName?: string;
+  discountAmount?: number | string;
+};
+
+type ApiPayPreviewMethod = {
+  code?: string;
+  name?: string;
+  balance?: number | string;
+  discountAmount?: number | string;
+  payableAmount?: number | string;
+  coupons?: ApiPayPreviewCoupon[];
+};
+
+type ApiPayPreview = {
+  totalPrice?: number | string;
+  paymentMethods?: ApiPayPreviewMethod[];
 };
 
 function requireSuccess<T>(response: ApiEnvelope<T>, fallback: string): T {
@@ -127,6 +159,32 @@ function toNumber(value: number | string | undefined): number {
 function toOptionalString(value: number | string | null | undefined): string | undefined {
   if (value === null || value === undefined || value === "") return undefined;
   return String(value);
+}
+
+/** trim 后为空串的字符串视为缺省（活动字段普通需求不输出） */
+function toTrimmedOptional(value: string | null | undefined): string | undefined {
+  const trimmed = (value || "").trim();
+  return trimmed === "" ? undefined : trimmed;
+}
+
+/** 活动卡逐行文案映射；label/value.text 均 trim，整行全空的丢弃 */
+function mapCardItems(
+  items: ApiRequestDetail["cardItems"],
+): QuickMatchRequestDetail["cardItems"] {
+  const mapped: NonNullable<QuickMatchRequestDetail["cardItems"]> = [];
+  for (const item of items ?? []) {
+    const label = (item?.label || "").trim();
+    const text = (item?.value?.text || "").trim();
+    if (!label && !text) continue;
+    mapped.push({ label, value: { text } });
+  }
+  return mapped;
+}
+
+/** 金额类字段：缺省（null/undefined）不输出；存在但非法兜底 0 */
+function toOptionalNumber(value: number | string | null | undefined): number | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  return toNumber(value);
 }
 
 function mapRequestDetail(item: ApiRequestDetail | null | undefined): QuickMatchRequestDetail | null {
@@ -156,6 +214,15 @@ function mapRequestDetail(item: ApiRequestDetail | null | undefined): QuickMatch
     buyerUserId: toOptionalString(item.buyerUserId),
     buyerNickname: item.buyerNickname,
     dispatcherUserId: toOptionalString(item.dispatcherUserId),
+    // 活动字段：普通需求不输出（undefined），活动需求透传
+    publishSource: toTrimmedOptional(item.publishSource),
+    activityId: toOptionalString(item.activityId),
+    activityCode: toTrimmedOptional(item.activityCode),
+    activityType: toTrimmedOptional(item.activityType),
+    cardItems: mapCardItems(item.cardItems),
+    discountAmount: toOptionalNumber(item.discountAmount),
+    realPayAmount: toOptionalNumber(item.realPayAmount),
+    maxSelectableCount: toOptionalNumber(item.maxSelectableCount),
   };
 }
 
@@ -374,17 +441,30 @@ export async function cancelQuickMatch(requestNo: string, token: string): Promis
   requireVoidSuccess(response, "取消派单失败，请稍后重试");
 }
 
+type SelectAndCreateOrderOptions = {
+  /** 活动模式透传活动 ID（Long 以字符串传递，后端自行解析）；普通模式不传 */
+  activityId?: string;
+};
+
 export async function selectAndCreateOrder(
   requestNo: string,
   grabIds: string[],
   token: string,
+  options?: SelectAndCreateOrderOptions,
 ): Promise<QuickMatchCreatedOrders> {
+  const activityId = (options?.activityId || "").trim();
   const response = await apiClient<ApiEnvelope<ApiCreatedOrders>>(
     "/client/v1/quickMatch/selectAndCreateOrder",
     {
       method: "POST",
       token,
-      body: { action: { requestNo, grabIds } },
+      body: {
+        action: {
+          requestNo,
+          grabIds,
+          ...(activityId ? { activityId } : {}),
+        },
+      },
     },
   );
   const data = requireSuccess(response, "创建订单失败");
@@ -395,7 +475,52 @@ export async function selectAndCreateOrder(
     const serviceUserId = toOptionalString(item.serviceUserId);
     orders.push(serviceUserId ? { orderId, serviceUserId } : { orderId });
   }
-  return { totalPrice: toNumber(data.totalPrice), orders };
+  return {
+    totalPrice: toNumber(data.totalPrice),
+    discountAmount: toOptionalNumber(data.discountAmount),
+    realPayAmount: toOptionalNumber(data.realPayAmount),
+    orders,
+  };
+}
+
+/**
+ * 支付预览（仅活动订单调用）：建单后展示优惠金额、应付与优惠券明细。
+ * 普通订单不调用（前端先上线时后端未部署，规避 404）。
+ */
+export async function fetchPayPreview(
+  requestNo: string,
+  grabIds: string[],
+  token: string,
+  signal?: AbortSignal,
+): Promise<PayPreview> {
+  const response = await apiClient<ApiEnvelope<ApiPayPreview>>("/client/v1/pay/preview", {
+    method: "POST",
+    token,
+    body: {
+      action: {
+        requestNo,
+        grabIds: grabIds.map((id) => toNumber(id)),
+        paymentMethodCode: "DIAMOND",
+      },
+    },
+    signal,
+  });
+  const data = requireSuccess(response, "支付信息查询失败");
+  return {
+    totalPrice: toNumber(data.totalPrice),
+    paymentMethods: (data.paymentMethods ?? []).map((method) => ({
+      code: method.code || "",
+      name: method.name || "",
+      balance: toNumber(method.balance),
+      discountAmount: toNumber(method.discountAmount),
+      payableAmount: toNumber(method.payableAmount),
+      coupons: (method.coupons ?? []).map((coupon) => ({
+        userCouponId: toOptionalString(coupon.userCouponId) ?? "",
+        couponName: coupon.couponName || "",
+        discountAmount: toNumber(coupon.discountAmount),
+      })),
+    })),
+  };
 }
 
 export async function fetchQuickMatchPayable(

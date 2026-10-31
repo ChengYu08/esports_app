@@ -79,6 +79,35 @@ export type QuickMatchGrabItem = {
   clubId?: string;
 };
 
+/** 活动卡逐行文案（仅活动需求输出） */
+export type QuickMatchCardItem = {
+  label: string;
+  value: { text: string };
+};
+
+/** 支付预览优惠券明细 */
+export type PayPreviewCoupon = {
+  userCouponId: string;
+  couponName: string;
+  discountAmount: number;
+};
+
+/** 支付预览支付方式（当前仅星钻 DIAMOND） */
+export type PayPreviewMethod = {
+  code: string;
+  name: string;
+  balance: number;
+  discountAmount: number;
+  payableAmount: number;
+  coupons: PayPreviewCoupon[];
+};
+
+/** 支付预览响应（仅活动订单调用，普通订单保持 batchPay/payable 流程） */
+export type PayPreview = {
+  totalPrice: number;
+  paymentMethods: PayPreviewMethod[];
+};
+
 export type QuickMatchRequestDetail = {
   requestNo: string;
   clubId?: string;
@@ -105,6 +134,22 @@ export type QuickMatchRequestDetail = {
   buyerUserId?: string;
   buyerNickname?: string;
   dispatcherUserId?: string;
+  /** 发布来源：QUICK_MATCH 普通派单 / ACTIVITY 活动派单（旧数据可能缺省） */
+  publishSource?: string;
+  /** 关联活动 ID（Long 转字符串，仅活动需求输出） */
+  activityId?: string;
+  /** 活动编码；非空即视为活动模式 */
+  activityCode?: string;
+  /** 活动类型（如 SECKILL） */
+  activityType?: string;
+  /** 活动卡逐行文案 */
+  cardItems?: QuickMatchCardItem[];
+  /** 活动优惠金额快照 */
+  discountAmount?: number;
+  /** 活动实付金额快照 */
+  realPayAmount?: number;
+  /** 本次最多可选抢单人数（活动=1；普通需求不输出，维持多选） */
+  maxSelectableCount?: number;
 };
 
 export type QuickMatchPayable = {
@@ -119,6 +164,10 @@ export type QuickMatchCreatedOrder = {
 
 export type QuickMatchCreatedOrders = {
   totalPrice: number;
+  /** 活动优惠金额（仅活动订单返回） */
+  discountAmount?: number;
+  /** 活动实付金额（仅活动订单返回） */
+  realPayAmount?: number;
   orders: QuickMatchCreatedOrder[];
 };
 
@@ -134,6 +183,50 @@ export function isMultiCompanionRequest(
   detail: QuickMatchRequestDetail | null | undefined,
 ): boolean {
   return detail != null && detail.companionPreference == null;
+}
+
+/** 抢单选人上限（与 PC / 后端 @Size(max = 3) 一致） */
+export const QUICK_MATCH_MAX_SELECT = 3;
+
+/** 活动模式判定：只认 activityCode 非空；为空即普通模式，行为保持不变 */
+export function isActivityQuickMatch(
+  detail: QuickMatchRequestDetail | null | undefined,
+): boolean {
+  return Boolean(detail && detail.activityCode && detail.activityCode.trim() !== "");
+}
+
+/** 选人上限：活动模式用 maxSelectableCount（缺省兜底单选 1），普通模式维持 3 人多选 */
+export function resolveMaxSelectableCount(
+  detail: QuickMatchRequestDetail | null | undefined,
+): number {
+  if (!isActivityQuickMatch(detail)) return QUICK_MATCH_MAX_SELECT;
+  const count = Number(detail?.maxSelectableCount);
+  if (Number.isFinite(count) && count >= 1) return Math.trunc(count);
+  return 1;
+}
+
+/**
+ * 选人切换纯逻辑（便于单测/跨容器复用）：
+ * - 点已选中的 → 取消选中；
+ * - 未达上限 → 追加；
+ * - 达上限且上限为 1（活动单选）→ 点其他人直接切换；
+ * - 达上限且上限 > 1 → 保持不变并提示超限。
+ */
+export function applyGrabSelection(
+  prev: string[],
+  grabId: string,
+  maxSelectable: number,
+): { ids: string[]; overLimit: boolean } {
+  if (prev.includes(grabId)) {
+    return { ids: prev.filter((id) => id !== grabId), overLimit: false };
+  }
+  if (prev.length >= maxSelectable) {
+    if (maxSelectable <= 1) {
+      return { ids: [grabId], overLimit: false };
+    }
+    return { ids: prev, overLimit: true };
+  }
+  return { ids: [...prev, grabId], overLimit: false };
 }
 
 export function isQuickMatchActive(request: QuickMatchRequestDetail | null): boolean {

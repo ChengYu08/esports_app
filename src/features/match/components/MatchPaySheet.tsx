@@ -7,8 +7,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   batchPayQuickMatch,
+  fetchPayPreview,
   fetchQuickMatchPayable,
 } from "@/features/match/api/match.api";
+import type { PayPreview } from "@/features/match/api/match.types";
 import { MatchLinearGradient } from "@/features/match/components/MatchLinearGradient";
 import { fetchStarBalance } from "@/features/mine/api/companion-order.api";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
@@ -23,6 +25,8 @@ type MatchPaySheetProps = {
   requestNo: string | null;
   token: string | null;
   fallbackTotal: number;
+  /** 活动模式的抢单 id 列表（非空走 pay/preview 展示优惠；普通订单不传，保持 payable 流程） */
+  activityGrabIds?: string[];
   onClose: () => void;
   onPaid: () => void;
 };
@@ -32,36 +36,75 @@ export function MatchPaySheet({
   requestNo,
   token,
   fallbackTotal,
+  activityGrabIds,
   onClose,
   onPaid,
 }: MatchPaySheetProps) {
   const insets = useSafeAreaInsets();
   const [balance, setBalance] = useState<number | null>(null);
   const [totalPrice, setTotalPrice] = useState(fallbackTotal);
+  /** 活动模式支付预览（优惠/应付/优惠券明细） */
+  const [preview, setPreview] = useState<PayPreview | null>(null);
   const [paying, setPaying] = useState(false);
   const [prompt, setPrompt] = useState<{ title?: string; message: string } | null>(null);
+  /** 用拼接串做依赖，避免调用方传入新数组引用导致预览重复请求 */
+  const activityGrabKey = (activityGrabIds ?? []).join(",");
+  const isActivityPay = activityGrabKey !== "";
+  /** 活动模式优先取星钻支付方式的应付金额；预览失败时退回建单返回的合计 */
+  const previewMethod =
+    preview?.paymentMethods.find((method) => method.code === "DIAMOND") ??
+    preview?.paymentMethods[0] ??
+    null;
+  const payableAmount =
+    isActivityPay && previewMethod ? previewMethod.payableAmount : totalPrice;
   const payDisabled = paying || balance === null;
+
+  // 打开/入参变化时重置展示状态（render 阶段派生重置，避免 effect 内同步 setState）
+  const resetKey = `${visible}-${requestNo ?? ""}-${fallbackTotal}-${activityGrabKey}`;
+  const [lastResetKey, setLastResetKey] = useState(resetKey);
+  if (lastResetKey !== resetKey) {
+    setLastResetKey(resetKey);
+    setBalance(null);
+    setPreview(null);
+    setTotalPrice(fallbackTotal);
+  }
 
   useEffect(() => {
     if (!visible || !token || !requestNo) return;
-    setBalance(null);
-    setTotalPrice(fallbackTotal);
     void fetchStarBalance(token)
       .then(setBalance)
       .catch((error: Error) => setPrompt({ message: error.message }));
+    if (activityGrabKey !== "") {
+      // 仅活动订单调用 pay/preview；普通订单保持原 payable 流程不动
+      void fetchPayPreview(requestNo, activityGrabKey.split(","), token)
+        .then((nextPreview) => {
+          setPreview(nextPreview);
+          const method =
+            nextPreview.paymentMethods.find((item) => item.code === "DIAMOND") ??
+            nextPreview.paymentMethods[0] ??
+            null;
+          if (method) {
+            setTotalPrice(nextPreview.totalPrice);
+          }
+        })
+        .catch(() => {
+          // 预览失败保留建单返回的 fallbackTotal
+        });
+      return;
+    }
     void fetchQuickMatchPayable(requestNo, token)
       .then((payable) => setTotalPrice(payable.totalPrice))
       .catch(() => {
         // 保留建单返回的 fallbackTotal
       });
-  }, [fallbackTotal, requestNo, token, visible]);
+  }, [activityGrabKey, fallbackTotal, requestNo, token, visible]);
 
   async function pay() {
     if (!token || !requestNo) {
       setPrompt({ message: "请先登录" });
       return;
     }
-    if ((balance ?? 0) < totalPrice) {
+    if ((balance ?? 0) < payableAmount) {
       setPrompt({
         title: "余额不足",
         message: "当前星钻余额不足，请充值后再支付",
@@ -119,6 +162,39 @@ export function MatchPaySheet({
               <Image source={diamondIcon} style={styles.diamondIcon} />
             </View>
           </View>
+          {isActivityPay && previewMethod && previewMethod.discountAmount > 0 ? (
+            <View style={styles.row}>
+              <Text style={styles.rowLabel}>活动优惠</Text>
+              <View style={styles.rowValue}>
+                <Text style={styles.discountValue}>-{previewMethod.discountAmount}</Text>
+                <Image source={diamondIcon} style={styles.diamondIcon} />
+              </View>
+            </View>
+          ) : null}
+          {isActivityPay && previewMethod ? (
+            <View style={styles.row}>
+              <Text style={styles.rowLabel}>应付</Text>
+              <View style={styles.rowValue}>
+                <Text style={styles.totalValue}>{previewMethod.payableAmount}</Text>
+                <Image source={diamondIcon} style={styles.diamondIcon} />
+              </View>
+            </View>
+          ) : null}
+          {isActivityPay && previewMethod
+            ? previewMethod.coupons.map((coupon) => {
+                return (
+                  <View key={coupon.userCouponId || coupon.couponName} style={styles.row}>
+                    <Text style={styles.couponLabel} numberOfLines={1}>
+                      {coupon.couponName || "优惠券"}
+                    </Text>
+                    <View style={styles.rowValue}>
+                      <Text style={styles.discountValue}>-{coupon.discountAmount}</Text>
+                      <Image source={diamondIcon} style={styles.diamondIcon} />
+                    </View>
+                  </View>
+                );
+              })
+            : null}
           <View style={styles.row}>
             <Text style={styles.rowLabel}>我的星钻</Text>
             <View style={styles.rowValue}>
@@ -257,6 +333,23 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#FE1F4C",
     textAlign: "right",
+  },
+  discountValue: {
+    fontFamily: DOUYIN_SANS,
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: "500",
+    color: "#FF6A00",
+    textAlign: "right",
+  },
+  couponLabel: {
+    flex: 1,
+    fontFamily: DOUYIN_SANS,
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#999999",
+    textAlign: "right",
+    marginRight: 8,
   },
   diamondIcon: {
     width: 16,

@@ -13,8 +13,8 @@ import {
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { selectAndCreateOrder } from "@/features/match/api/match.api";
 import {
+  isActivityQuickMatch,
   isMultiCompanionRequest,
   type MatchGame,
 } from "@/features/match/api/match.types";
@@ -23,6 +23,7 @@ import { MatchLinearGradient } from "@/features/match/components/MatchLinearGrad
 import { MatchPaySheet } from "@/features/match/components/MatchPaySheet";
 import { MatchingGrabListView } from "@/features/match/components/MatchingGrabListView";
 import { MatchingWaitingView } from "@/features/match/components/MatchingWaitingView";
+import { useMatchSelectAndPay } from "@/features/match/hooks/use-match-select-and-pay";
 import { useQuickMatchSession } from "@/features/match/hooks/use-quick-match-session";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
@@ -44,9 +45,6 @@ export default function MatchMatchingScreen({
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const token = useAuthStore((state) => state.accessToken);
-  const [payVisible, setPayVisible] = useState(false);
-  const [payTotal, setPayTotal] = useState(0);
-  const [paidOrderId, setPaidOrderId] = useState<string | null>(null);
   const [cancelPromptVisible, setCancelPromptVisible] = useState(false);
   /** 首位候选人出现的短暂庆祝动效 */
   const [celebrating, setCelebrating] = useState(false);
@@ -69,6 +67,8 @@ export default function MatchMatchingScreen({
   });
 
   const hasCandidates = session.candidates.length > 0;
+  /** 活动模式判定：只认 activityCode 非空，普通模式行为零变化 */
+  const activity = isActivityQuickMatch(session.detail);
 
   // 首个陪玩出现时短暂播一段庆祝动效（一次性）
   useEffect(() => {
@@ -83,60 +83,33 @@ export default function MatchMatchingScreen({
     setCancelPromptVisible(true);
   }, []);
 
-  const handleSelectAndOrder = useCallback(async () => {
-    if (!token) return;
-    if (session.orderPending) {
-      setPayVisible(true);
-      return;
-    }
-    if (!session.selectedGrabIds.length) {
-      showToast("请先选择陪玩");
-      return;
-    }
-    if (session.submitting) return;
-    const firstGrabId = session.selectedGrabIds[0];
-    const firstCompanionUserId = session.candidates.find(
-      (item) => item.id === firstGrabId,
-    )?.companionUserId;
-    session.setSubmitting(true);
-    try {
-      const created = await selectAndCreateOrder(
-        requestNo,
-        session.selectedGrabIds,
-        token,
-      );
-      const matchedOrder = firstCompanionUserId
-        ? created.orders.find(
-            (order) => order.serviceUserId === firstCompanionUserId,
-          )
-        : undefined;
-      setPaidOrderId(matchedOrder?.orderId ?? null);
-      session.setOrderPending(true);
-      setPayTotal(created.totalPrice);
-      setPayVisible(true);
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "创建订单失败");
-    } finally {
-      session.setSubmitting(false);
-    }
-  }, [requestNo, session, token]);
-
   // TODO(临时注释): 支付成功关闭试音房
   // const closeAuditionRoom = session.closeAuditionRoom;
-  const handlePaid = useCallback(() => {
-    setPayVisible(false);
-    showToast("支付成功");
-    // void (async () => {
-    //   await closeAuditionRoom();
-    //   leaveMatchFlow();
-    // })();
-    if (paidOrderId) {
-      // replace：用订单详情替换匹配页，返回键回到进入匹配前的页面
-      router.replace(`/order/${paidOrderId}?scope=place`);
-      return;
-    }
-    leaveMatchFlow();
-  }, [leaveMatchFlow, paidOrderId]);
+  /** 支付成功：跳订单详情（replace 使返回键回到进匹配前的页面） */
+  const handlePaid = useCallback(
+    (orderId: string | null) => {
+      showToast("支付成功");
+      if (orderId) {
+        router.replace(`/order/${orderId}?scope=place`);
+        return;
+      }
+      leaveMatchFlow();
+    },
+    [leaveMatchFlow],
+  );
+
+  /** 选人 + 建单 + 支付编排（可复用单元，与语聊房弹窗共用） */
+  const selectAndPay = useMatchSelectAndPay({
+    requestNo,
+    token,
+    detail: session.detail,
+    candidates: session.candidates,
+    selectedGrabIds: session.selectedGrabIds,
+    submitting: session.submitting,
+    setSubmitting: session.setSubmitting,
+    setOrderPending: session.setOrderPending,
+    onPaid: handlePaid,
+  });
 
   return (
     <View style={styles.root}>
@@ -199,8 +172,9 @@ export default function MatchMatchingScreen({
             selectedGrabIds={session.selectedGrabIds}
             submitting={session.submitting}
             multiCompanion={isMultiCompanionRequest(session.detail)}
+            cardItems={activity ? session.detail?.cardItems : undefined}
             onSelect={session.toggleGrab}
-            onConfirm={() => void handleSelectAndOrder()}
+            onConfirm={selectAndPay.handleConfirm}
           />
         ) : (
           <MatchingWaitingView
@@ -218,14 +192,7 @@ export default function MatchMatchingScreen({
         />
       ) : null}
 
-      <MatchPaySheet
-        visible={payVisible}
-        requestNo={requestNo}
-        token={token}
-        fallbackTotal={payTotal}
-        onClose={() => setPayVisible(false)}
-        onPaid={handlePaid}
-      />
+      <MatchPaySheet {...selectAndPay.paySheetProps} />
 
       <AppPrompt
         visible={cancelPromptVisible}
