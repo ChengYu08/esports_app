@@ -103,7 +103,11 @@ export async function fetchGodPage(params: {
   const sex = SEX_VALUES[filters.gender];
   if (sex) action.sex = sex;
   const gameStatus = STATUS_VALUES[filters.status];
-  if (gameStatus != null) action.gameStatus = gameStatus;
+  // 与 PC 端一致：选中状态筛选（空闲中/游戏中）时必须限定在线，否则会混入离线用户
+  if (gameStatus != null) {
+    action.onlineOnly = true;
+    action.gameStatus = gameStatus;
+  }
   const priceSort = PRICE_SORTS[filters.price];
   if (priceSort) action.priceSort = priceSort;
   if (filters.level) action.levelName = filters.level;
