@@ -1,4 +1,3 @@
-import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { ScrollView, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -6,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { APP_LINKS } from "@/core/config/links";
 import { openExternalLink } from "@/shared/navigation/open-external-link";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 const documents = {
   user: {
@@ -37,13 +37,18 @@ export default function ProtocolScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={[styles.header, { height: 44 + insets.top, paddingTop: insets.top }]}>
-        <Pressable accessibilityLabel="返回" hitSlop={12} onPress={() => router.back()} style={styles.backButton}>
-          <ChevronLeft24Regular color="#0A0A0A" width={24} height={24} style={styles.backIcon} />
-        </Pressable>
-        <Text style={styles.headerTitle}>{document.title}</Text>
-        <View style={styles.headerSpace} />
-      </View>
+      <ScreenHeader
+        title={document.title}
+        onBack={() => router.back()}
+        titleStyle={styles.headerTitle}
+        style={{
+          paddingTop: insets.top,
+          height: insets.top + 44,
+          paddingHorizontal: 16,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: "#EBEBEB",
+        }}
+      />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 24 + insets.bottom }]} showsVerticalScrollIndicator={false}>
         {document.sections.map(([heading, body]) => (
           <View key={heading} style={styles.section}>
@@ -65,10 +70,6 @@ export default function ProtocolScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#FFF" },
-  header: { backgroundColor: "#FFF", flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#EBEBEB" },
-  backButton: { width: 28, height: 28, justifyContent: "center" },
-  backIcon: { width: 24, height: 24 },
-  headerSpace: { width: 28 },
   headerTitle: { color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 17, lineHeight: 24, fontWeight: "600" },
   content: { padding: 20 },
   section: { marginBottom: 24 },

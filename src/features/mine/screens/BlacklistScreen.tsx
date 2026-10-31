@@ -1,4 +1,3 @@
-import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -18,6 +17,7 @@ import {
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { requireLogin } from "@/shared/navigation/require-login";
 
 export default function BlacklistScreen() {
@@ -48,23 +48,18 @@ export default function BlacklistScreen() {
 
   return (
     <GestureHandlerRootView style={styles.screen}>
-      <View
-        style={[
-          styles.header,
-          { height: 44 + insets.top, paddingTop: insets.top },
-        ]}
-      >
-        <Pressable
-          accessibilityLabel="返回"
-          hitSlop={12}
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <ChevronLeft24Regular color="#0A0A0A" width={24} height={24} style={styles.backIcon} />
-        </Pressable>
-        <Text style={styles.headerTitle}>黑名单</Text>
-        <View style={styles.headerSpace} />
-      </View>
+      <ScreenHeader
+        title="黑名单"
+        onBack={() => router.back()}
+        titleStyle={styles.headerTitle}
+        style={{
+          paddingTop: insets.top,
+          height: insets.top + 44,
+          paddingHorizontal: 16,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: "#EBEBEB",
+        }}
+      />
       {entries.length === 0 ? (
         <View style={styles.empty}>
           <EmptyState
@@ -139,18 +134,6 @@ const fallbackAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F7F7" },
-  header: {
-    backgroundColor: "#FFF",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#EBEBEB",
-  },
-  backButton: { width: 28, height: 28, justifyContent: "center" },
-  backIcon: { width: 24, height: 24 },
-  headerSpace: { width: 28 },
   headerTitle: {
     color: "#0A0A0A",
     fontFamily: DOUYIN_SANS,

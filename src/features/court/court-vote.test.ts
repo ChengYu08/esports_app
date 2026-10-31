@@ -179,4 +179,24 @@ describe("applyVoteToCases", () => {
     );
     expect(rows[0].voteSummary).toEqual({ plaintiff: 1, defendant: 0 });
   });
+
+  it("returns every row unchanged by reference when no caseId matches", () => {
+    const other = { caseId: 7, stage: "VOTING" } as CourtCase;
+    const rows = applyVoteToCases(
+      [voted, other],
+      99,
+      "PLAINTIFF_WIN",
+      { plaintiffVoteCount: 1 },
+    );
+    expect(rows[0]).toBe(voted);
+    expect(rows[1]).toBe(other);
+    expect(rows[0].voteSummary).toEqual({ plaintiff: 3, defendant: 5 });
+  });
+
+  it("falls back per side when the server returns only one count", () => {
+    const rows = applyVoteToCases([voted], 42, "PLAINTIFF_WIN", {
+      plaintiffVoteCount: 4,
+    });
+    expect(rows[0].voteSummary).toEqual({ plaintiff: 4, defendant: 5 });
+  });
 });

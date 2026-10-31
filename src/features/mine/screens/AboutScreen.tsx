@@ -16,6 +16,7 @@ import { APP_LINKS } from "@/core/config/links";
 import { useAppUpgradeStore } from "@/features/app-upgrade/app-upgrade.store";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { openExternalLink } from "@/shared/navigation/open-external-link";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 const appIcon = require("../../../../assets/images/icon.png");
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
@@ -56,24 +57,17 @@ export default function AboutScreen() {
 
   return (
     <View style={styles.screen}>
-      <View
-        style={[
-          styles.header,
-          { paddingTop: insets.top, height: 44 + insets.top },
-        ]}
-      >
-        <Pressable
-          accessibilityLabel="返回"
-          accessibilityRole="button"
-          hitSlop={12}
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Image source={backIcon} style={styles.backIcon} />
-        </Pressable>
-        <Text style={styles.headerTitle}>关于盼之电竞</Text>
-        <View style={styles.headerSpace} />
-      </View>
+      <ScreenHeader
+        title="关于盼之电竞"
+        onBack={() => router.back()}
+        backIcon={backIcon}
+        titleStyle={styles.headerTitle}
+        style={{
+          paddingTop: insets.top,
+          height: insets.top + 44,
+          paddingHorizontal: 12,
+        }}
+      />
 
       <ScrollView
         contentContainerStyle={[
@@ -137,20 +131,6 @@ function AboutRow({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F7F7" },
-  header: {
-    backgroundColor: "#FFF",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-  },
-  backButton: {
-    width: 32,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
   headerTitle: {
     color: "#0A0A0A",
     fontFamily: DOUYIN_SANS,
@@ -158,7 +138,6 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontWeight: "500",
   },
-  headerSpace: { width: 32 },
   content: { flexGrow: 1, paddingTop: 48 },
   brandBlock: { alignItems: "center", gap: 16 },
   appIcon: { width: 80, height: 80, borderRadius: 12 },

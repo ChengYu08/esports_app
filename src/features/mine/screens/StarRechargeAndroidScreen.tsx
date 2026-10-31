@@ -1,4 +1,3 @@
-import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
@@ -27,6 +26,7 @@ import { WechatPayQrModal } from "@/features/mine/components/WechatPayQrModal";
 import AlipayPayment from "../../../../modules/alipay-payment";
 import { openExternalLink } from "@/shared/navigation/open-external-link";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
 const headerBg = require("../../../../assets/images/star-recharge-header-bg.png");
@@ -271,29 +271,14 @@ export default function StarRechargeAndroidScreen() {
         pointerEvents="none"
       />
 
-      <View
-        style={[
-          styles.header,
-          { height: insets.top + 44, paddingTop: insets.top },
-        ]}
-      >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="返回"
-          hitSlop={10}
-          onPress={() => router.back()}
-          style={styles.headerSide}
-        >
-          <ChevronLeft24Regular
-            color="#0D0D0F"
-            width={24}
-            height={24}
-            style={styles.backIcon}
-          />
-        </Pressable>
-        <Text style={styles.headerTitle}>星钻充值</Text>
-        <View style={styles.headerSide} />
-      </View>
+      <ScreenHeader
+        title="星钻充值"
+        onBack={() => router.back()}
+        backgroundColor="transparent"
+        backIconColor="#0D0D0F"
+        titleStyle={styles.headerTitle}
+        style={{ paddingTop: insets.top, height: insets.top + 44 }}
+      />
 
       <View style={styles.balanceSection}>
         <Text style={styles.balanceValue}>
@@ -549,18 +534,6 @@ const styles = StyleSheet.create({
     right: 0,
     height: 276,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  headerSide: {
-    width: 48,
-    height: 44,
-    paddingLeft: 12,
-    justifyContent: "center",
-  },
-  backIcon: { width: 24, height: 24 },
   headerTitle: {
     color: "#0D0D0F",
     fontSize: 16,

@@ -23,6 +23,7 @@ import {
 } from "@/features/mine/api/teen-mode.api";
 import type { TeenModeStatus } from "@/features/mine/api/teen-mode.contract";
 import { saveLastTeenEnabled } from "@/features/mine/teen-mode-store";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { colors } from "@/shared/theme/tokens";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 
@@ -335,26 +336,13 @@ export default function TeenModeScreen({
 
   return (
     <View style={styles.screen}>
-      <View
-        style={[
-          styles.header,
-          { height: 44 + insets.top, paddingTop: insets.top },
-        ]}
-      >
-        {locked ? (
-          <View style={styles.backButton} />
-        ) : (
-          <Pressable
-            accessibilityLabel="返回"
-            accessibilityRole="button"
-            onPress={() => router.back()}
-            style={styles.backButton}
-          >
-            <Image source={backIcon} style={styles.backIcon} />
-          </Pressable>
-        )}
-        <View style={styles.headerEnd} />
-      </View>
+      {/* 锁定态作为启动门禁覆盖层使用：不提供返回，标题为空保持原有无页头标题的视觉 */}
+      <ScreenHeader
+        title=""
+        onBack={locked ? undefined : () => router.back()}
+        backIcon={backIcon}
+        style={{ paddingTop: insets.top, height: insets.top + 44 }}
+      />
       {status === null ? null : phase === "overview"
         ? renderOverview()
         : renderPassword()}
@@ -364,20 +352,6 @@ export default function TeenModeScreen({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#FFF" },
-  header: {
-    backgroundColor: "#FFF",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  backButton: {
-    width: 48,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
-  headerEnd: { width: 16 },
   overviewContent: {
     flex: 1,
     padding: 32,

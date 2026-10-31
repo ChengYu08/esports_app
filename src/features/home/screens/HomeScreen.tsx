@@ -271,7 +271,7 @@ export default function HomeScreen() {
         )}
         {mountedTabs.god && (
           <View style={[styles.pane, topTab !== "god" && styles.paneHidden]}>
-            <GodListScreen />
+            <GodListScreen active={topTab === "god"} />
           </View>
         )}
         {mountedTabs.ranking && (

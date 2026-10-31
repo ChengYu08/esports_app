@@ -1,7 +1,6 @@
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
-  ChevronLeft24Regular,
   ChevronRight16Regular,
   Dismiss24Regular,
 } from "@fluentui/react-native-icons";
@@ -20,6 +19,7 @@ import { BirthDatePickerSheet } from "@/features/mine/components/BirthDatePicker
 import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 const fallbackAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const cameraIcon = require("../../../../assets/mine/figma/edit-camera.svg");
@@ -150,23 +150,13 @@ export default function EditProfileScreen() {
 
   return (
     <View style={styles.screen}>
-      <View
-        style={[
-          styles.header,
-          { height: 44 + insets.top, paddingTop: insets.top },
-        ]}
-      >
-        <Pressable
-          accessibilityLabel="返回"
-          hitSlop={12}
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <ChevronLeft24Regular color="#0A0A0A" width={24} height={24} />
-        </Pressable>
-        <Text style={styles.headerTitle}>编辑资料</Text>
-        <View style={styles.headerSpace} />
-      </View>
+      <ScreenHeader
+        title="编辑资料"
+        onBack={() => router.back()}
+        backgroundColor="#F7F7F7"
+        titleStyle={styles.headerTitle}
+        style={{ paddingTop: insets.top, height: insets.top + 44 }}
+      />
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.avatarSection}>
@@ -311,18 +301,6 @@ export default function EditProfileScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F7F7" },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#F7F7F7",
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   headerTitle: {
     color: "#0D0D0F",
     fontFamily: DOUYIN_SANS,
@@ -330,7 +308,6 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontWeight: "600",
   },
-  headerSpace: { width: 44 },
   avatarSection: {
     height: 142,
     alignItems: "center",

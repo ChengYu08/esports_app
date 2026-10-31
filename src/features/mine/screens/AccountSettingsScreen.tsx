@@ -1,7 +1,6 @@
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
-  ChevronLeft24Regular,
   ChevronRight16Regular,
 } from "@fluentui/react-native-icons";
 import { router } from "expo-router";
@@ -32,6 +31,7 @@ import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 const avatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const SMS_NOTIFY_KEY_PREFIX = "pzdj:sms-notify:";
@@ -227,28 +227,16 @@ export default function AccountSettingsScreen() {
 
   return (
     <View style={styles.screen}>
-      <View
-        style={[
-          styles.header,
-          { height: 44 + insets.top, paddingTop: insets.top },
-        ]}
-      >
-        <Pressable
-          accessibilityLabel="返回"
-          hitSlop={12}
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <ChevronLeft24Regular
-            color="#0A0A0A"
-            width={24}
-            height={24}
-            style={styles.backIcon}
-          />
-        </Pressable>
-        <Text style={styles.headerTitle}>账号设置</Text>
-        <View style={styles.headerSpace} />
-      </View>
+      <ScreenHeader
+        title="账号设置"
+        onBack={() => router.back()}
+        titleStyle={styles.headerTitle}
+        style={{
+          paddingTop: insets.top,
+          height: insets.top + 44,
+          paddingHorizontal: 16,
+        }}
+      />
       {!user ? (
         <View style={styles.signedOut}>
           <Text style={styles.signedOutText}>登录后可管理账号设置</Text>
@@ -517,17 +505,6 @@ function editTitle(field: EditField | null) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F7F7" },
-  header: {
-    height: 44,
-    backgroundColor: "#FFF",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-  },
-  backButton: { width: 28, height: 28, justifyContent: "center" },
-  backIcon: { width: 24, height: 24 },
-  headerSpace: { width: 28 },
   headerTitle: {
     color: "#0A0A0A",
     fontFamily: DOUYIN_SANS,
