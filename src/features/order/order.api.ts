@@ -43,18 +43,28 @@ export function mapOrder(
     : rawStatus === "ACCEPTED" ? "waitingService"
     : rawStatus === "IN_SERVICE" ? "inService"
     : rawStatus === "COMPLETED" || rawStatus === "SETTLED" || rawStatus === "FINISHED" ? "completed"
+    : rawStatus === "PARTIAL_REFUNDED" ? "partiallyRefunded"
     : rawStatus === "REFUNDED" ? "refunded"
     : rawStatus === "CANCELED" || rawStatus === "CANCELLED" ? "cancelled"
     : rawStatus === "PROCESSING" ? "paid"
     : "pendingPayment";
   const id = stringValue(item, "id", "orderId", "orderNo") ?? `order-${index}`;
   const total = stringValue(item, "realPayAmount", "totalPrice", "payAmount", "amount") ?? "0";
-  // 状态文案对齐 Web 的 statusMeta：按真实状态计算，接单侧仅「用户已支付」不同。
-  const statusLabel = scope === "accept" && status === "paid"
+  // 接口分别返回模式、等级和服务，不能只取服务名或用旧标题覆盖。
+  const serviceParts = ["gameModeName", "gameLevelName", "serviceName"]
+    .map((key) => stringValue(item, key)?.trim())
+    .filter(Boolean);
+  // 免单与普通退款区分展示，部分退款不能回落成待支付。
+  const isFreeOrder = item.isFreeOrder === true;
+  const statusLabel = isFreeOrder && status === "refunded"
+    ? "已免单"
+    : isFreeOrder && status === "partiallyRefunded"
+    ? "部分免单"
+    : scope === "accept" && status === "paid"
     ? "用户已支付"
     : {
         pendingPayment: "待支付", paid: "已支付", waitingService: "待服务",
-        inService: "服务中", completed: "已完成", cancelled: "已取消", refunded: "已退款",
+        inService: "服务中", completed: "已完成", partiallyRefunded: "部分退款", cancelled: "已取消", refunded: "已退款",
       }[status];
   const reviewId = numberValue(item, "reviewId", "orderReviewId");
   const reviewExists = item.reviewExists === true || reviewId !== undefined;
@@ -64,7 +74,7 @@ export function mapOrder(
     ? [{ key: "cancel", label: "取消订单", variant: "secondary" }]
     : status === "inService"
     ? [{ key: "complete", label: "完成订单", variant: "primary" }]
-    : status === "completed"
+    : status === "completed" || status === "partiallyRefunded"
     ? [{ key: "afterSales", label: "售后", variant: "secondary" }, { key: "review", label: reviewExists ? "已评价" : "评价", variant: "secondary" }, { key: "reorder", label: "再来一单", variant: "secondary" }]
     : [];
   const times = readOrderTimeFields(item);
@@ -110,13 +120,14 @@ export function mapOrder(
     sellerAvatar: scope === "accept"
       ? stringValue(item, "buyerHeadImage") ?? sellerAvatar
       : stringValue(item, "sellerAvatar", "receiverHeadImage", "clubLogo", "logoUrl", "headImage") ?? sellerAvatar,
-    serviceName: stringValue(item, "title", "serviceName", "productName") ?? ([stringValue(item, "gameModeName"), stringValue(item, "gameLevelName")].filter(Boolean).join("-") || "陪玩服务"),
+    serviceName: serviceParts.join("-") || stringValue(item, "title", "productName") || "陪玩服务",
     gameName: stringValue(item, "gameName") ?? "未知游戏",
     gameIcon: gameIcon ? { uri: gameIcon } : undefined,
     unitPrice: stringValue(item, "unitPrice", "price") ?? total,
     quantity: numberValue(item, "quantity", "count", "num") ?? 1,
     billingUnitName: stringValue(item, "billingUnitName") ?? "小时",
     totalPrice: total,
+    freeAmount: isFreeOrder ? stringValue(item, "refundAmount") : undefined,
     remark: stringValue(item, "remark", "buyerRemark"),
     ...times,
     dispatchTime: stringValue(item, "dispatchTime", "assignedTime", "acceptedTime"),

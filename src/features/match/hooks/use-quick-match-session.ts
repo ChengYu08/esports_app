@@ -44,7 +44,7 @@ function resolveExpireAtMs(expireTime?: string): number {
   return Date.now() + DEFAULT_COUNTDOWN_SEC * 1000;
 }
 
-/** 发布页：若有进行中需求则恢复；需试音优先回试音房 */
+/** 发布页：若有进行中需求则恢复到抢单中页（不自动进试音房，对齐 PC） */
 export function useRestoreActiveMatch() {
   const token = useAuthStore((state) => state.accessToken);
   const queryClient = useQueryClient();
@@ -101,25 +101,6 @@ export function useRestoreActiveMatch() {
                 }
               : {}),
           };
-          if (active.needVoice) {
-            try {
-              const room = await ensureAuditionRoom(active.requestNo, token);
-              if (cancelled) return;
-              const roomId = resolveVoiceRoomId(room) || room.id;
-              if (!roomId) throw new Error("试音房信息不存在");
-              router.replace({
-                pathname: "/voice-room/[id]",
-                params: {
-                  id: roomId,
-                  scene: "audition",
-                  ...matchParams,
-                },
-              });
-              return;
-            } catch {
-              // 试音房恢复失败则回落匹配中页，避免卡在发布表单
-            }
-          }
           router.replace({
             pathname: "/match/matching/[requestNo]",
             params: matchParams,

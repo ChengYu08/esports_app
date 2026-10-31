@@ -32,6 +32,7 @@ import { VoiceRoomKickListener } from "@/features/voice-room/components/VoiceRoo
 import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
 import { leaveVoiceChatRoom } from "@/features/voice-room/voice-room-rongcloud";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
+import { VoiceRoomJoinedSyncHost } from "@/features/voice-room/use-sync-joined-voice-room";
 import { PushyUpdateHost } from "@/features/ota/PushyUpdateHost";
 import { AppUpgradeHost } from "@/features/app-upgrade/AppUpgradeHost";
 import { TeenModeGate } from "@/features/mine/components/TeenModeGate";
@@ -71,6 +72,7 @@ export default function RootLayout() {
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const authExpiryTask = useRef<Promise<void> | null>(null);
   const needsLoginRedirect = useRef(false);
+  const lastInitToken = useRef<string | null>(null);
   const setSession = useAuthStore((state) => state.setSession);
   const clearSession = useAuthStore((state) => state.clearSession);
   const accessToken = useAuthStore((state) => state.accessToken);
@@ -117,8 +119,16 @@ export default function RootLayout() {
   }, [accessToken, sessionReady]);
 
   useEffect(() => {
-    if (accessToken && privacyAccepted) void initializeMessages(accessToken);
-    else if (privacyReady) void resetMessages();
+    if (accessToken && privacyAccepted) {
+      // 防御：同 token 的 initialize 只触发一次，避免 initialize 内部 set 触发
+      // React 重渲染 → effect 依赖浅比较失败 → 重复 initialize 形成抖动循环。
+      if (lastInitToken.current === accessToken) return;
+      lastInitToken.current = accessToken;
+      void initializeMessages(accessToken);
+    } else if (privacyReady) {
+      lastInitToken.current = null;
+      void resetMessages();
+    }
   }, [
     accessToken,
     initializeMessages,
@@ -264,6 +274,7 @@ export default function RootLayout() {
             <InAppNotificationBanner visible={!pathname.startsWith("/voice-room/")} />
             <ActionNoticeHost />
             <VoiceRoomMiniPlayer />
+            <VoiceRoomJoinedSyncHost enabled={privacyAccepted} />
             <VoiceRoomKickListener />
             <RongCommandHost />
             <OrderNotifySyncHost />

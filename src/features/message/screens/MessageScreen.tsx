@@ -1,6 +1,7 @@
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { useAuthStore } from "@esports/auth";
 import { router, useFocusEffect } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo } from "react";
 import { AppState, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -107,13 +108,16 @@ export default function MessageScreen() {
           ? lastError || "消息连接失败"
           : items.length === 0 ? conversationError : null;
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <MessageHeader
-        onClear={() => void handleClear()}
-        onSearch={() =>
-          router.push({ pathname: "/search", params: { type: "message" } })
-        }
-      />
+    <View style={styles.screen}>
+      <StatusBar style="dark" />
+      <View style={[styles.navbar, { paddingTop: insets.top }]}>
+        <MessageHeader
+          onClear={() => void handleClear()}
+          onSearch={() =>
+            router.push({ pathname: "/search", params: { type: "message" } })
+          }
+        />
+      </View>
       {stateMessage ? (
         <View style={styles.state}>
           <Text style={styles.stateText}>{stateMessage}</Text>
@@ -152,6 +156,7 @@ export default function MessageScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F7F7" },
+  navbar: { backgroundColor: "#FFFFFF" },
   state: {
     flex: 1,
     alignItems: "center",

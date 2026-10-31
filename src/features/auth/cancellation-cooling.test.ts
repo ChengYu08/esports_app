@@ -4,6 +4,7 @@ import {
   buildCoolingRecord,
   formatCoolEndTime,
   isCoolingActive,
+  parseCoolEndTime,
 } from "./cancellation-cooling";
 
 describe("buildCoolingRecord", () => {
@@ -29,6 +30,20 @@ describe("formatCoolEndTime", () => {
   it("分钟个位补零", () => {
     const timestamp = new Date("2025-11-05T08:07:00").getTime();
     expect(formatCoolEndTime(timestamp)).toBe("2025年11月5日8时07分");
+  });
+});
+
+describe("parseCoolEndTime", () => {
+  it("解析服务端 yyyy-MM-dd HH:mm:ss 格式", () => {
+    expect(parseCoolEndTime("2026-11-14 18:30:00")).toBe(
+      new Date("2026-11-14T18:30:00").getTime(),
+    );
+  });
+
+  it("空值或非法格式返回 null", () => {
+    expect(parseCoolEndTime(null)).toBeNull();
+    expect(parseCoolEndTime("")).toBeNull();
+    expect(parseCoolEndTime("不是时间")).toBeNull();
   });
 });
 

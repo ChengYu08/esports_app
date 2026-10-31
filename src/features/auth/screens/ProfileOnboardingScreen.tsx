@@ -1,9 +1,9 @@
 import { useAuthStore } from "@esports/auth";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import {
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -240,7 +240,7 @@ export default function ProfileOnboardingScreen() {
                 />
                 <View style={styles.counterBox}>
                   <Text style={styles.counterText}>
-                    {trimmedNickname.length}/{NICKNAME_MAX_LENGTH}
+                    {nickname.length}/{NICKNAME_MAX_LENGTH}
                   </Text>
                 </View>
               </View>
@@ -263,7 +263,6 @@ export default function ProfileOnboardingScreen() {
                   <Image source={genderMaleIcon} style={styles.genderIcon} />
                   <Text style={styles.genderLabel}>男</Text>
                 </Pressable>
-                <View style={{ width: 12 }} />
                 <Pressable
                   style={[
                     styles.genderOption,
@@ -287,7 +286,6 @@ export default function ProfileOnboardingScreen() {
         <Pressable style={styles.skipButton} onPress={handleSkip}>
           <Text style={styles.skipButtonText}>跳过</Text>
         </Pressable>
-        <View style={{ width: 12 }} />
         <Pressable
           style={[
             styles.submitButton,
@@ -296,7 +294,7 @@ export default function ProfileOnboardingScreen() {
           onPress={handleSubmit}
           disabled={!canSubmit}
         >
-          <Text style={styles.submitButtonText}>完成</Text>
+          <Text style={styles.submitButtonText}>下一步</Text>
         </Pressable>
       </View>
     </View>
@@ -368,7 +366,6 @@ const styles = StyleSheet.create({
     height: 88,
     borderRadius: 44,
     overflow: "hidden",
-    backgroundColor: "#4D88FF",
     margin: 2,
   },
   avatarImage: {
@@ -460,9 +457,10 @@ const styles = StyleSheet.create({
   },
   genderRow: {
     flexDirection: "row",
+    gap: 12,
   },
   genderOption: {
-    flex: 1,
+    width: 149,
     height: 46,
     flexDirection: "row",
     alignItems: "center",
@@ -494,13 +492,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: "row",
+    gap: 12,
     paddingHorizontal: 16,
     paddingTop: 8,
     backgroundColor: "#fff",
   },
   skipButton: {
     width: 120,
-    height: 42,
+    height: 44,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: COLOR_BORDER,
@@ -517,7 +516,7 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     flex: 1,
-    height: 42,
+    height: 44,
     borderRadius: 8,
     backgroundColor: COLOR_BRAND,
     alignItems: "center",

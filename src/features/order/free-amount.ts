@@ -8,8 +8,22 @@ export function roundStar(n: number) {
   return Number(n.toFixed(2));
 }
 
+/** 已免单的金额从实付款中扣除，确认完成时显示剩余应收星钻 */
+export function computeOrderPayableStars(
+  order: Pick<OrderItemModel, "totalPrice" | "freeAmount">,
+) {
+  const total = Number(order.totalPrice);
+  const free = Number(order.freeAmount ?? 0);
+  if (!Number.isFinite(total) || !Number.isFinite(free)) {
+    return 0;
+  }
+  return roundStar(Math.max(0, total - Math.max(0, free)));
+}
+
 export function formatStar(n: number) {
-  return roundStar(n).toFixed(2).replace(/\.?0+$/, "");
+  return roundStar(n)
+    .toFixed(2)
+    .replace(/\.?0+$/, "");
 }
 
 export function formatHours(n: number) {
@@ -41,7 +55,10 @@ export function sanitizeHoursText(raw: string) {
   return `${intPart}.${decAll.slice(0, 1)}`;
 }
 
-type FreePriceSource = Pick<OrderItemModel, "quantity" | "unitPrice" | "totalPrice">;
+type FreePriceSource = Pick<
+  OrderItemModel,
+  "quantity" | "unitPrice" | "totalPrice"
+>;
 
 /** 钻石/时长：优先单价，缺省用总价除以订单时长 */
 export function computeFreeUnitPrice(order: FreePriceSource) {
@@ -58,7 +75,10 @@ export function computeFreeUnitPrice(order: FreePriceSource) {
 }
 
 /** 免单时长换算星钻，结果只保留最多两位小数；无效返回 null */
-export function computeFreeStarAmount(order: FreePriceSource, freeHours: number) {
+export function computeFreeStarAmount(
+  order: FreePriceSource,
+  freeHours: number,
+) {
   if (!(freeHours > 0)) {
     return null;
   }
@@ -67,4 +87,21 @@ export function computeFreeStarAmount(order: FreePriceSource, freeHours: number)
     return null;
   }
   return raw;
+}
+
+/** 订单保留下单数量，已免数量按退款星钻与原单价折算，单独展示。 */
+export function formatOrderFreeSummary(
+  order: FreePriceSource &
+    Pick<OrderItemModel, "freeAmount" | "billingUnitName">,
+) {
+  const freeAmount = Number(order.freeAmount);
+  if (!Number.isFinite(freeAmount) || freeAmount <= 0) {
+    return undefined;
+  }
+  const unitPrice = computeFreeUnitPrice(order);
+  const amountText = `${formatStar(freeAmount)}星钻`;
+  if (unitPrice <= 0) {
+    return amountText;
+  }
+  return `${formatHours(freeAmount / unitPrice)}${order.billingUnitName || "小时"}（${amountText}）`;
 }

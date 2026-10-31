@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeFreeStarAmount,
   computeFreeUnitPrice,
+  computeOrderPayableStars,
   parseHoursLive,
   sanitizeHoursText,
 } from "./free-amount";
@@ -12,6 +13,26 @@ const order = {
   unitPrice: "20",
   totalPrice: "80",
 };
+
+describe("computeOrderPayableStars", () => {
+  it("未免单时保留实付款", () => {
+    expect(computeOrderPayableStars({ totalPrice: "800" })).toBe(800);
+  });
+
+  it("部分免单后只收剩余金额", () => {
+    expect(computeOrderPayableStars({ totalPrice: "800", freeAmount: "200" })).toBe(600);
+  });
+
+  it("全额免单与超额退款时应收金额为零", () => {
+    expect(computeOrderPayableStars({ totalPrice: "800", freeAmount: "800" })).toBe(0);
+    expect(computeOrderPayableStars({ totalPrice: "800", freeAmount: "900" })).toBe(0);
+  });
+
+  it("小数金额按星钻精度计算，无效金额不显示为 NaN", () => {
+    expect(computeOrderPayableStars({ totalPrice: "9.99", freeAmount: "0.3" })).toBe(9.69);
+    expect(computeOrderPayableStars({ totalPrice: "未知" })).toBe(0);
+  });
+});
 
 describe("computeFreeUnitPrice", () => {
   it("优先使用单价", () => {

@@ -6,9 +6,12 @@ import updateConfig from "../../../update.json";
 const androidAppKey =
   Platform.OS === "android" ? updateConfig.android?.appKey : undefined;
 
-/** 仅 Android 使用的 Pushy 客户端；iOS / 其他平台为 null */
+/** 仅 Android release 包使用；dev 构建禁用，避免本地跑的包被 Pushy 后台的 ppk 覆盖 JS bundle */
 export const pushyClient =
-  androidAppKey !== undefined && androidAppKey !== ""
+  Platform.OS === "android" &&
+  !__DEV__ &&
+  androidAppKey !== undefined &&
+  androidAppKey !== ""
     ? new Pushy({
         appKey: androidAppKey,
         // 关闭自动检查，等同意隐私后再手动 checkUpdate

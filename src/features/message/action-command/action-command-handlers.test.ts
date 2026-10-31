@@ -39,6 +39,10 @@ vi.mock("@/features/order/order-query", () => ({
   refreshDispatchForRemoteChange: vi.fn(),
 }));
 
+vi.mock("@/core/logging/logger", () => ({
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+
 const {
   handleOrderNotifyPopup,
   handleQuickMatchExpired,
@@ -46,12 +50,20 @@ const {
   resetActionCommandDedupKeys,
 } = await import("./action-command-handlers");
 const { refreshDispatchForRemoteChange } = await import("@/features/order/order-query");
+const { logger } = await import("@/core/logging/logger");
 
 const NOW = new Date("2026-10-20T12:00:00").getTime();
 const PLATFORM = "50000000";
 
-function command(name: string, data: Record<string, unknown>, senderId = PLATFORM): RongCommand {
-  return { senderId, name, data };
+function command(
+  name: string,
+  data: Record<string, unknown>,
+  senderId = PLATFORM,
+  sentTime?: number,
+): RongCommand {
+  return sentTime === undefined
+    ? { senderId, name, data }
+    : { senderId, name, data, sentTime };
 }
 
 describe("handleQuickMatchNotice", () => {
@@ -171,6 +183,104 @@ describe("handleQuickMatchNotice", () => {
       NOW,
     );
     expect(refreshDispatchForRemoteChange).not.toHaveBeenCalled();
+  });
+
+  it("sentTime 距今超过 30 分钟的离线重放通知不弹条，仍刷新派单中心", () => {
+    handleQuickMatchNotice(
+      command(
+        "QUICK_MATCH_NOTICE",
+        { requestNo: "QM1", expireTime: "2026-10-20 12:30:00" },
+        PLATFORM,
+        NOW - 1_801_000,
+      ),
+      NOW,
+    );
+    expect(useActionNoticeStore.getState().items).toHaveLength(0);
+    expect(refreshDispatchForRemoteChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("sentTime 距今恰满 30 分钟仍在阈值内，正常弹条", () => {
+    handleQuickMatchNotice(
+      command(
+        "QUICK_MATCH_NOTICE",
+        { requestNo: "QM1", expireTime: "2026-10-20 12:30:00" },
+        PLATFORM,
+        NOW - 1_800_000,
+      ),
+      NOW,
+    );
+    expect(useActionNoticeStore.getState().items).toHaveLength(1);
+  });
+
+  it("sentTime 在 30 分钟内正常弹条", () => {
+    handleQuickMatchNotice(
+      command(
+        "QUICK_MATCH_NOTICE",
+        { requestNo: "QM1", expireTime: "2026-10-20 12:30:00" },
+        PLATFORM,
+        NOW - 30_000,
+      ),
+      NOW,
+    );
+    expect(useActionNoticeStore.getState().items).toHaveLength(1);
+  });
+
+  it("sentTime 缺失不拦截", () => {
+    handleQuickMatchNotice(
+      command("QUICK_MATCH_NOTICE", {
+        requestNo: "QM1",
+        expireTime: "2026-10-20 12:30:00",
+      }),
+      NOW,
+    );
+    expect(useActionNoticeStore.getState().items).toHaveLength(1);
+  });
+
+  it("打印是否过期、是否离线重放、是否缺字段的日志", () => {
+    handleQuickMatchNotice(
+      command(
+        "QUICK_MATCH_NOTICE",
+        { requestNo: "QM1", expireTime: "2026-10-20 11:00:00" },
+        PLATFORM,
+        NOW - 3_601_000,
+      ),
+      NOW,
+    );
+    expect(logger.info).toHaveBeenCalledWith(
+      "QUICK_MATCH_NOTICE",
+      expect.objectContaining({
+        requestNo: "QM1",
+        expired: true,
+        stale: true,
+        missingFields: "",
+        expireAt: "2026-10-20 11:00:00",
+        sentTime: "2026-10-20 10:59:59",
+      }),
+    );
+  });
+
+  it("expireTime 缺失时日志标记 missingFields", () => {
+    handleQuickMatchNotice(command("QUICK_MATCH_NOTICE", { requestNo: "QM1" }), NOW);
+    expect(logger.info).toHaveBeenCalledWith(
+      "QUICK_MATCH_NOTICE",
+      expect.objectContaining({
+        requestNo: "QM1",
+        expired: false,
+        stale: false,
+        missingFields: "expireTime",
+        expireAt: undefined,
+        sentTime: undefined,
+      }),
+    );
+  });
+
+  it("缺 requestNo 时告警日志", () => {
+    handleQuickMatchNotice(command("QUICK_MATCH_NOTICE", {}), NOW);
+    expect(logger.warn).toHaveBeenCalledWith(
+      "QUICK_MATCH_NOTICE 缺少 requestNo",
+      expect.objectContaining({ senderId: PLATFORM }),
+    );
+    expect(useActionNoticeStore.getState().items).toHaveLength(0);
   });
 });
 

@@ -13,7 +13,7 @@ import type {
   SsoRequestOptions,
   SsoToken,
 } from "./types";
-import { SsoError } from "./types";
+import { QuickLoginCancelledError, SsoError } from "./types";
 
 export class SsoClient {
   private readonly config: SsoClientConfig;
@@ -59,7 +59,9 @@ export class SsoClient {
       this.config.timeoutMs ?? 15_000,
     );
 
-    const parseBody = (raw: unknown): Record<string, unknown> | null | undefined => {
+    const parseBody = (
+      raw: unknown,
+    ): Record<string, unknown> | null | undefined => {
       if (raw === undefined || raw === null || raw === "") return {};
       if (typeof raw === "string") {
         try {
@@ -77,6 +79,8 @@ export class SsoClient {
     try {
       const headers = {
         ...createSignature(data, method, this.config),
+        // 必须带 Referer，否则会命中 WAF 被拦截
+        Referer: this.config.referer ?? "https://dj.panzhi.com/",
         AUTHORIZATION: `basic ${this.config.clientSecret}`,
         ...(options.headers ?? {}),
       };
@@ -119,14 +123,18 @@ export class SsoClient {
       });
       if (status < 200 || status >= 300)
         throw new SsoError(
-          readString(body?.info) ?? readString(body?.message) ?? `请求失败: ${status}`,
+          readString(body?.info) ??
+            readString(body?.message) ??
+            `请求失败: ${status}`,
           status,
           readString(body?.code),
         );
       if (path.includes("/oauth2/token")) {
         if (!body?.access_token)
           throw new SsoError(
-            readString(body?.info) ?? readString(body?.message) ?? "获取 token 失败",
+            readString(body?.info) ??
+              readString(body?.message) ??
+              "获取 token 失败",
             status,
             readString(body?.code),
           );
@@ -215,6 +223,45 @@ export class SsoClient {
     return token;
   }
 
+  /** 只探测当前设备是否支持一键登录，不拉起授权页。 */
+  async checkQuickLoginAvailable(
+    provider: QuickLoginProvider,
+  ): Promise<boolean> {
+    const authToken = await this.getQuickLoginAuthToken();
+    return provider.checkLoginAvailable(authToken);
+  }
+
+  /** 直接拉起运营商授权页完成一键登录（调用前应先确认可用）。 */
+  async authorizeQuickLogin(
+    provider: QuickLoginProvider,
+  ): Promise<SsoToken & { phone?: string }> {
+    const authToken = await this.getQuickLoginAuthToken();
+    console.info("[DEBUG-QUICK-LOGIN] requesting carrier authorization");
+    const result = await provider.getLoginToken(authToken);
+    const cancelled = QuickLoginCancelledError.from(result);
+    if (cancelled) {
+      console.info("[DEBUG-QUICK-LOGIN] carrier authorization cancelled", {
+        reason: cancelled.reason,
+      });
+      throw cancelled;
+    }
+    console.info("[DEBUG-QUICK-LOGIN] carrier authorization completed", {
+      hasSpToken: Boolean(result.spToken),
+    });
+    if (!result.spToken) throw new SsoError("一键登录未返回授权 token");
+    console.info("[DEBUG-QUICK-LOGIN] exchanging carrier token with SSO");
+    return this.request<SsoToken & { phone?: string }>(
+      "/api/auth/oauth2/token",
+      {
+        data: {
+          code: result.spToken,
+          grant_type: "ali_app_one_key",
+          scope: "openid",
+        },
+      },
+    );
+  }
+
   async quickLogin(
     provider: QuickLoginProvider,
   ): Promise<SsoToken & { phone?: string }> {
@@ -238,7 +285,7 @@ export class SsoClient {
       {
         data: {
           code: result.spToken,
-          grant_type: "ali_h5_one_key",
+          grant_type: "ali_app_one_key",
           scope: "openid",
         },
       },

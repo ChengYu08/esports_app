@@ -20,10 +20,14 @@ import { clientAuthApi } from "@/features/auth/client-auth.api";
 import {
   buildCoolingRecord,
   formatCoolEndTime,
+  parseCoolEndTime,
 } from "@/features/auth/cancellation-cooling";
 import { saveCoolingRecord } from "@/features/auth/cancellation-cooling-store";
 import { clearAuthSession } from "@/features/auth/session-persistence";
 import { messageStore } from "@/features/message/message-store";
+import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
+import { leaveVoiceChatRoom } from "@/features/voice-room/voice-room-rongcloud";
+import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
 import { colors } from "@/shared/theme/tokens";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { openExternalLink } from "@/shared/navigation/open-external-link";
@@ -124,17 +128,37 @@ export default function AccountCancellationScreen() {
     if (!token || confirming || smsCode.length === 0) return;
     setConfirming(true);
     try {
-      await clientAuthApi.cancelAccount(token, smsCode);
+      const coolEndTime = await clientAuthApi.cancelAccount(token, smsCode);
       setSheetVisible(false);
-      const record = buildCoolingRecord(
-        user?.phone ?? "",
-        Date.now(),
-        coolingDays,
-      );
+      // 截止时间以服务端返回为准（token 已吊销无法再查）；仅在缺失时才本地兜底估算
+      const serverEndTime = parseCoolEndTime(coolEndTime);
+      const record = serverEndTime != null
+        ? {
+            phone: user?.phone ?? "",
+            coolEndTime: serverEndTime,
+            coolingDays,
+          }
+        : buildCoolingRecord(user?.phone ?? "", Date.now(), coolingDays);
       await saveCoolingRecord(record);
+      // 注销等于强制登出,顺序对齐 PC forceLogout:先解绑实时资源,再清凭证。
+      const { activeRoom, joiningRoom, clearActiveRoom } =
+        useVoiceRoomSessionStore.getState();
+      clearActiveRoom();
+      if (activeRoom || joiningRoom) {
+        await leaveVoiceRtc().catch(() => undefined);
+        const chatroomIds = new Set([
+          activeRoom?.rongChatroomId,
+          joiningRoom?.rongChatroomId,
+        ]);
+        await Promise.allSettled(
+          [...chatroomIds]
+            .filter((id): id is string => Boolean(id))
+            .map((id) => leaveVoiceChatRoom(id)),
+        );
+      }
+      await messageStore.getState().reset().catch(() => undefined);
       await clearAuthSession().catch(() => undefined);
       clearSession();
-      await messageStore.getState().reset().catch(() => undefined);
       showToast(
         `已进入${coolingDays}天冷静期，账号将于 ${formatCoolEndTime(record.coolEndTime)} 完成注销`,
         { duration: toastDurations.LONG },

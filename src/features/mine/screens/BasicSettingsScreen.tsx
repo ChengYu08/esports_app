@@ -24,6 +24,9 @@ import { clearAuthSession } from "@/features/auth/session-persistence";
 import { messageStore } from "@/features/message/message-store";
 import { readLastTeenEnabled } from "@/features/mine/teen-mode-store";
 import { useSmsNotifyStatus } from "@/features/mine/hooks/use-sms-notify";
+import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
+import { leaveVoiceChatRoom } from "@/features/voice-room/voice-room-rongcloud";
+import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
@@ -108,20 +111,45 @@ export default function BasicSettingsScreen() {
           if (loggingOut) return;
           void (async () => {
             setLoggingOut(true);
-            if (token) void clientAuthApi.logout(token).catch(() => undefined);
+            // 顺序对齐 PC 端 user.ts#logout:
+            // 1. 用旧 token 先解绑实时资源(语音房 RTC/融云聊天室),再断开 IM
+            // 2. 清本地凭证 + 内存
+            // 3. 最后并行调 logout API,服务端 token 失效在本地清理之后、跳转之前完成
             try {
-              await clearAuthSession();
-            } catch {
-              // Local sign-out still completes when secure storage is unavailable.
+              const { activeRoom, joiningRoom, clearActiveRoom } =
+                useVoiceRoomSessionStore.getState();
+              clearActiveRoom();
+              if (activeRoom || joiningRoom) {
+                await leaveVoiceRtc().catch(() => undefined);
+                const chatroomIds = new Set([
+                  activeRoom?.rongChatroomId,
+                  joiningRoom?.rongChatroomId,
+                ]);
+                await Promise.allSettled(
+                  [...chatroomIds]
+                    .filter((id): id is string => Boolean(id))
+                    .map((id) => leaveVoiceChatRoom(id)),
+                );
+              }
+              await messageStore
+                .getState()
+                .reset()
+                .catch(() => undefined);
+            } finally {
+              try {
+                await clearAuthSession();
+              } catch {
+                // Local sign-out still completes when secure storage is unavailable.
+              }
+              clearSession();
+              queryClient.clear();
+              // 后端 logout 失败不阻塞本地登出;但仍要等其完成,避免新账号拿到未失效的旧 token。
+              if (token) {
+                await clientAuthApi.logout(token).catch(() => undefined);
+              }
+              router.replace("/");
+              setLoggingOut(false);
             }
-            clearSession();
-            queryClient.clear();
-            await messageStore
-              .getState()
-              .reset()
-              .catch(() => undefined);
-            router.replace("/");
-            setLoggingOut(false);
           })();
         },
       },

@@ -24,11 +24,9 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import {
-  ensureAuditionRoom,
-  publishQuickMatch,
-} from "@/features/match/api/match.api";
+import { publishQuickMatch } from "@/features/match/api/match.api";
 import type { MatchGame } from "@/features/match/api/match.types";
+import { openAuditionRoom } from "@/features/match/enter-audition-room";
 import { MatchLinearGradient } from "@/features/match/components/MatchLinearGradient";
 import {
   MATCH_COMPANION_PREFERENCE_OPTIONS,
@@ -38,8 +36,11 @@ import {
   useMatchForm,
 } from "@/features/match/hooks/use-match-form";
 import { exitVoiceRoom } from "@/features/voice-room/exit-voice-room";
-import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
-import { resolveVoiceRoomId } from "@/features/voice-room/voice-room.api";
+import {
+  resolveVoiceRoomId,
+  voiceRoomApi,
+} from "@/features/voice-room/voice-room.api";
+import type { VoiceRoomDetail } from "@/features/voice-room/voice-room.types";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
@@ -214,7 +215,6 @@ export function ClubQuickMatchSheet({
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const user = useAuthStore((state) => state.user);
-  const activeRoom = useVoiceRoomSessionStore((state) => state.activeRoom);
   const isReception = mode === "reception";
   const form = useMatchForm({
     enabled: visible,
@@ -224,6 +224,8 @@ export function ClubQuickMatchSheet({
   const [submitting, setSubmitting] = useState(false);
   const [exitRoomPromptVisible, setExitRoomPromptVisible] = useState(false);
   const pendingPublishRef = useRef<(() => Promise<void>) | null>(null);
+  const joinedRoomRef = useRef<VoiceRoomDetail | null>(null);
+  const checkingJoinedRoomRef = useRef(false);
   /** 本次打开是否已完成初始游戏对齐；之后用户手选不再被 initialGameId 覆盖 */
   const gameBootstrappedRef = useRef(false);
   const scrollMaxHeight = Math.max(280, windowHeight * 0.55);
@@ -278,37 +280,8 @@ export function ClubQuickMatchSheet({
       },
     ) => {
       if (!form.token) return false;
-      try {
-        const room = await ensureAuditionRoom(requestNo, form.token);
-        const roomId = resolveVoiceRoomId(room) || room.id;
-        if (!roomId) throw new Error("试音房信息不存在");
-        const game = options?.game;
-        onClose();
-        router.replace({
-          pathname: "/voice-room/[id]",
-          params: {
-            id: roomId,
-            scene: "audition",
-            requestNo,
-            ...(options?.expireTime ? { expireTime: options.expireTime } : {}),
-            ...(game?.id && game.name
-              ? {
-                  gameId: game.id,
-                  gameName: game.name,
-                  ...(game.iconUrl ? { gameIconUrl: game.iconUrl } : {}),
-                }
-              : {}),
-          },
-        });
-        return true;
-      } catch (error) {
-        showToast(
-          error instanceof Error
-            ? `派单已发布，但${error.message}`
-            : "派单已发布，但暂时无法进入试音房，请稍后重试",
-        );
-        return false;
-      }
+      onClose();
+      return openAuditionRoom(requestNo, form.token, options);
     },
     [form.token, onClose],
   );
@@ -370,8 +343,20 @@ export function ClubQuickMatchSheet({
     setSubmitting(true);
     try {
       // 仅老板自发试音需退出当前房；接待代发在老板房间发起，不能退散老板房间
-      if (!isReception && needVoice && activeRoom && user?.id) {
-        await exitVoiceRoom(activeRoom, String(user.id), form.token);
+      const joinedRoom = joinedRoomRef.current;
+      joinedRoomRef.current = null;
+      const joinedRoomId = joinedRoom ? resolveVoiceRoomId(joinedRoom) : null;
+      if (!isReception && needVoice && joinedRoom && joinedRoomId && user?.id) {
+        await exitVoiceRoom(
+          {
+            roomId: joinedRoomId,
+            roomVersion: joinedRoom.roomVersion ?? "1",
+            creatorUserId: joinedRoom.creatorUserId,
+            rongChatroomId: joinedRoom.rongChatroomId,
+          },
+          String(user.id),
+          form.token,
+        );
       }
 
       const result = await publishQuickMatch(
@@ -415,7 +400,6 @@ export function ClubQuickMatchSheet({
       setSubmitting(false);
     }
   }, [
-    activeRoom,
     buyerUserId,
     enterAuditionRoom,
     form,
@@ -426,14 +410,37 @@ export function ClubQuickMatchSheet({
     user?.id,
   ]);
 
-  const handlePublish = useCallback(() => {
-    if (!isReception && form.voice === "需试音" && activeRoom) {
-      pendingPublishRef.current = runPublish;
-      setExitRoomPromptVisible(true);
+  const handlePublish = useCallback(async () => {
+    if (isReception || form.voice !== "需试音") {
+      joinedRoomRef.current = null;
+      void runPublish();
       return;
     }
-    void runPublish();
-  }, [activeRoom, form.voice, isReception, runPublish]);
+    if (!form.token) {
+      showToast("请先登录");
+      return;
+    }
+    if (checkingJoinedRoomRef.current || submitting) return;
+    checkingJoinedRoomRef.current = true;
+    try {
+      const joined = await voiceRoomApi.getJoinedRoom(form.token);
+      const joinedId = resolveVoiceRoomId(joined);
+      if (joined && joinedId) {
+        joinedRoomRef.current = joined;
+        pendingPublishRef.current = runPublish;
+        setExitRoomPromptVisible(true);
+        return;
+      }
+      joinedRoomRef.current = null;
+      void runPublish();
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : "查询语聊房状态失败，请重试",
+      );
+    } finally {
+      checkingJoinedRoomRef.current = false;
+    }
+  }, [form.token, form.voice, isReception, runPublish, submitting]);
 
   const clubDisplayName = form.club?.name || lockedClub.name;
 
@@ -710,6 +717,7 @@ export function ClubQuickMatchSheet({
         onCancel={() => {
           setExitRoomPromptVisible(false);
           pendingPublishRef.current = null;
+          joinedRoomRef.current = null;
         }}
         onConfirm={() => {
           setExitRoomPromptVisible(false);
