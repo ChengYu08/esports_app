@@ -52,7 +52,9 @@ function stringField(data: Record<string, unknown>, key: string): string {
 /** 可选字符串字段：trim 后为空归 undefined（活动通知字段，普通通知后端不输出） */
 function optionalStringField(data: Record<string, unknown>, key: string): string | undefined {
   const value = stringField(data, key).trim();
-  if (!value) return undefined;
+  if (!value) {
+    return undefined;
+  }
   return value;
 }
 
