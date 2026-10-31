@@ -20,6 +20,9 @@ export function HomeBannerCard({ banner, label, style }: HomeBannerCardProps) {
   async function handlePress() {
     if (action.type === "image") {
       router.push({ pathname: "/image-preview", params: createImagePreviewParams([action.url], 0) });
+    } else if (action.type === "route") {
+      // 按端跳转协议的 App 内路由（如秒杀落地页）。
+      router.push({ pathname: action.path as never, params: action.params });
     } else if (action.type === "link") {
       await openExternalLink(action.url);
     }
