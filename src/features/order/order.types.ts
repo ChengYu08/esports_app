@@ -53,6 +53,8 @@ export type OrderItemModel = {
   billingUnitName?: string;
   requestNo?: string;
   voiceTag?: string;
+  /** 活动需求轻量标识（activityCode 非空时输出「活动」，普通需求不输出） */
+  activityTag?: string;
   sourceLabel?: string;
   unitPrice: string;
   quantity: number;

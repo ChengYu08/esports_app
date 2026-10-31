@@ -85,6 +85,9 @@ export const OrderCard = memo(function OrderCard({
                     {item.voiceTag}
                   </Text>
                 ) : null}
+                {item.activityTag ? (
+                  <Text style={styles.activityTag}>{item.activityTag}</Text>
+                ) : null}
               </View>
               {item.clubName ? (
                 <Text numberOfLines={1} style={styles.clubName}>
@@ -342,6 +345,16 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   voiceTagRequired: { color: "#581CE5", backgroundColor: "#F1EBFF" },
+  activityTag: {
+    overflow: "hidden",
+    borderRadius: 3,
+    backgroundColor: "#FFE9EC",
+    paddingHorizontal: 4,
+    color: "#F02A45",
+    fontFamily: SYSTEM_FONT,
+    fontSize: 11,
+    lineHeight: 18,
+  },
   orderBody: { gap: 8 },
   serviceName: {
     fontFamily: SYSTEM_FONT,

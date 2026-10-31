@@ -7,7 +7,7 @@ import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "@esports/auth";
 
-import { fetchDispatchDetail } from "../dispatch.api";
+import { fetchDispatchDetail, isActivityDispatchRequest } from "../dispatch.api";
 import { grabQuickMatchAndEnterAudition } from "@/features/match/grab-quick-match-flow";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
@@ -56,6 +56,9 @@ export function DispatchDetailScreen({ requestNo }: { requestNo: string }) {
     .join("-") || "陪玩服务";
   const statusLabel = getStatusLabel(status, grabStatus, hasGrabbed);
   const stateDescription = getStateDescription(status, grabStatus, hasGrabbed);
+  /** 活动派单判定：activityCode 非空即活动需求；普通需求渲染零变化 */
+  const isActivity = isActivityDispatchRequest(request);
+  const cardItems = isActivity ? request.cardItems ?? [] : [];
 
   const grabOrder = async () => {
     if (!canGrab || !request.requestNo || !token || grabbing) return;
@@ -106,6 +109,17 @@ export function DispatchDetailScreen({ requestNo }: { requestNo: string }) {
             <CachedImage source={request.gameIconUrl ? { uri: request.gameIconUrl } : GAME_FALLBACK} contentFit="contain" style={styles.gameIcon} />
             <Text numberOfLines={1} style={styles.gameName}>{request.gameName || "未知游戏"}</Text>
           </View>
+          {cardItems.length > 0 ? (
+            <View style={styles.activityCard}>
+              <Text style={styles.activityCardTitle}>活动信息</Text>
+              {cardItems.map((item, index) => (
+                <View key={`${item.label}-${index}`} style={styles.activityRow}>
+                  <Text style={styles.activityLabel}>{item.label}</Text>
+                  <Text numberOfLines={1} style={styles.activityValue}>{item.value.text}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
           <InfoRow label="服务" value={serviceName} />
           <InfoRow label="单价" value={`${unitPrice} 星钻/${request.billingUnitName || "小时"}`} />
           <InfoRow label="数量" value={`${quantity} ${request.billingUnitName || "小时"}`} />
@@ -198,6 +212,11 @@ const styles = StyleSheet.create({
   gameRow: { minHeight: 34, flexDirection: "row", alignItems: "center", gap: 8 },
   gameIcon: { width: 20, height: 20 },
   gameName: { flex: 1, color: "#222", fontFamily: DOUYIN_SANS, fontSize: 13 },
+  activityCard: { gap: 6, padding: 12, borderRadius: 8, backgroundColor: "#FFF5F6" },
+  activityCardTitle: { color: "#F02A45", fontFamily: DOUYIN_SANS, fontSize: 13, fontWeight: "600" },
+  activityRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
+  activityLabel: { width: 70, color: "#B98A90", fontFamily: DOUYIN_SANS, fontSize: 12, lineHeight: 20 },
+  activityValue: { flex: 1, color: "#F02A45", fontFamily: DOUYIN_SANS, fontSize: 12, lineHeight: 20, textAlign: "right" },
   infoRow: { minHeight: 34, flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
   multilineRow: { minHeight: 44 },
   label: { width: 70, color: "#999", fontFamily: DOUYIN_SANS, fontSize: 12, lineHeight: 20 },

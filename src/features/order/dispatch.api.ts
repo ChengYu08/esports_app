@@ -1,4 +1,5 @@
 import { apiClient } from "@/core/network/api-client";
+import type { QuickMatchCardItem } from "@/features/match/api/match.types";
 import type { OrderItemModel } from "./order.types";
 
 type ApiEnvelope<T> = { code?: string; info?: string; data?: T };
@@ -36,7 +37,31 @@ export type DispatchRequest = {
   expireTime?: string;
   endTime?: string;
   createTime?: string;
+  /** 以下为活动需求新增字段（与任务 3 QuickMatchRequestDetail 同形态），普通需求不输出 */
+  /** 发布来源：QUICK_MATCH 普通派单 / ACTIVITY 活动派单 */
+  publishSource?: string;
+  /** 关联活动 ID（后端 Long，前端按原样透传） */
+  activityId?: number | string;
+  /** 活动编码；非空即视为活动模式 */
+  activityCode?: string;
+  /** 活动类型（如 SECKILL） */
+  activityType?: string;
+  /** 活动卡逐行文案 */
+  cardItems?: QuickMatchCardItem[];
+  /** 活动优惠金额快照 */
+  discountAmount?: number | string;
+  /** 活动实付金额快照 */
+  realPayAmount?: number | string;
+  /** 本次最多可选抢单人数（活动=1；普通需求不输出，维持多选） */
+  maxSelectableCount?: number | string;
 };
+
+/** 活动派单判定：只认 activityCode 非空；为空/缺省即普通模式，行为保持不变 */
+export function isActivityDispatchRequest(
+  request: Pick<DispatchRequest, "activityCode"> | null | undefined,
+): boolean {
+  return Boolean(request && request.activityCode && request.activityCode.trim() !== "");
+}
 
 type GrabHistory = {
   id: number | string;
@@ -82,6 +107,7 @@ function mapDispatchRequest(request: DispatchRequest, userGender: number, histor
     remark: request.remark,
     sourceLabel: historyStatus ? undefined : request.publishType === "RECEPTION" ? "客服派单" : "用户派单",
     voiceTag: request.needVoice ? "需试音" : "不试音",
+    activityTag: isActivityDispatchRequest(request) ? "活动" : undefined,
     actions: canGrab ? [{ key: "grab", label: "抢单", variant: "primary" }] : [],
   };
 }
