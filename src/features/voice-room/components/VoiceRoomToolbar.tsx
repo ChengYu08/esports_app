@@ -18,6 +18,8 @@ const selectCompanionIcon = require("../../../../assets/voice-room/toolbar-selec
 
 type VoiceRoomToolbarProps = {
   bottomInset: number;
+  /** 键盘弹出时去掉底部预留 margin，避免输入框被顶得过高 */
+  keyboardOpen?: boolean;
   input: string;
   muted: boolean;
   rtcReady: boolean;
@@ -44,6 +46,7 @@ type VoiceRoomToolbarProps = {
 
 export function VoiceRoomToolbar({
   bottomInset,
+  keyboardOpen = false,
   input,
   muted,
   rtcReady,
@@ -73,7 +76,10 @@ export function VoiceRoomToolbar({
       style={[
         styles.container,
         compact && styles.containerCompact,
-        { paddingBottom: Math.max(bottomInset, 12) },
+        keyboardOpen && styles.containerKeyboardOpen,
+        {
+          paddingBottom: keyboardOpen ? 20 : Math.max(bottomInset, 12),
+        },
       ]}
     >
       <View style={[styles.composer, compact && styles.composerCompact]}>
@@ -258,6 +264,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
     marginBottom: 40,
+  },
+  containerKeyboardOpen: {
+    marginBottom: 0,
   },
   containerCompact: { gap: 8, paddingHorizontal: 12 },
   composer: {
