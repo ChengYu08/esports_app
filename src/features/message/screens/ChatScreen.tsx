@@ -5,7 +5,6 @@ import {
   HeadphonesRegular,
 } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
-import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -30,6 +29,9 @@ import EmojiPicker, { type EmojiType } from "rn-emoji-keyboard";
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import type { AfterSaleCardPayload } from "@/features/order/after-sale-card";
 import { afterSaleCardRows } from "@/features/order/after-sale-card";
+import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
+import { convertToJpeg } from "@/shared/media-picker/image-compat";
+import { showToast } from "@/shared/ui/app-toast";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { EmptyState } from "@/shared/ui/AsyncStates";
@@ -744,23 +746,19 @@ const ChatComposer = memo(function ChatComposer({
   const pickImage = async () => {
     if (imageSending) return;
     setEmojiPickerOpen(false);
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      void useAppConfirm.getState().confirm({
-        title: "需要访问相册",
-        message: "请在系统设置中允许访问照片，用于发送聊天图片。",
-      });
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      quality: 0.85,
-    });
-    if (result.canceled || !result.assets[0]) return;
+    // 相册选择页内部处理权限，选图结果经会话桥接回传
+    const pickPending = beginMediaPick();
+    router.push({ pathname: "/media-picker", params: { max: "1" } });
+    const picked = (await pickPending)?.[0];
+    if (!picked) return;
 
     setImageSending(true);
     try {
-      await onSendImage(result.assets[0].uri);
+      // 沿用旧照片选择器的行为：统一重编码为 JPEG，规避 HEIC 原图与超大原图直接发送
+      const sendUri = await convertToJpeg(picked);
+      await onSendImage(sendUri);
+    } catch {
+      showToast("图片处理失败，请重试");
     } finally {
       setImageSending(false);
     }

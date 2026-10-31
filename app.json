@@ -56,13 +56,6 @@
       "./plugins/withAndroidReleaseBuild",
       "./plugins/withPushyDeepLink",
       "./plugins/withPzOneClickLibs",
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "允许盼之电竞访问你的照片，用于发送聊天图片。",
-          "cameraPermission": "允许盼之电竞使用相机拍摄照片，用于发送聊天图片。"
-        }
-      ],
       "./plugins/withVoiceRoomBackground",
       "./plugins/withRongCloudPush",
       "./plugins/withRongCloudAndroidInit",
@@ -71,7 +64,7 @@
       [
         "expo-media-library",
         {
-          "photosPermission": "允许盼之电竞访问你的照片，用于选择头像及发送图片。",
+          "photosPermission": "允许盼之电竞访问你的照片，用于选择头像及上传图片。",
           "savePhotosPermission": false,
           "granularPermissions": ["photo"]
         }

@@ -35,6 +35,7 @@ let cancelConnectionAttempt: (() => void) | null = null;
 let connectionEpoch = 0;
 const conversationListeners = new Set<ConversationListener>();
 const conversationSyncListeners = new Set<() => void>();
+const conversationReadSyncListeners = new Set<(peerId: string, timestamp: number) => void>();
 const messageListeners = new Set<MessageListener>();
 const connectionStatusListeners = new Set<(signal: RongCloudConnectionSignal) => void>();
 const chatRoomMessageListeners = new Set<ChatRoomMessageListener>();
@@ -379,6 +380,15 @@ function installListeners() {
       chatRoomBlockedListeners.forEach((listener) => listener(event));
     }
   });
+  engine.setOnConversationReadStatusSyncMessageReceivedListener((type, targetId, timestamp) => {
+    const sdk = loadSdk();
+    const currentEngine = engine;
+    if (!sdk || !targetId || type !== sdk.RCIMIWConversationType.PRIVATE || !currentEngine) return;
+    // SDK 不会自动清本机未读，这里同步清掉，避免下次从快照加载又冒出来
+    void currentEngine.clearUnreadCount(type, targetId, '', timestamp).catch(() => undefined);
+    const peerId = normalizeSystemConversationId(targetId);
+    conversationReadSyncListeners.forEach((listener) => listener(peerId, timestamp));
+  });
   engine.setOnConnectionStatusChangedListener((status) => {
     publishConnectionStatus(status);
   });
@@ -605,6 +615,11 @@ export function subscribeRongConversationSync(listener: () => void) {
   return () => conversationSyncListeners.delete(listener);
 }
 
+export function subscribeRongConversationReadSync(listener: (peerId: string, timestamp: number) => void) {
+  conversationReadSyncListeners.add(listener);
+  return () => conversationReadSyncListeners.delete(listener);
+}
+
 export function subscribeRongMessages(onMessage: ConversationListener) {
   conversationListeners.add(onMessage);
   return () => conversationListeners.delete(onMessage);
@@ -711,8 +726,20 @@ export async function sendRongAfterSaleCard(targetId: string, payload: AfterSale
 export async function markRongConversationRead(targetId: string) {
   const sdk = loadSdk();
   if (!engine || !connected || !sdk || !targetId) return false;
-  const code = await engine.clearUnreadCount(sdk.RCIMIWConversationType.PRIVATE, getRongConversationTargetId(targetId), '', Date.now());
+  const rongTargetId = getRongConversationTargetId(targetId);
+  const code = await engine.clearUnreadCount(sdk.RCIMIWConversationType.PRIVATE, rongTargetId, '', Date.now());
   if (code !== 0) throw new Error(`清除未读失败（${code}）`);
+  // 上报服务端"已读至当前时间"，其他设备收到同步后清各自的未读数
+  const syncCode = await engine.syncConversationReadStatus(sdk.RCIMIWConversationType.PRIVATE, rongTargetId, '', Date.now(), {
+    onConversationReadStatusSynced: (result) => {
+      if (result !== 0) {
+        logger.warn('RongCloud conversation read status sync failed', { code: result, targetId });
+      }
+    },
+  });
+  if (syncCode !== 0) {
+    logger.warn('RongCloud conversation read status sync failed', { code: syncCode, targetId });
+  }
   return true;
 }
 
@@ -740,6 +767,7 @@ export async function disconnectRongCloud() {
   businessToken = '';
   conversationListeners.clear();
   conversationSyncListeners.clear();
+  conversationReadSyncListeners.clear();
   messageListeners.clear();
   connectionStatusListeners.clear();
 }

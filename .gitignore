@@ -51,6 +51,9 @@ example
 /android
 /apks
 
+# local scratch / 临时文件
+/temp
+
 # Expo module Android build outputs
 modules/*/android/build/
 modules/*/android/.gradle/

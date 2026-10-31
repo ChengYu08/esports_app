@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createMessageStore, type MessageAdapter } from './message-store';
 import type { ManagedMessage, MessageConversation, MessageHistoryPage } from './message-state';
+import { useInAppNotification } from './notification-hub';
 
 vi.mock('@/core/logging/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn() } }));
 vi.mock('@/features/auth/client-auth.api', () => ({
@@ -25,6 +26,7 @@ vi.mock('./rongcloud-im', () => ({
   setRongConversationPinned: vi.fn(),
   subscribeRongConnectionStatus: vi.fn(),
   subscribeRongConversationSync: vi.fn(),
+  subscribeRongConversationReadSync: vi.fn(),
   subscribeRongMessages: vi.fn(),
   subscribeRongMessageEvents: vi.fn(),
   disconnectRongCloud: vi.fn(),
@@ -228,6 +230,85 @@ describe('message store', () => {
     await store.getState().clearAllUnread();
     await store.getState().refreshConversations('token');
     expect(store.getState().conversations[0].unreadCount).toBe(2);
+    await store.getState().reset();
+  });
+
+  it('does not count own messages synced from other devices as unread', async () => {
+    let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
+    const store = createMessageStore(makeAdapter({
+      subscribeMessages: vi.fn((callback) => { receiveMessage = callback; return () => undefined; }),
+    }));
+    await store.getState().initialize('token');
+    // 换机后由离线补偿补回来的自己发出的消息，不产生未读，预览照常更新
+    receiveMessage?.('42', sentMessage, { ...conversation, preview: 'hello', updatedAt: 10 });
+    expect(store.getState().conversations[0]).toMatchObject({ id: '42', preview: 'hello', unreadCount: 0 });
+    receiveMessage?.('42', { ...sentMessage, isMine: false }, { ...conversation, preview: 'world', updatedAt: 11 });
+    expect(store.getState().conversations[0].unreadCount).toBe(1);
+    await store.getState().reset();
+  });
+
+  it('clears unread when another device reports the conversation as read', async () => {
+    let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
+    let reportRead: ((peerId: string, timestamp: number) => void) | undefined;
+    const store = createMessageStore(makeAdapter({
+      subscribeMessages: vi.fn((callback) => { receiveMessage = callback; return () => undefined; }),
+      subscribeReadSync: vi.fn((listener) => { reportRead = listener; return () => undefined; }),
+    }));
+    await store.getState().initialize('token');
+    receiveMessage?.('42', { ...sentMessage, isMine: false }, conversation);
+    expect(store.getState().conversations[0].unreadCount).toBe(1);
+    // 其他设备已读后服务端推送的同步通知，本机未读数随之清零
+    reportRead?.('42', 30);
+    expect(store.getState().conversations[0].unreadCount).toBe(0);
+    await store.getState().reset();
+  });
+
+  it('does not show in-app banner for compensated messages sent before this session', async () => {
+    let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
+    const adapter = makeAdapter({
+      subscribeMessages: (listener) => { receiveMessage = listener; return () => undefined; },
+    });
+    const store = createMessageStore(adapter);
+    useInAppNotification.getState().dismiss();
+    await store.getState().initialize('token');
+    // 模拟重装后离线补偿：sentAt 早于本次登录就绪时间
+    receiveMessage?.('42', { ...sentMessage, isMine: false, sentAt: 10 }, conversation);
+    expect(useInAppNotification.getState().notification).toBeNull();
+    // 不弹横幅但仍计入未读，列表红点正常
+    expect(store.getState().conversations[0]).toMatchObject({ id: '42', unreadCount: 1 });
+    await store.getState().reset();
+  });
+
+  it('shows in-app banner for live messages arriving after session ready', async () => {
+    let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
+    const adapter = makeAdapter({
+      subscribeMessages: (listener) => { receiveMessage = listener; return () => undefined; },
+    });
+    const store = createMessageStore(adapter);
+    useInAppNotification.getState().dismiss();
+    await store.getState().initialize('token');
+    receiveMessage?.('42', { ...sentMessage, isMine: false, sentAt: Date.now() + 1_000 }, conversation);
+    expect(useInAppNotification.getState().notification).toMatchObject({ peerId: '42' });
+    await store.getState().reset();
+  });
+
+  it('does not show in-app banner for messages arriving before the session is ready', async () => {
+    let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
+    let completeSnapshot!: (value: MessageConversation[]) => void;
+    const adapter = makeAdapter({
+      getConversations: vi.fn(() => new Promise<MessageConversation[]>((resolve) => { completeSnapshot = resolve; })),
+      subscribeMessages: (listener) => { receiveMessage = listener; return () => undefined; },
+    });
+    const store = createMessageStore(adapter);
+    useInAppNotification.getState().dismiss();
+    // 登录中（会话未就绪）收到的消息属于离线补偿，不弹横幅
+    const initializing = store.getState().initialize('token');
+    await vi.waitFor(() => expect(completeSnapshot).toBeDefined());
+    receiveMessage?.('42', { ...sentMessage, isMine: false, sentAt: Date.now() }, conversation);
+    expect(useInAppNotification.getState().notification).toBeNull();
+    expect(store.getState().conversations[0]).toMatchObject({ id: '42', unreadCount: 1 });
+    completeSnapshot([]);
+    await initializing;
     await store.getState().reset();
   });
 

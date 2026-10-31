@@ -22,18 +22,21 @@ const WINDOW_BG_DRAWABLE = `<?xml version="1.0" encoding="utf-8"?>
 `;
 
 /**
- * 把 Theme.App.SplashScreen 从「系统 SplashScreen API（中央小图标）」改为
- * 「windowBackground 全屏图」。这样 Android 12+ 不会再把启动图约束在中央小区域。
+ * 在保留 Theme.SplashScreen 继承（API < 31 需要 splashScreenIconSize 等 attr）的前提下，
+ * 用 android:windowBackground 铺全屏启动图，避免旧机 InflateException 闪退。
  */
 function setFullscreenSplashStyle(styles) {
   const { resources } = styles;
   const styleList = resources.style || [];
 
-  // 找到 Expo 生成的 Theme.App.SplashScreen，把 parent 改掉并替换 item
+  // 找到 Expo 生成的 Theme.App.SplashScreen，保留 SplashScreen parent 并补充全屏 windowBackground
   const target = styleList.find((s) => s.$?.name === 'Theme.App.SplashScreen');
   if (target) {
-    target.$.parent = 'Theme.AppCompat.DayNight.NoActionBar';
+    target.$.parent = 'Theme.SplashScreen';
     target.item = [
+      { $: { name: 'windowSplashScreenBackground' }, _: '@color/splashscreen_background' },
+      { $: { name: 'windowSplashScreenAnimatedIcon' }, _: '@drawable/splashscreen_logo' },
+      { $: { name: 'postSplashScreenTheme' }, _: '@style/AppTheme' },
       { $: { name: 'android:windowBackground' }, _: '@drawable/pz_splash_window' },
     ];
   } else {
