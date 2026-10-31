@@ -34,10 +34,10 @@
         {
           "image": "./assets/images/splash-screen.png",
           "resizeMode": "cover",
-          "backgroundColor": "#2A1013",
+          "backgroundColor": "#FFFFFF",
           "enableFullScreenImage_legacy": true,
           "android": {
-            "backgroundColor": "#2A1013",
+            "backgroundColor": "#FFFFFF",
             "image": "./assets/images/splash-screen.png",
             "resizeMode": "cover"
           }
