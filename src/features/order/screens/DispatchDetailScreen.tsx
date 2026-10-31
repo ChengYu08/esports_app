@@ -115,7 +115,7 @@ export function DispatchDetailScreen({ requestNo }: { requestNo: string }) {
               {cardItems.map((item, index) => (
                 <View key={`${item.label}-${index}`} style={styles.activityRow}>
                   <Text style={styles.activityLabel}>{item.label}</Text>
-                  <Text numberOfLines={1} style={styles.activityValue}>{item.value.text}</Text>
+                  <Text numberOfLines={1} style={styles.activityValue}>{item.value?.text ?? ""}</Text>
                 </View>
               ))}
             </View>

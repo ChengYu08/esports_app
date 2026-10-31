@@ -102,12 +102,19 @@ it("普通订单不输出活动字段，金额展示保持不变", () => {
   expect(order.totalPrice).toBe("500");
 });
 
-it("金额视角：买家合计取实付金额，陪玩合计取订单总价", () => {
+it("金额视角：普通订单陪玩侧仍取实付金额，活动订单陪玩侧取订单总价", () => {
   const raw = { id: 42, orderStatus: "PAID", totalPrice: 900, realPayAmount: 800 };
   expect(mapOrder(raw, 0, "place").totalPrice).toBe("800");
-  expect(mapOrder(raw, 0, "accept").totalPrice).toBe("900");
+  // 普通订单陪玩侧维持实付金额优先，后端意外输出 total≠实付时展示不变
+  expect(mapOrder(raw, 0, "accept").totalPrice).toBe("800");
   // 普通订单只有总价时两个视角都回落到总价，行为不变
   expect(mapOrder({ id: 42, orderStatus: "PAID", totalPrice: 500 }, 0, "accept").totalPrice).toBe("500");
+  // 活动订单（productId 存在）陪玩侧统一订单总价口径
+  expect(mapOrder({ ...raw, productId: 11 }, 0, "accept").totalPrice).toBe("900");
+  // discountAmount 为 0 也算活动字段（字段存在即活动订单）
+  expect(mapOrder({ ...raw, discountAmount: 0 }, 0, "accept").totalPrice).toBe("900");
+  // refundBaseAmount 存在同样视为活动订单
+  expect(mapOrder({ ...raw, refundBaseAmount: 900 }, 0, "accept").totalPrice).toBe("900");
 });
 
 it("免单提交口径：活动订单按原价退款基数折算，普通订单维持时长×单价计算值", () => {

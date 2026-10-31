@@ -50,9 +50,15 @@ export function mapOrder(
     : "pendingPayment";
   const id = stringValue(item, "id", "orderId", "orderNo") ?? `order-${index}`;
   // PRD 金额口径：买家视角合计=实付金额(realPayAmount)，陪玩视角=订单总价(totalPrice)。
-  // 普通订单两者相等展示不变；活动订单陪玩侧看原价、买家侧看折后实付。
+  // 活动订单（带活动字段）陪玩侧统一订单总价口径；普通订单保持实付金额优先，
+  // 后端意外输出 realPayAmount≠totalPrice 时普通订单展示不变。
+  const isActivityOrder = numberValue(item, "discountAmount") !== undefined
+    || numberValue(item, "refundBaseAmount") !== undefined
+    || numberValue(item, "productId") !== undefined;
   const total = scope === "accept"
-    ? stringValue(item, "totalPrice", "realPayAmount", "payAmount", "amount") ?? "0"
+    ? (isActivityOrder
+      ? stringValue(item, "totalPrice", "realPayAmount", "payAmount", "amount") ?? "0"
+      : stringValue(item, "realPayAmount", "totalPrice", "payAmount", "amount") ?? "0")
     : stringValue(item, "realPayAmount", "totalPrice", "payAmount", "amount") ?? "0";
   // 接口分别返回模式、等级和服务，不能只取服务名或用旧标题覆盖。
   const serviceParts = ["gameModeName", "gameLevelName", "serviceName"]

@@ -128,6 +128,12 @@ describe("isOwnActiveActivityRequest（语聊房「派单匹配中」判定）",
     expect(isOwnActiveActivityRequest(activeActivity({ publishSource: undefined }), activityUser)).toBe(false);
   });
 
+  it("publishSource 缺省但 activityCode 非空（与详情页判定同源）→ true", () => {
+    expect(
+      isOwnActiveActivityRequest(activeActivity({ publishSource: undefined, activityCode: "SECKILL001" }), activityUser),
+    ).toBe(true);
+  });
+
   it("已结束（status 非 MATCHING）→ false", () => {
     expect(isOwnActiveActivityRequest(activeActivity({ status: "ORDERED" }), activityUser)).toBe(false);
     expect(isOwnActiveActivityRequest(activeActivity({ status: "CANCELLED" }), activityUser)).toBe(false);
