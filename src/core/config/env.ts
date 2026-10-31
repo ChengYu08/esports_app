@@ -31,12 +31,10 @@ const defaultProtocolBaseUrl =
 export const env = envSchema.parse({
   apiBaseUrl: isIos
     ? (extra.apiBaseUrlIos ?? process.env.EXPO_PUBLIC_API_BASE_URL_IOS)
-    : (extra.apiBaseUrlAndroid ??
-      process.env.EXPO_PUBLIC_API_BASE_URL_ANDROID),
+    : (extra.apiBaseUrlAndroid ?? process.env.EXPO_PUBLIC_API_BASE_URL_ANDROID),
   ssoBaseUrl: isIos
     ? (extra.ssoBaseUrlIos ?? process.env.EXPO_PUBLIC_SSO_BASE_URL_IOS)
-    : (extra.ssoBaseUrlAndroid ??
-      process.env.EXPO_PUBLIC_SSO_BASE_URL_ANDROID),
+    : (extra.ssoBaseUrlAndroid ?? process.env.EXPO_PUBLIC_SSO_BASE_URL_ANDROID),
   protocolBaseUrl:
     extra.protocolBaseUrl ??
     process.env.EXPO_PUBLIC_PROTOCOL_BASE_URL ??
@@ -56,6 +54,12 @@ export const env = envSchema.parse({
   rongCloudAppKey:
     extra.rongCloudAppKey ?? process.env.EXPO_PUBLIC_RONGCLOUD_APP_KEY,
   agoraAppId: extra.agoraAppId ?? process.env.EXPO_PUBLIC_AGORA_APP_ID,
-  alipayAppId:
-    extra.alipayAppId ?? process.env.EXPO_PUBLIC_ALIPAY_APP_ID,
+  alipayAppId: extra.alipayAppId ?? process.env.EXPO_PUBLIC_ALIPAY_APP_ID,
 });
+
+console.log("[ENV-CHECK]", JSON.stringify({
+  environment: env.environment,
+  apiBaseUrl: env.apiBaseUrl,
+  ssoBaseUrl: env.ssoBaseUrl,
+  protocolBaseUrl: env.protocolBaseUrl,
+}));
