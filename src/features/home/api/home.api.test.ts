@@ -5,6 +5,10 @@ import { fetchBanners, fetchClubPage, fetchCompanionPage, fetchGameCategories, f
 
 vi.mock("@/core/network/api-client", () => ({ apiClient: vi.fn() }));
 
+// home.api 依赖的 home-banner.contract 运行时引用 react-native，node 测试环境无法加载，这里桩掉。
+// 本套件不触达 Platform 取值，桩值仅用于阻断 react-native 进入 import 图。
+vi.mock("react-native", () => ({ Platform: { OS: "ios" } }));
+
 afterEach(() => vi.clearAllMocks());
 
 describe("首页活动轮播下发", () => {

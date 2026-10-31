@@ -48,7 +48,6 @@ describe("parseBannerJump 按端跳转协议", () => {
   });
 
   it("ANDROID 端取 ANDROID 配置解析为路由动作", () => {
-    platformState.os = "android";
     expect(parseBannerJump(jumpJson)).toEqual({ type: "route", path: "/clubs", params: { id: "1" } });
   });
 
