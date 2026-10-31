@@ -14,6 +14,12 @@ const envSchema = z.object({
   aliyunIosAuthKey: z.string().default(""),
   aliyunAndroidAuthKey: z.string().default(""),
   rongCloudAppKey: z.string().default(""),
+  miPushAppId: z.string().default(""),
+  miPushAppKey: z.string().default(""),
+  meizuPushAppId: z.string().default(""),
+  meizuPushAppKey: z.string().default(""),
+  oppoPushAppKey: z.string().default(""),
+  oppoPushAppSecret: z.string().default(""),
   agoraAppId: z.string().default(""),
   alipayAppId: z.string().default(""),
 });
@@ -53,6 +59,12 @@ export const env = envSchema.parse({
     process.env.EXPO_PUBLIC_ALIYUN_ANDROID_AUTH_KEY,
   rongCloudAppKey:
     extra.rongCloudAppKey ?? process.env.EXPO_PUBLIC_RONGCLOUD_APP_KEY,
+  miPushAppId: extra.miPushAppId ?? process.env.EXPO_PUBLIC_MI_PUSH_APP_ID,
+  miPushAppKey: extra.miPushAppKey ?? process.env.EXPO_PUBLIC_MI_PUSH_APP_KEY,
+  meizuPushAppId: extra.meizuPushAppId ?? process.env.EXPO_PUBLIC_MEIZU_PUSH_APP_ID,
+  meizuPushAppKey: extra.meizuPushAppKey ?? process.env.EXPO_PUBLIC_MEIZU_PUSH_APP_KEY,
+  oppoPushAppKey: extra.oppoPushAppKey ?? process.env.EXPO_PUBLIC_OPPO_PUSH_APP_KEY,
+  oppoPushAppSecret: extra.oppoPushAppSecret ?? process.env.EXPO_PUBLIC_OPPO_PUSH_APP_SECRET,
   agoraAppId: extra.agoraAppId ?? process.env.EXPO_PUBLIC_AGORA_APP_ID,
   alipayAppId: extra.alipayAppId ?? process.env.EXPO_PUBLIC_ALIPAY_APP_ID,
 });

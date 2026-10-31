@@ -64,6 +64,9 @@
         }
       ],
       "./plugins/withVoiceRoomBackground",
+      "./plugins/withRongCloudPush",
+      "./plugins/withRongCloudAndroidInit",
+      "./plugins/withRongCloudIosPush",
       [
         "expo-media-library",
         {
@@ -88,7 +91,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.esportsapp.apps",
       "infoPlist": {
-        "UIBackgroundModes": ["audio"],
+        "UIBackgroundModes": ["audio", "remote-notification"],
         "NSMicrophoneUsageDescription": "用于在语聊房中进行语音交流。"
       }
     },

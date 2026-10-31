@@ -62,7 +62,6 @@ export async function joinVoiceRtc(options: {
     onUserJoined: (_connection, uid) => {
       const userId = String(uid);
       remoteUserIds.add(userId);
-      if (__DEV__) console.log("[voice-rtc] onUserJoined:", userId);
       activeCallbacks?.onUserJoined?.(userId);
     },
     onUserOffline: (_connection, uid) => {
@@ -72,13 +71,10 @@ export async function joinVoiceRtc(options: {
     },
     onUserMuteAudio: (_connection, uid, muted) => activeCallbacks?.onUserMuted?.(String(uid), muted),
     onRemoteAudioStateChanged: (_connection, uid, state) => {
-      if (__DEV__) console.log("[voice-rtc] onRemoteAudioStateChanged:", String(uid), "state:", state);
       // Starting/Decoding 说明对端音频流真实到达，即使漏掉 mute 广播也能据此纠正麦位状态
       if (state === 1 || state === 2) activeCallbacks?.onRemoteAudioActive?.(String(uid));
     },
-    onAudioVolumeIndication: (_connection, speakers, speakerNumber, totalVolume) => {
-      if (__DEV__ && speakerNumber > 0)
-        console.log("[voice-rtc] volume:", JSON.stringify(speakers.map((s) => ({ uid: s.uid, volume: s.volume }))), "count:", speakerNumber, "total:", totalVolume);
+    onAudioVolumeIndication: (_connection, speakers) => {
       activeCallbacks?.onSpeakingChanged?.(
         speakers.filter((speaker) => (speaker.volume ?? 0) > 20).map((speaker) => String(speaker.uid)),
       );

@@ -9,6 +9,7 @@ import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AppState,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
@@ -41,7 +42,7 @@ import { OrderNotifyCard } from "../components/OrderNotifyCard";
 import { touchCustomerServiceSession } from "../customer-service.api";
 import { resolveConversationAvatar } from "../message-avatar";
 import type { ManagedMessage } from "../message-state";
-import { useMessageStore } from "../message-store";
+import { messageStore, useMessageStore } from "../message-store";
 import { getConversationDisplayTitle } from "../message-title";
 import {
   getSystemConversationTitle,
@@ -206,6 +207,20 @@ export default function ChatScreen() {
       if (accessToken) void refreshOnlineStatuses(accessToken);
     }, [accessToken, refreshOnlineStatuses]),
   );
+  // 前后台/覆盖与 openConversation 的 activePeerId 解耦：页面被覆盖或退后台时
+  // activePeerId 仍在，但必须退出"已读"状态，否则新消息未读会被静默清零。
+  useFocusEffect(
+    useCallback(() => {
+      messageStore.getState().setChatForeground(true);
+      return () => messageStore.getState().setChatForeground(false);
+    }, []),
+  );
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      messageStore.getState().setChatForeground(state === "active");
+    });
+    return () => subscription.remove();
+  }, []);
   const isOrderAssistant = isOrderAssistantConversationId(conversationId);
   const isDispatchAssistant = isDispatchAssistantConversationId(conversationId);
   const isPinned = Boolean(conversation?.isPinned);

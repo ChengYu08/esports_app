@@ -47,7 +47,17 @@ function getRuntimeConfig() {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     return require('../../core/config/env') as typeof import('../../core/config/env');
   } catch {
-    return { env: { rongCloudAppKey: '' } };
+    return {
+      env: {
+        rongCloudAppKey: '',
+        miPushAppId: '',
+        miPushAppKey: '',
+        meizuPushAppId: '',
+        meizuPushAppKey: '',
+        oppoPushAppKey: '',
+        oppoPushAppSecret: '',
+      },
+    };
   }
 }
 
@@ -436,7 +446,19 @@ async function connectRongCloudOnce(accessToken: string, attemptEpoch: number) {
       }
       stage = 'engine-init';
       const { env } = getRuntimeConfig();
-      engine = sdk.RCIMIWEngine.create(env.rongCloudAppKey);
+      engine = sdk.RCIMIWEngine.create(env.rongCloudAppKey, {
+        enablePush: true,
+        pushOptions: {
+          idMI: env.miPushAppId || undefined,
+          appKeyMI: env.miPushAppKey || undefined,
+          appIdMeizu: env.meizuPushAppId || undefined,
+          appKeyMeizu: env.meizuPushAppKey || undefined,
+          appKeyOPPO: env.oppoPushAppKey || undefined,
+          appSecretOPPO: env.oppoPushAppSecret || undefined,
+          enableHWPush: true,
+          enableVIVOPush: true,
+        },
+      });
       // Server notifications use this envelope; ORDER_NOTIFY is its name field.
       await engine.registerNativeCustomMessage(
         'RC:CustomMsg',
