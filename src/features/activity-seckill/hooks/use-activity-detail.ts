@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useQuery } from "@tanstack/react-query";
 
 import { fetchActivityDetail } from "../api/activity.api";
+import { initCountdownState } from "./countdown";
 
 export const activityDetailQueryKey = (activityCode: string) =>
   ["activity-seckill", "detail", activityCode] as const;
@@ -17,20 +18,25 @@ export function useActivityDetail(activityCode: string) {
 }
 
 /**
- * 倒计时 hook：用 detail.serverTime 校准本地时钟 offset，本地 1s tick。
+ * 倒计时 hook：用 detail.serverTime 校准本地时钟 offset（useMemo 以 serverTime 为稳定基准，
+ * 数据到达时计算一次），本地 1s tick 仅更新 nowMs。
  * 不轮询库存，剩余名额以进页时快照为准。
+ * 纯时间推进逻辑见 ./countdown（initCountdownState / tickCountdown）。
  */
 export function useActivityCountdown(serverTime?: string) {
   const [nowMs, setNowMs] = useState(() => Date.now());
-  // offset = serverTime - Date.now()，无有效 serverTime 时为 0（按本地时钟）。
   const [offsetMs, setOffsetMs] = useState(0);
+  // 记录已校准过的 serverTime：每个值只校准一次 offset，后续 tick 不再重算（重算会冻结倒计时）。
+  const calibratedRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      // 每次心跳重算 offset，自动吸收详情异步到达后的 serverTime 校准。
-      const serverMs = serverTime ? Date.parse(serverTime) : Number.NaN;
-      setOffsetMs(Number.isFinite(serverMs) ? serverMs - Date.now() : 0);
-      setNowMs(Date.now());
+      const localNowMs = Date.now();
+      setNowMs(localNowMs);
+      if (calibratedRef.current !== serverTime) {
+        calibratedRef.current = serverTime;
+        setOffsetMs(initCountdownState(serverTime, localNowMs).offsetMs);
+      }
     }, 1000);
     return () => {
       clearInterval(timer);
@@ -40,12 +46,4 @@ export function useActivityCountdown(serverTime?: string) {
   return useMemo(() => ({ nowMs, offsetMs }), [nowMs, offsetMs]);
 }
 
-/** 剩余毫秒数格式化为 HH:mm:ss（小时可超过两位）。 */
-export function formatCountdown(remainingMs: number): string {
-  const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000));
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
-}
+export { formatCountdown } from "./countdown";

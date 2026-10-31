@@ -103,7 +103,8 @@ export default function SeckillLandingScreen({ activityCode }: { activityCode: s
     if (computed.status !== "ACTIVE") {
       return;
     }
-    if (!token || !requireLogin()) {
+    // 登录判断只走 requireLogin（未登录会跳登录页）；!token 仅为通过后的类型收窄。
+    if (!requireLogin() || !token) {
       return;
     }
     setPublishing(true);
