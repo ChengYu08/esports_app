@@ -131,8 +131,9 @@ export default function ClubDetailScreen() {
             priceSort,
             sex: selectedSex,
             gameStatus: selectedStatus,
-            // 空闲中=gameStatus 0 且必须在线；离线用户仅在状态不限时展示。
-            onlineOnly: selectedStatus === 0 ? true : undefined,
+            // 空闲中/游戏中都必须在线：离线用户的 gameStatus 不可信（可能残留为 1），
+            // 只传 gameStatus 会把离线数据混进状态筛选；离线用户仅在状态不限时展示。
+            onlineOnly: selectedStatus !== undefined ? true : undefined,
             gameModeId: selectedMode,
             gameLevelId: selectedLevel,
           }

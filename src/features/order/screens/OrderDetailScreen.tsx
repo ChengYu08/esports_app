@@ -18,8 +18,8 @@ import { formatOrderFreeSummary } from "@/features/order/free-amount";
 import { useOrderDetailActions } from "@/features/order/hooks/use-order-detail-actions";
 import { getOrderDetailAction } from "@/features/order/order-detail-actions";
 import { formatOrderTime } from "@/features/order/order-detail-format";
-import { orderDetailQueryKey } from "@/features/order/order-query";
-import { fetchOrderDetail, mapOrder } from "@/features/order/order.api";
+import { orderClubQueryKey, orderDetailQueryKey } from "@/features/order/order-query";
+import { fetchOrderClub, fetchOrderDetail, mapOrder } from "@/features/order/order.api";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 
@@ -61,6 +61,15 @@ export function OrderDetailScreen({
     scope,
     refetch: detail.refetch,
   });
+  // 详情接口只回 companionClubId，俱乐部名另查公开详情（有缓存）。
+  const clubId = detail.data?.clubId;
+  const clubQuery = useQuery({
+    queryKey: orderClubQueryKey(clubId ?? 0),
+    queryFn: ({ signal }) => fetchOrderClub(clubId as number, signal),
+    enabled: clubId != null,
+    staleTime: 10 * 60_000,
+    retry: 1,
+  });
   const [clock, setClock] = useState(() => Date.now());
   const dispatchDeadline = detail.data?.dispatchDeadline;
   useEffect(() => {
@@ -92,6 +101,7 @@ export function OrderDetailScreen({
     );
   }
   const order = detail.data;
+  const clubName = order.clubName ?? clubQuery.data?.name;
   const isCompleted =
     order.status === "completed" || order.status === "partiallyRefunded";
   const detailAction = getOrderDetailAction(order.actions);
@@ -205,6 +215,7 @@ export function OrderDetailScreen({
         <OrderDetailInfoBlocks
           order={order}
           scope={scope}
+          clubName={clubName}
           orderNumber={orderNumber}
           onCopy={actions.copyOrderNumber}
           onChat={actions.handleChat}

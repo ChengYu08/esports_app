@@ -16,9 +16,12 @@ const icons = {
 
 export function ClubCard({
   club,
+  onlineCount = club.onlineCount,
   onSelect,
 }: {
   club: Club;
+  /** 在线陪玩人数，null 表示尚未获取；未传时使用俱乐部自身的统计。 */
+  onlineCount?: number | null;
   onSelect?: (club: Club) => void;
 }) {
   const colors = ["#24354b", "#4a2637", "#2e4650", "#493e2e"];
@@ -70,7 +73,7 @@ export function ClubCard({
           </Text>
           <View style={styles.online}>
             <View style={styles.onlineDot} />
-            <Text style={styles.onlineText}>{club.onlineCount}人</Text>
+            <Text style={styles.onlineText}>{onlineCount ?? "--"}人</Text>
           </View>
         </View>
         <Text numberOfLines={1} style={styles.desc}>

@@ -239,6 +239,9 @@ export async function fetchClubPage(filters: ClubFilters, page: number, pageSize
       clubCode: String(club.id),
       isSelfOperated: club.clubName?.includes('自营') ?? false,
       clubTag: club.clubTag || undefined,
+      gameIds: Array.from(new Set((club.clubGames ?? [])
+        .filter((item) => item.status !== 0)
+        .map((item) => item.gameId))),
       // 列表接口已带 clubGames（游戏图标），卡片上展示主打游戏。
       games: (club.clubGames ?? [])
         .filter((item) => item.status !== 0 && item.iconUrl)
@@ -251,4 +254,30 @@ export async function fetchClubPage(filters: ClubFilters, page: number, pageSize
     hasMore: (data?.page ?? page) < (data?.totalPages ?? page),
     nextPage: page + 1,
   };
+}
+
+/** 按详情页相同的服务条件查询在线陪玩，跨游戏按用户去重，不统计普通在线成员。 */
+export async function fetchClubOnlineCount(clubId: string, gameIds: readonly number[], signal?: AbortSignal): Promise<number> {
+  const onlineUsers = new Set<number>();
+  // 同一俱乐部的游戏依次查询，避免首页每张卡片同时发起大量请求。
+  for (const gameId of new Set(gameIds)) {
+    let page = 1;
+    let totalPages = 1;
+    do {
+      const response = await apiClient<ApiEnvelope<ApiCompanionPage>>("/client/v1/companion/public/page", {
+        method: "POST",
+        body: { page, pageSize: 50, action: { clubId: Number(clubId), gameId, onlineOnly: true } },
+        signal,
+      });
+      const data = requireSuccess(response, "在线陪玩人数加载失败");
+      for (const companion of data.records ?? []) {
+        if (companion.onlineStatus === 1) {
+          onlineUsers.add(companion.userId ?? companion.profileId);
+        }
+      }
+      totalPages = data.totalPages ?? 1;
+      page += 1;
+    } while (page <= totalPages);
+  }
+  return onlineUsers.size;
 }

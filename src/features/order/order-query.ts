@@ -12,6 +12,10 @@ export function orderDetailQueryKey(
     : (["order-detail", String(orderId)] as const);
 }
 
+export function orderClubQueryKey(clubId: string | number) {
+  return ["order-club", String(clubId)] as const;
+}
+
 export async function invalidateOrderQueries(orderId?: string | number) {
   await queryClient.invalidateQueries({
     queryKey: ["orders"],
