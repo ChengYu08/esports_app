@@ -15,6 +15,12 @@ describe('RongCloud private command routing', () => {
     });
   });
 
+  it('carries sentTime from the sdk message when present', () => {
+    expect(parseRongCommand({ ...message, sentTime: 1_792_128_600_000 }, enums)?.sentTime)
+      .toBe(1_792_128_600_000);
+    expect(parseRongCommand(message, enums)?.sentTime).toBeUndefined();
+  });
+
   it.each([
     { conversationType: 4 }, { messageType: 1 }, { data: '{invalid' }, { data: 'null' }, { data: '[]' },
   ])('ignores non-private commands and malformed data: %j', (overrides) => {
