@@ -1,4 +1,3 @@
-import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
@@ -9,6 +8,7 @@ import { usePriceList } from "../hooks/use-home-data";
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 export default function PriceListScreen() {
   const insets = useSafeAreaInsets();
@@ -49,13 +49,12 @@ export default function PriceListScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={[styles.nav, { paddingTop: insets.top, height: insets.top + 44 }]}>
-        <Pressable accessibilityLabel="返回" hitSlop={10} onPress={() => router.back()} style={styles.navSide}>
-          <ChevronLeft24Regular color="#0A0A0A" width={24} height={24} style={styles.backIcon} />
-        </Pressable>
-        <Text style={styles.navTitle}>价目表</Text>
-        <View style={styles.navSide} />
-      </View>
+      <ScreenHeader
+        title="价目表"
+        onBack={() => router.back()}
+        titleStyle={styles.navTitle}
+        style={{ paddingTop: insets.top, height: insets.top + 44 }}
+      />
       {tabs.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabs}>
           {tabs.map((tab, index) => (
@@ -93,10 +92,9 @@ function PriceImage({ uri, onPress }: { uri: string; onPress: () => void }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#fff" },
-  nav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#fff" },
-  navSide: { width: 56, height: 44, paddingLeft: 12, justifyContent: "center" },
-  backIcon: { width: 24, height: 24 },
-  navTitle: { flex: 1, color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 16, lineHeight: 24, fontWeight: "500", textAlign: "center" },
+  // 原 flex:1 是行内布局里横向铺满用的，ScreenHeader 的 titleWrap 已自适配宽度；
+  // 传入后反而会让 Text 在纵向撑满页头导致标题上移，故删除
+  navTitle: { color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 16, lineHeight: 24, fontWeight: "500", textAlign: "center" },
   tabsScroll: { flexGrow: 0, height: 54, backgroundColor: "#fff" },
   tabs: { minWidth: "100%", paddingHorizontal: 16, justifyContent: "space-around", backgroundColor: "#fff" },
   tab: {

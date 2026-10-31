@@ -14,6 +14,7 @@ import {
 } from "@/features/court/court.api";
 import { COURT_FONT_FAMILY } from "@/features/court/court.theme";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { useAuthStore } from "@esports/auth";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import * as Clipboard from "expo-clipboard";
@@ -184,17 +185,13 @@ export default function CourtDetailScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={[styles.header, { height: 44 + insets.top, paddingTop: insets.top }]}>
-        <Pressable
-          accessibilityLabel="返回"
-          onPress={() => router.back()}
-          style={styles.back}
-        >
-          <Text style={styles.backText}>‹</Text>
-        </Pressable>
-        <Text style={styles.headerTitle}>评审详情</Text>
-        <View style={styles.back} />
-      </View>
+      <ScreenHeader
+        title="评审详情"
+        onBack={() => router.back()}
+        backIconColor="#0D0D0F"
+        titleStyle={styles.headerTitle}
+        style={{ paddingTop: insets.top, height: insets.top + 44, paddingHorizontal: 12 }}
+      />
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -457,20 +454,6 @@ function caseTypeLabel(code?: string) {
 }
 const styles = StyleSheet.create({
   screen: { backgroundColor: "#F5F6F7", flex: 1 },
-  header: {
-    alignItems: "center",
-    backgroundColor: "#fff",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-  },
-  back: {
-    alignItems: "center",
-    height: 36,
-    justifyContent: "center",
-    width: 36,
-  },
-  backText: { color: "#0D0D0F", fontSize: 32, lineHeight: 34 },
   headerTitle: {
     color: "#0D0D0F",
     fontFamily: COURT_FONT_FAMILY,

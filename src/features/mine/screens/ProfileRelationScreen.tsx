@@ -1,5 +1,5 @@
 import { useAuthStore } from "@esports/auth";
-import { ChevronLeft24Regular, Person24Regular } from "@fluentui/react-native-icons";
+import { Person24Regular } from "@fluentui/react-native-icons";
 import { useLocalSearchParams, router } from "expo-router";
 import { useState } from "react";
 import {
@@ -25,6 +25,7 @@ import { requireLogin } from "@/shared/navigation/require-login";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { EmptyState, ErrorState } from "@/shared/ui/AsyncStates";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 const fallbackAvatar = require("../../../../assets/coms/avatar_default.webp");
 
@@ -112,22 +113,10 @@ export default function ProfileRelationScreen() {
 
   return (
     <View style={styles.screen}>
-      <View
-        style={[
-          styles.header,
-          { height: 44 + insets.top, paddingTop: insets.top },
-        ]}
-      >
-        <View style={styles.nav}>
-          <Pressable
-            accessibilityLabel="返回"
-            accessibilityRole="button"
-            hitSlop={12}
-            onPress={() => router.back()}
-            style={styles.backButton}
-          >
-            <ChevronLeft24Regular color="#0A0A0A" width={24} height={24} style={styles.backIcon} />
-          </Pressable>
+      <ScreenHeader
+        title=""
+        onBack={() => router.back()}
+        right={
           <View style={styles.tabBar}>
             <Pressable
               accessibilityRole="tab"
@@ -159,9 +148,9 @@ export default function ProfileRelationScreen() {
               {type === "fans" ? <View style={styles.tabIndicator} /> : null}
             </Pressable>
           </View>
-          <View style={styles.headerSpace} />
-        </View>
-      </View>
+        }
+        style={{ paddingTop: insets.top, height: insets.top + 44 }}
+      />
 
       <FlatList
         data={items}
@@ -302,26 +291,16 @@ export default function ProfileRelationScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#FFFFFF" },
-  header: { backgroundColor: "#FFFFFF" },
-  nav: {
-    height: 44,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  backButton: {
-    width: 48,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  backIcon: { width: 24, height: 24 },
+  // 标签组放 right 插槽：alignSelf 拉满剩余宽度，paddingRight 抵消左侧 48 的返回键宽度，
+  // 使「关注/粉丝」在屏幕水平居中（与原 nav + headerSpace 48 的布局一致）
   tabBar: {
-    flex: 1,
+    alignSelf: "stretch",
     height: 44,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 36,
+    paddingRight: 48,
   },
   tab: {
     height: 44,
@@ -348,7 +327,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: "#E62336",
   },
-  headerSpace: { width: 48, height: 44 },
   listContent: { paddingHorizontal: 16 },
   emptyContent: { flexGrow: 1 },
   row: {

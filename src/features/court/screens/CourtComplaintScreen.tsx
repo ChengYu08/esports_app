@@ -1,4 +1,3 @@
-import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import {
   toUploadItems,
   useCaseDetail,
@@ -43,6 +42,7 @@ import {
   View,
 } from "react-native";
 import { showToast, toastDurations } from "@/shared/ui/app-toast";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Mode = "court" | "ticket" | "evidence" | "appeal";
@@ -366,24 +366,18 @@ export default function CourtComplaintScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       style={styles.screen}
     >
-      <View
-        style={[
-          styles.header,
-          { paddingTop: insets.top, height: insets.top + 44 },
-        ]}
-      >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="返回"
-          disabled={submitting}
-          onPress={() => router.back()}
-          style={styles.back}
-        >
-          <ChevronLeft24Regular color="#0D0D0F" width={24} height={24} style={styles.backIcon} />
-        </Pressable>
-        <Text style={styles.headerTitle}>{title}</Text>
-        <View style={styles.back} />
-      </View>
+      <ScreenHeader
+        title={title}
+        onBack={() => {
+          // 提交中保持返回键可见但不响应，与原 disabled={submitting} 行为一致
+          if (!submitting) {
+            router.back();
+          }
+        }}
+        backIconColor="#0D0D0F"
+        titleStyle={styles.headerTitle}
+        style={{ paddingTop: insets.top, height: insets.top + 44, paddingHorizontal: 16 }}
+      />
       <ScrollView
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
