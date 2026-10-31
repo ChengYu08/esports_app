@@ -57,6 +57,10 @@
       "./plugins/withPushyDeepLink",
       "./plugins/withPzOneClickLibs",
       "./plugins/withVoiceRoomBackground",
+      "./plugins/withRongCloudPush",
+      "./plugins/withRongCloudAndroidInit",
+      "./plugins/withRongCloudAndroidPushClick",
+      "./plugins/withRongCloudIosPush",
       [
         "expo-media-library",
         {
@@ -79,9 +83,9 @@
     "owner": "chengyu08s-team",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.esportsapp.apps",
+      "bundleIdentifier": "com.spacewhisp.apps",
       "infoPlist": {
-        "UIBackgroundModes": ["audio"],
+        "UIBackgroundModes": ["audio", "remote-notification"],
         "NSMicrophoneUsageDescription": "用于在语聊房中进行语音交流。"
       }
     },

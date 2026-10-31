@@ -96,7 +96,8 @@
     "build:apk:init-signing": "node scripts/build_apk.cjs --init-signing",
     "build:apk:test": "node scripts/build_apk.cjs --env test --abi arm64",
     "build:apk:test:universal": "node scripts/build_apk.cjs --env test --abi universal",
-    "build:apk:prod": "node scripts/build_apk.cjs --abi arm64"
+    "build:apk:prod": "node scripts/build_apk.cjs --abi arm64",
+    "check":"tsc --noEmit"
   },
   "private": true,
   "workspaces": [

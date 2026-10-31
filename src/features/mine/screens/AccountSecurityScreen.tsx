@@ -21,6 +21,10 @@ export default function AccountSecurityScreen() {
     router.push("/real-name-verification");
   };
 
+  const openChangePassword = () => {
+    router.push("/change-password");
+  };
+
   return (
     <View style={styles.screen}>
       <View
@@ -71,6 +75,18 @@ export default function AccountSecurityScreen() {
             {phone ? "（已绑定）" : ""}
           </Text>
         </View>
+        <View style={styles.divider} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="修改密码"
+          onPress={openChangePassword}
+          style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+        >
+          <Text style={styles.label}>修改密码</Text>
+          <View style={styles.rowRight}>
+            <Image source={arrowIcon} style={styles.arrow} />
+          </View>
+        </Pressable>
       </View>
       <Pressable
         accessibilityRole="button"

@@ -6,7 +6,7 @@ private let quickLoginTag = "[DEBUG-QUICK-LOGIN]"
 #if DEBUG
 private let protocolBaseURL = "https://djpc.yingbowl.com"
 #else
-private let protocolBaseURL = "https://dj.panzhi.com"
+private let protocolBaseURL = "https://djpc.jlgkj.top"
 #endif
 private let userAgreementURL = "\(protocolBaseURL)/public/protocols?code=user_server"
 private let privacyPolicyURL = "\(protocolBaseURL)/public/protocols?code=user_privacy"
@@ -134,7 +134,6 @@ public class PzOneClickModule: Module {
     // Figma 设计稿颜色常量
     let brandPrimary = UIColor(red: 254.0 / 255, green: 31.0 / 255, blue: 76.0 / 255, alpha: 1) // #FE1F4C
     let gray1 = UIColor(red: 26.0 / 255, green: 26.0 / 255, blue: 26.0 / 255, alpha: 1)         // #1A1A1A
-    let gray3 = UIColor(red: 153.0 / 255, green: 153.0 / 255, blue: 153.0 / 255, alpha: 1)      // #999999
     let gray9 = UIColor(red: 128.0 / 255, green: 128.0 / 255, blue: 128.0 / 255, alpha: 1)      // #808080
     let linkBlue = UIColor(red: 27.0 / 255, green: 106.0 / 255, blue: 224.0 / 255, alpha: 1)    // #1B6AE0
 
@@ -216,14 +215,6 @@ public class PzOneClickModule: Module {
     model.privacyNavTitleColor = gray1
     model.privacyNavTitleFont = .systemFont(ofSize: 18, weight: .semibold)
     model.privacyNavBackImage = Self.makeBackArrowImage(color: gray1)
-    // 「验证码或密码登录」样式：12pt #999999
-    model.swithText = NSAttributedString(
-      string: "验证码或密码登录",
-      attributes: [
-        .foregroundColor: gray3,
-        .font: UIFont.systemFont(ofSize: 12),
-      ]
-    )
     // SDK 仅一个切换入口，已用于「暂不登录」，隐藏的 changeBtn 不再重复暴露
     model.changeBtnIsHidden = true
     return model

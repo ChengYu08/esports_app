@@ -88,10 +88,13 @@ export type MessageStoreState = {
   historyByPeerId: Record<string, HistoryState>;
   openPeerIds: string[];
   activePeerId: string | null;
+  /** 聊天界面是否在前台可见；activePeerId 在页面被覆盖/退后台时仍保留，已读判断必须叠加此项 */
+  chatForeground: boolean;
   lastError: string | null;
   refreshOnlineStatuses: (token: string) => Promise<void>;
   refreshConversations: (token: string) => Promise<void>;
   initialize: (token: string) => Promise<void>;
+  setChatForeground: (visible: boolean) => void;
   openConversation: (conversation: Pick<MessageConversation, 'id' | 'title' | 'avatar' | 'clubId' | 'isCustomerService'>) => Promise<void>;
   closeConversation: (peerId?: string) => void;
   loadOlder: (peerId: string) => Promise<void>;
@@ -207,7 +210,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
     const receiveMessage = (peerId: string, message: ManagedMessage, conversation: MessageConversation) => {
       const normalizedPeerId = normalizeSystemConversationId(peerId);
       const normalizedConversationTitle = getSystemConversationTitle(normalizedPeerId, conversation.title);
-      const isActive = get().activePeerId === normalizedPeerId;
+      const isActive = get().activePeerId === normalizedPeerId && get().chatForeground;
       const preview = messagePreview(message);
       logger.info('message.new', {
         peerId: normalizedPeerId,
@@ -258,11 +261,26 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           unreadCount: isActive ? 0 : message.isMine ? (existing?.unreadCount || 0) : (existing?.unreadCount || 0) + 1,
           updatedAt: message.sentAt,
         };
+        const conversations = isActive
+          // 当前会话显式置 0；快照合并不降未读，不能整体走 mergeConversations。
+          // 保留本地态字段（置顶/备注/客服身份等）：updated 为 undefined 时回退本地值。
+          ? state.conversations.map((item) =>
+              item.id === normalizedPeerId
+                ? {
+                    ...item,
+                    ...Object.fromEntries(
+                      Object.entries(nextConversation).filter(([, value]) => value !== undefined),
+                    ),
+                    unreadCount: 0,
+                  }
+                : item,
+            )
+          : mergeConversations(state.conversations, nextConversation);
         return {
           messagesByPeerId: state.openPeerIds.includes(normalizedPeerId)
             ? { ...state.messagesByPeerId, [normalizedPeerId]: mergeMessages(state.messagesByPeerId[normalizedPeerId] || [], message) }
             : state.messagesByPeerId,
-          conversations: mergeConversations(state.conversations, nextConversation),
+          conversations,
         };
       });
       if (isActive) void adapter.markRead(normalizedPeerId).catch((error) => set({ lastError: error instanceof Error ? error.message : '清除未读失败' }));
@@ -397,6 +415,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       historyByPeerId: {},
       openPeerIds: [],
       activePeerId: null,
+      chatForeground: false,
       lastError: null,
 
       refreshOnlineStatuses: async (token) => {
@@ -575,6 +594,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           const current = state.conversations.find((item) => item.id === conversation.id);
           return {
             activePeerId: conversation.id,
+            chatForeground: true,
             openPeerIds: [...state.openPeerIds, conversation.id],
             conversations: mergeConversations(state.conversations, { ...(current || toConversationShell(conversation)), ...conversation }),
           };
@@ -620,7 +640,13 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         const activePeerId = state.activePeerId === closingPeerId
           ? (stillOpen ? closingPeerId : openPeerIds.at(-1)) || null
           : state.activePeerId;
-        set({ activePeerId, openPeerIds, messagesByPeerId, historyByPeerId });
+        set({
+          activePeerId,
+          openPeerIds,
+          messagesByPeerId,
+          historyByPeerId,
+          chatForeground: activePeerId ? state.chatForeground : false,
+        });
         if (state.activePeerId === closingPeerId && activePeerId) {
           void get().markRead(activePeerId);
         }
@@ -717,6 +743,8 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         conversations: state.conversations.map((conversation) => conversation.id === peerId ? { ...conversation, note } : conversation),
       })),
 
+      setChatForeground: (visible) => set({ chatForeground: visible }),
+
       setConversationPinned: async (peerId, isPinned) => {
         const previous = get().conversations.find((item) => item.id === peerId)?.isPinned ?? false;
         const applyPinned = (value: boolean) => set((state) => ({
@@ -775,7 +803,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         stopConversationSyncSubscription = undefined;
         stopReadSyncSubscription = undefined;
         await adapter.disconnect();
-        set({ connectionState: 'idle', conversationError: null, conversations: [], blacklistedUserIds: [], messagesByPeerId: {}, historyByPeerId: {}, openPeerIds: [], activePeerId: null, lastError: null });
+        set({ connectionState: 'idle', conversationError: null, conversations: [], blacklistedUserIds: [], messagesByPeerId: {}, historyByPeerId: {}, openPeerIds: [], activePeerId: null, chatForeground: false, lastError: null });
       },
     };
   });
