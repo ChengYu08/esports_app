@@ -103,7 +103,9 @@ export function useMatchSelectAndPay(options: UseMatchSelectAndPayOptions) {
 
   const confirmSelectAndPay = useCallback(async () => {
     const tokenValue = token;
-    if (!tokenValue) return;
+    if (!tokenValue) {
+      return;
+    }
     const pendingEntry = orderPendingRef.current;
     if (pendingEntry.requestNo === requestNo && pendingEntry.pending) {
       // 已建单未支付：直接回到支付面板，不重复建单
@@ -114,7 +116,9 @@ export function useMatchSelectAndPay(options: UseMatchSelectAndPayOptions) {
       showToast("请先选择陪玩");
       return;
     }
-    if (submittingRef.current) return;
+    if (submittingRef.current) {
+      return;
+    }
     const grabIds = [...selectedGrabIdsRef.current];
     const firstGrabId = grabIds[0];
     const firstCompanionUserId = candidatesRef.current.find(

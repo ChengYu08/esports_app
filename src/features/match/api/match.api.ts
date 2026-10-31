@@ -175,7 +175,9 @@ function mapCardItems(
   for (const item of items ?? []) {
     const label = (item?.label || "").trim();
     const text = (item?.value?.text || "").trim();
-    if (!label && !text) continue;
+    if (!label && !text) {
+      continue;
+    }
     mapped.push({ label, value: { text } });
   }
   return mapped;

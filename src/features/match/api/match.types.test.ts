@@ -4,6 +4,7 @@ import {
   applyGrabSelection,
   isActivityQuickMatch,
   isMultiCompanionRequest,
+  isOwnActiveActivityRequest,
   resolveMaxSelectableCount,
   type QuickMatchRequestDetail,
 } from "./match.types";
@@ -89,5 +90,62 @@ describe("isMultiCompanionRequest（普通模式既有判定回归）", () => {
   it("companionPreference 缺失仍视为一陪多单", () => {
     expect(isMultiCompanionRequest(detail())).toBe(true);
     expect(isMultiCompanionRequest(detail({ companionPreference: 1 }))).toBe(false);
+  });
+});
+
+describe("isOwnActiveActivityRequest（语聊房「派单匹配中」判定）", () => {
+  const activityUser = "1001";
+
+  function activeActivity(
+    overrides: Partial<QuickMatchRequestDetail> = {},
+  ): QuickMatchRequestDetail {
+    return detail({
+      status: "MATCHING",
+      publishSource: "ACTIVITY",
+      buyerUserId: activityUser,
+      ...overrides,
+    });
+  }
+
+  it("进行中 + ACTIVITY + 本人 → true", () => {
+    expect(isOwnActiveActivityRequest(activeActivity(), activityUser)).toBe(true);
+  });
+
+  it("进行中 + ACTIVITY + buyerUserId 缺省（active/detail 仅返回本人需求）→ true", () => {
+    expect(
+      isOwnActiveActivityRequest(activeActivity({ buyerUserId: undefined }), activityUser),
+    ).toBe(true);
+  });
+
+  it("他人需求（buyerUserId 与当前用户不一致）→ false", () => {
+    expect(isOwnActiveActivityRequest(activeActivity({ buyerUserId: "2002" }), activityUser)).toBe(false);
+  });
+
+  it("普通需求（publishSource 非 ACTIVITY 或缺省）→ false", () => {
+    expect(
+      isOwnActiveActivityRequest(activeActivity({ publishSource: "QUICK_MATCH" }), activityUser),
+    ).toBe(false);
+    expect(isOwnActiveActivityRequest(activeActivity({ publishSource: undefined }), activityUser)).toBe(false);
+  });
+
+  it("已结束（status 非 MATCHING）→ false", () => {
+    expect(isOwnActiveActivityRequest(activeActivity({ status: "ORDERED" }), activityUser)).toBe(false);
+    expect(isOwnActiveActivityRequest(activeActivity({ status: "CANCELLED" }), activityUser)).toBe(false);
+  });
+
+  it("已过期（expireTime 已过）→ false", () => {
+    expect(
+      isOwnActiveActivityRequest(
+        activeActivity({ expireTime: "2020-01-01 00:00:00" }),
+        activityUser,
+      ),
+    ).toBe(false);
+  });
+
+  it("active 为空或 userId 缺失 → false", () => {
+    expect(isOwnActiveActivityRequest(null, activityUser)).toBe(false);
+    expect(isOwnActiveActivityRequest(undefined, activityUser)).toBe(false);
+    expect(isOwnActiveActivityRequest(activeActivity(), "")).toBe(false);
+    expect(isOwnActiveActivityRequest(activeActivity(), undefined)).toBe(false);
   });
 });

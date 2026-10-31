@@ -234,3 +234,20 @@ export function isQuickMatchActive(request: QuickMatchRequestDetail | null): boo
   if (!request.expireTime) return true;
   return parseServerDateTime(request.expireTime) > Date.now();
 }
+
+/**
+ * 语聊房「派单匹配中」判定（任务 4）：当前用户有进行中的活动需求。
+ * 条件：需求进行中（MATCHING 且未过期）+ 活动派单（publishSource === "ACTIVITY"）+ 本人发起。
+ * buyerUserId 有值时二次校验；缺省视为本人（/quickMatch/active/detail 仅返回调用者自己的需求）。
+ */
+export function isOwnActiveActivityRequest(
+  active: QuickMatchRequestDetail | null | undefined,
+  userId: string | number | null | undefined,
+): boolean {
+  if (userId == null || String(userId) === "") return false;
+  if (!active || !isQuickMatchActive(active)) return false;
+  if (active.publishSource !== "ACTIVITY") return false;
+  const buyerUserId = active.buyerUserId;
+  if (buyerUserId == null || buyerUserId === "") return true;
+  return buyerUserId === String(userId);
+}

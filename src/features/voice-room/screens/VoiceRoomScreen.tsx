@@ -6,11 +6,20 @@ import {
   fetchDispatchActiveQuickMatch,
   fetchQuickMatchClubDetail,
   fetchQuickMatchGames,
+  fetchQuickMatchGrabList,
 } from "@/features/match/api/match.api";
-import { isQuickMatchActive } from "@/features/match/api/match.types";
-import type { MatchGame } from "@/features/match/api/match.types";
+import {
+  isOwnActiveActivityRequest,
+  isQuickMatchActive,
+} from "@/features/match/api/match.types";
+import type {
+  MatchGame,
+  QuickMatchGrabItem,
+  QuickMatchRequestDetail,
+} from "@/features/match/api/match.types";
 import { useQuickMatchEndSignals } from "@/features/match/quick-match-end-signals";
 import { ClubQuickMatchSheet } from "@/features/match/components/ClubQuickMatchSheet";
+import { MatchSelectAndPaySheet } from "@/features/match/components/MatchSelectAndPaySheet";
 import { messageStore } from "@/features/message/message-store";
 import { useAuthStore } from "@esports/auth";
 import {
@@ -254,6 +263,15 @@ export default function VoiceRoomScreen() {
   >(null);
   const [matchActiveForQuickMatchCreated, setMatchActiveForQuickMatchCreated] =
     useState<boolean | null>(null);
+  /** 本人进行中的活动需求（秒杀派单）：进房/聚焦时刷新一次，不轮询 */
+  const [activityRequest, setActivityRequest] =
+    useState<QuickMatchRequestDetail | null>(null);
+  /** 「派单匹配中」选人+支付弹窗 */
+  const [matchSelectVisible, setMatchSelectVisible] = useState(false);
+  const [grabCandidates, setGrabCandidates] = useState<QuickMatchGrabItem[]>([]);
+  const [grabLoading, setGrabLoading] = useState(false);
+  /** 活动需求系统提示只插一次 */
+  const activityTipShownRef = useRef(false);
 
   const roomVersion = room?.roomVersion ?? "1";
   const chatroomId = room?.rongChatroomId;
@@ -291,16 +309,20 @@ export default function VoiceRoomScreen() {
   const quickMatchCreatedRequestNo =
     quickMatchCreatedFromSession?.matchRequestNo || undefined;
 
-  // 与「呼叫接待」互斥（对齐 PC）：进行中的派单已包含呼叫客服语义，该位置让给「选择陪玩」
+  /** 活动需求进行中：房主可见「派单匹配中」按钮，房内下单收敛为唯一下单链路 */
+  const showMatchPending = isOwner && Boolean(activityRequest);
+  // 与「呼叫接待」互斥（对齐 PC）：进行中的派单已包含呼叫客服语义，该位置让给「选择陪玩」；
+  // 活动需求进行中时「选择陪玩」让位给「派单匹配中」（限制唯一下单链路）
   const showSelectCompanion =
-    (isOwner &&
+    !showMatchPending &&
+    ((isOwner &&
       isAuditionScene &&
       Boolean(auditionRequestNo) &&
       matchActiveForAudition === true) ||
-    (isOwner &&
-      isQuickMatchCreatedScene &&
-      Boolean(quickMatchCreatedRequestNo) &&
-      matchActiveForQuickMatchCreated === true);
+      (isOwner &&
+        isQuickMatchCreatedScene &&
+        Boolean(quickMatchCreatedRequestNo) &&
+        matchActiveForQuickMatchCreated === true));
   const showCallService = isOwner && !hasService && !showSelectCompanion;
   const rtcReady = Boolean(roomId && rtcReadyRoomId === roomId);
   const muted = !roomId || micState?.roomId !== roomId || micState.muted;
@@ -435,6 +457,33 @@ export default function VoiceRoomScreen() {
     routeGameName,
     sessionActiveRoom,
   ]);
+
+  /** 「派单匹配中」：打开选人弹窗并拉取抢单列表（参照既有 openSelectCompanion 的数据获取方式） */
+  const openMatchSelect = useCallback(() => {
+    const requestNo = activityRequest?.requestNo;
+    if (!requestNo || !accessToken) return;
+    setMatchSelectVisible(true);
+    if (grabLoading) return;
+    setGrabLoading(true);
+    void fetchQuickMatchGrabList(requestNo, accessToken)
+      .then((list) => setGrabCandidates(list))
+      .catch((cause) => {
+        console.warn("[voice-room] grab list load failed", cause);
+        showToast("抢单列表加载失败，请稍后重试");
+      })
+      .finally(() => setGrabLoading(false));
+  }, [accessToken, activityRequest, grabLoading]);
+
+  /** 支付成功（对齐匹配中页）：提示 + 关弹窗 + 清活动态；有订单号跳订单详情，无则留在房内 */
+  const handleMatchPaid = useCallback((orderId: string | null) => {
+    showToast("支付成功");
+    setMatchSelectVisible(false);
+    setActivityRequest(null);
+    setGrabCandidates([]);
+    if (orderId) {
+      router.replace(`/order/${orderId}?scope=place`);
+    }
+  }, []);
 
   /** 路由带试音标记时补写到 session（只写 audition，不覆盖 quickMatchCreated） */
   useEffect(() => {
@@ -576,6 +625,50 @@ export default function VoiceRoomScreen() {
       quickMatchCreatedRequestNo,
       roomId,
     ]),
+  );
+
+  /** 活动需求进行中判定（任务 4）：进房/聚焦时刷新一次，不轮询 */
+  useFocusEffect(
+    useCallback(() => {
+      if (!accessToken) {
+        setActivityRequest(null);
+        return;
+      }
+      let cancelled = false;
+      void (async () => {
+        try {
+          const active = await fetchActiveQuickMatch(accessToken);
+          if (cancelled) return;
+          const own =
+            isOwnActiveActivityRequest(active, currentUser?.id) ? active : null;
+          setActivityRequest(own);
+          // 进房检测到自己是活动需求发起人时插入一次性系统提示
+          if (own && !activityTipShownRef.current) {
+            activityTipShownRef.current = true;
+            setMessages((items) =>
+              items.some((item) => item.id === "activity-match-tip")
+                ? items
+                : [
+                    ...items,
+                    {
+                      id: "activity-match-tip",
+                      kind: "notice" as const,
+                      text: "点击下方「派单匹配中」按钮查看抢单大神，勾选大神下单",
+                      sentAt: Date.now(),
+                    },
+                  ].slice(-80),
+            );
+          }
+        } catch (cause) {
+          if (cancelled) return;
+          console.warn("[voice-room] activity match check failed", cause);
+          setActivityRequest(null);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [accessToken, currentUser]),
   );
 
   useEffect(() => {
@@ -1479,6 +1572,7 @@ export default function VoiceRoomScreen() {
           showCallService={showCallService}
           showServiceDispatch={canServiceDispatch}
           showSelectCompanion={showSelectCompanion}
+          showMatchPending={showMatchPending}
           onToggleDistance={() => setDistanceEnabled((prev) => !prev)}
           onChangeText={setInput}
           onSend={() => void sendMessage()}
@@ -1496,6 +1590,7 @@ export default function VoiceRoomScreen() {
           onCallService={() => void callService()}
           onServiceDispatch={() => void onServiceDispatch()}
           onSelectCompanion={openSelectCompanion}
+          onMatchPending={openMatchSelect}
         />
       </View>
       <VoiceRoomExitDialog
@@ -1526,6 +1621,17 @@ export default function VoiceRoomScreen() {
           buyerNickname={receptionBuyerName}
         />
       ) : null}
+      {activityRequest ? (
+        <MatchSelectAndPaySheet
+          visible={matchSelectVisible}
+          requestNo={activityRequest.requestNo}
+          detail={activityRequest}
+          candidates={grabCandidates}
+          token={accessToken}
+          onClose={() => setMatchSelectVisible(false)}
+          onPaid={handleMatchPaid}
+        />
+      ) : null}
       <VoiceRoomMemberSheet
         visible={memberSheetVisible}
         member={
@@ -1534,6 +1640,12 @@ export default function VoiceRoomScreen() {
         }
         room={room}
         roomId={roomId}
+        /** 活动需求进行中：MemberSheet「主页」入口（唯一通往下单的路由）替换为提示文案 */
+        orderEntryBlockedText={
+          showMatchPending
+            ? "活动需求进行中，请点击「派单匹配中」按钮选人下单"
+            : undefined
+        }
         onClose={() => setMemberSheetVisible(false)}
         onMemberKicked={(userId) => {
           setMembers((items) =>
