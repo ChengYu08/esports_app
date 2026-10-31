@@ -459,17 +459,26 @@ export default function VoiceRoomScreen() {
   ]);
 
   /** 「派单匹配中」：打开选人弹窗并拉取抢单列表（参照既有 openSelectCompanion 的数据获取方式） */
+  const grabInFlightRequestNoRef = useRef<string | null>(null);
   const openMatchSelect = useCallback(() => {
     const requestNo = activityRequest?.requestNo;
-    if (!requestNo || !accessToken) return;
+    if (!requestNo || !accessToken) {
+      return;
+    }
     setMatchSelectVisible(true);
-    if (grabLoading) return;
+    // 同一需求已有请求在途时才跳过；不同需求或上次失败允许重拉
+    if (grabLoading && grabInFlightRequestNoRef.current === requestNo) {
+      return;
+    }
+    grabInFlightRequestNoRef.current = requestNo;
     setGrabLoading(true);
     void fetchQuickMatchGrabList(requestNo, accessToken)
       .then((list) => setGrabCandidates(list))
       .catch((cause) => {
         console.warn("[voice-room] grab list load failed", cause);
         showToast("抢单列表加载失败，请稍后重试");
+        // 失败后清空在途标记，允许下次点击重拉
+        grabInFlightRequestNoRef.current = null;
       })
       .finally(() => setGrabLoading(false));
   }, [accessToken, activityRequest, grabLoading]);
@@ -545,7 +554,9 @@ export default function VoiceRoomScreen() {
       void (async () => {
         try {
           const active = await fetchActiveQuickMatch(accessToken);
-          if (cancelled) return;
+          if (cancelled) {
+            return;
+          }
           const ok =
             Boolean(active) &&
             isQuickMatchActive(active) &&
@@ -553,7 +564,9 @@ export default function VoiceRoomScreen() {
           setMatchActiveForAudition(ok);
           if (!ok && roomId) clearAuditionSessionMarkers(roomId);
         } catch (error) {
-          if (cancelled) return;
+          if (cancelled) {
+            return;
+          }
           console.warn("[voice-room] audition match check failed", error);
           setMatchActiveForAudition(false);
           if (roomId) clearAuditionSessionMarkers(roomId);
@@ -596,7 +609,9 @@ export default function VoiceRoomScreen() {
       void (async () => {
         try {
           const active = await fetchActiveQuickMatch(accessToken);
-          if (cancelled) return;
+          if (cancelled) {
+            return;
+          }
           const ok =
             Boolean(active) &&
             isQuickMatchActive(active) &&
@@ -604,7 +619,9 @@ export default function VoiceRoomScreen() {
           setMatchActiveForQuickMatchCreated(ok);
           if (!ok && roomId) clearQuickMatchCreatedSessionMarkers(roomId);
         } catch (error) {
-          if (cancelled) return;
+          if (cancelled) {
+            return;
+          }
           console.warn(
             "[voice-room] quickMatchCreated match check failed",
             error,
@@ -638,7 +655,9 @@ export default function VoiceRoomScreen() {
       void (async () => {
         try {
           const active = await fetchActiveQuickMatch(accessToken);
-          if (cancelled) return;
+          if (cancelled) {
+            return;
+          }
           const own =
             isOwnActiveActivityRequest(active, currentUser?.id) ? active : null;
           setActivityRequest(own);
@@ -660,7 +679,9 @@ export default function VoiceRoomScreen() {
             );
           }
         } catch (cause) {
-          if (cancelled) return;
+          if (cancelled) {
+            return;
+          }
           console.warn("[voice-room] activity match check failed", cause);
           setActivityRequest(null);
         }
