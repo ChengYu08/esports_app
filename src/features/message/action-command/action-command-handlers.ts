@@ -73,6 +73,18 @@ function buildQuickMatchMessage(payload: {
   return `「${buyer}」发布了${game}需求`;
 }
 
+/**
+ * 活动通知文案：带「秒杀」语境前缀（PRD 要求标题体现活动语境，当前仅秒杀）。
+ * 普通通知（activityCode 为空）不走这里，保持原文案零变化。
+ */
+function buildActivityQuickMatchMessage(payload: {
+  buyerNickname: string;
+  gameName: string;
+}) {
+  const base = buildQuickMatchMessage(payload);
+  return `秒杀匹配中：${base}`;
+}
+
 function buildOrderPayMessage(buyerNickname: string) {
   return `「${buyerNickname || "老板"}」已支付订单，请尽快接单`;
 }
@@ -112,10 +124,14 @@ export function handleQuickMatchNotice(command: RongCommand, now = Date.now()) {
 
   const noticeId = `qm:${payload.requestNo}`;
   quickMatchNoticeKeys.add(payload.requestNo);
+  // 活动语境文案：仅 activityCode 非空时切换标题；跳转链路与普通通知完全一致
+  const text = payload.activityCode
+    ? buildActivityQuickMatchMessage(payload)
+    : buildQuickMatchMessage(payload);
   actionNotice.push(
     {
       id: noticeId,
-      text: buildQuickMatchMessage(payload),
+      text,
       actionText: "去抢单",
       icon: TRADE_NOTICE_ICON,
       expireAt,

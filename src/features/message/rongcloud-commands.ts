@@ -12,6 +12,10 @@ export type QuickMatchNoticePayload = {
   serviceName: string;
   /** "yyyy-MM-dd HH:mm:ss"；NaN 表示不可解析 */
   expireAtMs: number;
+  /** 活动编码：非空即活动通知；普通通知后端不输出 → undefined */
+  activityCode?: string;
+  /** 活动类型：用于选择具体活动样式/通知标题，当前固定 ACTIVITY_BASED_DISPATCHING */
+  activityType?: string;
 };
 
 export type QuickMatchExpiredPayload = {
@@ -45,6 +49,13 @@ function stringField(data: Record<string, unknown>, key: string): string {
   return String(value);
 }
 
+/** 可选字符串字段：trim 后为空归 undefined（活动通知字段，普通通知后端不输出） */
+function optionalStringField(data: Record<string, unknown>, key: string): string | undefined {
+  const value = stringField(data, key).trim();
+  if (!value) return undefined;
+  return value;
+}
+
 export function parseQuickMatchNotice(
   data: Record<string, unknown>,
 ): QuickMatchNoticePayload | null {
@@ -58,6 +69,8 @@ export function parseQuickMatchNotice(
     levelName: stringField(data, "levelName"),
     serviceName: stringField(data, "serviceName"),
     expireAtMs: parseServerDateTime(stringField(data, "expireTime")),
+    activityCode: optionalStringField(data, "activityCode"),
+    activityType: optionalStringField(data, "activityType"),
   };
 }
 

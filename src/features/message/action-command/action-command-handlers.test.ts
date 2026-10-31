@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   actionNotice,
+  getActionNoticeHandlers,
   resetActionNoticeStore,
   useActionNoticeStore,
 } from "@/shared/ui/action-notice/action-notice-store";
@@ -281,6 +282,63 @@ describe("handleQuickMatchNotice", () => {
       expect.objectContaining({ senderId: PLATFORM }),
     );
     expect(useActionNoticeStore.getState().items).toHaveLength(0);
+  });
+
+  it("activityCode 非空时文案带秒杀活动语境", () => {
+    handleQuickMatchNotice(
+      command("QUICK_MATCH_NOTICE", {
+        requestNo: "QM1",
+        buyerNickname: "老板A",
+        gameName: "王者荣耀",
+        activityCode: "SECKILL001",
+        activityType: "ACTIVITY_BASED_DISPATCHING",
+        expireTime: "2026-10-20 12:30:00",
+      }),
+      NOW,
+    );
+    const items = useActionNoticeStore.getState().items;
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      id: "qm:QM1",
+      text: "秒杀匹配中：「老板A」发布了王者荣耀需求",
+    });
+  });
+
+  it("activityCode 为空串时走普通文案", () => {
+    handleQuickMatchNotice(
+      command("QUICK_MATCH_NOTICE", {
+        requestNo: "QM1",
+        buyerNickname: "老板A",
+        gameName: "王者荣耀",
+        activityCode: "   ",
+        expireTime: "2026-10-20 12:30:00",
+      }),
+      NOW,
+    );
+    expect(useActionNoticeStore.getState().items[0]?.text).toBe(
+      "「老板A」发布了王者荣耀需求",
+    );
+  });
+
+  it("活动通知点击仍走既有抢单链路", async () => {
+    const { grabQuickMatchAndEnterAudition } = await import(
+      "@/features/match/grab-quick-match-flow"
+    );
+    vi.mocked(grabQuickMatchAndEnterAudition).mockResolvedValue({
+      status: "success",
+    } as never);
+    handleQuickMatchNotice(
+      command("QUICK_MATCH_NOTICE", {
+        requestNo: "QM1",
+        activityCode: "SECKILL001",
+        expireTime: "2026-10-20 12:30:00",
+      }),
+      NOW,
+    );
+    const onAction = getActionNoticeHandlers("qm:QM1")?.onAction;
+    expect(onAction).toBeDefined();
+    await onAction?.();
+    expect(grabQuickMatchAndEnterAudition).toHaveBeenCalledWith("QM1");
   });
 });
 
