@@ -1,7 +1,7 @@
 import { voiceRoomApi } from './voice-room.api';
 import { leaveVoiceRtc } from './voice-room-rtc';
 import { leaveVoiceChatRoom } from './voice-room-rongcloud';
-import { useVoiceRoomSessionStore } from './voice-room-session';
+import { markVoiceRoomIntentionalExit, useVoiceRoomSessionStore } from './voice-room-session';
 
 type RoomToExit = {
   roomId: string;
@@ -12,6 +12,8 @@ type RoomToExit = {
 
 export async function exitVoiceRoom(room: RoomToExit, userId: string, accessToken: string) {
   if (String(room.creatorUserId ?? '') === userId) {
+    // 先打标再请求：destroy 引发的融云销毁事件可能先于 HTTP 响应到达
+    markVoiceRoomIntentionalExit(room);
     await voiceRoomApi.destroy(room.roomId, room.roomVersion, accessToken);
   } else {
     await voiceRoomApi.leave(room.roomId, room.roomVersion, accessToken);
