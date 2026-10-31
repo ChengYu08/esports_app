@@ -24,4 +24,6 @@ export const APP_LINKS = {
   // 盼之电竞购买须知（星钻充值页，安卓充值页 rechargeAgreement 同 code）
   purchaseNotice: `${protocolBaseUrl}/public/protocols?code=${protocolCode("user_recharge")}`,
   rechargeAgreement: `${protocolBaseUrl}/public/protocols?code=${protocolCode("user_recharge")}`,
+  // 注销协议（注销流程页《注销协议》入口）
+  accountCancellation: `${protocolBaseUrl}/public/protocols?code=${protocolCode("user_cancellation")}`,
 } as const;

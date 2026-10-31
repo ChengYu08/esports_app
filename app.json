@@ -34,10 +34,10 @@
         {
           "image": "./assets/images/splash-screen.png",
           "resizeMode": "cover",
-          "backgroundColor": "#2A1013",
+          "backgroundColor": "#FFFFFF",
           "enableFullScreenImage_legacy": true,
           "android": {
-            "backgroundColor": "#2A1013",
+            "backgroundColor": "#FFFFFF",
             "image": "./assets/images/splash-screen.png",
             "resizeMode": "cover"
           }
@@ -84,6 +84,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.spacewhisp.apps",
+      "appStoreUrl": "https://apps.apple.com/cn/app/id6822211814",
       "infoPlist": {
         "UIBackgroundModes": ["audio", "remote-notification"],
         "NSMicrophoneUsageDescription": "用于在语聊房中进行语音交流。"

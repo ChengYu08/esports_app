@@ -988,6 +988,8 @@ const styles = StyleSheet.create({
   },
   gameTabContentActive: {
     backgroundColor: COLORS.white,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
   },
   gameTabIcon: {
     width: 16,
