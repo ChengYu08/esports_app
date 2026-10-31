@@ -249,13 +249,6 @@ function RetryNotice({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface },
-  header: { alignItems: "center", paddingBottom: 4 },
-  title: {
-    fontFamily: DOUYIN_SANS,
-    fontSize: 22,
-    fontWeight: "600",
-    color: colors.text,
-  },
   boardRow: {
     flexDirection: "row",
     justifyContent: "space-between",

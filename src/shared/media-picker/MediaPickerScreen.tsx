@@ -1,11 +1,12 @@
 import {
   CaretDown16Regular,
   Dismiss24Regular,
+  Checkmark24Regular,
 } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import * as MediaLibrary from "expo-media-library/legacy";
-import { router } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   Linking,
@@ -19,9 +20,9 @@ import { showToast } from "@/shared/ui/app-toast";
 
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import {
-  completeAvatarEdit,
-  isAvatarEditActive,
-} from "@/features/mine/utils/avatar-edit-session";
+  completeMediaPick,
+  isMediaPickActive,
+} from "@/shared/media-picker/media-picker-session";
 
 type MediaAsset = MediaLibrary.Asset;
 
@@ -32,8 +33,27 @@ type AlbumOption = {
 
 const PAGE_SIZE = 60;
 
-export default function AvatarAlbumScreen() {
+/** iOS 的 ph:// 无法直接读取/裁剪，先换取本地文件路径 */
+async function resolveLocalUri(asset: MediaAsset): Promise<string> {
+  if (!asset.uri.startsWith("ph://")) {
+    return asset.uri;
+  }
+  const info = await MediaLibrary.getAssetInfoAsync(asset);
+  return info.localUri ?? asset.uri;
+}
+
+export default function MediaPickerScreen() {
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ max?: string; crop?: string }>();
+  const maxCount = useMemo(() => {
+    const parsed = Number(Array.isArray(params.max) ? params.max[0] : params.max);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 1;
+  }, [params.max]);
+  // 头像流程：单选后进入裁剪页，由裁剪页回传结果
+  const cropEnabled =
+    maxCount === 1 &&
+    (Array.isArray(params.crop) ? params.crop[0] : params.crop) === "1";
+
   const [permission, setPermission] = useState<MediaLibrary.PermissionResponse | null>(
     null,
   );
@@ -47,9 +67,10 @@ export default function AvatarAlbumScreen() {
     name: "最近项目",
   });
   const [albumsOpen, setAlbumsOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   // 请求序号：递增使过期响应失效，避免切相册竞态与双触发重复追加
   const requestSeq = useRef(0);
-  const navigatingRef = useRef(false);
+  const completingRef = useRef(false);
 
   const requestPermission = useCallback(async () => {
     // 只申请图片粒度权限（不申请音频/视频，保持权限最小化）
@@ -116,14 +137,23 @@ export default function AvatarAlbumScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 手势/物理返回键兜底：终结会话，避免编辑资料页悬挂
+  // 手势/物理返回键兜底：终结会话，避免调用方页面悬挂
   useEffect(() => {
     return () => {
-      if (isAvatarEditActive()) {
-        completeAvatarEdit(null);
+      if (isMediaPickActive()) {
+        completeMediaPick(null);
       }
     };
   }, []);
+
+  // 裁剪页被手势/物理返回键关闭时，会话已被裁剪页兜底终结；本页恢复可交互状态
+  useFocusEffect(
+    useCallback(() => {
+      if (!isMediaPickActive()) {
+        completingRef.current = false;
+      }
+    }, []),
+  );
 
   const switchAlbum = (album: AlbumOption) => {
     setAlbumsOpen(false);
@@ -133,37 +163,86 @@ export default function AvatarAlbumScreen() {
     setActiveAlbum(album);
     setAssets([]);
     setEndCursor(null);
+    setSelectedIds(new Set());
     void loadPage(album);
   };
 
   const close = () => {
-    if (navigatingRef.current) {
+    if (completingRef.current) {
       return;
     }
-    navigatingRef.current = true;
-    completeAvatarEdit(null);
+    completingRef.current = true;
+    completeMediaPick(null);
     router.back();
   };
 
-  // iOS 的 ph:// 无法直接裁剪，先换取本地文件路径
-  const openCrop = async (asset: MediaAsset) => {
-    if (navigatingRef.current) {
+  const complete = async (picked: MediaAsset[]) => {
+    if (completingRef.current || !picked.length) {
       return;
     }
-    navigatingRef.current = true;
-    let uri = asset.uri;
-    if (uri.startsWith("ph://")) {
-      const info = await MediaLibrary.getAssetInfoAsync(asset);
-      uri = info.localUri ?? uri;
+    completingRef.current = true;
+    try {
+      const uris = await Promise.all(picked.map((asset) => resolveLocalUri(asset)));
+      completeMediaPick(uris);
+    } catch {
+      completingRef.current = false;
+      showToast("照片读取失败，请稍后重试");
+      return;
     }
-    router.push({
-      pathname: "/avatar-crop",
-      params: {
-        uri,
-        width: String(asset.width),
-        height: String(asset.height),
-      },
+    router.back();
+  };
+
+  // 头像流程：进入裁剪页，裁剪结果由裁剪页回传
+  const openCrop = async (asset: MediaAsset) => {
+    if (completingRef.current) {
+      return;
+    }
+    completingRef.current = true;
+    try {
+      const uri = await resolveLocalUri(asset);
+      router.push({
+        pathname: "/avatar-crop",
+        params: {
+          uri,
+          width: String(asset.width),
+          height: String(asset.height),
+        },
+      });
+    } catch {
+      completingRef.current = false;
+      showToast("照片读取失败，请稍后重试");
+    }
+  };
+
+  const toggleSelect = (asset: MediaAsset) => {
+    if (completingRef.current) {
+      return;
+    }
+    if (cropEnabled) {
+      void openCrop(asset);
+      return;
+    }
+    if (maxCount === 1) {
+      void complete([asset]);
+      return;
+    }
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(asset.id)) {
+        next.delete(asset.id);
+      } else if (next.size >= maxCount) {
+        showToast(`最多选择${maxCount}张`);
+        return current;
+      } else {
+        next.add(asset.id);
+      }
+      return next;
     });
+  };
+
+  const confirmMultiSelect = () => {
+    const picked = assets.filter((asset) => selectedIds.has(asset.id));
+    void complete(picked);
   };
 
   if (permission && !permission.granted) {
@@ -175,7 +254,7 @@ export default function AvatarAlbumScreen() {
         <Text style={styles.deniedText}>
           {goSettings
             ? "相册访问权限已被拒绝，请前往系统设置开启后重试。"
-            : "没有访问照片的权限，需要允许访问照片后才能选择头像。"}
+            : "没有访问照片的权限，需要允许访问照片后才能选择。"}
         </Text>
         <Pressable
           accessibilityRole="button"
@@ -204,6 +283,8 @@ export default function AvatarAlbumScreen() {
     );
   }
 
+  const selectedCount = selectedIds.size;
+
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <View style={styles.navbar}>
@@ -227,7 +308,24 @@ export default function AvatarAlbumScreen() {
           </Text>
           <CaretDown16Regular color="#333333" width={16} height={16} />
         </Pressable>
-        <View style={styles.navPlaceholder} />
+        {maxCount > 1 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="确认选择"
+            disabled={selectedCount === 0}
+            onPress={confirmMultiSelect}
+            style={[
+              styles.confirmButton,
+              selectedCount === 0 && styles.confirmButtonDisabled,
+            ]}
+          >
+            <Text style={styles.confirmText}>
+              {selectedCount > 0 ? `完成(${selectedCount}/${maxCount})` : "完成"}
+            </Text>
+          </Pressable>
+        ) : (
+          <View style={styles.navPlaceholder} />
+        )}
       </View>
 
       {albumsOpen ? (
@@ -266,22 +364,30 @@ export default function AvatarAlbumScreen() {
         data={assets}
         numColumns={4}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="选择照片"
-            onPress={() => void openCrop(item)}
-            style={styles.gridItem}
-          >
-            <Image
-              source={{ uri: item.uri }}
-              style={styles.thumb}
-              contentFit="cover"
-              transition={0}
-              recyclingKey={item.id}
-            />
-          </Pressable>
-        )}
+        renderItem={({ item }) => {
+          const selected = selectedIds.has(item.id);
+          return (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="选择照片"
+              onPress={() => toggleSelect(item)}
+              style={styles.gridItem}
+            >
+              <Image
+                source={{ uri: item.uri }}
+                style={styles.thumb}
+                contentFit="cover"
+                transition={0}
+                recyclingKey={item.id}
+              />
+              {maxCount > 1 && selected ? (
+                <View style={styles.checkOverlay}>
+                  <Checkmark24Regular color="#FFFFFF" width={18} height={18} />
+                </View>
+              ) : null}
+            </Pressable>
+          );
+        }}
         onEndReachedThreshold={0.4}
         onEndReached={() => {
           if (hasNextPage && endCursor && !loading) {
@@ -336,6 +442,24 @@ const styles = StyleSheet.create({
     maxWidth: 200,
   },
   navPlaceholder: { width: 32 },
+  confirmButton: {
+    minWidth: 32,
+    height: 28,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: "#FE1F4C",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmButtonDisabled: {
+    backgroundColor: "#F5F5F5",
+  },
+  confirmText: {
+    color: "#FFFFFF",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 13,
+    fontWeight: "600",
+  },
   albumsPanel: {
     position: "absolute",
     left: 0,
@@ -371,6 +495,16 @@ const styles = StyleSheet.create({
     padding: 0.5,
   },
   thumb: { width: "100%", height: "100%", backgroundColor: "#F0F0F0" },
+  checkOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: "rgba(254, 31, 76, 0.35)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   emptyText: {
     marginTop: 80,
     alignSelf: "center",

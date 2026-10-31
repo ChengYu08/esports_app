@@ -1,38 +1,53 @@
-import { launchImageLibraryAsync, type ImagePickerAsset } from "expo-image-picker";
-import { Platform } from "react-native";
-import { pickCompanionImageFiles } from "./companion-document-picker";
+import { router } from "expo-router";
+import { convertToJpeg, detectImageFormat } from "@/shared/media-picker/image-compat";
+import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
 
-export type CompanionGalleryImage = Pick<
-  ImagePickerAsset,
-  "uri" | "fileName" | "fileSize" | "mimeType"
->;
+export type CompanionGalleryImage = {
+  uri: string;
+  fileName: string | null;
+  fileSize: number | null;
+  mimeType: string | null;
+};
 
+function inferImageMimeType(fileName: string | null): string | null {
+  const suffix = fileName?.split(".").pop()?.toLowerCase();
+  if (suffix === "jpg" || suffix === "jpeg") return "image/jpeg";
+  if (suffix === "png") return "image/png";
+  if (suffix === "webp") return "image/webp";
+  return null;
+}
+
+function toGalleryImage(uri: string): CompanionGalleryImage {
+  const fileName = uri.split(/[?#]/)[0].split(/[\\/]/).pop() ?? null;
+  return {
+    uri,
+    fileName,
+    fileSize: null,
+    mimeType: inferImageMimeType(fileName),
+  };
+}
+
+/** 打开通用相册选择页多选取图（权限在选择页内处理），取消时返回空数组。 */
 export async function pickCompanionGalleryImages(
   selectionLimit: number,
 ): Promise<CompanionGalleryImage[]> {
-  if (Platform.OS === "android") {
-    // 使用 ACTION_OPEN_DOCUMENT 读取原文件记录；照片选择器的 fileName 可能是系统别名。
-    const result = await pickCompanionImageFiles();
-    if (result.canceled) {
-      return [];
-    }
-    return result.assets.slice(0, selectionLimit).map((asset) => ({
-      uri: asset.uri,
-      // 缓存路径可能已被重命名，提示和上传始终保留原始 name。
-      fileName: asset.name,
-      fileSize: asset.size,
-      mimeType: asset.mimeType,
-    }));
-  }
-
-  const result = await launchImageLibraryAsync({
-    mediaTypes: ["images"],
-    allowsMultipleSelection: true,
-    selectionLimit,
-    quality: 0.85,
+  const pickPending = beginMediaPick();
+  router.push({
+    pathname: "/media-picker",
+    params: { max: String(Math.max(1, selectionLimit)) },
   });
-  if (result.canceled) {
+  const picked = await pickPending;
+  if (!picked?.length) {
     return [];
   }
-  return result.assets.slice(0, selectionLimit);
+  const result: CompanionGalleryImage[] = [];
+  for (const uri of picked.slice(0, selectionLimit)) {
+    // iOS 相机默认 HEIC 不在 JPG/PNG/WebP 白名单内，转成 JPEG 再走选择校验
+    if (detectImageFormat(uri)) {
+      result.push(toGalleryImage(uri));
+    } else {
+      result.push(toGalleryImage(await convertToJpeg(uri, 0.9)));
+    }
+  }
+  return result;
 }
