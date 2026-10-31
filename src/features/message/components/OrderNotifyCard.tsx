@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import type { OrderNotifyCardMessage } from "../chat-message";
 
-const orderAssistantCoin = require("../../../../assets/message/order-assistant-coin-3f6fcf.png");
+const orderAssistantCoin = require("../../../../assets/message/order-assistant-coin-3f6fcf.webp");
 
 type OrderNotifyCardProps = {
   item: OrderNotifyCardMessage;
