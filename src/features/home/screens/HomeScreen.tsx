@@ -33,6 +33,13 @@ export default function HomeScreen() {
     ticketSubmitted?: string;
   }>();
   const [topTab, setTopTab] = useState<HomeTab>("home");
+  // 顶部频道懒挂载 + 常驻：首次选中才挂载，之后仅显隐切换，避免低端机反复整屏重挂载。
+  const [mountedTabs, setMountedTabs] = useState<Record<HomeTab, boolean>>({
+    home: true,
+    god: false,
+    ranking: false,
+    court: false,
+  });
   const [courtEntry, setCourtEntry] = useState(0);
   const [courtInitialPage, setCourtInitialPage] = useState<"court" | "ticket">(
     "court",
@@ -121,6 +128,9 @@ export default function HomeScreen() {
   );
   const selectTopTab = useCallback((tab: HomeTab) => {
     setTopTab(tab);
+    setMountedTabs((current) =>
+      current[tab] ? current : { ...current, [tab]: true },
+    );
   }, []);
   const selectCategory = useCallback((id: string) => {
     setCategory(id);
@@ -183,10 +193,10 @@ export default function HomeScreen() {
   );
   const isHomeLoading = games.isLoading || categories.isLoading;
 
-  // 切换顶部频道或重新挂载列表时，背景回到首屏状态。
+  // 列表首次加载完成时背景回到首屏状态；频道切换后 keep-alive 保住滚动位置，背景透明度跟随真实偏移。
   useEffect(() => {
     scrollY.setValue(0);
-  }, [topTab, isHomeLoading, scrollY]);
+  }, [isHomeLoading, scrollY]);
 
   return (
     <View
@@ -210,56 +220,73 @@ export default function HomeScreen() {
         <HomeBackground />
       )}
       <HomeTopBar tab={topTab} onTabChange={selectTopTab} />
-      {isHomeLoading && topTab === "home" ? (
-        <HomeSkeleton bottomPadding={100 + insets.bottom} />
-      ) : topTab === "god" ? (
-        <GodListScreen />
-      ) : topTab === "ranking" ? (
-        <RankingScreen embedded />
-      ) : topTab === "court" ? (
-        <CourtHomeScreen
-          key={courtEntry}
-          bottomInset={insets.bottom}
-          initialPage={courtInitialPage}
-        />
-      ) : (
-        <Animated.FlatList
-          style={styles.clubList}
-          data={clubItems}
-          keyExtractor={(item) => item.id}
-          renderItem={renderClub}
-          ListHeaderComponent={header}
-          contentContainerStyle={{
-            flexGrow: 1,
-            paddingBottom: 100 + insets.bottom,
-          }}
-          refreshControl={
-            <RefreshControl
-              refreshing={
-                (clubs.isRefetching && !clubs.isFetchingNextPage) ||
-                games.isRefetching ||
-                categories.isRefetching ||
-                banners.isRefetching
-              }
-              onRefresh={refreshHome}
-              tintColor="#ff214b"
-            />
-          }
-          onEndReached={loadMoreClubs}
-          onEndReachedThreshold={0.3}
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
-          ListEmptyComponent={
-            clubs.isLoading ? (
-              <LoadingState />
-            ) : clubs.isError ? (
-              <ErrorState onRetry={clubs.refetch} />
+      <View style={styles.paneContainer}>
+        {mountedTabs.home && (
+          <View style={[styles.pane, topTab !== "home" && styles.paneHidden]}>
+            {isHomeLoading ? (
+              <HomeSkeleton bottomPadding={100 + insets.bottom} />
             ) : (
-              <EmptyState message="暂无俱乐部" />
-            )
-          }
-        />
-      )}
+              <Animated.FlatList
+                style={styles.clubList}
+                data={clubItems}
+                keyExtractor={(item) => item.id}
+                renderItem={renderClub}
+                ListHeaderComponent={header}
+                contentContainerStyle={{
+                  flexGrow: 1,
+                  paddingBottom: 100 + insets.bottom,
+                }}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={
+                      (clubs.isRefetching && !clubs.isFetchingNextPage) ||
+                      games.isRefetching ||
+                      categories.isRefetching ||
+                      banners.isRefetching
+                    }
+                    onRefresh={refreshHome}
+                    tintColor="#ff214b"
+                  />
+                }
+                onEndReached={loadMoreClubs}
+                onEndReachedThreshold={0.3}
+                windowSize={7}
+                maxToRenderPerBatch={6}
+                updateCellsBatchingPeriod={50}
+                initialNumToRender={8}
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
+                ListEmptyComponent={
+                  clubs.isLoading ? (
+                    <LoadingState />
+                  ) : clubs.isError ? (
+                    <ErrorState onRetry={clubs.refetch} />
+                  ) : (
+                    <EmptyState message="暂无俱乐部" />
+                  )
+                }
+              />
+            )}
+          </View>
+        )}
+        {mountedTabs.god && (
+          <View style={[styles.pane, topTab !== "god" && styles.paneHidden]}>
+            <GodListScreen />
+          </View>
+        )}
+        {mountedTabs.ranking && (
+          <View style={[styles.pane, topTab !== "ranking" && styles.paneHidden]}>
+            <RankingScreen embedded />
+          </View>
+        )}
+        {topTab === "court" && (
+          <CourtHomeScreen
+            key={courtEntry}
+            bottomInset={insets.bottom}
+            initialPage={courtInitialPage}
+          />
+        )}
+      </View>
     </View>
   );
 }
@@ -269,6 +296,9 @@ const styles = StyleSheet.create({
   homeScreen: { backgroundColor: "#F5F6F7" },
   homeHeader: { backgroundColor: "#F5F6F7" },
   clubList: { backgroundColor: "#fff" },
+  paneContainer: { flex: 1 },
+  pane: { flex: 1 },
+  paneHidden: { display: "none" },
   topBackground: {
     position: "absolute",
     top: 0,

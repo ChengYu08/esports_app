@@ -6,6 +6,7 @@ import { CachedImage } from "@/shared/ui/CachedImage";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
+import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 
@@ -14,7 +15,17 @@ const icons = {
   id: require("../../../../assets/home/club-id.svg"),
 };
 
-export function ClubCard({
+// 角标渐变为静态元素，提升到模块级共享，避免每张卡片渲染时重复创建。
+const tagGradient = (
+  <LinearGradient
+    colors={["#FF8C6C", "#F92E7F"]}
+    start={{ x: 0, y: 0.5 }}
+    end={{ x: 1, y: 0.5 }}
+    style={StyleSheet.absoluteFill}
+  />
+);
+
+export const ClubCard = memo(function ClubCard({
   club,
   onSelect,
 }: {
@@ -50,12 +61,7 @@ export function ClubCard({
         )}
         {club.clubTag && (
           <View style={styles.tag}>
-            <LinearGradient
-              colors={["#FF8C6C", "#F92E7F"]}
-              start={{ x: 0, y: 0.5 }}
-              end={{ x: 1, y: 0.5 }}
-              style={StyleSheet.absoluteFill}
-            />
+            {tagGradient}
             <Text numberOfLines={1} style={styles.tagText}>
               {club.clubTag}
             </Text>
@@ -106,7 +112,7 @@ export function ClubCard({
       <View style={styles.divider} />
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   // 设计稿：卡片全宽白底，pad 16/12/16/12，内容 gap 12，底部细分割线
