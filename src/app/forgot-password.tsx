@@ -23,6 +23,7 @@ export default function ForgotPasswordRoute() {
             os: Platform.OS === "ios" ? "iOS" : "Android",
             sourceType:
               Platform.OS === "ios" ? "dianjing-ios" : "dianjing-android",
+            referer: env.referer,
           })
         : null,
     [],

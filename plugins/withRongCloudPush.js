@@ -16,7 +16,6 @@ const VENDOR_REPOS = [
   "        maven { url 'https://developer.huawei.com/repo/' }",
   "        maven { url 'https://developer.hihonor.com/repo' }",
 ].join('\n');
-
 const VENDOR_PROPS = [
   ['MI_PUSH_APPID', process.env.MI_PUSH_APPID ?? ''],
   ['MI_PUSH_APPKEY', process.env.MI_PUSH_APPKEY ?? ''],
@@ -62,15 +61,23 @@ dependencies {
 `;
 
 function withRongCloudPush(config) {
-  // 1. Add vendor Maven repos to project-level build.gradle
+  // 1. Add vendor Maven repos to project-level build.gradle.
+  // Must anchor to an existing repository statement inside allprojects —
+  // inserting right after "allprojects {" lands outside the template's own
+  // repositories block and breaks Gradle 9 evaluation with
+  // "Could not find method maven()".
   config = withProjectBuildGradle(config, (mod) => {
     if (mod.modResults.language !== 'groovy') {
       throw new Error(`${TAG} requires Groovy project/build.gradle.`);
     }
     if (mod.modResults.contents.includes('developer.huawei.com/repo')) return mod;
+    const anchor = mod.modResults.contents.match(/^\s+mavenCentral\(\)/m);
+    if (!anchor) {
+      throw new Error(`${TAG}: mavenCentral() anchor not found in project/build.gradle.`);
+    }
     mod.modResults.contents = mod.modResults.contents.replace(
-      /allprojects\s*\{/,
-      (match) => `${match}\n${VENDOR_REPOS}`,
+      anchor[0],
+      `${VENDOR_REPOS}\n${anchor[0]}`,
     );
     return mod;
   });
