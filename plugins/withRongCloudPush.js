@@ -61,23 +61,22 @@ dependencies {
 `;
 
 function withRongCloudPush(config) {
-  // 1. Add vendor Maven repos to project-level build.gradle.
-  // Must anchor to an existing repository statement inside allprojects —
-  // inserting right after "allprojects {" lands outside the template's own
-  // repositories block and breaks Gradle 9 evaluation with
-  // "Could not find method maven()".
+  // 1. Add vendor Maven repos to allprojects.repositories in project-level build.gradle.
+  // Must land inside the allprojects repositories block — anchoring to the first
+  // bare mavenCentral() hits buildscript.repositories instead, which only resolves
+  // classpath deps; app dependency resolution then fails with "Could not find".
   config = withProjectBuildGradle(config, (mod) => {
     if (mod.modResults.language !== 'groovy') {
       throw new Error(`${TAG} requires Groovy project/build.gradle.`);
     }
     if (mod.modResults.contents.includes('developer.huawei.com/repo')) return mod;
-    const anchor = mod.modResults.contents.match(/^\s+mavenCentral\(\)/m);
+    const anchor = mod.modResults.contents.match(/allprojects\s*\{[\s\S]*?^\s+mavenCentral\(\)/m);
     if (!anchor) {
-      throw new Error(`${TAG}: mavenCentral() anchor not found in project/build.gradle.`);
+      throw new Error(`${TAG}: mavenCentral() anchor not found inside allprojects in project/build.gradle.`);
     }
     mod.modResults.contents = mod.modResults.contents.replace(
       anchor[0],
-      `${VENDOR_REPOS}\n${anchor[0]}`,
+      anchor[0].replace(/mavenCentral\(\)/, `${VENDOR_REPOS}\n    mavenCentral()`),
     );
     return mod;
   });

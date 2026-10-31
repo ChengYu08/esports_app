@@ -220,7 +220,7 @@ export default function AccountCancellationScreen() {
             我已阅读并同意
             <Text
               style={styles.agreementLink}
-              onPress={() => void openExternalLink(APP_LINKS.userAgreement)}
+              onPress={() => void openExternalLink(APP_LINKS.accountCancellation)}
             >
               《注销协议》
             </Text>
