@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, View } from "react-native";
 import { Skeleton, SkeletonText } from "@/shared/ui/Skeleton";
 import { colors, spacing } from "@/shared/theme/tokens";
 
-const bgClubImage = require("../../../../assets/home/club-detail/bg-club.png");
+const bgClubImage = require("../../../../assets/home/club-detail/bg-club.webp");
 
 const lightSkeleton = {
   baseColor: "rgba(255,255,255,.28)",

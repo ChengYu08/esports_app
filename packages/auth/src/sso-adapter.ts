@@ -19,5 +19,9 @@ export function createAuthSsoAdapter(client: SsoClient) {
     forgetPassword: (payload: ForgotPasswordPayload) =>
       client.forgetPassword(payload.phone, payload.code, payload.password),
     quickLogin: (provider: Parameters<SsoClient["quickLogin"]>[0]) => client.quickLogin(provider),
+    checkQuickLoginAvailable: (provider: Parameters<SsoClient["checkQuickLoginAvailable"]>[0]) =>
+      client.checkQuickLoginAvailable(provider),
+    authorizeQuickLogin: (provider: Parameters<SsoClient["authorizeQuickLogin"]>[0]) =>
+      client.authorizeQuickLogin(provider),
   };
 }

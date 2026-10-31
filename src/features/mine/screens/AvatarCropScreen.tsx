@@ -19,9 +19,9 @@ import Svg, { Path } from "react-native-svg";
 
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import {
-  completeAvatarEdit,
-  isAvatarEditActive,
-} from "@/features/mine/utils/avatar-edit-session";
+  completeMediaPick,
+  isMediaPickActive,
+} from "@/shared/media-picker/media-picker-session";
 import {
   clampAvatarPan,
   computeAvatarCropRect,
@@ -88,8 +88,8 @@ export default function AvatarCropScreen() {
   // 手势返回/物理返回键时兜底终结会话，避免编辑资料页悬挂在等待态
   useEffect(() => {
     return () => {
-      if (isAvatarEditActive()) {
-        completeAvatarEdit(null);
+      if (isMediaPickActive()) {
+        completeMediaPick(null);
       }
     };
   }, []);
@@ -147,7 +147,7 @@ export default function AvatarCropScreen() {
   }));
 
   const cancel = () => {
-    completeAvatarEdit(null);
+    completeMediaPick(null);
     // 取消视为放弃本次流程，直接回编辑资料页
     router.dismiss(2);
   };
@@ -183,7 +183,7 @@ export default function AvatarCropScreen() {
         ],
         { compress: 0.9, format: SaveFormat.JPEG },
       );
-      completeAvatarEdit(result.uri);
+      completeMediaPick([result.uri]);
       // 回到编辑资料页：弹出裁剪页与相册页两层
       router.dismiss(2);
     } catch {
@@ -200,7 +200,7 @@ export default function AvatarCropScreen() {
         <Pressable
           accessibilityRole="button"
           onPress={() => {
-            completeAvatarEdit(null);
+            completeMediaPick(null);
             router.dismiss(2);
           }}
           style={styles.hintActionWrap}

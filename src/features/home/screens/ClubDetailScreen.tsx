@@ -46,7 +46,7 @@ import {
 } from "../hooks/use-home-data";
 
 // 切图资源（新设计稿：俱乐部主页 455-68151 / 490-84520 / 557-88105）
-const bgClubImage = require("../../../../assets/home/club-detail/bg-club.png");
+const bgClubImage = require("../../../../assets/home/club-detail/bg-club.webp");
 // 设计稿导航栏内容行高度 44（不含状态栏，状态栏高度由安全区 insets 提供）
 const NAV_BAR_CONTENT_HEIGHT = 44;
 const tabCornerLeftIcon = require("../../../../assets/home/club-detail/tab-corner-left.svg");

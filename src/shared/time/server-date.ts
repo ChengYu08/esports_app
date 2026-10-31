@@ -42,3 +42,12 @@ export function parseServerDateTime(value?: string | null): number {
   }
   return utcMs - SERVER_TZ_OFFSET_MS;
 }
+
+/** epoch 按北京时区格式化为 "yyyy-MM-dd HH:mm:ss"（parseServerDateTime 的逆操作，非法值返回空串） */
+export function formatServerDateTime(epochMs: number): string {
+  if (!Number.isFinite(epochMs)) return "";
+  const date = new Date(epochMs + SERVER_TZ_OFFSET_MS);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} `
+    + `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}`;
+}

@@ -4,7 +4,6 @@ import {
   ChevronLeft24Regular,
   ChevronRight16Regular,
 } from "@fluentui/react-native-icons";
-import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -29,6 +28,7 @@ import {
 } from "@/features/auth/session-persistence";
 import { messageStore } from "@/features/message/message-store";
 import { RealNameVerificationSheet } from "@/features/mine/components/RealNameVerificationSheet";
+import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
@@ -139,29 +139,14 @@ export default function AccountSettingsScreen() {
 
   const changeAvatar = async () => {
     if (!token || !user || avatarUploading) return;
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      setFeedback({
-        title: "需要访问相册",
-        message: "请在系统设置中允许访问照片，用于更换头像。",
-      });
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.9,
-    });
-    if (result.canceled || !result.assets[0]) return;
-    const selected = result.assets[0];
-    if (selected.fileSize && selected.fileSize > 2 * 1024 * 1024) {
-      setFeedback({ title: "图片过大", message: "头像图片不能超过 2MB。" });
-      return;
-    }
+    // 进入相册选择 → 裁剪，裁剪结果经会话桥接回传（权限在相册页内处理）
+    const pickPending = beginMediaPick();
+    router.push({ pathname: "/media-picker", params: { crop: "1", max: "1" } });
+    const croppedUri = (await pickPending)?.[0];
+    if (!croppedUri) return;
     setAvatarUploading(true);
     try {
-      const fileName = selected.fileName || `avatar-${Date.now()}.jpg`;
+      const fileName = `avatar-${Date.now()}.jpg`;
       let imageUrl = "";
       let lastUploadError: unknown;
       for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -176,7 +161,7 @@ export default function AccountSettingsScreen() {
         const objectKey = sts.objectList?.[0];
         if (!objectKey) throw new Error("上传凭证无效：缺少 objectList[0]");
         try {
-          imageUrl = await uploadClientObject(sts, objectKey, selected);
+          imageUrl = await uploadClientObject(sts, objectKey, { uri: croppedUri });
           break;
         } catch (error) {
           lastUploadError = error;

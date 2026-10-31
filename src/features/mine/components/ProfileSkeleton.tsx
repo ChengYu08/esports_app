@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, View } from "react-native";
 import { Skeleton, SkeletonText } from "@/shared/ui/Skeleton";
 import { colors, radius, spacing } from "@/shared/theme/tokens";
 
-const background = require("../../../../assets/mine/figma/profile-bg.png");
+const background = require("../../../../assets/mine/figma/profile-bg.webp");
 
 type ProfileSkeletonProps = {
   topInset?: number;

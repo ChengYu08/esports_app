@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseServerDateTime } from "./server-date";
+import { formatServerDateTime, parseServerDateTime } from "./server-date";
 
 describe("parseServerDateTime", () => {
   it("无时区时间按北京时区（UTC+8）换算为 epoch", () => {
@@ -40,4 +40,20 @@ describe("parseServerDateTime", () => {
       expect(parseServerDateTime(input as string | null | undefined)).toBeNaN();
     },
   );
+});
+
+describe("formatServerDateTime", () => {
+  it("epoch 按北京时区格式化为 yyyy-MM-dd HH:mm:ss", () => {
+    const epoch = parseServerDateTime("2026-10-20 12:30:05");
+    expect(formatServerDateTime(epoch)).toBe("2026-10-20 12:30:05");
+  });
+
+  it("与 parse 互逆（跨日边界）", () => {
+    const epoch = parseServerDateTime("2026-10-21 00:00:00");
+    expect(formatServerDateTime(epoch)).toBe("2026-10-21 00:00:00");
+  });
+
+  it.each([Number.NaN, Infinity, -Infinity])("非法 epoch %j 返回空串", (epoch) => {
+    expect(formatServerDateTime(epoch)).toBe("");
+  });
 });

@@ -1,9 +1,8 @@
 import { complaintStyles } from "@/features/court/complaint.styles";
 import { preparePickedEvidenceImage } from "@/features/court/court-evidence-image";
-import { useAppConfirm } from "@/shared/ui/app-confirm";
+import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
-import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -55,37 +54,23 @@ export function useEvidenceImages(
     pickingImagesRef.current = true;
     setPickingImages(true);
     try {
-      const permission =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        void useAppConfirm.getState().confirm({
-          title: "需要相册权限",
-          message: "允许访问相册后才能添加证据截图",
-        });
-        return;
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"],
-        allowsMultipleSelection: true,
-        selectionLimit: MAX_IMAGES - images.length,
-        quality: 0.9,
-        preferredAssetRepresentationMode:
-          ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
-        base64: true,
+      // 相册选择页内部处理权限，选图结果经会话桥接回传
+      const pickPending = beginMediaPick();
+      router.push({
+        pathname: "/media-picker",
+        params: { max: String(MAX_IMAGES - images.length) },
       });
-      if (result.canceled) {
+      const pickedUris = await pickPending;
+      if (!pickedUris?.length) {
         return;
       }
       const picked: UploadItem[] = [];
       let failed = 0;
-      for (const asset of result.assets) {
+      for (const imageUri of pickedUris) {
         try {
-          picked.push(preparePickedEvidenceImage(asset));
+          picked.push(await preparePickedEvidenceImage(imageUri));
         } catch {
           failed += 1;
-        } finally {
-          // 转成本地文件后不再持有大的 base64 字符串。
-          asset.base64 = null;
         }
       }
       checkAccountRef.current();

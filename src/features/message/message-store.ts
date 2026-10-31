@@ -12,6 +12,7 @@ import {
   markRongConversationRead,
   subscribeRongConnectionStatus,
   subscribeRongConversationSync,
+  subscribeRongConversationReadSync,
   sendRongImage,
   sendRongText,
   sendRongAfterSaleCard,
@@ -65,6 +66,8 @@ export type MessageAdapter = {
   setConversationPinned?: (peerId: string, isPinned: boolean) => Promise<boolean>;
   subscribeConnectionStatus?: (listener: (signal: RongCloudConnectionSignal) => void) => () => void;
   subscribeConversationSync?: (listener: () => void) => () => void;
+  // 其他设备上报"会话已读至某时间戳"后，服务端推送过来的同步通知
+  subscribeReadSync?: (listener: (peerId: string, timestamp: number) => void) => () => void;
   subscribeConversations: (listener: (conversation: MessageConversation) => void) => () => void;
   subscribeMessages: (listener: (peerId: string, message: ManagedMessage, conversation: MessageConversation) => void) => () => void;
   disconnect: () => Promise<void>;
@@ -85,10 +88,13 @@ export type MessageStoreState = {
   historyByPeerId: Record<string, HistoryState>;
   openPeerIds: string[];
   activePeerId: string | null;
+  /** 聊天界面是否在前台可见；activePeerId 在页面被覆盖/退后台时仍保留，已读判断必须叠加此项 */
+  chatForeground: boolean;
   lastError: string | null;
   refreshOnlineStatuses: (token: string) => Promise<void>;
   refreshConversations: (token: string) => Promise<void>;
   initialize: (token: string) => Promise<void>;
+  setChatForeground: (visible: boolean) => void;
   openConversation: (conversation: Pick<MessageConversation, 'id' | 'title' | 'avatar' | 'clubId' | 'isCustomerService'>) => Promise<void>;
   closeConversation: (peerId?: string) => void;
   loadOlder: (peerId: string) => Promise<void>;
@@ -153,6 +159,7 @@ function createAdapter(): MessageAdapter {
     setConversationPinned: setRongConversationPinned,
     subscribeConnectionStatus: subscribeRongConnectionStatus,
     subscribeConversationSync: subscribeRongConversationSync,
+    subscribeReadSync: subscribeRongConversationReadSync,
     subscribeConversations: subscribeRongMessages,
     subscribeMessages: subscribeRongMessageEvents,
     disconnect: disconnectRongCloud,
@@ -164,6 +171,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
   let stopBlacklistSubscription: (() => void) | undefined;
   let stopConnectionStatusSubscription: (() => void) | undefined;
   let stopConversationSyncSubscription: (() => void) | undefined;
+  let stopReadSyncSubscription: (() => void) | undefined;
   let blacklistRevision = 0;
   let onlineStatusRequestId = 0;
   let onlineStatusToken: string | null = null;
@@ -173,6 +181,10 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   let reconnectAttempts = 0;
   let lifecycleRevision = 0;
+  // 本次登录会话的就绪时间：离线补偿的历史消息（含已读）晚于它到达，但 sentAt 在它之前
+  let sessionReadyAt = 0;
+  // 允许少量设备间时钟误差，避免"刚好就绪时刻"的新消息被误判为补偿消息
+  const BANNER_CLOCK_SKEW_MS = 5_000;
 
   const store = createStore<MessageStoreState>((set, get) => {
     const applyBlacklist = (entries: BlacklistEntry[]) => {
@@ -198,7 +210,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
     const receiveMessage = (peerId: string, message: ManagedMessage, conversation: MessageConversation) => {
       const normalizedPeerId = normalizeSystemConversationId(peerId);
       const normalizedConversationTitle = getSystemConversationTitle(normalizedPeerId, conversation.title);
-      const isActive = get().activePeerId === normalizedPeerId;
+      const isActive = get().activePeerId === normalizedPeerId && get().chatForeground;
       const preview = messagePreview(message);
       logger.info('message.new', {
         peerId: normalizedPeerId,
@@ -219,7 +231,17 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         return;
       }
       const normalizedConversation = { ...conversation, id: normalizedPeerId, title: normalizedConversationTitle };
-      if (!isActive && !message.isMine && !isMessageNotificationMuted()) {
+      if (
+        !isActive
+        && !message.isMine
+        && !isMessageNotificationMuted()
+        // 重装/换设备登录后，离线补偿的历史消息（含其他设备已读的）分两批到达：
+        // 一批在"连接后、会话就绪前"（此时 sessionReadyAt 还是 0），
+        // 一批在就绪后但 sentAt 早于本次登录就绪时间。
+        // 两类都只进列表（未读红点），不弹横幅
+        && sessionReadyAt > 0
+        && message.sentAt > sessionReadyAt - BANNER_CLOCK_SKEW_MS
+      ) {
         dispatchInAppNotification({
           peerId: normalizedPeerId,
           title: getSystemConversationTitle(normalizedPeerId, normalizedConversation.title),
@@ -236,14 +258,29 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           avatar: existing?.avatar || normalizedConversation.avatar,
           preview: preview || normalizedConversation.preview,
           isOnline: message.isMine ? existing?.isOnline : true,
-          unreadCount: isActive ? 0 : (existing?.unreadCount || 0) + 1,
+          unreadCount: isActive ? 0 : message.isMine ? (existing?.unreadCount || 0) : (existing?.unreadCount || 0) + 1,
           updatedAt: message.sentAt,
         };
+        const conversations = isActive
+          // 当前会话显式置 0；快照合并不降未读，不能整体走 mergeConversations。
+          // 保留本地态字段（置顶/备注/客服身份等）：updated 为 undefined 时回退本地值。
+          ? state.conversations.map((item) =>
+              item.id === normalizedPeerId
+                ? {
+                    ...item,
+                    ...Object.fromEntries(
+                      Object.entries(nextConversation).filter(([, value]) => value !== undefined),
+                    ),
+                    unreadCount: 0,
+                  }
+                : item,
+            )
+          : mergeConversations(state.conversations, nextConversation);
         return {
           messagesByPeerId: state.openPeerIds.includes(normalizedPeerId)
             ? { ...state.messagesByPeerId, [normalizedPeerId]: mergeMessages(state.messagesByPeerId[normalizedPeerId] || [], message) }
             : state.messagesByPeerId,
-          conversations: mergeConversations(state.conversations, nextConversation),
+          conversations,
         };
       });
       if (isActive) void adapter.markRead(normalizedPeerId).catch((error) => set({ lastError: error instanceof Error ? error.message : '清除未读失败' }));
@@ -378,6 +415,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       historyByPeerId: {},
       openPeerIds: [],
       activePeerId: null,
+      chatForeground: false,
       lastError: null,
 
       refreshOnlineStatuses: async (token) => {
@@ -486,6 +524,20 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
             });
           });
         }
+        if (!stopReadSyncSubscription) {
+          stopReadSyncSubscription = adapter.subscribeReadSync?.((peerId) => {
+            set((state) => ({
+              conversations: state.conversations.map((item) => item.id === peerId ? { ...item, unreadCount: 0 } : item),
+            }));
+          });
+        }
+        set({ connectionState: 'connecting', lastError: null });
+        initializeInProgress = true;
+        conversationSyncPending = false;
+        logger.info('RongCloud initialize starting', {
+          stage: 'message-store-initialize',
+          attempt: reconnectAttempts,
+        });
         try {
           const ready = await adapter.initialize(token);
           if (initializationRevision !== lifecycleRevision) {
@@ -519,6 +571,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           }
           hasInitialized = true;
           initializeInProgress = false;
+          sessionReadyAt = Date.now();
           set({ connectionState: 'ready', lastError: null });
         } catch (error) {
           if (initializationRevision !== lifecycleRevision) {
@@ -541,6 +594,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           const current = state.conversations.find((item) => item.id === conversation.id);
           return {
             activePeerId: conversation.id,
+            chatForeground: true,
             openPeerIds: [...state.openPeerIds, conversation.id],
             conversations: mergeConversations(state.conversations, { ...(current || toConversationShell(conversation)), ...conversation }),
           };
@@ -586,7 +640,13 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         const activePeerId = state.activePeerId === closingPeerId
           ? (stillOpen ? closingPeerId : openPeerIds.at(-1)) || null
           : state.activePeerId;
-        set({ activePeerId, openPeerIds, messagesByPeerId, historyByPeerId });
+        set({
+          activePeerId,
+          openPeerIds,
+          messagesByPeerId,
+          historyByPeerId,
+          chatForeground: activePeerId ? state.chatForeground : false,
+        });
         if (state.activePeerId === closingPeerId && activePeerId) {
           void get().markRead(activePeerId);
         }
@@ -683,6 +743,8 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         conversations: state.conversations.map((conversation) => conversation.id === peerId ? { ...conversation, note } : conversation),
       })),
 
+      setChatForeground: (visible) => set({ chatForeground: visible }),
+
       setConversationPinned: async (peerId, isPinned) => {
         const previous = get().conversations.find((item) => item.id === peerId)?.isPinned ?? false;
         const applyPinned = (value: boolean) => set((state) => ({
@@ -726,6 +788,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         initializeInProgress = false;
         conversationSyncPending = false;
         reconnectAttempts = 0;
+        sessionReadyAt = 0;
         clearCsInviteClaimStates();
         if (reconnectTimer) clearTimeout(reconnectTimer);
         reconnectTimer = undefined;
@@ -733,12 +796,14 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         stopBlacklistSubscription?.();
         stopConnectionStatusSubscription?.();
         stopConversationSyncSubscription?.();
+        stopReadSyncSubscription?.();
         stopMessageSubscription = undefined;
         stopBlacklistSubscription = undefined;
         stopConnectionStatusSubscription = undefined;
         stopConversationSyncSubscription = undefined;
+        stopReadSyncSubscription = undefined;
         await adapter.disconnect();
-        set({ connectionState: 'idle', conversationError: null, conversations: [], blacklistedUserIds: [], messagesByPeerId: {}, historyByPeerId: {}, openPeerIds: [], activePeerId: null, lastError: null });
+        set({ connectionState: 'idle', conversationError: null, conversations: [], blacklistedUserIds: [], messagesByPeerId: {}, historyByPeerId: {}, openPeerIds: [], activePeerId: null, chatForeground: false, lastError: null });
       },
     };
   });

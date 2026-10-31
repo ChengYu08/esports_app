@@ -203,7 +203,7 @@ Key libraries already installed:
 - **State**: `zustand`, `@tanstack/react-query`
 - **IM**: `@rongcloud/react-native-im-wrapper`
 - **Storage**: `@react-native-async-storage/async-storage`, `expo-secure-store`
-- **Media**: `expo-image-picker`, `expo-audio`, `expo-file-system`
+- **Media**: `expo-media-library`(相册选图/保存), `expo-audio`, `expo-file-system`
 - **Animation**: `react-native-reanimated`, `react-native-gesture-handler`
 - **Utils**: `zod`, `crypto-js`, `react-native-root-toast`
 

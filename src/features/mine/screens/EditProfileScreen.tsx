@@ -17,9 +17,7 @@ import { toAuthUser } from "@/features/auth/client-auth-flow";
 import { uploadClientObject } from "@/features/auth/oss-upload";
 import { saveAuthSession } from "@/features/auth/session-persistence";
 import { BirthDatePickerSheet } from "@/features/mine/components/BirthDatePickerSheet";
-import {
-  beginAvatarEdit,
-} from "@/features/mine/utils/avatar-edit-session";
+import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 
@@ -121,11 +119,11 @@ export default function EditProfileScreen() {
       return;
     }
     // 进入相册选择 → 裁剪，裁剪结果经会话桥接回传（权限在相册页内处理）
-    const editPending = beginAvatarEdit();
+    const editPending = beginMediaPick();
     setAvatarEditing(true);
-    router.push("/avatar-album");
+    router.push({ pathname: "/media-picker", params: { crop: "1", max: "1" } });
     try {
-      const croppedUri = await editPending;
+      const croppedUri = (await editPending)?.[0];
       if (!croppedUri) return;
       setAvatarUploading(true);
       const fileName = `avatar-${Date.now()}.jpg`;

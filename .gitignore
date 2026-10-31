@@ -39,7 +39,7 @@ yarn-error.*
 
 # local env files
 # .env
-# .env*.local
+.env*.local
 
 # typescript
 *.tsbuildinfo
@@ -50,6 +50,9 @@ example
 /ios
 /android
 /apks
+
+# local scratch / 临时文件
+/temp
 
 # Expo module Android build outputs
 modules/*/android/build/

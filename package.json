@@ -37,7 +37,6 @@
     "expo-iap": "^6.3.0",
     "expo-image": "~57.0.5",
     "expo-image-manipulator": "~57.0.21",
-    "expo-image-picker": "~57.0.19",
     "expo-intent-launcher": "~57.0.1",
     "expo-linear-gradient": "~57.0.2",
     "expo-linking": "~57.0.10",
@@ -97,7 +96,8 @@
     "build:apk:init-signing": "node scripts/build_apk.cjs --init-signing",
     "build:apk:test": "node scripts/build_apk.cjs --env test --abi arm64",
     "build:apk:test:universal": "node scripts/build_apk.cjs --env test --abi universal",
-    "build:apk:prod": "node scripts/build_apk.cjs --abi arm64"
+    "build:apk:prod": "node scripts/build_apk.cjs --abi arm64",
+    "check":"tsc --noEmit"
   },
   "private": true,
   "workspaces": [

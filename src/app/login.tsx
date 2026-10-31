@@ -17,16 +17,38 @@ import { getPasswordLoginErrorMessage } from "@/features/auth/password-login-err
 import { openExternalLink } from "@/shared/navigation/open-external-link";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { createAuthSsoAdapter, LoginScreen, useAuthStore } from "@esports/auth";
-import { createNativeQuickLoginProvider, SsoClient } from "@esports/sso-sdk";
+import {
+  createNativeQuickLoginProvider,
+  QuickLoginCancelledError,
+  SsoClient,
+} from "@esports/sso-sdk";
 import {
   router,
   Stack,
   useFocusEffect,
   useLocalSearchParams,
 } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
-import { BackHandler, Platform } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  BackHandler,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { showToast } from "@/shared/ui/app-toast";
+
+// 新登录用户（register=true）或需要完善资料的老用户，跳转到资料完善页
+const resolvePostLoginRoute = (
+  userId: string,
+  isNewUser: boolean,
+  shouldShowOnboarding: (userId: string) => boolean,
+) => {
+  if (isNewUser || shouldShowOnboarding(userId)) return "/onboarding";
+  return "/";
+};
 
 export default function LoginRoute() {
   const params = useLocalSearchParams<{ mode?: string; phone?: string }>();
@@ -44,6 +66,15 @@ export default function LoginRoute() {
     null,
   );
   const [coolingDialogVisible, setCoolingDialogVisible] = useState(false);
+  const [quickLoginLoading, setQuickLoginLoading] = useState(false);
+  // 一键登录优先：进入登录页先探测运营商一键登录可用性
+  // checking：探测中，盖全屏加载；ready：可一键登录，已自动拉起授权页；fallback：不可用，直接显示密码/验证码界面
+  const [quickLoginPhase, setQuickLoginPhase] = useState<
+    "checking" | "ready" | "fallback"
+  >(() => (env.ssoClientSecret ? "checking" : "fallback"));
+  const quickLoginStartedRef = useRef(false);
+  const quickLoginInFlightRef = useRef(false);
+  const quickLoginProbedRef = useRef(false);
   const sso = useMemo(
     () =>
       env.ssoClientSecret
@@ -64,6 +95,12 @@ export default function LoginRoute() {
     () =>
       createNativeQuickLoginProvider(
         Platform.OS === "ios" ? env.aliyunIosAuthKey : env.aliyunAndroidAuthKey,
+        {
+          // 「验证码或密码登录」/返回键：原生关授权页的瞬间就把 RN 遮罩撤掉，
+          // 露出下面的密码/验证码表单。等 promise 链路的 finally 再关会晚几百毫秒，
+          // 用户会先看到"正在登录…"遮罩，像跳错了页面。
+          onAuthPageClosed: () => setQuickLoginLoading(false),
+        },
       ),
     [],
   );
@@ -107,11 +144,114 @@ export default function LoginRoute() {
     return true;
   };
 
-  // 新登录用户（register=true）或需要完善资料的老用户，跳转到资料完善页
-  const resolvePostLoginRoute = (userId: string, isNewUser: boolean) => {
-    if (isNewUser || shouldShowOnboarding(userId)) return "/onboarding";
-    return "/";
-  };
+  // 拉起运营商授权页并完成一键登录。原生授权页拿到 token 就会关闭，
+  // 但 token 换登录态还要几秒网络请求，这期间盖住下面的登录页，
+  // 否则用户会看到验证码/密码界面闪一下。
+  const runQuickLogin = useCallback(async () => {
+    if (!adapter) return;
+    // 探测 effect 和手动点击可能并发触发，原生侧同时只承载一个授权页，
+    // 重复进入会让取消只关闭其中一个请求，剩下的还在飞，遮罩就一直关不掉。
+    if (quickLoginInFlightRef.current) return;
+    quickLoginInFlightRef.current = true;
+    setQuickLoginLoading(true);
+    try {
+      const token = await adapter.authorizeQuickLogin(quickLoginProvider);
+      const { login, profile } = await completeClientLogin(
+        token,
+        "ONE_CLICK_LOGIN",
+        setSession,
+        setCompanionStatus,
+        token.phone,
+      );
+      router.replace(
+        resolvePostLoginRoute(
+          String(profile.id),
+          login.register,
+          shouldShowOnboarding,
+        ),
+      );
+    } catch (error) {
+      // 用户在授权页主动退出，授权页盖在登录页之上，关掉后自然露出下面的界面。
+      // switch：点了「验证码或密码登录」，露出下面的密码/验证码表单，静默即可；
+      // exit：点了返回按钮/返回键，退出登录页回首页。
+      if (error instanceof QuickLoginCancelledError) {
+        console.warn("[DEBUG-QUICK-LOGIN] cancelled", { reason: error.reason });
+        // 取消后落到表单态：phase 不再是 ready，回到登录页不会又自动拉起授权页
+        setQuickLoginPhase("fallback");
+        if (error.reason === "exit") {
+          router.replace("/");
+        }
+        return;
+      }
+      // 拉起/换 token 阶段失败：授权页已关闭（或根本没拉起），降级到密码/验证码表单。
+      setQuickLoginPhase("fallback");
+      console.error("[DEBUG-QUICK-LOGIN] failed", {
+        name: error instanceof Error ? error.name : "UnknownError",
+        message: error instanceof Error ? error.message : String(error),
+      });
+      showToast(
+        `一键登录失败，${error instanceof Error ? error.message : "请使用验证码登录"}`,
+      );
+    } finally {
+      quickLoginInFlightRef.current = false;
+      setQuickLoginLoading(false);
+    }
+  }, [adapter, quickLoginProvider, setSession, setCompanionStatus, shouldShowOnboarding]);
+
+  // 进入登录页先探测一键登录可用性：可用 → 自动拉起授权页；不可用 → 显示密码/验证码界面
+  useEffect(() => {
+    if (!adapter) return;
+    // effect 可能因 adapter/provider 重建而重跑，探测只需一次；
+    // 并发探测会让原生单例 helper 的监听器互相覆盖。
+    if (quickLoginProbedRef.current) return;
+    quickLoginProbedRef.current = true;
+    adapter
+      .checkQuickLoginAvailable(quickLoginProvider)
+      .then((available) => {
+        setQuickLoginPhase((phase) =>
+          phase === "checking" ? (available ? "ready" : "fallback") : phase,
+        );
+      })
+      .catch(() => {
+        setQuickLoginPhase((phase) =>
+          phase === "checking" ? "fallback" : phase,
+        );
+      });
+  }, [adapter, quickLoginProvider]);
+
+  // 可用时自动拉起一键登录授权页，只触发一次
+  useEffect(() => {
+    if (quickLoginPhase !== "ready" || quickLoginStartedRef.current) return;
+    quickLoginStartedRef.current = true;
+    void runQuickLogin();
+  }, [quickLoginPhase, runQuickLogin]);
+
+  const renderQuickLoginLoading = () => (
+    <Modal
+      transparent
+      visible={quickLoginLoading}
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={() => {}}
+    >
+      <View style={quickLoginLoadingStyles.backdrop}>
+        <ActivityIndicator size="large" color="#FE1F4C" />
+        <Text style={quickLoginLoadingStyles.label}>正在登录…</Text>
+      </View>
+    </Modal>
+  );
+
+  // 探测一键登录可用性时，避免闪现密码/验证码表单
+  if (quickLoginPhase === "checking") {
+    return (
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <View style={quickLoginLoadingStyles.backdrop}>
+          <ActivityIndicator size="large" color="#FE1F4C" />
+        </View>
+      </>
+    );
+  }
 
   return (
     <>
@@ -150,7 +290,7 @@ export default function LoginRoute() {
               setCompanionStatus,
               payload.username,
             );
-            router.replace(resolvePostLoginRoute(String(profile.id), login.register));
+            router.replace(resolvePostLoginRoute(String(profile.id), login.register, shouldShowOnboarding));
           } catch (error) {
             setPasswordLoginError(getPasswordLoginErrorMessage(error));
           }
@@ -166,45 +306,11 @@ export default function LoginRoute() {
         }
         onQuickLogin={async () => {
           if (!ensureNotCooling()) return;
-          console.info("[DEBUG-QUICK-LOGIN] button pressed", {
-            platform: Platform.OS,
-            ssoConfigured: Boolean(env.ssoClientSecret),
-          });
           if (!adapter) {
-            console.warn(
-              "[DEBUG-QUICK-LOGIN] stopped: SSO client secret is not configured",
-            );
             showToast("暂无法一键登录，请先配置 SSO client secret。");
             return;
           }
-          try {
-            const token = await adapter.quickLogin(quickLoginProvider);
-            const { login, profile } = await completeClientLogin(
-              token,
-              "ONE_CLICK_LOGIN",
-              setSession,
-              setCompanionStatus,
-              token.phone,
-            );
-            router.replace(resolvePostLoginRoute(String(profile.id), login.register));
-          } catch (error) {
-            // 用户在一键登录授权页主动返回：原生侧用 USER_CANCELLED 标记，静默即可
-            if (
-              error &&
-              typeof error === "object" &&
-              "code" in error &&
-              (error as { code?: unknown }).code === "USER_CANCELLED"
-            ) {
-              return;
-            }
-            console.error("[DEBUG-QUICK-LOGIN] failed", {
-              name: error instanceof Error ? error.name : "UnknownError",
-              message: error instanceof Error ? error.message : String(error),
-            });
-            showToast(
-              `一键登录不可用，${error instanceof Error ? error.message : "请使用验证码登录"}`,
-            );
-          }
+          await runQuickLogin();
         }}
         onLogin={async (payload) => {
           if (!ensureNotCooling()) return;
@@ -221,7 +327,7 @@ export default function LoginRoute() {
               setCompanionStatus,
               payload.phone,
             );
-            router.replace(resolvePostLoginRoute(String(profile.id), login.register));
+            router.replace(resolvePostLoginRoute(String(profile.id), login.register, shouldShowOnboarding));
           } catch (error) {
             showToast(
               `登录失败，${error instanceof Error ? error.message : "请检查手机号和验证码"}`,
@@ -229,6 +335,7 @@ export default function LoginRoute() {
           }
         }}
       />
+      {renderQuickLoginLoading()}
       <AppPrompt
         visible={passwordLoginError !== null}
         title="密码登录失败"
@@ -250,3 +357,17 @@ export default function LoginRoute() {
     </>
   );
 }
+
+const quickLoginLoadingStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+  },
+  label: {
+    marginTop: 16,
+    fontSize: 14,
+    color: "#999999",
+  },
+});

@@ -33,13 +33,13 @@ import { requireLogin } from "@/shared/navigation/require-login";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const avatar = require("../../../../assets/mine/figma/mine-avatar.png");
-const heroBackground = require("../../../../assets/mine/figma/mine-hero-bg.png");
+const heroBackground = require("../../../../assets/mine/figma/mine-hero-bg.webp");
 const menuClubIcon = require("../../../../assets/mine/figma/mine-menu-club.svg");
 const settingsIcon = require("../../../../assets/mine/figma/mine-settings.svg");
 const maleIcon = require("../../../../assets/home/club-detail/male.svg");
-const femaleIcon = require("../../../../assets/home/club-detail/female.svg");
-const companionEntryQrCode = require("../../../../assets/coms/qrcode-pws.png");
-const clubEntryQrCode = require("../../../../assets/coms/qrcode-jlb.png");
+const femaleIcon = require("../../../../assets/mine/figma/mine-female.svg");
+const companionEntryQrCode = require("../../../../assets/coms/qrcode-pws.webp");
+const clubEntryQrCode = require("../../../../assets/coms/qrcode-jlb.webp");
 const menuRoomIcon = require("../../../../assets/mine/figma/mine-menu-room.svg");
 const menuCompanionIcon = require("../../../../assets/mine/figma/mine-menu-companion.svg");
 

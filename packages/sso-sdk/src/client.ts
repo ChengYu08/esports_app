@@ -13,7 +13,7 @@ import type {
   SsoRequestOptions,
   SsoToken,
 } from "./types";
-import { SsoError } from "./types";
+import { QuickLoginCancelledError, SsoError } from "./types";
 
 export class SsoClient {
   private readonly config: SsoClientConfig;
@@ -221,6 +221,45 @@ export class SsoClient {
     }
     console.info("[DEBUG-QUICK-LOGIN] SSO auth token received");
     return token;
+  }
+
+  /** 只探测当前设备是否支持一键登录，不拉起授权页。 */
+  async checkQuickLoginAvailable(
+    provider: QuickLoginProvider,
+  ): Promise<boolean> {
+    const authToken = await this.getQuickLoginAuthToken();
+    return provider.checkLoginAvailable(authToken);
+  }
+
+  /** 直接拉起运营商授权页完成一键登录（调用前应先确认可用）。 */
+  async authorizeQuickLogin(
+    provider: QuickLoginProvider,
+  ): Promise<SsoToken & { phone?: string }> {
+    const authToken = await this.getQuickLoginAuthToken();
+    console.info("[DEBUG-QUICK-LOGIN] requesting carrier authorization");
+    const result = await provider.getLoginToken(authToken);
+    const cancelled = QuickLoginCancelledError.from(result);
+    if (cancelled) {
+      console.info("[DEBUG-QUICK-LOGIN] carrier authorization cancelled", {
+        reason: cancelled.reason,
+      });
+      throw cancelled;
+    }
+    console.info("[DEBUG-QUICK-LOGIN] carrier authorization completed", {
+      hasSpToken: Boolean(result.spToken),
+    });
+    if (!result.spToken) throw new SsoError("一键登录未返回授权 token");
+    console.info("[DEBUG-QUICK-LOGIN] exchanging carrier token with SSO");
+    return this.request<SsoToken & { phone?: string }>(
+      "/api/auth/oauth2/token",
+      {
+        data: {
+          code: result.spToken,
+          grant_type: "ali_app_one_key",
+          scope: "openid",
+        },
+      },
+    );
   }
 
   async quickLogin(

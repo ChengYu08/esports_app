@@ -13,7 +13,7 @@ import { searchTypography } from "../search-typography";
 import { HighlightedSearchText, SearchResultId } from "./SearchResultText";
 
 const maleIcon = require("../../../../assets/home/club-detail/male.svg");
-const femaleIcon = require("../../../../assets/home/club-detail/female.svg");
+const femaleIcon = require("../../../../assets/mine/figma/mine-female.svg");
 const idleIcon = require("../../../../assets/search/status-idle.svg");
 const playingIcon = require("../../../../assets/search/status-playing.svg");
 

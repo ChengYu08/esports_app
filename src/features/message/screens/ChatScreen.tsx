@@ -5,10 +5,10 @@ import {
   HeadphonesRegular,
 } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
-import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AppState,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
@@ -29,18 +29,22 @@ import EmojiPicker, { type EmojiType } from "rn-emoji-keyboard";
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import type { AfterSaleCardPayload } from "@/features/order/after-sale-card";
 import { afterSaleCardRows } from "@/features/order/after-sale-card";
+import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
+import { convertToJpeg } from "@/shared/media-picker/image-compat";
+import { showToast } from "@/shared/ui/app-toast";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import { enterRoomFromInvite } from "@/features/voice-room/enter-room-from-invite";
 import { CsInviteCard } from "../components/CsInviteCard";
 import { MarkdownMessage } from "../components/MarkdownMessage";
 import { OrderNotifyCard } from "../components/OrderNotifyCard";
 import { touchCustomerServiceSession } from "../customer-service.api";
 import { resolveConversationAvatar } from "../message-avatar";
 import type { ManagedMessage } from "../message-state";
-import { useMessageStore } from "../message-store";
+import { messageStore, useMessageStore } from "../message-store";
 import { getConversationDisplayTitle } from "../message-title";
 import {
   getSystemConversationTitle,
@@ -205,6 +209,20 @@ export default function ChatScreen() {
       if (accessToken) void refreshOnlineStatuses(accessToken);
     }, [accessToken, refreshOnlineStatuses]),
   );
+  // 前后台/覆盖与 openConversation 的 activePeerId 解耦：页面被覆盖或退后台时
+  // activePeerId 仍在，但必须退出"已读"状态，否则新消息未读会被静默清零。
+  useFocusEffect(
+    useCallback(() => {
+      messageStore.getState().setChatForeground(true);
+      return () => messageStore.getState().setChatForeground(false);
+    }, []),
+  );
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      messageStore.getState().setChatForeground(state === "active");
+    });
+    return () => subscription.remove();
+  }, []);
   const isOrderAssistant = isOrderAssistantConversationId(conversationId);
   const isDispatchAssistant = isDispatchAssistantConversationId(conversationId);
   const isPinned = Boolean(conversation?.isPinned);
@@ -306,12 +324,9 @@ export default function ChatScreen() {
           myAvatar={myAvatar}
           peerName={conversation?.title || title || "用户"}
           myName={myNickname || "我"}
-          onEnterRoomInvite={(roomId, roomVersion) =>
-            router.push({
-          pathname: "/voice-room/[id]",
-          params: { id: roomId, v: roomVersion },
-        })
-          }
+          onEnterRoomInvite={(roomId, roomVersion) => {
+            void enterRoomFromInvite(roomId, roomVersion);
+          }}
           onRetry={handleRetryMessage}
           onOpenProfile={canViewProfile ? openProfile : undefined}
           onOpenOrder={isOrderAssistant ? openOrderDetail : undefined}
@@ -731,23 +746,19 @@ const ChatComposer = memo(function ChatComposer({
   const pickImage = async () => {
     if (imageSending) return;
     setEmojiPickerOpen(false);
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      void useAppConfirm.getState().confirm({
-        title: "需要访问相册",
-        message: "请在系统设置中允许访问照片，用于发送聊天图片。",
-      });
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      quality: 0.85,
-    });
-    if (result.canceled || !result.assets[0]) return;
+    // 相册选择页内部处理权限，选图结果经会话桥接回传
+    const pickPending = beginMediaPick();
+    router.push({ pathname: "/media-picker", params: { max: "1" } });
+    const picked = (await pickPending)?.[0];
+    if (!picked) return;
 
     setImageSending(true);
     try {
-      await onSendImage(result.assets[0].uri);
+      // 沿用旧照片选择器的行为：统一重编码为 JPEG，规避 HEIC 原图与超大原图直接发送
+      const sendUri = await convertToJpeg(picked);
+      await onSendImage(sendUri);
+    } catch {
+      showToast("图片处理失败，请重试");
     } finally {
       setImageSending(false);
     }

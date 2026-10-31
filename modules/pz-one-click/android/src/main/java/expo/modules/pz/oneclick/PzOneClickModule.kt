@@ -117,21 +117,34 @@ class PzOneClickModule : Module() {
         }
 
         override fun onTokenFailed(result: String) {
+          val code = resultCode(result)
+          val message = resultMessage(result)
+          Log.i(TAG, "[DEBUG-QUICK-LOGIN] onTokenFailed: code=$code, message=$message, finished=$finished")
           if (finished) return
           finished = true
-          val code = resultCode(result)
-          // 700011 是「用户按返回键」，SDK 在 AAR 里是独立常量 CODE_ERROR_USER_CONTROL_CANCEL_BYKEY。
-          val cancelled =
+          // 取消路径分两类，JS 侧要据此决定露出什么：
+          // 700001 点「验证码或密码登录」→ 关掉授权页，露出下面的密码/验证码表单；
+          // 700010/700011 点返回按钮/返回键 → 退出登录页回首页。
+          val cancelledBySwitch = code == ResultCode.CODE_ERROR_USER_SWITCH
+          val cancelledByBack =
             code == ResultCode.CODE_ERROR_USER_CANCEL ||           // 700000
-            code == ResultCode.CODE_ERROR_USER_SWITCH ||           // 700001 切换登录方式
             code == ResultCode.CODE_ERROR_USER_CONTROL_CANCEL_BYBTN || // 700010
             code == ResultCode.CODE_ERROR_USER_CONTROL_CANCEL_BYKEY    // 700011 返回键
+          val cancelled = cancelledBySwitch || cancelledByBack
           Log.i(TAG, "[DEBUG-QUICK-LOGIN] authorization ended: code=$code, cancelled=$cancelled")
           authHelper?.setAuthListener(null)
           // 失败/取消时都要关掉授权页，避免残留在 Activity 栈里。
           authHelper?.quitLoginPage()
           sendEvent("onStateChange", mapOf("state" to if (cancelled) "cancelled" else "unavailable"))
-          promise.reject(if (cancelled) "USER_CANCELLED" else "AUTHORIZATION_FAILED", "一键登录失败，请使用其他登录方式", null)
+          promise.reject(
+            when {
+              cancelledBySwitch -> "USER_SWITCHED"
+              cancelledByBack -> "USER_EXITED"
+              else -> "AUTHORIZATION_FAILED"
+            },
+            "一键登录失败，请使用其他登录方式",
+            null,
+          )
         }
       })
       helper.setAuthSDKInfo(authSDKKey)
@@ -171,6 +184,10 @@ class PzOneClickModule : Module() {
       cornerRadius = 8f * density
     }
     return com.mobile.auth.gatewayauth.AuthUIConfig.Builder()
+    // 授权页进出不做动画：退出时 RN 侧会立即盖一层全屏加载遮罩，
+    // SDK 默认的 Activity 转场动画会和遮罩淡入打架，看起来像闪回登录页。
+    .setAuthPageActIn("android:activity/fade_in", "android:activity/fade_out")
+    .setAuthPageActOut("android:activity/fade_in", "android:activity/fade_out")
     .setNavHidden(false)
     // setLightColor(true) 表示「浅色状态栏图标」，配白底会让文字看不见。
     // 改为 setStatusBarUIFlag 强制深色图标（SYSTEM_UI_FLAG_LIGHT_STATUS_BAR），文字才能显示。
@@ -192,9 +209,9 @@ class PzOneClickModule : Module() {
     .setLogBtnHeight(42)
     .setLogBtnMarginLeftAndRight((32f * density).toInt())
     .setLogBtnBackgroundDrawable(loginButton)
-    // 「暂不登录，先去逛逛」：12dp #999999
+    // 「验证码或密码登录」：12dp #999999，点击后切到密码/验证码登录界面
     .setSwitchAccHidden(false)
-    .setSwitchAccText("暂不登录，先去逛逛")
+    .setSwitchAccText("验证码或密码登录")
     .setSwitchAccTextColor(gray3)
     .setSwitchAccTextSizeDp(12)
     // 协议：默认勾选 false
@@ -213,6 +230,13 @@ class PzOneClickModule : Module() {
     .setWebNavColor(Color.WHITE)
     .setWebNavTextColor(gray1)
     .setWebNavTextSizeDp(18)
+    // 原生授权页保留协议勾选 checkbox：默认未勾选（合规要求用户主动同意）。
+    // SDK 内置 privacyAlert 弹窗布局不可靠（自定义尺寸会拉伸到全屏，默认又太窄），
+    // 这里关闭它，未勾选时让 SDK 走失败回调，原生模块再弹自己的 AlertDialog。
+    .setPrivacyState(false)
+    .setCheckboxHidden(false)
+    .setPrivacyAlertIsNeedShow(false)
+    .setPrivacyAlertIsNeedAutoLogin(false)
     .create()
   }
 
