@@ -23,7 +23,8 @@ export function useHomeGameCategories() {
 
 export function useHomeClubs(tab: HomeTab, filters: ClubFilters) {
   return useInfiniteQuery({
-    queryKey: ["home-clubs", tab, filters],
+    // queryKey 不含 tab：切到其他顶部频道（enabled 变 false）时，隐藏中的首页列表数据保持在缓存中不塌缩；切回时 stale 查询自动后台重拉
+    queryKey: ["home-clubs", filters],
     enabled: tab === "home",
     initialPageParam: 1,
     queryFn: ({ pageParam, signal }) => fetchClubPage(filters, pageParam, 10, signal),
