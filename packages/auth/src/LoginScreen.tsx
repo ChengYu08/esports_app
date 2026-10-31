@@ -142,6 +142,7 @@ export function LoginScreen({
       await onSendCode(phone);
       setCodeSentPhone(phone);
       setCodeCountdown(60);
+      credentialInputRef.current?.focus();
     } catch {
       // The route owns API error presentation. A rejected request must not count down.
     } finally {

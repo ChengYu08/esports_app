@@ -1,5 +1,5 @@
 import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -23,6 +23,8 @@ import { DOUYIN_SANS } from "./typography";
 
 export type ForgotPasswordScreenProps = {
   initialPhone?: string;
+  /** 页面标题：忘记密码 / 修改密码等场景复用同一表单 */
+  title?: string;
   onBack: () => void;
   onSendCode: (phone: string) => void | Promise<void>;
   onSubmit: (payload: ForgotPasswordPayload) => void | Promise<void>;
@@ -30,6 +32,7 @@ export type ForgotPasswordScreenProps = {
 
 export function ForgotPasswordScreen({
   initialPhone,
+  title = "忘记密码",
   onBack,
   onSendCode,
   onSubmit,
@@ -49,6 +52,7 @@ export function ForgotPasswordScreen({
   const [validationMessage, setValidationMessage] = useState<string | null>(
     null,
   );
+  const codeInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -71,6 +75,7 @@ export function ForgotPasswordScreen({
     try {
       await onSendCode(phone);
       setCountdown(60);
+      codeInputRef.current?.focus();
     } catch {
       // The route layer owns API error presentation.
     } finally {
@@ -132,7 +137,7 @@ export function ForgotPasswordScreen({
               </View>
             </Pressable>
             <Text accessibilityRole="header" style={styles.title}>
-              忘记密码
+              {title}
             </Text>
             <View style={styles.headerSpacer} />
           </View>
@@ -158,6 +163,7 @@ export function ForgotPasswordScreen({
 
             <View style={styles.field}>
               <TextInput
+                ref={codeInputRef}
                 accessibilityLabel="验证码"
                 value={code}
                 onChangeText={(value) => {

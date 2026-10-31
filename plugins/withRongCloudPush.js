@@ -68,10 +68,16 @@ function withRongCloudPush(config) {
       throw new Error(`${TAG} requires Groovy project/build.gradle.`);
     }
     if (mod.modResults.contents.includes('developer.huawei.com/repo')) return mod;
-    mod.modResults.contents = mod.modResults.contents.replace(
-      /allprojects\s*\{/,
+    // vendor 仓库必须插到 allprojects 内部的 repositories 块里：
+    // Gradle 9 已移除项目级裸 maven() 方法，插在 allprojects { 正下方会构建失败
+    const next = mod.modResults.contents.replace(
+      /(allprojects\s*\{\s*\n\s*repositories\s*\{)/,
       (match) => `${match}\n${VENDOR_REPOS}`,
     );
+    if (!next.includes('maven.rongcloud.cn')) {
+      throw new Error(`${TAG} failed to inject vendor repositories into allprojects.repositories`);
+    }
+    mod.modResults.contents = next;
     return mod;
   });
 
