@@ -2,16 +2,25 @@ const {
   createRunOncePlugin,
   withInfoPlist,
   withAppDelegate,
+  withEntitlementsPlist,
 } = require('@expo/config-plugins');
 
 const TAG = 'with-rongcloud-ios-push';
 
-// Request push authorization and register for remote notifications on app launch.
+// MARKER comments let us remove old generated code on re-prebuild
+const MARKER = '// RongCloudPush:';
+
+// 1. Import UserNotifications (must be at file scope, top of file)
+const IMPORT_SNIPPET = `import UserNotifications
+`;
+
+// 2. Request push authorization + register for remote notifications.
+//    AppDelegate is already UIApplicationDelegate (via ExpoAppDelegate), so no conformance needed.
 const APP_DELEGATE_SNIPPET = `
-    // RongCloud offline push — request authorization and register for remote notifications
-    let notificationCenter = UNUserNotificationCenter.current()
-    notificationCenter.delegate = self
-    notificationCenter.requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
+    ${MARKER} request authorization and register for remote notifications
+    let rongPushCenter = UNUserNotificationCenter.current()
+    rongPushCenter.delegate = self
+    rongPushCenter.requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
       if granted {
         DispatchQueue.main.async {
           application.registerForRemoteNotifications()
@@ -20,10 +29,9 @@ const APP_DELEGATE_SNIPPET = `
     }
 `;
 
-// Directly set deviceToken to RongCloud in native layer (must happen before JS connect()).
-// We use a static flag to ensure it's only set once per app lifecycle.
+// 3. Forward APNs deviceToken to RongCloud SDK before any JS connect() call
 const DEVICE_TOKEN_HANDLER = `
-  // RongCloud offline push — forward APNs deviceToken directly to RongCloud SDK
+  ${MARKER} forward APNs deviceToken to RongCloud SDK
   public override func application(
     _ application: UIApplication,
     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
@@ -32,8 +40,51 @@ const DEVICE_TOKEN_HANDLER = `
   }
 `;
 
-// Handler class that imports RongIMWrapper and sets deviceToken.
+// 3b. Capture cold-start notification from launchOptions (before JS is ready)
+const LAUNCH_OPTIONS_CAPTURE = `
+    // RongCloudPush: capture cold-start push notification
+    if let rongRemoteNotification = launchOptions?[UIApplication.LaunchOptionsKey.remoteNotification] as? [AnyHashable: Any],
+       let rongRcData = rongRemoteNotification["rc"] as? [String: Any] {
+      let rongTargetId = rongRcData["tId"] as? String ?? ""
+      if !rongTargetId.isEmpty {
+        UserDefaults.standard.set(["targetId": rongTargetId], forKey: "rongPushPendingClick")
+      }
+    }
+`;
+
+// 3b-2. Insert cold-start capture AFTER super.application() returns, avoiding race with JS init
+const LAUNCH_OPTIONS_INJECTION = `
+    let rongLaunchResult = super.application(application, didFinishLaunchingWithOptions: launchOptions)
+${LAUNCH_OPTIONS_CAPTURE}
+    return rongLaunchResult
+`;
+
+// 3c. Handle notification tap → save targetId for JS to read on next launch
+const NOTIFICATION_TAP_HANDLER = `
+  ${MARKER} handle notification tap
+  public override func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    didReceive response: UNNotificationResponse,
+    withCompletionHandler completionHandler: @escaping () -> Void
+  ) {
+    let userInfo = response.notification.request.content.userInfo
+    if let rcData = userInfo["rc"] as? [String: Any] {
+      let targetId = rcData["tId"] as? String ?? ""
+      let conversationType = rcData["cType"] as? String ?? ""
+      if !targetId.isEmpty {
+        UserDefaults.standard.set(
+          ["targetId": targetId, "conversationType": conversationType],
+          forKey: "rongPushPendingClick"
+        )
+      }
+    }
+    completionHandler()
+  }
+`;
+
+// 4. Handler class (imports RongIMWrapper, calls setDeviceToken)
 const HANDLER_CLASS = `
+${MARKER} push handler
 import RongIMWrapper
 
 final class RongCloudPushHandler {
@@ -58,21 +109,40 @@ function withRongCloudIosPush(config) {
     return mod;
   });
 
-  // 2. Inject push registration into AppDelegate.didFinishLaunchingWithOptions
+  // 2. Add aps-environment entitlement (required for APNs on iOS)
+  config = withEntitlementsPlist(config, (mod) => {
+    if (!mod.modResults['aps-environment']) {
+      // Use 'development' for debug builds; EAS production builds will use 'production'
+      mod.modResults['aps-environment'] =
+        process.env.EAS_BUILD_PROFILE === 'production' ? 'production' : 'development';
+    }
+    return mod;
+  });
+
+  // 3. Inject push registration into AppDelegate.swift
   config = withAppDelegate(config, (mod) => {
     if (mod.modResults.language !== 'swift') {
       throw new Error(`${TAG} requires Swift AppDelegate.`);
     }
-    if (mod.modResults.contents.includes('RongCloudPushHandler')) return mod;
+    if (mod.modResults.contents.includes(MARKER)) return mod;
 
-    // Insert authorization request after factory.startReactNative(...) call
+    // 3a. Add UserNotifications import at the very top (before all other imports)
+    mod.modResults.contents = IMPORT_SNIPPET + mod.modResults.contents;
+
+    // 3b. Insert authorization request after factory.startReactNative(...) call
     mod.modResults.contents = mod.modResults.contents.replace(
-      /(factory\.startReactNative\([\s\S]*?\n\s*\)\n)/,
+      /(factory\.startReactNative\([\s\S]*?launchOptions: launchOptions\)\n)/,
       `$1\n${APP_DELEGATE_SNIPPET}`,
     );
 
-    // Insert deviceToken handler at the end of AppDelegate class body
-    // (AppDelegate class ends right before "class ReactNativeDelegate")
+    // 3c. Replace "return super.application(...)" with capture + return pattern
+    mod.modResults.contents = mod.modResults.contents.replace(
+      /return super\.application\(application, didFinishLaunchingWithOptions: launchOptions\)/,
+      `${LAUNCH_OPTIONS_INJECTION.trim()}`,
+    );
+
+    // 3d. Insert deviceToken handler into AppDelegate class body
+    //     (AppDelegate class ends right before "class ReactNativeDelegate")
     const classBoundary = mod.modResults.contents.indexOf('class ReactNativeDelegate');
     if (classBoundary !== -1) {
       const beforeBoundary = mod.modResults.contents.slice(0, classBoundary);
@@ -81,12 +151,13 @@ function withRongCloudIosPush(config) {
         mod.modResults.contents =
           beforeBoundary.slice(0, lastClose) +
           DEVICE_TOKEN_HANDLER +
+          NOTIFICATION_TAP_HANDLER +
           beforeBoundary.slice(lastClose) +
           mod.modResults.contents.slice(classBoundary);
       }
     }
 
-    // Append the handler class at the end of the file
+    // 3e. Append handler class at end of file
     mod.modResults.contents += HANDLER_CLASS;
 
     return mod;
@@ -95,4 +166,4 @@ function withRongCloudIosPush(config) {
   return config;
 }
 
-module.exports = createRunOncePlugin(withRongCloudIosPush, TAG, '1.0.0');
+module.exports = createRunOncePlugin(withRongCloudIosPush, TAG, '1.1.0');

@@ -75,7 +75,7 @@ import type {
 const CS_CALL_TIMEOUT_SECONDS = 60;
 
 const closeIcon = require("../../../../assets/voice-room/navbar-exit.svg");
-const inviteIcon = require("../../../../assets/voice-room/invite.svg");
+const inviteIcon = require("../../../../assets/voice-room/toolbar-invite.svg");
 const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
 const ringOwner = require("../../../../assets/voice-room/ring-owner.svg");
 const ringInvite = require("../../../../assets/voice-room/ring-invite.svg");

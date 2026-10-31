@@ -12,6 +12,7 @@ const RONG_PUSH_VERSION = '5.34.2';
 
 const VENDOR_REPOS = [
   '        // RongCloud Push 2.0 vendor repositories',
+  "        maven { url 'https://maven.rongcloud.cn/repository/maven-releases' }",
   "        maven { url 'https://developer.huawei.com/repo/' }",
   "        maven { url 'https://developer.hihonor.com/repo' }",
 ].join('\n');

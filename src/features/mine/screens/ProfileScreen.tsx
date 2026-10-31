@@ -69,10 +69,10 @@ import { EmptyState } from "@/shared/ui/AsyncStates";
 import { showToast } from "@/shared/ui/app-toast";
 
 const fallbackAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
-const background = require("../../../../assets/mine/figma/profile-bg.png");
+const background = require("../../../../assets/mine/figma/profile-bg.webp");
 const maleIcon = require("../../../../assets/home/club-detail/male.svg");
 const femaleIcon = require("../../../../assets/mine/figma/mine-female.svg");
-const backIcon = require("../../../../assets/mine/figma/profile-back.svg");
+const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const settingsIcon = require("../../../../assets/mine/figma/mine-settings.svg");
 const customerIcon = require("../../../../assets/coms/customer.svg");
 const arrowDownIcon = require("../../../../assets/mine/figma/profile-arrow-down.svg");

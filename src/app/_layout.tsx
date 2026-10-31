@@ -5,6 +5,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PermissionsAndroid, Platform } from "react-native";
+import { handlePendingPushClick } from "@/features/message/push-click-handler";
 import { RootSiblingParent } from "react-native-root-siblings";
 import { showToast } from "@/shared/ui/app-toast";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -137,6 +138,7 @@ export default function RootLayout() {
       if (lastInitToken.current === accessToken) return;
       lastInitToken.current = accessToken;
       void initializeMessages(accessToken);
+      void handlePendingPushClick();
     } else if (privacyReady) {
       lastInitToken.current = null;
       void resetMessages();

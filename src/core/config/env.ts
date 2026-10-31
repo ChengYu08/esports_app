@@ -5,7 +5,8 @@ import { z } from "zod";
 const envSchema = z.object({
   apiBaseUrl: z.string().url().default("https://djapi.jlgkj.top"),
   ssoBaseUrl: z.string().url().default("https://auth.jlgkj.top"),
-  protocolBaseUrl: z.string().url(),
+  protocolBaseUrlIos: z.string().url(),
+  protocolBaseUrlAndroid: z.string().url(),
   environment: z
     .enum(["development", "preview", "production"])
     .default("development"),
@@ -29,7 +30,11 @@ const isIos = Platform.OS === "ios";
 const environment =
   (extra.environment as string | undefined) ??
   process.env.EXPO_PUBLIC_ENVIRONMENT;
-const defaultProtocolBaseUrl =
+const defaultProtocolBaseUrlIos =
+  environment === "production"
+    ? "https://djpc.jlgkj.top"
+    : "https://djpc.yingbowl.com";
+const defaultProtocolBaseUrlAndroid =
   environment === "production"
     ? "https://dj.panzhi.com"
     : "https://djpc.yingbowl.com";
@@ -41,10 +46,14 @@ export const env = envSchema.parse({
   ssoBaseUrl: isIos
     ? (extra.ssoBaseUrlIos ?? process.env.EXPO_PUBLIC_SSO_BASE_URL_IOS)
     : (extra.ssoBaseUrlAndroid ?? process.env.EXPO_PUBLIC_SSO_BASE_URL_ANDROID),
-  protocolBaseUrl:
-    extra.protocolBaseUrl ??
-    process.env.EXPO_PUBLIC_PROTOCOL_BASE_URL ??
-    defaultProtocolBaseUrl,
+  protocolBaseUrlIos:
+    extra.protocolBaseUrlIos ??
+    process.env.EXPO_PUBLIC_PROTOCOL_BASE_URL_IOS ??
+    defaultProtocolBaseUrlIos,
+  protocolBaseUrlAndroid:
+    extra.protocolBaseUrlAndroid ??
+    process.env.EXPO_PUBLIC_PROTOCOL_BASE_URL_ANDROID ??
+    defaultProtocolBaseUrlAndroid,
   environment,
   ssoClientAppId: isIos ? "dianjing-ios" : "dianjing-android",
   ssoClientSecret: isIos
@@ -73,5 +82,5 @@ console.log("[ENV-CHECK]", JSON.stringify({
   environment: env.environment,
   apiBaseUrl: env.apiBaseUrl,
   ssoBaseUrl: env.ssoBaseUrl,
-  protocolBaseUrl: env.protocolBaseUrl,
+  protocolBaseUrl: isIos ? env.protocolBaseUrlIos : env.protocolBaseUrlAndroid,
 }));
