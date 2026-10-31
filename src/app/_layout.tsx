@@ -4,6 +4,8 @@ import { router, Stack, usePathname } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { PermissionsAndroid, Platform } from "react-native";
+import { handlePendingPushClick } from "@/features/message/push-click-handler";
 import { RootSiblingParent } from "react-native-root-siblings";
 import { showToast } from "@/shared/ui/app-toast";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -45,6 +47,13 @@ import { StartupSplash } from "@/shared/ui/StartupSplash";
 
 // Keep the native screen until the full-screen artwork is ready to display.
 void SplashScreen.preventAutoHideAsync().catch(() => undefined);
+
+// Android 13+ requires runtime POST_NOTIFICATIONS permission for vendor offline push.
+function requestNotificationPermissionIfNeeded() {
+  PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS).catch(
+    () => undefined,
+  );
+}
 
 const STARTUP_TIMEOUT_MS = 8000;
 
@@ -120,11 +129,16 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (accessToken && privacyAccepted) {
+      // Android 13+ requires runtime notification permission for vendor offline push.
+      if (Platform.OS === 'android' && Platform.Version >= 33) {
+        requestNotificationPermissionIfNeeded();
+      }
       // 防御：同 token 的 initialize 只触发一次，避免 initialize 内部 set 触发
       // React 重渲染 → effect 依赖浅比较失败 → 重复 initialize 形成抖动循环。
       if (lastInitToken.current === accessToken) return;
       lastInitToken.current = accessToken;
       void initializeMessages(accessToken);
+      void handlePendingPushClick();
     } else if (privacyReady) {
       lastInitToken.current = null;
       void resetMessages();

@@ -182,6 +182,55 @@ describe('message store', () => {
     expect(store.getState().conversations[0].isOnline).toBe(true);
     await store.getState().openConversation({ id: '42', title: 'Peer' });
     expect(store.getState().conversations[0].unreadCount).toBe(0);
+    await store.getState().reset();
+  });
+
+  it('keeps local pin and note state when the active conversation receives a message', async () => {
+    let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
+    const store = createMessageStore(makeAdapter({
+      getConversations: vi.fn(async () => [conversation]),
+      subscribeMessages: vi.fn((listener) => { receiveMessage = listener; return () => undefined; }),
+    }));
+    await store.getState().initialize('token');
+    await store.getState().setConversationPinned('42', true);
+    store.getState().setConversationNote('42', '常用陪玩');
+    await store.getState().openConversation({ id: '42', title: 'Peer' });
+    receiveMessage?.('42', { ...sentMessage, isMine: false }, conversation);
+    expect(store.getState().conversations[0]).toMatchObject({
+      isPinned: true,
+      note: '常用陪玩',
+      unreadCount: 0,
+    });
+    await store.getState().reset();
+  });
+
+  it('counts unread while the active conversation is in the background', async () => {
+    let receiveMessage: ((peerId: string, message: ManagedMessage, value: MessageConversation) => void) | undefined;
+    const store = createMessageStore(makeAdapter({
+      subscribeMessages: vi.fn((callback) => { receiveMessage = callback; return () => undefined; }),
+    }));
+    await store.getState().initialize('token');
+    await store.getState().openConversation({ id: '42', title: 'Peer' });
+    store.getState().setChatForeground(false);
+    receiveMessage?.('42', { ...sentMessage, isMine: false }, { ...conversation, preview: 'hello', updatedAt: 10 });
+    expect(store.getState().conversations[0].unreadCount).toBe(1);
+    store.getState().setChatForeground(true);
+    receiveMessage?.('42', { ...sentMessage, isMine: false, id: 'server-2' }, { ...conversation, preview: 'again', updatedAt: 20 });
+    expect(store.getState().conversations[0].unreadCount).toBe(0);
+    await store.getState().reset();
+  });
+
+  it('keeps locally accumulated unread when the remote snapshot is smaller', async () => {
+    const store = createMessageStore(makeAdapter({
+      getConversations: vi.fn(async () => [{ ...conversation, unreadCount: 2 }]),
+    }));
+    await store.getState().initialize('token');
+    await store.getState().refreshConversations('token');
+    expect(store.getState().conversations[0].unreadCount).toBe(2);
+    await store.getState().clearAllUnread();
+    await store.getState().refreshConversations('token');
+    expect(store.getState().conversations[0].unreadCount).toBe(2);
+    await store.getState().reset();
   });
 
   it('does not count own messages synced from other devices as unread', async () => {

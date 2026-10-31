@@ -67,20 +67,29 @@ steps:
         echo "ANDROID_HOME: $${ANDROID_HOME}"
 
         # ---- 按分支名自动选择构建环境 ----
-        if [ -n "$${DRONE_ENV}" ]; then
-          BUILD_ENV="$${DRONE_ENV}"
-          echo "使用手动指定 DRONE_ENV: $${BUILD_ENV}"
-        else
-          case "$DRONE_BRANCH" in
-            *prod*|*main*)
-              BUILD_ENV="prod"
-              ;;
-            *)
-              BUILD_ENV="test"
-              ;;
-          esac
-          echo "按分支自动选择构建环境: $${BUILD_ENV}"
-        fi
+        case "$DRONE_BRANCH" in
+          *prod*)
+            # prod 分支固定使用 .env.production 构建，忽略手动覆盖
+            BUILD_ENV="prod"
+            echo "prod 分支：固定使用 .env.production 构建"
+            ;;
+          *)
+            if [ -n "$${DRONE_ENV}" ]; then
+              BUILD_ENV="$${DRONE_ENV}"
+              echo "使用手动指定 DRONE_ENV: $${BUILD_ENV}"
+            else
+              case "$DRONE_BRANCH" in
+                *main*)
+                  BUILD_ENV="prod"
+                  ;;
+                *)
+                  BUILD_ENV="test"
+                  ;;
+              esac
+              echo "按分支自动选择构建环境: $${BUILD_ENV}"
+            fi
+            ;;
+        esac
 
         if [ -n "$${DRONE_ABI}" ]; then
           BUILD_ABI="$${DRONE_ABI}"
@@ -158,12 +167,9 @@ steps:
         - push
         - custom
       branch:
-        - main
-        - prod
-        - "*main*"
-        - "*prod*"
-        - "*test*"
-        - "*dev*"
+        exclude:
+          - prod
+          - "*prod*"
 
   - name: move-to-dev-server
     image: nexus.jinliwangluo.com:8082/appleboy/drone-scp-with-tools:latest
@@ -198,12 +204,9 @@ steps:
         - push
         - custom
       branch:
-        - main
-        - prod
-        - "*main*"
-        - "*prod*"
-        - "*test*"
-        - "*dev*"
+        exclude:
+          - prod
+          - "*prod*"
 
   - name: print-build-info
     image: alpine:3.19
@@ -314,12 +317,9 @@ steps:
         - push
         - custom
       branch:
-        - main
-        - prod
-        - "*main*"
-        - "*prod*"
-        - "*test*"
-        - "*dev*"
+        exclude:
+          - prod
+          - "*prod*"
     depends_on:
       - move-to-dev-server
 
@@ -329,9 +329,107 @@ trigger:
       - push
       - custom
   branch:
-    - main
+    exclude:
+      - prod
+      - "*prod*"
+
+---
+# =============================================================================
+# prod 分支专用流水线：仅 prod 分支（push / custom）触发，
+# 固定使用 .env.production 构建，不上传 dev 下载站。
+# 产物保存在构建工作区 ./apks/，流水线日志会打印文件清单。
+# =============================================================================
+kind: pipeline
+type: docker
+name: android-prod
+
+timeout: 180
+
+environment:
+  TZ_OFFSET_MINUTES: 480
+
+image_pull_secrets:
+  - dockerconfig
+
+volumes:
+  - name: gradle-cache
+    host:
+      path: /var/lib/drone/cache/esportsapp/gradle
+  - name: npm-cache
+    host:
+      path: /var/lib/drone/cache/esportsapp/npm
+  - name: ndk-cache
+    host:
+      path: /var/lib/drone/cache/esportsapp/android-ndk
+
+steps:
+  - name: build-android-prod
+    image: nexus.jinliwangluo.com:8082/panzhi/android-build-box:optimized-1.0.0
+    pull: if-not-exists
+    volumes:
+      - name: gradle-cache
+        path: /root/.gradle
+      - name: npm-cache
+        path: /root/.npm
+      - name: ndk-cache
+        path: /opt/android-sdk/ndk
+    environment:
+      ANDROID_HOME: /opt/android-sdk
+      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+      npm_config_cache: /root/.npm
+      ANDROID_NDK_VERSION: "27.1.12297006"
+    commands:
+      - |
+        set -e
+
+        echo "=========================================="
+        echo "prod 构建任务配置"
+        echo "=========================================="
+        echo "分支: $DRONE_BRANCH"
+        echo "Node: $(node -v)"
+        echo "Java: $(java -version 2>&1 | head -1)"
+
+        # prod 分支固定使用 .env.production
+        BUILD_ENV="prod"
+        BUILD_ABI="$${DRONE_ABI:-arm64}"
+        echo "构建环境: $${BUILD_ENV}（.env.production）  ABI: $${BUILD_ABI}"
+        echo "=========================================="
+
+        mkdir -p "$${ANDROID_HOME}/licenses"
+        printf '%s\n' \
+          '24333f8a63b6825ea9c5514f83c2829b004d1fee' \
+          > "$${ANDROID_HOME}/licenses/android-sdk-license"
+        printf '%s\n' \
+          '84831b9409646a918e30573bab4c9c91346d8abd' \
+          > "$${ANDROID_HOME}/licenses/android-sdk-preview-license"
+        if command -v sdkmanager >/dev/null 2>&1; then
+          yes | sdkmanager --sdk_root="$${ANDROID_HOME}" --licenses >/dev/null || true
+        fi
+
+        NDK_DIR="$${ANDROID_HOME}/ndk/$${ANDROID_NDK_VERSION}"
+        if [ ! -d "$${NDK_DIR}" ]; then
+          echo "安装 NDK $${ANDROID_NDK_VERSION}（首次会下载，之后走缓存）..."
+          sdkmanager --sdk_root="$${ANDROID_HOME}" "ndk;$${ANDROID_NDK_VERSION}"
+        else
+          echo "已命中 NDK 缓存: $${NDK_DIR}"
+        fi
+
+        pkill -9 -f GradleDaemon 2>/dev/null || true
+        pkill -9 -f KotlinCompileDaemon 2>/dev/null || true
+        find /root/.gradle -name '*.lock' -delete 2>/dev/null || true
+
+        npm ci --prefer-offline --no-audit --no-fund
+
+        node scripts/build_apk.cjs --env prod --abi "$${BUILD_ABI}"
+
+        echo "构建完成，产物:"
+        ls -lh ./apks/ 2>/dev/null || echo "未找到 APK"
+
+trigger:
+  event:
+    include:
+      - push
+      - custom
+  branch:
     - prod
-    - "*main*"
     - "*prod*"
-    - "*test*"
-    - "*dev*"

@@ -19,7 +19,7 @@ import { openExternalLink } from "@/shared/navigation/open-external-link";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { Skeleton } from "@/shared/ui/Skeleton";
 
-const headerBg = require("../../../../assets/mine/figma/star-recharge-bg.png");
+const headerBg = require("../../../../assets/mine/figma/star-recharge-bg.webp");
 const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond.png");
 
 const SCREEN_WIDTH = Dimensions.get("window").width;

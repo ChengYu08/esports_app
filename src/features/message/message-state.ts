@@ -53,6 +53,8 @@ export function mergeConversations(
     preview: hasNewerMessage ? updated.preview : current.preview,
     time: hasNewerMessage ? updated.time : current.time,
     updatedAt: Math.max(current?.updatedAt || 0, updated.updatedAt),
+    // 只升不降：本地已读清零可能比融云快照/其他端状态更新，快照回灌不能吞掉实时累加的未读
+    unreadCount: Math.max(current?.unreadCount || 0, updated.unreadCount),
     clubId: updated.clubId ?? current?.clubId,
     note: updated.note ?? current?.note,
     isPinned: updated.isPinned ?? current?.isPinned,
