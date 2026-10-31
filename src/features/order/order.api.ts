@@ -49,7 +49,11 @@ export function mapOrder(
     : rawStatus === "PROCESSING" ? "paid"
     : "pendingPayment";
   const id = stringValue(item, "id", "orderId", "orderNo") ?? `order-${index}`;
-  const total = stringValue(item, "realPayAmount", "totalPrice", "payAmount", "amount") ?? "0";
+  // PRD 金额口径：买家视角合计=实付金额(realPayAmount)，陪玩视角=订单总价(totalPrice)。
+  // 普通订单两者相等展示不变；活动订单陪玩侧看原价、买家侧看折后实付。
+  const total = scope === "accept"
+    ? stringValue(item, "totalPrice", "realPayAmount", "payAmount", "amount") ?? "0"
+    : stringValue(item, "realPayAmount", "totalPrice", "payAmount", "amount") ?? "0";
   // 接口分别返回模式、等级和服务，不能只取服务名或用旧标题覆盖。
   const serviceParts = ["gameModeName", "gameLevelName", "serviceName"]
     .map((key) => stringValue(item, key)?.trim())
@@ -127,6 +131,11 @@ export function mapOrder(
     quantity: numberValue(item, "quantity", "count", "num") ?? 1,
     billingUnitName: stringValue(item, "billingUnitName") ?? "小时",
     totalPrice: total,
+    realPayAmount: stringValue(item, "realPayAmount"),
+    productId: numberValue(item, "productId"),
+    activityId: numberValue(item, "activityId"),
+    discountAmount: numberValue(item, "discountAmount"),
+    refundBaseAmount: numberValue(item, "refundBaseAmount"),
     freeAmount: isFreeOrder ? stringValue(item, "refundAmount") : undefined,
     remark: stringValue(item, "remark", "buyerRemark"),
     ...times,

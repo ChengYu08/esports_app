@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from "vitest";
 
 import { apiClient } from "@/core/network/api-client";
 import { queryClient } from "@/core/query/query-client";
-import { computeOrderPayableStars, formatOrderFreeSummary } from "./free-amount";
+import { computeFreeSubmitAmount, computeOrderPayableStars, formatOrderFreeSummary } from "./free-amount";
 import { filterOrders } from "./order.filter";
 
 vi.mock("@/core/network/api-client", () => ({ apiClient: vi.fn() }));
@@ -77,6 +77,47 @@ it("普通部分退款使用退款文案，不冒充免单", () => {
   const order = mapOrder({ ...partialFreeOrder, isFreeOrder: false });
   expect(order.statusLabel).toBe("部分退款");
   expect(formatOrderFreeSummary(order)).toBeUndefined();
+});
+
+it("活动订单透传 productId/activityId/discountAmount/refundBaseAmount 与实付金额", () => {
+  const order = mapOrder(
+    { id: 42, orderStatus: "PAID", totalPrice: 900, realPayAmount: 800, productId: 11, activityId: 22, discountAmount: 100, refundBaseAmount: 900 },
+    0,
+    "place",
+  );
+  expect(order.productId).toBe(11);
+  expect(order.activityId).toBe(22);
+  expect(order.discountAmount).toBe(100);
+  expect(order.refundBaseAmount).toBe(900);
+  expect(order.realPayAmount).toBe("800");
+});
+
+it("普通订单不输出活动字段，金额展示保持不变", () => {
+  const order = mapOrder({ id: 42, orderStatus: "PAID", totalPrice: 500 }, 0, "place");
+  expect(order.productId).toBeUndefined();
+  expect(order.activityId).toBeUndefined();
+  expect(order.discountAmount).toBeUndefined();
+  expect(order.refundBaseAmount).toBeUndefined();
+  expect(order.realPayAmount).toBeUndefined();
+  expect(order.totalPrice).toBe("500");
+});
+
+it("金额视角：买家合计取实付金额，陪玩合计取订单总价", () => {
+  const raw = { id: 42, orderStatus: "PAID", totalPrice: 900, realPayAmount: 800 };
+  expect(mapOrder(raw, 0, "place").totalPrice).toBe("800");
+  expect(mapOrder(raw, 0, "accept").totalPrice).toBe("900");
+  // 普通订单只有总价时两个视角都回落到总价，行为不变
+  expect(mapOrder({ id: 42, orderStatus: "PAID", totalPrice: 500 }, 0, "accept").totalPrice).toBe("500");
+});
+
+it("免单提交口径：活动订单按原价退款基数折算，普通订单维持时长×单价计算值", () => {
+  // 活动订单全额免单：freeAmount 即 refundBaseAmount
+  const activity = { quantity: 2, refundBaseAmount: 900 };
+  expect(computeFreeSubmitAmount(activity, 470, 2)).toBe(900);
+  // 活动订单部分免单：按免单时长占比折算原价基数
+  expect(computeFreeSubmitAmount(activity, 470, 1)).toBe(450);
+  // 普通订单无 refundBaseAmount：维持现有计算值，行为不变
+  expect(computeFreeSubmitAmount({ quantity: 2 }, 470, 1)).toBe(470);
 });
 
 it("最终确认免单向真实业务接口提交星钻金额，失败时向上抛出", async () => {

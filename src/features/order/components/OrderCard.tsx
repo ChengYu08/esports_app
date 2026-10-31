@@ -47,6 +47,9 @@ export const OrderCard = memo(function OrderCard({
   actionPending = false,
 }: OrderCardProps) {
   const freeSummary = formatOrderFreeSummary(item);
+  // 活动订单优惠金额（普通订单不输出，展示零变化）
+  const discountAmount = item.discountAmount ?? 0;
+  const hasDiscount = discountAmount > 0;
   const copyOrderNo = async () => {
     const orderNo = item.orderNo ?? item.id;
     try {
@@ -163,6 +166,13 @@ export const OrderCard = memo(function OrderCard({
                 {item.remark || "-"}
               </Text>
             </OrderDetailRow>
+            {hasDiscount ? (
+              <OrderDetailRow label="优惠">
+                <Text style={[styles.detailValue, styles.discountValue]}>
+                  {`已优惠 ${formatStar(discountAmount)} 星钻`}
+                </Text>
+              </OrderDetailRow>
+            ) : null}
             {freeSummary ? (
               <OrderDetailRow label="免单">
                 <Text style={[styles.detailValue, styles.freeSummary]}>
@@ -409,6 +419,7 @@ const styles = StyleSheet.create({
     textDecorationLine: "line-through",
   },
   freeSummary: { color: "#FE1F4C" },
+  discountValue: { color: "#FE1F4C" },
   quantity: {
     fontFamily: SYSTEM_FONT,
     color: "#999999",

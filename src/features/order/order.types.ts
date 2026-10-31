@@ -59,6 +59,16 @@ export type OrderItemModel = {
   unitPrice: string;
   quantity: number;
   totalPrice: string;
+  /** 实付金额（买家视角合计口径，活动订单为折后金额） */
+  realPayAmount?: string;
+  /** 活动商品 ID（非空表示商品订单；不得用 activityId 反查活动商品） */
+  productId?: number;
+  /** 活动周期 ID（活动订单输出，普通订单不输出） */
+  activityId?: number;
+  /** 优惠金额（活动订单输出，普通订单不输出） */
+  discountAmount?: number;
+  /** 原价口径退款基数（活动订单免单传参用，普通订单不输出） */
+  refundBaseAmount?: number;
   /** 已免单的星钻金额，来自订单退款信息 */
   freeAmount?: string;
   remark?: string;

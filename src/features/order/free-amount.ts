@@ -89,6 +89,25 @@ export function computeFreeStarAmount(
   return raw;
 }
 
+/**
+ * 免单提交金额口径：活动订单（refundBaseAmount 非空）按原价退款基数 × 免单时长占比折算，
+ * 全额免单时即 refundBaseAmount；普通订单无该字段，维持时长×单价计算值，行为不变。
+ * 后端退款规则：退款比例 = freeAmount/totalPrice，实退 = realPayAmount × 比例。
+ */
+export function computeFreeSubmitAmount(
+  order: Pick<OrderItemModel, "quantity" | "refundBaseAmount">,
+  computedAmount: number,
+  freeHours: number,
+) {
+  const base = Number(order.refundBaseAmount);
+  if (!Number.isFinite(base) || base <= 0) {
+    return computedAmount;
+  }
+  const quantity = Number(order.quantity) > 0 ? Number(order.quantity) : 1;
+  const ratio = Math.min(1, Math.max(0, freeHours) / quantity);
+  return roundStar(base * ratio);
+}
+
 /** 订单保留下单数量，已免数量按退款星钻与原单价折算，单独展示。 */
 export function formatOrderFreeSummary(
   order: FreePriceSource &
