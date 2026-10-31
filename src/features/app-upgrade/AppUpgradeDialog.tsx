@@ -1,5 +1,5 @@
 import Constants from "expo-constants";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 
@@ -24,9 +24,11 @@ export function AppUpgradeDialog() {
 
   if (!visible) return null;
 
+  const isIos = Platform.OS === "ios";
   const busy = downloadPhase === "downloading" || downloadPhase === "installing";
-  const buttonLabel =
-    downloadPhase === "downloading"
+  const buttonLabel = isIos
+    ? "去 App Store 更新"
+    : downloadPhase === "downloading"
       ? `正在下载 ${downloadProgress}%`
       : downloadPhase === "installing"
         ? "正在启动安装…"
@@ -42,6 +44,10 @@ export function AppUpgradeDialog() {
   };
 
   const handleConfirm = () => {
+    if (isIos) {
+      void confirmUpdate();
+      return;
+    }
     if (downloadPhase === "need-permission") {
       openPermissionSettings();
       return;
@@ -68,7 +74,7 @@ export function AppUpgradeDialog() {
             <ScrollView style={styles.updateContentScroll} nestedScrollEnabled>
               <Text style={styles.updateContent}>{updateContent}</Text>
             </ScrollView>
-            {downloadPhase === "error" && (
+            {downloadPhase === "error" && !isIos && (
               <Text style={styles.errorText}>
                 {downloadErrorType === "integrity"
                   ? "安装包校验失败，已删除损坏文件，请重新下载"

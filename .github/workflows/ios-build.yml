@@ -380,8 +380,12 @@ jobs:
       - name: Configure compiler cache
         if: ${{ env.REACT_NATIVE_PROJECT == 'true' && inputs.ccache == true }}
         run: |
-          ccache --max-size=1G
+          ccache --max-size=2G
           ccache --zero-stats
+
+      - name: Resolve build concurrency
+        id: concurrency
+        run: echo "tasks=$(sysctl -n hw.ncpu)" >> "$GITHUB_OUTPUT"
 
       - name: Install CocoaPods pods (React Native)
         if: ${{ env.REACT_NATIVE_PROJECT == 'true' }}
@@ -524,7 +528,7 @@ jobs:
           fi
 
           archive_log="$RUNNER_TEMP/ios-archive.log"
-          archive_args=(archive "${archive_source[@]}" -scheme "$XCODE_SCHEME" -configuration "$IOS_BUILD_CONFIGURATION" -destination generic/platform=iOS -archivePath "$ARCHIVE_PATH" -showBuildTimingSummary "${signing_args[@]}")
+          archive_args=(archive "${archive_source[@]}" -scheme "$XCODE_SCHEME" -configuration "$IOS_BUILD_CONFIGURATION" -destination generic/platform=iOS -archivePath "$ARCHIVE_PATH" -showBuildTimingSummary -IDEBuildOperationMaxNumberOfConcurrentCompileTasks="${{ steps.concurrency.outputs.tasks }}" "${signing_args[@]}")
           echo "Archiving $XCODE_SCHEME ($IOS_BUILD_CONFIGURATION); full log will be saved to the workflow artifact on failure."
           if xcodebuild "${archive_args[@]}" > "$archive_log" 2>&1; then
             echo "Archive succeeded: $ARCHIVE_PATH"

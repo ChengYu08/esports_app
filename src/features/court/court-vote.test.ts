@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { courtApi, type CourtCase } from "./court.api";
 import {
+  applyVoteToCases,
   canApplyCourtReviewer,
   courtVoteUnavailableReason,
   isCourtReviewerApproved,
@@ -40,6 +41,18 @@ describe("App voting and reviewer certification", () => {
     expect(await submitCourtVote(activeCase, "DEFENDANT_WIN")).toMatchObject({ type: "voted" });
     expect(courtApi.getReviewerStatus).toHaveBeenCalledTimes(2);
     expect(courtApi.vote).toHaveBeenCalledExactlyOnceWith(42, "FIRST", "DEFENDANT_WIN");
+  });
+
+  it("returns the server vote counts for local list updates", async () => {
+    vi.mocked(courtApi.vote).mockResolvedValue({
+      plaintiffVoteCount: 9,
+      defendantVoteCount: 2,
+    });
+    expect(await submitCourtVote(activeCase, "PLAINTIFF_WIN")).toEqual({
+      type: "voted",
+      reviewerStatus: { pageStatus: "APPROVED" },
+      voteCounts: { plaintiffVoteCount: 9, defendantVoteCount: 2 },
+    });
   });
 
   it("reports a status lookup failure instead of treating it as missing qualification", async () => {
@@ -128,5 +141,42 @@ describe("reviewer application requirements", () => {
     expect(canApplyCourtReviewer({ ...eligible, pageStatus: "PENDING" })).toBe(false);
     expect(canApplyCourtReviewer({ ...eligible, pageStatus: "APPROVED" })).toBe(false);
     expect(canApplyCourtReviewer({ ...eligible, pageStatus: "REJECTED" })).toBe(true);
+  });
+});
+
+describe("applyVoteToCases", () => {
+  const voted = {
+    caseId: 42,
+    stage: "VOTING",
+    voteSummary: { plaintiff: 3, defendant: 5 },
+  } as CourtCase;
+
+  it("updates only the voted case with server counts and keeps other rows by reference", () => {
+    const other = { caseId: 7, stage: "VOTING" } as CourtCase;
+    const rows = applyVoteToCases(
+      [other, voted],
+      42,
+      "PLAINTIFF_WIN",
+      { plaintiffVoteCount: 4, defendantVoteCount: 5 },
+    );
+    expect(rows[0]).toBe(other);
+    expect(rows[1].myVoteResult).toBe("PLAINTIFF_WIN");
+    expect(rows[1].voteSummary).toEqual({ plaintiff: 4, defendant: 5 });
+  });
+
+  it("falls back to optimistic increment when the server omits counts", () => {
+    const rows = applyVoteToCases([voted], "42", "DEFENDANT_WIN", undefined);
+    expect(rows[0].myVoteResult).toBe("DEFENDANT_WIN");
+    expect(rows[0].voteSummary).toEqual({ plaintiff: 3, defendant: 6 });
+  });
+
+  it("handles a case without a previous summary and null counts", () => {
+    const rows = applyVoteToCases(
+      [{ caseId: 1, stage: "VOTING" } as CourtCase],
+      1,
+      "PLAINTIFF_WIN",
+      null,
+    );
+    expect(rows[0].voteSummary).toEqual({ plaintiff: 1, defendant: 0 });
   });
 });

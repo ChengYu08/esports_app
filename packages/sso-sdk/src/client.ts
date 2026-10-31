@@ -79,8 +79,12 @@ export class SsoClient {
     try {
       const headers = {
         ...createSignature(data, method, this.config),
-        // 必须带 Referer，否则会命中 WAF 被拦截
-        Referer: this.config.referer ?? "https://dj.panzhi.com/",
+        // 必须带 Referer，否则会命中 WAF 被拦截（默认按平台取协议域名）
+        Referer:
+          this.config.referer ??
+          (this.config.os === "iOS"
+            ? "https://djpc.jlgkj.top"
+            : "https://dj.panzhi.com"),
         AUTHORIZATION: `basic ${this.config.clientSecret}`,
         ...(options.headers ?? {}),
       };

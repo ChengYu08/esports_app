@@ -44,12 +44,12 @@ import {
   ProfileSkeleton,
 } from "@/features/mine/components/ProfileSkeleton";
 import { StarPaymentSheet } from "@/features/mine/components/StarPaymentSheet";
+import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
 import {
   useProfileDetail,
   useProfileGameDetail,
   useProfileReviews,
 } from "@/features/mine/hooks/use-profile-data";
-import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
 import {
   useToggleUserFollow,
   useUserFollowState,
@@ -64,9 +64,9 @@ import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { requireLogin } from "@/shared/navigation/require-login";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { showToast } from "@/shared/ui/app-toast";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { EmptyState } from "@/shared/ui/AsyncStates";
-import { showToast } from "@/shared/ui/app-toast";
 
 const fallbackAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const background = require("../../../../assets/mine/figma/profile-bg.webp");
@@ -76,7 +76,7 @@ const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const settingsIcon = require("../../../../assets/mine/figma/mine-settings.svg");
 const customerIcon = require("../../../../assets/coms/customer.svg");
 const arrowDownIcon = require("../../../../assets/mine/figma/profile-arrow-down.svg");
-const diamondIcon = require("../../../../assets/home/club-detail/icon-diamond.svg");
+const diamondIcon = require("../../../../assets/message/order-assistant-coin-3f6fcf.webp");
 const idleStatusIcon = require("../../../../assets/home/club-detail/status-idle.svg");
 const playingStatusIcon = require("../../../../assets/home/club-detail/status-playing.svg");
 type ProfileTab = "技能" | "评价";
@@ -115,7 +115,8 @@ export default function ProfileScreen() {
   );
   const paymentCancelingRef = useRef(false);
   const chatCheckPendingRef = useRef(false);
-  const { entering: enteringCS, openCustomerService } = useCustomerServiceEntry();
+  const { entering: enteringCS, openCustomerService } =
+    useCustomerServiceEntry();
   const detailQuery = useProfileDetail(routeParams);
   const detail = detailQuery.data;
   const followStateQuery = useUserFollowState(
@@ -735,7 +736,8 @@ export default function ProfileScreen() {
                 followStateQuery.data?.followed ? "已关注" : "关注"
               }
               accessibilityState={{
-                disabled: followStateQuery.isLoading || followMutation.isPending,
+                disabled:
+                  followStateQuery.isLoading || followMutation.isPending,
                 busy: followMutation.isPending,
               }}
               disabled={followStateQuery.isLoading || followMutation.isPending}
@@ -1677,7 +1679,7 @@ const styles = StyleSheet.create({
     borderColor: "#FE4267",
     backgroundColor: "#FFF5F7",
   },
-  gameLogo: { width: 20, height: 20, borderRadius: 4 },
+  gameLogo: { width: 15, height: 12.8, borderRadius: 4 },
   gameText: {
     color: "#656566",
     fontFamily: DOUYIN_SANS,
