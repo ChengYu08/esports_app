@@ -92,6 +92,32 @@ it("活动订单透传 productId/activityId/discountAmount/refundBaseAmount 与�
   expect(order.realPayAmount).toBe("800");
 });
 
+it("orderType=ACTIVITY：透传类型与三金额字段，合计按玩家/陪玩视角分流", () => {
+  const raw = {
+    id: 1869,
+    orderType: "ACTIVITY",
+    orderStatus: "PAID",
+    price: 1680,
+    quantity: 1,
+    totalPrice: 1680,
+    realPayAmount: 990,
+    discountAmount: 690,
+    productId: 10004,
+    activityId: 3,
+    billingUnitName: "次",
+  };
+  const place = mapOrder(raw, 0, "place");
+  const accept = mapOrder(raw, 0, "accept");
+  expect(place.orderType).toBe("ACTIVITY");
+  expect(place.unitPrice).toBe("1680");
+  expect(place.discountAmount).toBe(690);
+  expect(place.realPayAmount).toBe("990");
+  expect(place.billingUnitName).toBe("次");
+  // 玩家合计=实付，陪玩合计=price
+  expect(place.totalPrice).toBe("990");
+  expect(accept.totalPrice).toBe("1680");
+});
+
 it("普通订单不输出活动字段，金额展示保持不变", () => {
   const order = mapOrder({ id: 42, orderStatus: "PAID", totalPrice: 500 }, 0, "place");
   expect(order.productId).toBeUndefined();

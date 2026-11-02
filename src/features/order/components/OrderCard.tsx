@@ -47,9 +47,16 @@ export const OrderCard = memo(function OrderCard({
   actionPending = false,
 }: OrderCardProps) {
   const freeSummary = formatOrderFreeSummary(item);
-  // 活动订单优惠金额（普通订单不输出，展示零变化）
-  const discountAmount = item.discountAmount ?? 0;
-  const hasDiscount = discountAmount > 0;
+  const isActivityOrder = item.orderType === "ACTIVITY";
+  const billingUnit = item.billingUnitName ?? "小时";
+  const qty = Math.max(1, item.quantity);
+  // 活动单三行按单价口径展示；优惠/实付为订单合计时按数量折算
+  const activityOriginal = item.unitPrice;
+  const activityDiscount = formatStar((item.discountAmount ?? 0) / qty);
+  const activityRealPayRaw = Number(item.realPayAmount ?? item.totalPrice);
+  const activityRealPay = formatStar(
+    (Number.isFinite(activityRealPayRaw) ? activityRealPayRaw : 0) / qty,
+  );
   const copyOrderNo = async () => {
     const orderNo = item.orderNo ?? item.id;
     try {
@@ -140,11 +147,31 @@ export const OrderCard = memo(function OrderCard({
                 {formatOrderTime(item.createTime)}
               </Text>
             </OrderDetailRow>
-            <OrderDetailRow label="单价">
-              <Text style={styles.detailValue}>
-                {item.unitPrice}星钻/{item.billingUnitName ?? "小时"}
-              </Text>
-            </OrderDetailRow>
+            {isActivityOrder ? (
+              <>
+                <OrderDetailRow label="原价" labelWide>
+                  <Text style={styles.detailValue}>
+                    {`${activityOriginal}星钻/${billingUnit}`}
+                  </Text>
+                </OrderDetailRow>
+                <OrderDetailRow label="优惠减免" labelWide>
+                  <Text style={styles.detailValue}>
+                    {`${activityDiscount}星钻/${billingUnit}`}
+                  </Text>
+                </OrderDetailRow>
+                <OrderDetailRow label="实付" labelWide>
+                  <Text style={styles.detailValue}>
+                    {`${activityRealPay}星钻/${billingUnit}`}
+                  </Text>
+                </OrderDetailRow>
+              </>
+            ) : (
+              <OrderDetailRow label="单价">
+                <Text style={styles.detailValue}>
+                  {item.unitPrice}星钻/{billingUnit}
+                </Text>
+              </OrderDetailRow>
+            )}
             <OrderDetailRow label="订单号">
               <View style={styles.orderNoValue}>
                 <Text numberOfLines={1} style={styles.detailValue}>
@@ -166,13 +193,6 @@ export const OrderCard = memo(function OrderCard({
                 {item.remark || "-"}
               </Text>
             </OrderDetailRow>
-            {hasDiscount ? (
-              <OrderDetailRow label="优惠">
-                <Text style={[styles.detailValue, styles.discountValue]}>
-                  {`已优惠 ${formatStar(discountAmount)} 星钻`}
-                </Text>
-              </OrderDetailRow>
-            ) : null}
             {freeSummary ? (
               <OrderDetailRow label="免单">
                 <Text style={[styles.detailValue, styles.freeSummary]}>
@@ -231,13 +251,17 @@ export const OrderCard = memo(function OrderCard({
 function OrderDetailRow({
   label,
   children,
+  labelWide = false,
 }: {
   label: string;
   children: ReactNode;
+  labelWide?: boolean;
 }) {
   return (
     <View style={styles.detailRow}>
-      <Text style={styles.detailLabel}>{label}</Text>
+      <Text style={[styles.detailLabel, labelWide && styles.detailLabelWide]}>
+        {label}
+      </Text>
       <View style={styles.detailContent}>{children}</View>
     </View>
   );
@@ -387,6 +411,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
   },
+  detailLabelWide: {
+    width: "auto",
+    minWidth: 48,
+  },
   detailContent: { flex: 1 },
   detailValue: {
     color: "#0A0A0A",
@@ -419,7 +447,6 @@ const styles = StyleSheet.create({
     textDecorationLine: "line-through",
   },
   freeSummary: { color: "#FE1F4C" },
-  discountValue: { color: "#FE1F4C" },
   quantity: {
     fontFamily: SYSTEM_FONT,
     color: "#999999",

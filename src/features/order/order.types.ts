@@ -59,6 +59,8 @@ export type OrderItemModel = {
   unitPrice: string;
   quantity: number;
   totalPrice: string;
+  /** 订单类型（ACTIVITY=活动单，COMPANION=普通陪玩单等） */
+  orderType?: string;
   /** 实付金额（买家视角合计口径，活动订单为折后金额） */
   realPayAmount?: string;
   /** 活动商品 ID（非空表示商品订单；不得用 activityId 反查活动商品） */
