@@ -20,6 +20,7 @@ import {
   submitOrderReview,
   type AfterSaleMember,
   type OrderReview,
+  type OrderReviewInput,
 } from "@/features/order/order.api";
 import type { OrderAction, OrderItemModel } from "@/features/order/order.types";
 import { requireLogin } from "@/shared/navigation/require-login";
@@ -277,10 +278,15 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
       .finally(() => setActionPending(false));
   };
 
-  const submitReview = async (rating: number, content: string) => {
+  const submitReview = async (input: OrderReviewInput) => {
     if (!order || !token) return;
-    await submitOrderReview(order.orderNo || order.id, rating, content, token);
-    setReviewDetail({ rating, content });
+    await submitOrderReview(order.orderNo || order.id, input, token);
+    setReviewDetail({
+      rating: input.rating,
+      content: input.content,
+      imageUrls: input.imageUrls,
+      anonymous: input.anonymous,
+    });
     if (currentUser?.id) {
       // 评价后列表卡片需换成「已评价」，同样以详情为准就地刷新。
       await refreshOrderAfterAction(order.id, token, currentUser.id);

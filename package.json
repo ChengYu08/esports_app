@@ -59,6 +59,7 @@
     "react-native": "0.86.3",
     "react-native-agora": "4.6.4",
     "react-native-gesture-handler": "~2.32.0",
+    "react-native-keyboard-controller": "1.21.9",
     "react-native-qrcode-svg": "^6.3.46",
     "react-native-reanimated": "4.5.1",
     "react-native-root-toast": "^4.0.1",
