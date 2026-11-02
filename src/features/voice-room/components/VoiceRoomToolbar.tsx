@@ -31,8 +31,6 @@ type VoiceRoomToolbarProps = {
   /** 当前用户为房间绑定接待时展示「客服派单」 */
   showServiceDispatch?: boolean;
   showSelectCompanion?: boolean;
-  /** 活动需求进行中时展示「派单匹配中」，点击拉起选人+支付弹窗 */
-  showMatchPending?: boolean;
   onToggleDistance: () => void;
   onChangeText: (text: string) => void;
   onSend: () => void;
@@ -42,7 +40,6 @@ type VoiceRoomToolbarProps = {
   onCallService: () => void;
   onServiceDispatch?: () => void;
   onSelectCompanion?: () => void;
-  onMatchPending?: () => void;
 };
 
 export function VoiceRoomToolbar({
@@ -58,7 +55,6 @@ export function VoiceRoomToolbar({
   showCallService = false,
   showServiceDispatch = false,
   showSelectCompanion = false,
-  showMatchPending = false,
   onToggleDistance,
   onChangeText,
   onSend,
@@ -68,7 +64,6 @@ export function VoiceRoomToolbar({
   onCallService,
   onServiceDispatch,
   onSelectCompanion,
-  onMatchPending,
 }: VoiceRoomToolbarProps) {
   const { width } = useWindowDimensions();
   const compact = width < 360;
@@ -127,41 +122,6 @@ export function VoiceRoomToolbar({
             contentFit="contain"
           />
         </Pressable>
-        {showMatchPending ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="派单匹配中"
-            disabled={leaving}
-            onPress={onMatchPending}
-            hitSlop={4}
-            style={({ pressed }) => [
-              styles.actionPillButton,
-              leaving && styles.disabled,
-              pressed && styles.pressed,
-            ]}
-          >
-            <LinearGradient
-              colors={["#FF1F2E", "#FF1F69"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[
-                styles.actionPillContent,
-                compact && styles.actionPillContentCompact,
-              ]}
-            >
-              <Text
-                numberOfLines={1}
-                maxFontSizeMultiplier={1.2}
-                style={[
-                  styles.actionPillText,
-                  compact && styles.actionPillTextCompact,
-                ]}
-              >
-                派单匹配中
-              </Text>
-            </LinearGradient>
-          </Pressable>
-        ) : null}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="邀请用户"
