@@ -11,7 +11,7 @@ import { showToast } from "@/shared/ui/app-toast";
 type UseMatchSelectAndPayOptions = {
   requestNo: string;
   token: string | null;
-  /** 活动模式判定与 activityId 来源（activityCode 非空即活动模式） */
+  /** 活动模式判定（activityCode 非空即活动模式） */
   detail: QuickMatchRequestDetail | null;
   /** 候选人列表：用于把首个选中 grabId 映射为 companionUserId 以定位支付后跳转的订单 */
   candidates: QuickMatchGrabItem[];
@@ -29,7 +29,7 @@ type UseMatchSelectAndPayOptions = {
 /**
  * 「选人 + 建单 + 支付」编排（可复用单元）：
  * 匹配中页与语聊房「派单匹配中」弹窗共用；调用方持有选人与提交状态，
- * 本 hook 负责 selectAndCreateOrder（活动模式透传 activityId）与 MatchPaySheet 的拉起。
+ * 本 hook 负责 selectAndCreateOrder 与 MatchPaySheet 的拉起。
  */
 export function useMatchSelectAndPay(options: UseMatchSelectAndPayOptions) {
   const {
@@ -129,12 +129,7 @@ export function useMatchSelectAndPay(options: UseMatchSelectAndPayOptions) {
     submittingRef.current = true;
     setSubmitting(true);
     try {
-      const created = await selectAndCreateOrder(
-        requestNo,
-        grabIds,
-        tokenValue,
-        activityMode ? { activityId: detailValue?.activityId } : undefined,
-      );
+      const created = await selectAndCreateOrder(requestNo, grabIds, tokenValue);
       const matchedOrder = firstCompanionUserId
         ? created.orders.find((order) => order.serviceUserId === firstCompanionUserId)
         : undefined;
@@ -180,7 +175,7 @@ export function useMatchSelectAndPay(options: UseMatchSelectAndPayOptions) {
   return {
     /** 是否活动模式（activityCode 非空） */
     activity,
-    /** 确认下单：建单（活动带 activityId）并拉起支付面板 */
+    /** 确认下单：建单并拉起支付面板 */
     handleConfirm,
     /** 直接透传给 MatchPaySheet 的完整 props */
     paySheetProps,

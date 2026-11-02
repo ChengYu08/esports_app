@@ -443,18 +443,12 @@ export async function cancelQuickMatch(requestNo: string, token: string): Promis
   requireVoidSuccess(response, "取消派单失败，请稍后重试");
 }
 
-type SelectAndCreateOrderOptions = {
-  /** 活动模式透传活动 ID（Long 以字符串传递，后端自行解析）；普通模式不传 */
-  activityId?: string;
-};
-
 export async function selectAndCreateOrder(
   requestNo: string,
   grabIds: string[],
   token: string,
-  options?: SelectAndCreateOrderOptions,
 ): Promise<QuickMatchCreatedOrders> {
-  const activityId = (options?.activityId || "").trim();
+  // 活动归属由后端按 requestNo 反查，请求不携带活动 ID。
   const response = await apiClient<ApiEnvelope<ApiCreatedOrders>>(
     "/client/v1/quickMatch/selectAndCreateOrder",
     {
@@ -464,7 +458,6 @@ export async function selectAndCreateOrder(
         action: {
           requestNo,
           grabIds,
-          ...(activityId ? { activityId } : {}),
         },
       },
     },

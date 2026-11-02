@@ -82,8 +82,8 @@ describe("快速匹配详情：活动字段透传", () => {
   });
 });
 
-describe("selectAndCreateOrder：活动模式透传 activityId", () => {
-  it("活动模式请求 action 带 activityId（字符串透传），响应金额透传", async () => {
+describe("selectAndCreateOrder：请求只带 requestNo 与 grabIds", () => {
+  it("请求 action 不携带活动 ID（活动归属由后端按 requestNo 反查），响应金额透传", async () => {
     vi.mocked(apiClient).mockResolvedValue({
       code: "SUCCESS",
       data: {
@@ -94,15 +94,13 @@ describe("selectAndCreateOrder：活动模式透传 activityId", () => {
       },
     });
 
-    const result = await selectAndCreateOrder("QM1", ["101"], "token", {
-      activityId: "10086",
-    });
+    const result = await selectAndCreateOrder("QM1", ["101"], "token");
 
     expect(apiClient).toHaveBeenCalledWith("/client/v1/quickMatch/selectAndCreateOrder", {
       method: "POST",
       token: "token",
       body: {
-        action: { requestNo: "QM1", grabIds: ["101"], activityId: "10086" },
+        action: { requestNo: "QM1", grabIds: ["101"] },
       },
     });
     expect(result).toEqual({
@@ -113,7 +111,7 @@ describe("selectAndCreateOrder：活动模式透传 activityId", () => {
     });
   });
 
-  it("普通模式请求不带 activityId，行为不变", async () => {
+  it("多选普通模式请求结构不变", async () => {
     vi.mocked(apiClient).mockResolvedValue({
       code: "SUCCESS",
       data: { totalPrice: 20, orders: [{ orderId: "8002" }] },
