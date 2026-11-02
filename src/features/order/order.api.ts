@@ -108,10 +108,8 @@ export function mapOrder(
     receiverName: stringValue(item, "receiverNickname", "companionName"),
     receiverAvatar: receiverAvatar ? { uri: receiverAvatar } : undefined,
     clubId: numberValue(item, "companionClubId", "clubId", "receiverClubId"),
-    // 俱乐部名仅在下单侧展示（接单侧对端是老板，无俱乐部概念）
-    clubName: scope === "accept"
-      ? undefined
-      : stringValue(item, "companionClubName", "clubName"),
+    // 只认陪玩师本人所属俱乐部；订单归属 clubName（如自营渠道单）不是打手所在俱乐部，不能兜底。
+    clubName: stringValue(item, "companionClubName"),
     reviewId,
     reviewExists,
     sellerName: scope === "accept"
@@ -212,6 +210,22 @@ export async function fetchOrderDetail(orderId: string, token: string, signal?: 
   if (response.code !== "SUCCESS" || !response.data) throw new Error(response.info || "订单详情加载失败");
   const nested = response.data.orderInfo;
   return nested && typeof nested === "object" ? { ...response.data, ...(nested as ApiOrder) } : response.data;
+}
+
+export type OrderClubBrief = { id: number; name: string };
+
+/** 订单接口只回 companionClubId，俱乐部名称需另查俱乐部公开详情。 */
+export async function fetchOrderClub(clubId: number, signal?: AbortSignal): Promise<OrderClubBrief | null> {
+  const response = await apiClient<ApiEnvelope<{ id?: number | string; clubName?: string }>>(
+    `/client/v1/club/public/detail?id=${encodeURIComponent(clubId)}`,
+    { method: "GET", signal },
+  );
+  if (response.code !== "SUCCESS") {
+    throw new Error(response.info || "俱乐部信息加载失败");
+  }
+  const data = response.data;
+  if (!data?.id) return null;
+  return { id: Number(data.id), name: data.clubName || "未命名俱乐部" };
 }
 
 export async function fetchOrderPage(filter: OrderFilter, token: string, userId: string, scope: OrderScope = "place", page = 1, pageSize = 20, signal?: AbortSignal) {

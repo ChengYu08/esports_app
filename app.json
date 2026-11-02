@@ -29,6 +29,7 @@
       "expo-router",
       "expo-iap",
       "./plugins/withAndroidFullscreenSplash",
+      "./plugins/withDisableElegantTextHeight",
       [
         "expo-splash-screen",
         {

@@ -1382,10 +1382,16 @@ function toLocalProfile(
   };
 }
 
+// 状态口径与 Web getCompanionStatus 对齐：必须先确认在线，
+// 离线时残留的 gameStatus=1 不能覆盖成「游戏中」。
 function getStatus(onlineStatus: number, gameStatus: number) {
-  if (gameStatus === 1) return { label: "游戏中", color: "#F5821D" };
-  if (onlineStatus === 1) return { label: "空闲中", color: "#14A357" };
-  return null;
+  if (onlineStatus !== 1) {
+    return null;
+  }
+  if (gameStatus === 1) {
+    return { label: "游戏中", color: "#F5821D" };
+  }
+  return { label: "空闲中", color: "#14A357" };
 }
 
 function formatReviewDate(value?: string) {

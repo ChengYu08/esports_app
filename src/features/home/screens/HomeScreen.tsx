@@ -3,6 +3,7 @@ import GodListScreen from "@/features/god/screens/GodListScreen";
 import RankingScreen from "@/features/ranking/screens/RankingScreen";
 import type { GameKey, HomeTab } from "@/features/home/api/home.types";
 import { ClubCard } from "@/features/home/components/ClubCard";
+import { useClubOnlineCounts } from "@/features/home/hooks/use-club-online-counts";
 import { HomeBackground } from "@/features/home/components/HomeBackground";
 import { HomeHeader, HomeTopBar } from "@/features/home/components/HomeHeader";
 import { HomeSkeleton } from "@/features/home/components/HomeSkeleton";
@@ -126,6 +127,11 @@ export default function HomeScreen() {
     () => clubs.data?.pages.flatMap((page) => page.items) ?? [],
     [clubs.data],
   );
+  const onlineGameIds = useMemo(
+    () => selectedGame ? [Number(selectedGame)] : selectedCategory ? categoryGames.map((item) => item.id) : undefined,
+    [selectedGame, selectedCategory, categoryGames],
+  );
+  const onlineCounts = useClubOnlineCounts(clubItems, onlineGameIds, topTab === "home");
   const selectTopTab = useCallback((tab: HomeTab) => {
     setTopTab(tab);
     setMountedTabs((current) =>
@@ -145,6 +151,7 @@ export default function HomeScreen() {
       games.refetch(),
       categories.refetch(),
       banners.refetch(),
+      onlineCounts.refetch(),
     ]);
   };
   const loadMoreClubs = () => {
@@ -154,9 +161,12 @@ export default function HomeScreen() {
   };
   const renderClub = useCallback(
     ({ item }: { item: (typeof clubItems)[number] }) => (
-      <ClubCard club={item} />
+      <ClubCard
+        club={item}
+        onlineCount={onlineCounts.counts[item.id] ?? null}
+      />
     ),
-    [],
+    [onlineCounts.counts],
   );
   const header = useMemo(
     () => (
@@ -242,7 +252,8 @@ export default function HomeScreen() {
                       (clubs.isRefetching && !clubs.isFetchingNextPage) ||
                       games.isRefetching ||
                       categories.isRefetching ||
-                      banners.isRefetching
+                      banners.isRefetching ||
+                      onlineCounts.isRefetching
                     }
                     onRefresh={refreshHome}
                     tintColor="#ff214b"

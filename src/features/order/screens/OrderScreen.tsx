@@ -37,6 +37,7 @@ import {
   computeOrderPayableStars,
 } from "../free-amount";
 import { useOrderPage } from "../hooks/use-order-page";
+import { useOrderClubNames } from "../hooks/use-order-club-names";
 import {
   invalidateOrderQueries,
   refreshOrderAfterAction,
@@ -135,6 +136,12 @@ export default function OrderScreen() {
   const items = useMemo(
     () => orders.data?.pages.flatMap((page) => page.items) ?? [],
     [orders.data],
+  );
+  // 列表接口不回俱乐部名，按 companionClubId 批量解析（react-query 缓存，同俱乐部只查一次）。
+  const clubNameById = useOrderClubNames(
+    items
+      .filter((item) => !item.clubName && item.clubId != null)
+      .map((item) => Number(item.clubId)),
   );
   const emptyMessage =
     scope === "dispatch"
@@ -345,12 +352,16 @@ export default function OrderScreen() {
     ({ item }: { item: OrderItemModel }) => (
       <OrderCard
         item={item}
+        clubName={
+          item.clubName ??
+          (item.clubId != null ? clubNameById[item.clubId] : undefined)
+        }
         actionPending={pendingOrderId === item.id}
         onAction={handleOrderAction}
         onPress={handleOrderPress}
       />
     ),
-    [pendingOrderId, handleOrderAction, handleOrderPress],
+    [clubNameById, pendingOrderId, handleOrderAction, handleOrderPress],
   );
 
   // refetch 在 react-query 中是稳定引用，解构后作为依赖可让 memo 长效命中

@@ -25,7 +25,7 @@ import {
   ActivityIndicator,
   FlatList,
   Keyboard,
-  KeyboardAvoidingView,
+  type KeyboardEvent,
   Linking,
   Platform,
   Pressable,
@@ -258,6 +258,7 @@ export default function VoiceRoomScreen() {
     },
   ]);
   const [input, setInput] = useState("");
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [selectedMember, setSelectedMember] = useState<VoiceRoomMember | null>(
     null,
   );
@@ -380,6 +381,27 @@ export default function VoiceRoomScreen() {
   useEffect(() => {
     roomRef.current = room;
   }, [room]);
+
+  // 按键盘高度顶起底部工具栏（edge-to-edge 下 Android resize 常失效；麦位固定高度也会挤掉输入框）
+  useEffect(() => {
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const onShow = (event: KeyboardEvent) => {
+      setKeyboardHeight(event.endCoordinates.height);
+    };
+    const onHide = () => {
+      setKeyboardHeight(0);
+    };
+    const showSub = Keyboard.addListener(showEvent, onShow);
+    const hideSub = Keyboard.addListener(hideEvent, onHide);
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   const minimize = useCallback(() => {
     if (router.canGoBack()) router.back();
     else router.replace("/(tabs)");
@@ -1405,15 +1427,22 @@ export default function VoiceRoomScreen() {
     }
   };
 
+  const keyboardOpen = keyboardHeight > 0;
+
   return (
-    <KeyboardAvoidingView
-      style={styles.screen}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={0}
-    >
+    <View style={styles.screen}>
       <StatusBar style="light" />
       <VoiceRoomBackground />
-      <View style={[styles.safe, { paddingTop: insets.top }]}>
+      <View
+        style={[
+          styles.safe,
+          {
+            paddingTop: insets.top,
+            // 键盘高度已含底部安全区，打开时不再叠加 insets.bottom
+            paddingBottom: keyboardOpen ? keyboardHeight : 0,
+          },
+        ]}
+      >
         <View style={styles.header}>
           <Pressable
             accessibilityRole="button"
@@ -1497,7 +1526,8 @@ export default function VoiceRoomScreen() {
         </View>
 
         <VoiceRoomToolbar
-          bottomInset={insets.bottom}
+          bottomInset={keyboardOpen ? 0 : insets.bottom}
+          keyboardOpen={keyboardOpen}
           input={input}
           muted={muted}
           rtcReady={rtcReady}
@@ -1572,7 +1602,7 @@ export default function VoiceRoomScreen() {
           if (selectedMember?.userId === userId) setMemberSheetVisible(false);
         }}
       />
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -1601,11 +1631,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     paddingHorizontal: 16,
-    height: 381,
+    // flexBasis 代替固定 height，键盘顶起时可压缩且仍能看见麦位
+    flexBasis: 381,
+    flexGrow: 0,
+    flexShrink: 1,
+    minHeight: 103,
     alignItems: "center",
     alignContent: "center",
     justifyContent: "center",
     rowGap: 12,
+    overflow: "hidden",
   },
   memberSlot: { alignItems: "center", minHeight: 103, overflow: "visible" },
   avatarWrap: {
