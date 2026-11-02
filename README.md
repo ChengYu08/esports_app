@@ -120,3 +120,7 @@ EAS 云构建默认 `NODE_ENV=production`，走 `.env.production`；如需 EAS �
 | -------------- | --------------------------------- |
 | `dockerconfig` | 拉取自建 nexus 私有镜像           |
 | `ssh_rsa`      | 上传 APK 到 dev 服务器的 SSH 私钥 |
+
+## 更新记录
+
+- 2026-11-02 修复完善资料重复弹窗、聊天主页无限套娃、协议页 App 内 WebView、聊天多图发送、价目表降级（MR !64 重开触发 CI）
