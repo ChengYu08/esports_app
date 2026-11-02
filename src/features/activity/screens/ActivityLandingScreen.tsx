@@ -6,7 +6,6 @@ import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -14,9 +13,9 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ApiError } from "@/core/network/api-client";
+import { setPendingActivityRules } from "@/features/activity/activity-rules-transfer";
 import { computeActivityStatus } from "@/features/activity/activity-status";
 import { publishActivity } from "@/features/activity/api/activity.api";
-import { ActivityRulesModal } from "@/features/activity/components/ActivityRulesModal";
 import {
   formatCountdown,
   useActivityCountdown,
@@ -29,6 +28,7 @@ import { showToast } from "@/shared/ui/app-toast";
 const BG_COLOR = "#0C0C2E";
 const ACCENT_COLOR = "#FE4267";
 const FOOTER_CONTENT_BOTTOM = 22;
+const COUNTDOWN_OVERLAP = 17;
 
 /** ISO-8601 时间格式化为 MM-dd HH:mm（用于开抢时间展示）。 */
 function formatStartAt(iso: string): string {
@@ -50,7 +50,6 @@ export default function ActivityLandingScreen({ activityCode }: { activityCode: 
   const { nowMs, offsetMs } = useActivityCountdown(detail?.serverTime);
 
   const [publishing, setPublishing] = useState(false);
-  const [rulesVisible, setRulesVisible] = useState(false);
 
   const computed = useMemo(() => {
     if (!detail) {
@@ -90,6 +89,14 @@ export default function ActivityLandingScreen({ activityCode }: { activityCode: 
       router.replace("/");
     }
   }, []);
+
+  const openRules = useCallback(() => {
+    if (!detail?.rules) {
+      return;
+    }
+    setPendingActivityRules(detail.rules);
+    router.push("/activity/rules");
+  }, [detail?.rules]);
 
   const retry = useCallback(() => {
     void detailQuery.refetch();
@@ -146,6 +153,13 @@ export default function ActivityLandingScreen({ activityCode }: { activityCode: 
 
   const joinable = computed?.status === "ACTIVE" && !publishing;
   const showCountdown = computed?.status === "ACTIVE" || computed?.status === "NOT_STARTED";
+  const countdownLabel =
+    computed?.status === "NOT_STARTED"
+      ? `距开抢 ${formatCountdown(countdownMs)}`
+      : `活动倒计时 ${formatCountdown(countdownMs)}`;
+  const priceUnit = detail?.product.billingUnitName
+    ? `钻石/${detail.product.billingUnitName}`
+    : "钻石";
 
   return (
     <View style={styles.root}>
@@ -162,7 +176,7 @@ export default function ActivityLandingScreen({ activityCode }: { activityCode: 
           >
             <ChevronLeft24Regular color="white" width={24} height={24} style={styles.backIcon} />
           </Pressable>
-          <Text style={styles.navTitle}>{detail?.displayTag || "活动"}</Text>
+          <View style={styles.navMiddle} />
           <View style={styles.navRight} />
         </View>
       </View>
@@ -182,82 +196,62 @@ export default function ActivityLandingScreen({ activityCode }: { activityCode: 
         </View>
       ) : (
         <>
-          <ScrollView
-            style={styles.scroll}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            <Text style={styles.mainTitle}>{detail.mainTitle || detail.displayTag}</Text>
-            {detail.subTitle ? <Text style={styles.subTitle}>{detail.subTitle}</Text> : null}
-
-            <View style={styles.priceCard}>
-              <View style={styles.priceRow}>
-                <Text style={styles.priceValue}>{detail.product.activityPrice}</Text>
-                <Text style={styles.priceUnit}>钻石{detail.product.billingUnitName ? `/${detail.product.billingUnitName}` : ""}</Text>
-              </View>
-              <Text style={styles.originalPrice}>{detail.product.originalPrice}钻石</Text>
-            </View>
-
-            {showCountdown ? (
-              <View style={styles.statRow}>
-                <Text style={styles.statLabel}>
-                  {computed?.status === "NOT_STARTED" ? "距开始" : "距结束"}
-                </Text>
-                <Text style={styles.statValue}>{formatCountdown(countdownMs)}</Text>
-              </View>
-            ) : null}
-            <View style={styles.statRow}>
-              <Text style={styles.statLabel}>剩余名额</Text>
-              <Text style={styles.statValue}>{detail.remainingStock}个</Text>
-            </View>
-
+          <View style={styles.body}>
             {detail.rules ? (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="查看活动规则"
-                style={styles.rulesEntry}
-                onPress={() => {
-                  setRulesVisible(true);
-                }}
+                style={styles.rulesPill}
+                onPress={openRules}
               >
-                <Text style={styles.rulesEntryText}>活动规则</Text>
-                <ChevronLeft24Regular
-                  color="rgba(255,255,255,0.4)"
-                  width={16}
-                  height={16}
-                  style={styles.rulesArrow}
-                />
+                <Text style={styles.rulesPillText}>活动规则</Text>
               </Pressable>
             ) : null}
-          </ScrollView>
+
+            <View style={styles.hero}>
+              <Text style={styles.mainTitle}>{detail.mainTitle || detail.displayTag}</Text>
+              {detail.subTitle ? <Text style={styles.subTitle}>{detail.subTitle}</Text> : null}
+            </View>
+
+            <View style={styles.priceBlock}>
+              <Text style={styles.priceLabel}>秒杀价</Text>
+              <Text style={styles.priceValue}>
+                {detail.product.activityPrice}
+                <Text style={styles.priceUnit}> {priceUnit}</Text>
+              </Text>
+              <Text style={styles.originalPrice}>
+                {detail.product.originalPrice}
+                {priceUnit}
+              </Text>
+            </View>
+          </View>
 
           <View style={[styles.footer, { paddingBottom: insets.bottom + FOOTER_CONTENT_BOTTOM }]}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={buttonLabel}
-              disabled={!joinable}
-              onPress={handleJoin}
-              style={({ pressed }) => [
-                styles.joinButton,
-                !joinable && styles.joinDisabled,
-                pressed && joinable && styles.joinPressed,
-              ]}
-            >
-              <Text style={styles.joinText}>{buttonLabel}</Text>
-            </Pressable>
+            <View style={styles.ctaWrap}>
+              {showCountdown ? (
+                <View style={styles.countdownPill}>
+                  <Text style={styles.countdownText}>{countdownLabel}</Text>
+                </View>
+              ) : null}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={buttonLabel}
+                disabled={!joinable}
+                onPress={handleJoin}
+                style={({ pressed }) => [
+                  styles.joinButton,
+                  showCountdown ? styles.joinButtonWithCountdown : styles.joinButtonSolo,
+                  !joinable && styles.joinDisabled,
+                  pressed && joinable && styles.joinPressed,
+                ]}
+              >
+                <Text style={styles.joinText}>{buttonLabel}</Text>
+                <Text style={styles.joinSubText}>今日剩余名额：{detail.remainingStock}</Text>
+              </Pressable>
+            </View>
           </View>
         </>
       )}
-
-      {detail ? (
-        <ActivityRulesModal
-          visible={rulesVisible}
-          rules={detail.rules}
-          onClose={() => {
-            setRulesVisible(false);
-          }}
-        />
-      ) : null}
     </View>
   );
 }
@@ -285,13 +279,8 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
   },
-  navTitle: {
+  navMiddle: {
     flex: 1,
-    fontSize: 16,
-    lineHeight: 24,
-    fontWeight: "600",
-    color: "#FFFFFF",
-    textAlign: "center",
   },
   navRight: {
     width: 56,
@@ -320,102 +309,113 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: "#FFFFFF",
   },
-  scroll: {
+  body: {
     flex: 1,
-  },
-  scrollContent: {
-    paddingTop: 16,
     paddingHorizontal: 16,
-    paddingBottom: 32,
-    gap: 16,
+  },
+  rulesPill: {
+    position: "absolute",
+    top: 8,
+    right: 0,
+    zIndex: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderTopLeftRadius: 4,
+    borderBottomLeftRadius: 4,
+    backgroundColor: "rgba(255,255,255,0.16)",
+  },
+  rulesPillText: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: "rgba(255,255,255,0.72)",
+  },
+  hero: {
+    alignItems: "center",
+    paddingTop: 72,
+    gap: 12,
   },
   mainTitle: {
-    fontSize: 22,
-    lineHeight: 30,
+    fontSize: 28,
+    lineHeight: 36,
     fontWeight: "600",
     color: "#FFFFFF",
+    textAlign: "center",
   },
   subTitle: {
     fontSize: 14,
     lineHeight: 20,
-    color: "rgba(255,255,255,0.6)",
+    color: "rgba(255,255,255,0.72)",
+    textAlign: "center",
   },
-  priceCard: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.06)",
+  priceBlock: {
+    marginTop: 40,
+    alignItems: "center",
+    gap: 8,
   },
-  priceRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 4,
+  priceLabel: {
+    fontSize: 18,
+    lineHeight: 26,
+    fontWeight: "500",
+    color: "#FFFFFF",
   },
   priceValue: {
-    fontSize: 32,
-    lineHeight: 38,
+    fontSize: 40,
+    lineHeight: 48,
     fontWeight: "700",
     color: ACCENT_COLOR,
   },
   priceUnit: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "500",
     color: ACCENT_COLOR,
-    paddingBottom: 4,
   },
   originalPrice: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "rgba(255,255,255,0.4)",
+    fontSize: 18,
+    lineHeight: 26,
+    color: "rgba(255,255,255,0.35)",
     textDecorationLine: "line-through",
-    paddingBottom: 4,
-  },
-  statRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  statLabel: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "rgba(255,255,255,0.6)",
-  },
-  statValue: {
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: "600",
-    color: "#FFFFFF",
-  },
-  rulesEntry: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.06)",
-  },
-  rulesEntryText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "rgba(255,255,255,0.8)",
-  },
-  rulesArrow: {
-    transform: [{ rotate: "180deg" }],
   },
   footer: {
     paddingTop: 8,
     paddingHorizontal: 16,
+    alignItems: "center",
+  },
+  ctaWrap: {
+    width: 243,
+    alignItems: "center",
+  },
+  countdownPill: {
+    zIndex: 1,
+    marginBottom: -COUNTDOWN_OVERLAP,
+    paddingHorizontal: 16,
+    height: 34,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  countdownText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: "#0D0D0F",
   },
   joinButton: {
-    height: 46,
-    borderRadius: 23,
+    width: "100%",
+    minHeight: 80,
+    borderRadius: 12,
+    paddingBottom: 12,
+    paddingHorizontal: 12,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: ACCENT_COLOR,
+    gap: 4,
+  },
+  joinButtonWithCountdown: {
+    paddingTop: COUNTDOWN_OVERLAP + 8,
+  },
+  joinButtonSolo: {
+    paddingTop: 12,
   },
   joinDisabled: {
     backgroundColor: "rgba(255,255,255,0.16)",
@@ -424,9 +424,16 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
   joinText: {
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 22,
+    lineHeight: 28,
     fontWeight: "600",
     color: "#FFFFFF",
+    textAlign: "center",
+  },
+  joinSubText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: "rgba(255,255,255,0.85)",
+    textAlign: "center",
   },
 });
