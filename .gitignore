@@ -54,6 +54,10 @@ example
 # local scratch / 临时文件
 /temp
 
+# 本地排查 scratch（superpowers 工作区、含生产 AppKey 的探针脚本，禁止入库）
+/.superpowers/
+/scripts/rc-probe.cjs
+
 # Expo module Android build outputs
 modules/*/android/build/
 modules/*/android/.gradle/

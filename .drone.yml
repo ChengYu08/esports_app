@@ -3,8 +3,8 @@
 # 配套镜像：panzhi/android-build-box（JDK17 / Android SDK 预置，含 node）
 #
 # 分支规则（自动选择构建环境）：
-#   - main / prod，或分支名包含 prod、main  -> 正式包（.env.production）
-#   - 分支名包含 test、dev，或其它分支      -> 测试包（.env.development）
+#   - prod 或分支名包含 prod     -> 正式包（.env.production，走 android-prod 流水线）
+#   - test / dev / 其它分支      -> 测试包（.env.development，本流水线脚本自动判断）
 #   - 可用自定义事件变量覆盖：DRONE_ENV=prod|test、DRONE_ABI=arm64|universal|all
 #
 # 缓存：仓库已设为 Trusted，通过 host 卷挂载持久化 Gradle / npm / NDK 缓存，
@@ -66,26 +66,18 @@ steps:
         echo "Java: $(java -version 2>&1 | head -1)"
         echo "ANDROID_HOME: $${ANDROID_HOME}"
 
-        # ---- 按分支名自动选择构建环境 ----
+        # ---- 按分支名自动选择构建环境（本流水线不含 prod 分支，仍保留 prod 判断兜底） ----
         case "$DRONE_BRANCH" in
           *prod*)
-            # prod 分支固定使用 .env.production 构建，忽略手动覆盖
             BUILD_ENV="prod"
-            echo "prod 分支：固定使用 .env.production 构建"
+            echo "检测到 prod 分支：使用 .env.production 构建"
             ;;
           *)
             if [ -n "$${DRONE_ENV}" ]; then
               BUILD_ENV="$${DRONE_ENV}"
               echo "使用手动指定 DRONE_ENV: $${BUILD_ENV}"
             else
-              case "$DRONE_BRANCH" in
-                *main*)
-                  BUILD_ENV="prod"
-                  ;;
-                *)
-                  BUILD_ENV="test"
-                  ;;
-              esac
+              BUILD_ENV="test"
               echo "按分支自动选择构建环境: $${BUILD_ENV}"
             fi
             ;;
@@ -162,16 +154,8 @@ steps:
         } >> ./drone-build-info.env
 
         echo "构建元数据已生成: ./drone-build-info.env"
-    when:
-      event:
-        - push
-        - custom
-      branch:
-        exclude:
-          - prod
-          - "*prod*"
 
-  - name: move-to-dev-server
+  - name: move-to-dev-servers
     image: nexus.jinliwangluo.com:8082/appleboy/drone-scp-with-tools:latest
     pull: if-not-exists
     settings:
@@ -199,14 +183,6 @@ steps:
         from_secret: ssh_rsa
     depends_on:
       - build-android
-    when:
-      event:
-        - push
-        - custom
-      branch:
-        exclude:
-          - prod
-          - "*prod*"
 
   - name: print-build-info
     image: alpine:3.19
@@ -312,16 +288,8 @@ steps:
           echo "  ⚠️  未找到 APK 文件"
         fi
         echo " "
-    when:
-      event:
-        - push
-        - custom
-      branch:
-        exclude:
-          - prod
-          - "*prod*"
     depends_on:
-      - move-to-dev-server
+      - move-to-dev-servers
 
 trigger:
   event:
@@ -329,8 +297,9 @@ trigger:
       - push
       - custom
   branch:
-    include:
-      - test
+    exclude:
+      - prod
+      - "*prod*"
 
 ---
 # =============================================================================
