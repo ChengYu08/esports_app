@@ -25,14 +25,16 @@ import {
   ActivityIndicator,
   FlatList,
   Keyboard,
-  type KeyboardEvent,
   Linking,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import {
+  KeyboardAvoidingView,
+  useKeyboardState,
+} from "react-native-keyboard-controller";
 import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -258,7 +260,8 @@ export default function VoiceRoomScreen() {
     },
   ]);
   const [input, setInput] = useState("");
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  // 键盘可见性来自 keyboard-controller 原生事件，顶起由 KeyboardAvoidingView 处理
+  const keyboardOpen = useKeyboardState((state) => state.isVisible);
   const [selectedMember, setSelectedMember] = useState<VoiceRoomMember | null>(
     null,
   );
@@ -381,26 +384,6 @@ export default function VoiceRoomScreen() {
   useEffect(() => {
     roomRef.current = room;
   }, [room]);
-
-  // 按键盘高度顶起底部工具栏（edge-to-edge 下 Android resize 常失效；麦位固定高度也会挤掉输入框）
-  useEffect(() => {
-    const showEvent =
-      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent =
-      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-    const onShow = (event: KeyboardEvent) => {
-      setKeyboardHeight(event.endCoordinates.height);
-    };
-    const onHide = () => {
-      setKeyboardHeight(0);
-    };
-    const showSub = Keyboard.addListener(showEvent, onShow);
-    const hideSub = Keyboard.addListener(hideEvent, onHide);
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
 
   const minimize = useCallback(() => {
     if (router.canGoBack()) router.back();
@@ -1427,21 +1410,13 @@ export default function VoiceRoomScreen() {
     }
   };
 
-  const keyboardOpen = keyboardHeight > 0;
-
   return (
     <View style={styles.screen}>
       <StatusBar style="light" />
       <VoiceRoomBackground />
-      <View
-        style={[
-          styles.safe,
-          {
-            paddingTop: insets.top,
-            // 键盘高度已含底部安全区，打开时不再叠加 insets.bottom
-            paddingBottom: keyboardOpen ? keyboardHeight : 0,
-          },
-        ]}
+      <KeyboardAvoidingView
+        behavior="padding"
+        style={[styles.safe, { paddingTop: insets.top }]}
       >
         <View style={styles.header}>
           <Pressable
@@ -1526,7 +1501,7 @@ export default function VoiceRoomScreen() {
         </View>
 
         <VoiceRoomToolbar
-          bottomInset={keyboardOpen ? 0 : insets.bottom}
+          bottomInset={insets.bottom}
           keyboardOpen={keyboardOpen}
           input={input}
           muted={muted}
@@ -1557,7 +1532,7 @@ export default function VoiceRoomScreen() {
           onServiceDispatch={() => void onServiceDispatch()}
           onSelectCompanion={openSelectCompanion}
         />
-      </View>
+      </KeyboardAvoidingView>
       <VoiceRoomExitDialog
         visible={exitDialogVisible}
         isOwner={isOwner}
@@ -1667,6 +1642,9 @@ const styles = StyleSheet.create({
     flex: 1,
     marginTop: 8,
     marginHorizontal: 16,
+    // 键盘顶起后剩余高度紧张，flex 收缩会把消息列表压成 0（内容被"挤没"），
+    // 保住最小高度让消息仍可见，压缩量改由麦位区（有 minHeight 兜底）承担
+    minHeight: 96,
   },
   loading: { marginTop: 12 },
   errorText: {

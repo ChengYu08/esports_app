@@ -28,21 +28,22 @@ import {
   type CourtSource,
   type TicketTarget,
 } from "@/features/court/court.api";
+import { showToast, toastDurations } from "@/shared/ui/app-toast";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { useAuthStore } from "@esports/auth";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
-  ScrollView,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { showToast, toastDurations } from "@/shared/ui/app-toast";
-import { ScreenHeader } from "@/shared/ui/ScreenHeader";
+import {
+  KeyboardAvoidingView,
+  KeyboardAwareScrollView,
+} from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Mode = "court" | "ticket" | "evidence" | "appeal";
@@ -104,6 +105,11 @@ export default function CourtComplaintScreen() {
         ? ("APPEAL" as const)
         : ("RESUBMIT" as const);
   const caseDetail = useCaseDetail(params.caseId, requiredAction, (item) => {
+    // 与 Web 端一致：只有重新提交回填原表单；补充举证 / 申诉是全新的空白表单，
+    // 原投诉内容已在页面顶部的案件信息区展示，不带入输入框。
+    if (mode !== "court") {
+      return;
+    }
     if (item.content) setContent(item.content);
     if (item.claim) setClaim(item.claim);
     if (item.caseType) setCaseType(item.caseType as CourtCaseType);
@@ -369,10 +375,9 @@ export default function CourtComplaintScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={styles.screen}
-    >
+    // keyboard-controller 的 KeyboardAvoidingView 在 Android 上同样生效（基于原生键盘插值），
+    // 弹键盘时整列收缩、底部提交栏抬到键盘上方；配合 KeyboardAwareScrollView 自动把聚焦输入框滚入可视区
+    <KeyboardAvoidingView behavior="padding" style={styles.screen}>
       <ScreenHeader
         title={title}
         onBack={() => {
@@ -383,10 +388,15 @@ export default function CourtComplaintScreen() {
         }}
         backIconColor="#0D0D0F"
         titleStyle={styles.headerTitle}
-        style={{ paddingTop: insets.top, height: insets.top + 44, paddingHorizontal: 16 }}
+        style={{
+          paddingTop: insets.top,
+          height: insets.top + 44,
+          paddingHorizontal: 16,
+        }}
       />
-      <ScrollView
+      <KeyboardAwareScrollView
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
@@ -525,7 +535,7 @@ export default function CourtComplaintScreen() {
               驳回原因：{caseDetail.rejectionReason}
             </Text>
           )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
       <View
         style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}
       >
