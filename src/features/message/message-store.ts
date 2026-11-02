@@ -226,6 +226,8 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         isMine: message.isMine,
         isActive,
         sentAt: message.sentAt,
+        receivedOffline: message.receivedOffline === true,
+        sessionReadyAt,
       });
       if (
         !isSystemConversationId(normalizedPeerId)
@@ -332,6 +334,14 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       }
       if (expectedLifecycleRevision !== lifecycleRevision) return;
       const blockedUserIds = new Set(get().blacklistedUserIds);
+      const unreadSnapshot = conversations
+        .filter((conversation) => conversation.unreadCount > 0)
+        .map((conversation) => ({ peerId: conversation.id, title: conversation.title, unread: conversation.unreadCount }));
+      if (unreadSnapshot.length > 0) {
+        logger.info('RongCloud conversation snapshot unread', {
+          unread: JSON.stringify(unreadSnapshot),
+        });
+      }
       const blockedConversationIds = conversations
         .filter((conversation) =>
           !isSystemConversationId(conversation.id)
@@ -772,7 +782,11 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
 
       markRead: async (peerId) => {
         set((state) => ({ conversations: state.conversations.map((item) => item.id === peerId ? { ...item, unreadCount: 0 } : item) }));
-        if (get().connectionState !== 'ready') return;
+        if (get().connectionState !== 'ready') {
+          // 静默吞掉已读上报会导致服务端永远不知道已读，重装后未读会复活——必须留痕
+          logger.warn('markRead skipped while IM not ready', { peerId, connectionState: get().connectionState });
+          return;
+        }
         try { await adapter.markRead(peerId); } catch (error) { set({ lastError: error instanceof Error ? error.message : '清除未读失败' }); }
       },
 
