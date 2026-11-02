@@ -1,4 +1,3 @@
-import { useAuthStore } from "@esports/auth";
 import { Delete24Regular } from "@fluentui/react-native-icons";
 import { Paths } from "expo-file-system";
 import { Image } from "expo-image";
@@ -6,7 +5,6 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Platform,
   Pressable,
@@ -16,17 +14,14 @@ import {
   View,
 } from "react-native";
 import { showToast } from "@/shared/ui/app-toast";
+import { useAppConfirm } from "@/shared/ui/app-confirm";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { queryClient } from "@/core/query/query-client";
-import { clientAuthApi } from "@/features/auth/client-auth.api";
-import { clearAuthSession } from "@/features/auth/session-persistence";
-import { messageStore } from "@/features/message/message-store";
+import { signOut } from "@/features/auth/sign-out";
 import { readLastTeenEnabled } from "@/features/mine/teen-mode-store";
 import { useSmsNotifyStatus } from "@/features/mine/hooks/use-sms-notify";
-import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
-import { leaveVoiceChatRoom } from "@/features/voice-room/voice-room-rongcloud";
-import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
@@ -52,8 +47,6 @@ function formatBytes(bytes: number | null) {
 
 export default function BasicSettingsScreen() {
   const insets = useSafeAreaInsets();
-  const token = useAuthStore((state) => state.accessToken);
-  const clearSession = useAuthStore((state) => state.clearSession);
   const [clearing, setClearing] = useState(false);
   const [cacheModalVisible, setCacheModalVisible] = useState(false);
   const [cacheSize, setCacheSize] = useState<number | null>(() =>
@@ -102,79 +95,38 @@ export default function BasicSettingsScreen() {
   };
 
   const logout = () => {
-    Alert.alert("退出登录", "确认退出当前账号吗？", [
-      { text: "取消", style: "cancel" },
-      {
-        text: "退出登录",
-        style: "destructive",
-        onPress: () => {
-          if (loggingOut) return;
-          void (async () => {
-            setLoggingOut(true);
-            // 顺序对齐 PC 端 user.ts#logout:
-            // 1. 用旧 token 先解绑实时资源(语音房 RTC/融云聊天室),再断开 IM
-            // 2. 清本地凭证 + 内存
-            // 3. 最后并行调 logout API,服务端 token 失效在本地清理之后、跳转之前完成
-            try {
-              const { activeRoom, joiningRoom, clearActiveRoom } =
-                useVoiceRoomSessionStore.getState();
-              clearActiveRoom();
-              if (activeRoom || joiningRoom) {
-                await leaveVoiceRtc().catch(() => undefined);
-                const chatroomIds = new Set([
-                  activeRoom?.rongChatroomId,
-                  joiningRoom?.rongChatroomId,
-                ]);
-                await Promise.allSettled(
-                  [...chatroomIds]
-                    .filter((id): id is string => Boolean(id))
-                    .map((id) => leaveVoiceChatRoom(id)),
-                );
-              }
-              await messageStore
-                .getState()
-                .reset()
-                .catch(() => undefined);
-            } finally {
-              try {
-                await clearAuthSession();
-              } catch {
-                // Local sign-out still completes when secure storage is unavailable.
-              }
-              clearSession();
-              queryClient.clear();
-              // 后端 logout 失败不阻塞本地登出;但仍要等其完成,避免新账号拿到未失效的旧 token。
-              if (token) {
-                await clientAuthApi.logout(token).catch(() => undefined);
-              }
-              router.replace("/");
-              setLoggingOut(false);
-            }
-          })();
-        },
-      },
-    ]);
+    void (async () => {
+      const confirmed = await useAppConfirm.getState().confirm({
+        title: "退出登录",
+        message: "确认退出当前账号吗？",
+        cancelText: "取消",
+        confirmText: "退出登录",
+      });
+      if (!confirmed) {
+        return;
+      }
+      if (loggingOut) {
+        return;
+      }
+      setLoggingOut(true);
+      try {
+        await signOut();
+      } finally {
+        router.replace("/");
+        setLoggingOut(false);
+      }
+    })();
   };
 
   return (
     <View style={styles.screen}>
-      <View
-        style={[
-          styles.header,
-          { paddingTop: insets.top, height: insets.top + 44 },
-        ]}
-      >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="返回"
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Image source={backIcon} style={styles.backIcon} />
-        </Pressable>
-        <Text style={styles.headerTitle}>基础设置</Text>
-        <View style={styles.headerEnd} />
-      </View>
+      <ScreenHeader
+        title="基础设置"
+        onBack={() => router.back()}
+        backIcon={backIcon}
+        titleStyle={styles.headerTitle}
+        style={{ paddingTop: insets.top, height: insets.top + 44 }}
+      />
 
       <ScrollView
         contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) }}
@@ -310,26 +262,12 @@ function SettingsRow({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F7F7" },
-  header: {
-    backgroundColor: "#FFF",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  backButton: {
-    width: 48,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
   headerTitle: {
     color: "#0A0A0A",
     fontWeight: "500",
     fontSize: 16,
     lineHeight: 24,
   },
-  headerEnd: { width: 16 },
   settingsGroup: { marginTop: 8, backgroundColor: "#FFF" },
   row: {
     minHeight: 54,

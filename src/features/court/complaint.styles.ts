@@ -3,20 +3,6 @@ import { StyleSheet } from "react-native";
 
 export const complaintStyles = StyleSheet.create({
   screen: { backgroundColor: "#f7f7f7", flex: 1 },
-  header: {
-    alignItems: "center",
-    backgroundColor: "#fff",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-  },
-  back: {
-    alignItems: "flex-start",
-    height: 44,
-    justifyContent: "center",
-    width: 44,
-  },
-  backIcon: { height: 24, width: 24 },
   headerTitle: {
     color: "#111",
     fontFamily: COURT_FONT_FAMILY,

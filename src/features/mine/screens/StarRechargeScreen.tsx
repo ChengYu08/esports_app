@@ -10,13 +10,13 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Path } from "react-native-svg";
 
 import { useStarIap } from "@/features/iap/use-star-iap";
 import { fetchStarBalance } from "@/features/mine/api/companion-order.api";
 import { APP_LINKS } from "@/core/config/links";
 import { openExternalLink } from "@/shared/navigation/open-external-link";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { Skeleton } from "@/shared/ui/Skeleton";
 
 const headerBg = require("../../../../assets/mine/figma/star-recharge-bg.webp");
@@ -30,17 +30,6 @@ const CARD_WIDTH = (SCREEN_WIDTH - GRID_PADDING * 2 - GRID_GAP * 2) / 3;
 
 function formatAmount(value: number): string {
   return value.toLocaleString("zh-CN");
-}
-
-function BackIcon() {
-  return (
-    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M15.9078 19.0673C16.2298 19.3895 16.2299 19.9112 15.9078 20.2333C15.5857 20.5553 15.0639 20.5553 14.7418 20.2333L7.47762 12.9692C6.94244 12.4336 6.94218 11.5652 7.47762 11.0297L14.7418 3.76701C15.064 3.44483 15.5856 3.44483 15.9078 3.76701C16.23 4.08919 16.23 4.61084 15.9078 4.93303L8.84286 11.9994L15.9078 19.0673Z"
-        fill="#0D0D0F"
-      />
-    </Svg>
-  );
 }
 
 export default function StarRechargeScreen() {
@@ -181,19 +170,14 @@ export default function StarRechargeScreen() {
         style={[styles.headerBg, { height: HEADER_BG_HEIGHT }]}
       />
 
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="返回"
-          hitSlop={10}
-          onPress={() => router.back()}
-          style={styles.headerSide}
-        >
-          <BackIcon />
-        </Pressable>
-        <Text style={styles.headerTitle}>星钻充值</Text>
-        <View style={styles.headerSide} />
-      </View>
+      <ScreenHeader
+        title="星钻充值"
+        onBack={() => router.back()}
+        backgroundColor="transparent"
+        backIconColor="#0D0D0F"
+        titleStyle={styles.headerTitle}
+        style={{ paddingTop: insets.top, height: insets.top + 44 }}
+      />
 
       <View style={styles.balanceSection}>
         <Text style={styles.balanceValue}>
@@ -361,17 +345,6 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     width: SCREEN_WIDTH,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  headerSide: {
-    width: 48,
-    height: 44,
-    paddingLeft: 12,
-    justifyContent: "center",
   },
   headerTitle: {
     color: "#0D0D0F",

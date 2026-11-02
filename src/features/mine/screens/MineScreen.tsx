@@ -180,6 +180,9 @@ export default function MineScreen() {
   const genderIcon =
     user?.gender === 1 ? maleIcon : user?.gender === 2 ? femaleIcon : null;
 
+  // 已加入俱乐部（login/info 返回 clubInfo）的用户不再展示入驻入口。
+  const hasClub = Boolean(user?.clubInfo?.id);
+
   const menuItems = [
     {
       key: "room",
@@ -208,18 +211,22 @@ export default function MineScreen() {
           ? router.push("/companion-dashboard")
           : setQrCodeVisible(true),
     },
-    {
-      key: "club-apply",
-      title: "俱乐部入驻",
-      icon: (
-        <Image
-          source={menuClubIcon}
-          contentFit="contain"
-          style={styles.menuIcon}
-        />
-      ),
-      onPress: () => setClubQrCodeVisible(true),
-    },
+    ...(hasClub
+      ? []
+      : [
+          {
+            key: "club-apply",
+            title: "俱乐部入驻",
+            icon: (
+              <Image
+                source={menuClubIcon}
+                contentFit="contain"
+                style={styles.menuIcon}
+              />
+            ),
+            onPress: () => setClubQrCodeVisible(true),
+          },
+        ]),
     {
       key: "settings",
       title: "基础设置",

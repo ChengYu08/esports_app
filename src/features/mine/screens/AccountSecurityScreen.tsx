@@ -4,6 +4,8 @@ import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
+
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const arrowIcon = require("../../../../assets/mine/figma/mine-arrow-right.svg");
 
@@ -21,25 +23,19 @@ export default function AccountSecurityScreen() {
     router.push("/real-name-verification");
   };
 
+  const openChangePassword = () => {
+    router.push("/change-password");
+  };
+
   return (
     <View style={styles.screen}>
-      <View
-        style={[
-          styles.header,
-          { height: 44 + insets.top, paddingTop: insets.top },
-        ]}
-      >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="返回"
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Image source={backIcon} style={styles.backIcon} />
-        </Pressable>
-        <Text style={styles.title}>账号与安全</Text>
-        <View style={styles.headerEnd} />
-      </View>
+      <ScreenHeader
+        title="账号与安全"
+        onBack={() => router.back()}
+        backIcon={backIcon}
+        titleStyle={styles.title}
+        style={{ paddingTop: insets.top, height: insets.top + 44 }}
+      />
       <View style={styles.group}>
         <Pressable
           accessibilityRole="button"
@@ -71,6 +67,18 @@ export default function AccountSecurityScreen() {
             {phone ? "（已绑定）" : ""}
           </Text>
         </View>
+        <View style={styles.divider} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="修改密码"
+          onPress={openChangePassword}
+          style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+        >
+          <Text style={styles.label}>修改密码</Text>
+          <View style={styles.rowRight}>
+            <Image source={arrowIcon} style={styles.arrow} />
+          </View>
+        </Pressable>
       </View>
       <Pressable
         accessibilityRole="button"
@@ -88,20 +96,6 @@ export default function AccountSecurityScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F7F7" },
-  header: {
-    backgroundColor: "#FFF",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  backButton: {
-    width: 48,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
-  headerEnd: { width: 16 },
   title: {
     color: "#0A0A0A",
     fontSize: 16,

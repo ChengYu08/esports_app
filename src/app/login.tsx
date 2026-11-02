@@ -85,6 +85,7 @@ export default function LoginRoute() {
             os: Platform.OS === "ios" ? "iOS" : "Android",
             sourceType:
               Platform.OS === "ios" ? "dianjing-ios" : "dianjing-android",
+            referer: env.referer,
             onRequestLog: (log) => console.log("[SSO]", JSON.stringify(log)),
           })
         : null,

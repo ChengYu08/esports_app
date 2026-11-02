@@ -12,9 +12,11 @@ const ONCREATE_INJECT = `
     handlePushClickIntent(intent)`;
 
 // New methods added to the class (onNewIntent + handlePushClickIntent)
+// 注意 onNewIntent 参数必须是非空 Intent：Activity.onNewIntent 的 Kotlin 签名为 (Intent)，
+// 用 Intent? 会报 "overrides nothing"，super 调用处也随之类型不匹配
 const NEW_METHODS = `
   ${MARKER} handle warm-start push tap
-  override fun onNewIntent(intent: android.content.Intent?) {
+  override fun onNewIntent(intent: android.content.Intent) {
     super.onNewIntent(intent)
     handlePushClickIntent(intent)
   }

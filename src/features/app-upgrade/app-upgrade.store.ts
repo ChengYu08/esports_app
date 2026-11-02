@@ -16,7 +16,7 @@ import {
   reuseCachedApkIfVerified,
 } from "./apk-installer";
 import { appUpgradeApi } from "./app-upgrade.api";
-import type { AppVersionVO } from "./app-upgrade.contract";
+import type { AppUpgradePlatform, AppVersionVO } from "./app-upgrade.contract";
 import { decideAppUpgrade } from "./app-upgrade-gate";
 
 export type AppUpgradeDownloadPhase =
@@ -62,14 +62,15 @@ type AppUpgradeState = {
 };
 
 const currentVersion = Constants.expoConfig?.version ?? "1.0.0";
+const currentPlatform: AppUpgradePlatform =
+  Platform.OS === "ios" ? "IOS" : "ANDROID";
 
 function runCheck(silent: boolean): Promise<boolean> {
   const store = useAppUpgradeStore;
   return (async () => {
-    if (Platform.OS !== "android") return false;
     store.setState({ checking: true });
     try {
-      const latest = await appUpgradeApi.fetchLatestVersion("ANDROID", currentVersion);
+      const latest = await appUpgradeApi.fetchLatestVersion(currentPlatform, currentVersion);
       const decision = decideAppUpgrade(latest, currentVersion);
       // 重新弹出弹窗时清理上次下载尝试的残留状态，避免显示过期的失败提示；
       // 下载/安装进行中不打断，已缓存的下载文件保留（复用路径会重新校验 md5）
@@ -150,6 +151,14 @@ export const useAppUpgradeStore = create<AppUpgradeState>(() => ({
       downloadPhase === "downloading" ||
       downloadPhase === "installing"
     ) {
+      return;
+    }
+
+    // iOS 无 APK 下载/安装流程，直接跳 App Store
+    // 动态 import：Android 已 exclude expo-store-review 原生模块，静态 import 会在启动时报错
+    if (Platform.OS === "ios") {
+      const { openAppStoreReview } = await import("./ios-store-review");
+      await openAppStoreReview();
       return;
     }
 

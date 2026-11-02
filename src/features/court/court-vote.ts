@@ -62,6 +62,37 @@ export async function submitCourtVote(item: CourtCase, side: "PLAINTIFF_WIN" | "
   if (!latest.actions?.includes("VOTE")) {
     throw new Error("当前账号无法参与此案件的投票");
   }
-  await courtApi.vote(latest.caseId, latest.level || "FIRST", side);
-  return { type: "voted" as const, reviewerStatus };
+  const voteCounts = await courtApi.vote(
+    latest.caseId,
+    latest.level || "FIRST",
+    side,
+  );
+  return { type: "voted" as const, reviewerStatus, voteCounts };
+}
+
+/** 投票成功后的本地列表更新：优先采用服务端返回的最新票数，缺省时对所投一侧乐观 +1。 */
+export function applyVoteToCases(
+  cases: CourtCase[],
+  caseId: string | number,
+  result: "PLAINTIFF_WIN" | "DEFENDANT_WIN",
+  counts?: { plaintiffVoteCount?: number; defendantVoteCount?: number } | null,
+): CourtCase[] {
+  return cases.map((row) => {
+    if (String(row.caseId) !== String(caseId)) {
+      return row;
+    }
+    const summary = row.voteSummary ?? {};
+    return {
+      ...row,
+      myVoteResult: result,
+      voteSummary: {
+        plaintiff:
+          counts?.plaintiffVoteCount ??
+          (summary.plaintiff ?? 0) + (result === "PLAINTIFF_WIN" ? 1 : 0),
+        defendant:
+          counts?.defendantVoteCount ??
+          (summary.defendant ?? 0) + (result === "DEFENDANT_WIN" ? 1 : 0),
+      },
+    };
+  });
 }

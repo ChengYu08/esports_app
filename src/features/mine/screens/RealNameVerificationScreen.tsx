@@ -12,6 +12,7 @@ import {
 } from "@/features/mine/real-name";
 import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
 import { submitRealNameVerification } from "@/features/mine/real-name-session";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { colors } from "@/shared/theme/tokens";
 
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
@@ -72,23 +73,13 @@ export function RealNameVerificationScreen() {
 
   return (
     <View style={styles.screen}>
-      <View
-        style={[
-          styles.header,
-          { height: 44 + insets.top, paddingTop: insets.top },
-        ]}
-      >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="返回"
-          onPress={goBack}
-          style={styles.backButton}
-        >
-          <Image source={backIcon} style={styles.backIcon} />
-        </Pressable>
-        <Text style={styles.title}>实名认证</Text>
-        <View style={styles.headerEnd} />
-      </View>
+      <ScreenHeader
+        title="实名认证"
+        onBack={goBack}
+        backIcon={backIcon}
+        titleStyle={styles.title}
+        style={{ paddingTop: insets.top, height: insets.top + 44 }}
+      />
       {phase === "form" ? (
         <View style={styles.formBody}>
           <View style={styles.noticeBar}>
@@ -219,20 +210,6 @@ export function RealNameVerificationScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#FFF" },
-  header: {
-    backgroundColor: "#FFF",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  backButton: {
-    width: 48,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
-  headerEnd: { width: 16 },
   title: {
     color: "#0A0A0A",
     fontSize: 16,

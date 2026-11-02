@@ -201,7 +201,12 @@ export default function ClubSearchScreen() {
           onPress={handleSubmit}
           style={styles.submit}
         >
-          <Text style={[styles.submitText, input.trim().length > 0 && styles.submitActive]}>搜索</Text>
+          <Text
+            numberOfLines={1}
+            style={[styles.submitText, input.trim().length > 0 && styles.submitActive]}
+          >
+            搜索
+          </Text>
         </Pressable>
       </View>
       {searching && searchType !== "message" ? (
@@ -275,7 +280,15 @@ const styles = StyleSheet.create({
     color: "#111",
     textAlignVertical: "center",
   },
-  submit: { width: 56, height: 44, paddingLeft: 12, paddingRight: 16, alignItems: "center", justifyContent: "center" },
+  // 不写死宽度：固定 56 减去左右内边距后只剩 28pt，两个 14pt 汉字会被挤成两行
+  submit: {
+    height: 44,
+    flexShrink: 0,
+    paddingLeft: 12,
+    paddingRight: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   submitText: {
     ...searchTypography.medium14,
     color: "#FF708D",

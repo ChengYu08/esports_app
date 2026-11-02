@@ -1,12 +1,12 @@
-import { memo } from "react";
 import { Image } from "expo-image";
+import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 
 const maleIcon = require("../../../assets/home/club-detail/male.svg");
 const femaleIcon = require("../../../assets/mine/figma/mine-female.svg");
-const diamondIcon = require("../../../assets/home/club-detail/icon-diamond.svg");
+const diamondIcon = require("../../../assets/message/order-assistant-coin-3f6fcf.webp");
 const emptyAvatar = require("../../../assets/mine/figma/mine-avatar.png");
 const statusPlayingIcon = require("../../../assets/home/club-detail/status-playing.svg");
 const statusIdleIcon = require("../../../assets/home/club-detail/status-idle.svg");
@@ -101,21 +101,42 @@ export const CompanionCard = memo(function CompanionCard({
             {sex === 1 || sex === 2 ? (
               <Image
                 source={sex === 1 ? maleIcon : femaleIcon}
-                style={[styles.genderIcon, sex === 1 ? styles.genderMale : styles.genderFemale]}
+                style={[
+                  styles.genderIcon,
+                  sex === 1 ? styles.genderMale : styles.genderFemale,
+                ]}
               />
             ) : null}
             {age != null && (sex === 1 || sex === 2) ? (
-              <Text style={[styles.ageText, sex === 1 ? styles.ageTextMale : styles.ageTextFemale]}>
+              <Text
+                style={[
+                  styles.ageText,
+                  sex === 1 ? styles.ageTextMale : styles.ageTextFemale,
+                ]}
+              >
                 {age}
               </Text>
             ) : null}
             {online ? (
-              <View style={[styles.statusTag, busy ? styles.statusBusyBg : styles.statusIdleBg]}>
+              <View
+                style={[
+                  styles.statusTag,
+                  busy ? styles.statusBusyBg : styles.statusIdleBg,
+                ]}
+              >
                 <Image
                   source={busy ? statusPlayingIcon : statusIdleIcon}
-                  style={[styles.statusTagIcon, busy ? styles.statusIconBusy : styles.statusIconIdle]}
+                  style={[
+                    styles.statusTagIcon,
+                    busy ? styles.statusIconBusy : styles.statusIconIdle,
+                  ]}
                 />
-                <Text style={[styles.statusTagText, busy ? styles.statusBusyText : styles.statusIdleText]}>
+                <Text
+                  style={[
+                    styles.statusTagText,
+                    busy ? styles.statusBusyText : styles.statusIdleText,
+                  ]}
+                >
                   {busy ? "游戏中" : "空闲中"}
                 </Text>
               </View>
@@ -124,7 +145,11 @@ export const CompanionCard = memo(function CompanionCard({
           {gameName ? (
             <View style={styles.gameTag}>
               {gameIconUrl ? (
-                <Image source={{ uri: gameIconUrl }} style={styles.gameTagIcon} contentFit="cover" />
+                <Image
+                  source={{ uri: gameIconUrl }}
+                  style={styles.gameTagIcon}
+                  contentFit="cover"
+                />
               ) : null}
               <Text style={styles.gameTagText}>{gameName}</Text>
             </View>
@@ -132,7 +157,10 @@ export const CompanionCard = memo(function CompanionCard({
           <View style={styles.introRow}>
             {introTagText ? (
               <View
-                style={[styles.levelTag, { backgroundColor: introTagColor || "#C0C4CC" }]}
+                style={[
+                  styles.levelTag,
+                  { backgroundColor: introTagColor || "#C0C4CC" },
+                ]}
               >
                 <Text style={styles.levelTagText}>{introTagText}</Text>
               </View>
@@ -232,7 +260,12 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
   },
   gameTagIcon: { width: 16, height: 16, borderRadius: 3 },
-  gameTagText: { color: "#B25C15", fontSize: 10, lineHeight: 14, fontWeight: "500" },
+  gameTagText: {
+    color: "#B25C15",
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: "500",
+  },
   introRow: {
     flexDirection: "row",
     // 标签与右侧文案垂直居中对齐，间距与卡内其他行一致为 4
@@ -274,8 +307,13 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontWeight: "600",
   },
-  diamond: { width: 15, height: 15, marginBottom: 3 },
-  salesWrap: { marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 4 },
+  diamond: { width: 15, height: 13, marginBottom: 5 },
+  salesWrap: {
+    marginLeft: "auto",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
   salesLabel: { color: "#979799", fontSize: 12, lineHeight: 18 },
   salesValue: { color: "#7F7F80", fontSize: 12, lineHeight: 18 },
 });

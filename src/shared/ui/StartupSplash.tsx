@@ -58,8 +58,8 @@ const styles = StyleSheet.create({
   // image renders "cover"-fitted into a smaller area and leaves letterboxes.
   provider: {
     flex: 1,
-    backgroundColor: "#2A1013",
+    backgroundColor: "#FFFFFF",
   },
-  screen: { flex: 1, backgroundColor: "#2A1013" },
+  screen: { flex: 1, backgroundColor: "#FFFFFF" },
   image: { flex: 1, width: "100%" },
 });

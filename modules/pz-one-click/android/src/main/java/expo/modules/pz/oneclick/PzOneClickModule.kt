@@ -178,11 +178,12 @@ class PzOneClickModule : Module() {
     val gray9 = Color.rgb(128, 128, 128)             // #808080
     val linkBlue = Color.rgb(27, 106, 224)           // #1B6AE0
 
-    // Figma 按钮：高 42、圆角 8、红 #FE1F4C
+    // Figma 按钮：高 42、圆角 8、红 #FE1F4C，左右边距 15dp
     val loginButton = GradientDrawable().apply {
       setColor(brandPrimary)
       cornerRadius = 8f * density
     }
+    val loginButtonMargin = (15f * density).toInt()
     return com.mobile.auth.gatewayauth.AuthUIConfig.Builder()
     // 授权页进出不做动画：退出时 RN 侧会立即盖一层全屏加载遮罩，
     // SDK 默认的 Activity 转场动画会和遮罩淡入打架，看起来像闪回登录页。
@@ -207,7 +208,7 @@ class PzOneClickModule : Module() {
     .setLogBtnText("一键登录")
     .setLogBtnTextSizeDp(14)
     .setLogBtnHeight(42)
-    .setLogBtnMarginLeftAndRight((32f * density).toInt())
+    .setLogBtnMarginLeftAndRight(loginButtonMargin)
     .setLogBtnBackgroundDrawable(loginButton)
     // 「验证码或密码登录」：12dp #999999，点击后切到密码/验证码登录界面
     .setSwitchAccHidden(false)

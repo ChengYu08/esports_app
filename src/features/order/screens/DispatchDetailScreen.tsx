@@ -11,6 +11,7 @@ import { fetchDispatchDetail } from "../dispatch.api";
 import { grabQuickMatchAndEnterAudition } from "@/features/match/grab-quick-match-flow";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 const DEFAULT_AVATAR = require("../../../../assets/order/order-seller-avatar.svg");
 const GAME_FALLBACK = require("../../../../assets/voice-room/game.svg");
@@ -79,12 +80,17 @@ export function DispatchDetailScreen({ requestNo }: { requestNo: string }) {
 
   return (
     <View style={styles.screen}>
+      {/* 原页头为 88 高、内容贴底的异形结构：外层 View 负责总高与底部对齐，内部用 ScreenHeader 承载返回键/标题行。
+          原页头行高由返回键文本 lineHeight 28 决定，总高公式为 max(88, insets.top + 28 + 12) = max(88, insets.top + 40)；
+          若用组件默认 44 高，总高会被撑到 insets.top + 56，内容起点下移约 16px，故显式传 height 28 保持总高与迁移前一致 */}
       <View style={[styles.header, { paddingTop: insets.top }]}>
-        <Pressable accessibilityLabel="返回" hitSlop={12} onPress={() => router.back()} style={styles.back}>
-          <Text style={styles.backText}>‹</Text>
-        </Pressable>
-        <Text style={styles.headerTitle}>派单详情</Text>
-        <View style={styles.headerSlot} />
+        <ScreenHeader
+          title="派单详情"
+          onBack={() => router.back()}
+          backIconColor="#111111"
+          titleStyle={styles.headerTitle}
+          height={28}
+        />
       </View>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 104 + insets.bottom }]} showsVerticalScrollIndicator={false}>
         <View style={styles.statusBlock}>
@@ -177,11 +183,10 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, backgroundColor: "#FFF" },
   muted: { color: "#999", fontFamily: DOUYIN_SANS, fontSize: 14 },
   retry: { color: "#FF3158", fontFamily: DOUYIN_SANS, fontSize: 14 },
-  header: { minHeight: 88, backgroundColor: "#FFF", flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", paddingHorizontal: 16, paddingBottom: 12 },
-  back: { width: 32, alignItems: "flex-start" },
-  backText: { color: "#111", fontSize: 34, lineHeight: 28, fontWeight: "300" },
+  // 外层只管总高（minHeight 88，含 paddingTop insets.top）与内容贴底（paddingBottom 12 + flex-end）；
+  // 内部 ScreenHeader 传 height 28（原返回键文本 lineHeight），总高 = max(88, insets.top + 40) 与迁移前一致
+  header: { minHeight: 88, backgroundColor: "#FFF", justifyContent: "flex-end", paddingBottom: 12, paddingHorizontal: 16 },
   headerTitle: { color: "#111", fontFamily: DOUYIN_SANS, fontSize: 16, fontWeight: "600" },
-  headerSlot: { width: 32 },
   content: { gap: 12, paddingBottom: 24 },
   statusBlock: { backgroundColor: "#FFF", paddingHorizontal: 20, paddingVertical: 22, gap: 8 },
   statusTitle: { color: "#F02A45", fontFamily: DOUYIN_SANS, fontSize: 22, fontWeight: "700" },

@@ -33,6 +33,7 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { openExternalLink } from "@/shared/navigation/open-external-link";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const closeIcon = require("../../../../assets/svgs/icon-close.svg");
@@ -175,23 +176,13 @@ export default function AccountCancellationScreen() {
 
   return (
     <View style={styles.screen}>
-      <View
-        style={[
-          styles.header,
-          { height: 44 + insets.top, paddingTop: insets.top },
-        ]}
-      >
-        <Pressable
-          accessibilityLabel="返回"
-          accessibilityRole="button"
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Image source={backIcon} style={styles.backIcon} />
-        </Pressable>
-        <Text style={styles.headerTitle}>注销</Text>
-        <View style={styles.headerEnd} />
-      </View>
+      <ScreenHeader
+        title="注销"
+        onBack={() => router.back()}
+        backIcon={backIcon}
+        titleStyle={styles.headerTitle}
+        style={{ paddingTop: insets.top, height: insets.top + 44 }}
+      />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -220,7 +211,7 @@ export default function AccountCancellationScreen() {
             我已阅读并同意
             <Text
               style={styles.agreementLink}
-              onPress={() => void openExternalLink(APP_LINKS.userAgreement)}
+              onPress={() => void openExternalLink(APP_LINKS.accountCancellation)}
             >
               《注销协议》
             </Text>
@@ -346,20 +337,6 @@ function maskPhone(phone?: string) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#FFF" },
-  header: {
-    backgroundColor: "#FFF",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  backButton: {
-    width: 48,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
-  headerEnd: { width: 16 },
   headerTitle: {
     color: "#0A0A0A",
     fontSize: 16,

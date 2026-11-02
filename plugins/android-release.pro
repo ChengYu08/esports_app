@@ -38,6 +38,20 @@
 -dontwarn com.huawei.hms.common.ApiException
 -dontwarn com.huawei.hms.push.HmsMessageService
 -dontwarn com.huawei.hms.push.RemoteMessage
+# Huawei HMS 依赖的厂商/分析可选类，本机无对应 SDK，R8 需忽略
+-dontwarn android.telephony.HwTelephonyManager
+-dontwarn com.huawei.android.os.BuildEx$VERSION
+-dontwarn com.huawei.hianalytics.process.HiAnalyticsConfig$Builder
+-dontwarn com.huawei.hianalytics.process.HiAnalyticsConfig
+-dontwarn com.huawei.hianalytics.process.HiAnalyticsInstance$Builder
+-dontwarn com.huawei.hianalytics.process.HiAnalyticsInstance
+-dontwarn com.huawei.hianalytics.process.HiAnalyticsManager
+-dontwarn com.huawei.hianalytics.util.HiAnalyticTools
+-dontwarn com.huawei.hms.availableupdate.UpdateAdapterMgr
+-dontwarn com.huawei.libcore.io.ExternalStorageFile
+-dontwarn com.huawei.libcore.io.ExternalStorageFileInputStream
+-dontwarn com.huawei.libcore.io.ExternalStorageFileOutputStream
+-dontwarn com.huawei.libcore.io.ExternalStorageRandomAccessFile
 -dontwarn com.meizu.cloud.pushsdk.PushManager
 -dontwarn com.meizu.cloud.pushsdk.MzPushMessageReceiver
 -dontwarn com.meizu.cloud.pushsdk.handler.MzPushMessage

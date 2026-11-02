@@ -7,6 +7,7 @@ const envSchema = z.object({
   ssoBaseUrl: z.string().url().default("https://auth.jlgkj.top"),
   protocolBaseUrlIos: z.string().url(),
   protocolBaseUrlAndroid: z.string().url(),
+  referer: z.string().url(),
   environment: z
     .enum(["development", "preview", "production"])
     .default("development"),
@@ -54,6 +55,14 @@ export const env = envSchema.parse({
     extra.protocolBaseUrlAndroid ??
     process.env.EXPO_PUBLIC_PROTOCOL_BASE_URL_ANDROID ??
     defaultProtocolBaseUrlAndroid,
+  // 必须带 Referer，否则会命中 WAF 被拦截（按平台取协议域名）
+  referer: isIos
+    ? ((extra.protocolBaseUrlIos as string | undefined) ??
+      process.env.EXPO_PUBLIC_PROTOCOL_BASE_URL_IOS ??
+      defaultProtocolBaseUrlIos)
+    : ((extra.protocolBaseUrlAndroid as string | undefined) ??
+      process.env.EXPO_PUBLIC_PROTOCOL_BASE_URL_ANDROID ??
+      defaultProtocolBaseUrlAndroid),
   environment,
   ssoClientAppId: isIos ? "dianjing-ios" : "dianjing-android",
   ssoClientSecret: isIos

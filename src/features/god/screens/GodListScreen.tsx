@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Animated,
   Easing,
@@ -150,9 +150,63 @@ function levelTagColor(tagName: string) {
   return "#C0C4CC";
 }
 
-export default function GodListScreen() {
+/**
+ * 大神列表卡片中间层：隔离屏幕级 state（筛选、语音播放状态）变化，
+ * 让 CompanionCard 的 memo 命中，仅重渲染播放状态实际变化的卡片。
+ */
+const GodCard = memo(function GodCard({
+  item,
+  gameIconUrl,
+  playingUrl,
+  onToggleVoice,
+  onItemPress,
+}: {
+  item: GodListItem;
+  gameIconUrl: string | undefined;
+  playingUrl: string | null;
+  onToggleVoice: (voiceUrl: string) => void;
+  onItemPress: (item: GodListItem) => void;
+}) {
+  return (
+    <CompanionCard
+      nickname={item.nickname}
+      avatar={item.avatar}
+      sex={item.sex}
+      age={item.age}
+      introTagText={item.tagName}
+      introTagColor={item.tagColor || levelTagColor(item.tagName)}
+      gameName={item.gameName}
+      gameIconUrl={gameIconUrl}
+      modeName={item.modeName}
+      levelName={item.levelName}
+      serviceName={item.serviceName}
+      signature={item.signature}
+      onlineStatus={item.onlineStatus}
+      gameStatus={item.gameStatus}
+      price={item.price}
+      orderCount={item.orderCount}
+      voiceUrl={item.voiceUrl}
+      voiceDurationSeconds={item.voiceDurationSeconds}
+      voicePlayingUrl={playingUrl}
+      onToggleVoice={onToggleVoice}
+      onPress={() => onItemPress(item)}
+    />
+  );
+});
+
+export default function GodListScreen({ active = true }: { active?: boolean }) {
   const insets = useSafeAreaInsets();
   const voicePlayer = useVoicePlayer();
+
+  // keep-alive 常驻后卸载清理不再触发，切走频道时显式停止语音，保持与卸载版行为一致。
+  const stopVoice = voicePlayer.stop;
+  useEffect(() => {
+    if (active) {
+      return;
+    }
+    stopVoice();
+  }, [active, stopVoice]);
+
   const [gameKey, setGameKey] = useState(ALL_GAME_KEY);
   const [filters, setFilters] = useState<GodFilters>(GOD_EMPTY_FILTERS);
   const [openFilter, setOpenFilter] = useState<FilterKey | null>(null);
@@ -200,39 +254,43 @@ export default function GodListScreen() {
     [godList.data],
   );
 
-  const renderCard = ({ item }: { item: GodListItem }) => (
-    <CompanionCard
-      nickname={item.nickname}
-      avatar={item.avatar}
-      sex={item.sex}
-      age={item.age}
-      introTagText={item.tagName}
-      introTagColor={item.tagColor || levelTagColor(item.tagName)}
-      gameName={item.gameName}
-      gameIconUrl={gameIconByName.get(item.gameName)}
-      modeName={item.modeName}
-      levelName={item.levelName}
-      serviceName={item.serviceName}
-      signature={item.signature}
-      onlineStatus={item.onlineStatus}
-      gameStatus={item.gameStatus}
-      price={item.price}
-      orderCount={item.orderCount}
-      voiceUrl={item.voiceUrl}
-      voiceDurationSeconds={item.voiceDurationSeconds}
-      voicePlayingUrl={voicePlayer.playingUrl}
-      onToggleVoice={voicePlayer.toggle}
-      onPress={() =>
-        router.push({
-          pathname: "/profile",
-          params: {
-            clubId: String(item.clubId),
-            userId: String(item.userId),
-            ...(item.gameName ? { gameId: gameKey === ALL_GAME_KEY ? "" : gameKey } : {}),
-          },
-        })
-      }
-    />
+  const handleItemPress = useCallback(
+    (item: GodListItem) => {
+      router.push({
+        pathname: "/profile",
+        params: {
+          clubId: String(item.clubId),
+          userId: String(item.userId),
+          ...(item.gameName
+            ? { gameId: gameKey === ALL_GAME_KEY ? "" : gameKey }
+            : {}),
+        },
+      });
+    },
+    [gameKey],
+  );
+
+  const renderCard = useCallback(
+    ({ item }: { item: GodListItem }) => (
+      <GodCard
+        item={item}
+        gameIconUrl={gameIconByName.get(item.gameName)}
+        // 仅把播放中卡片的 voiceUrl 传入，其余卡片恒为 null：语音启停时只有新旧两张卡片重渲染。
+        playingUrl={
+          voicePlayer.playingUrl === item.voiceUrl && item.voiceUrl
+            ? voicePlayer.playingUrl
+            : null
+        }
+        onToggleVoice={voicePlayer.toggle}
+        onItemPress={handleItemPress}
+      />
+    ),
+    [
+      gameIconByName,
+      handleItemPress,
+      voicePlayer.playingUrl,
+      voicePlayer.toggle,
+    ],
   );
 
   return (
@@ -319,6 +377,10 @@ export default function GodListScreen() {
             }
           }}
           onEndReachedThreshold={0.2}
+          windowSize={7}
+          maxToRenderPerBatch={6}
+          updateCellsBatchingPeriod={50}
+          initialNumToRender={6}
         />
         {activeFilterDef ? (
           <FilterMenu

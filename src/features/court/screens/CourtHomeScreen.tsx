@@ -2,6 +2,7 @@ import { CourtCard } from "@/features/court/components/CourtCard";
 import { CourtReviewerPromptModal } from "@/features/court/components/CourtReviewerPromptModal";
 import { PlatformTicketCard } from "@/features/court/components/PlatformTicketCard";
 import {
+  applyVoteToCases,
   isCourtReviewerApproved,
   submitCourtVote,
 } from "@/features/court/court-vote";
@@ -235,14 +236,9 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
         return;
       }
       setCases((current) =>
-        current.map((row) =>
-          String(row.caseId) === String(item.caseId)
-            ? { ...row, myVoteResult: result }
-            : row,
-        ),
+        applyVoteToCases(current, item.caseId, result, outcome.voteCounts),
       );
       showToast("支持成功");
-      await load();
     } catch (error) {
       showToast(error instanceof Error ? error.message : "投票失败");
     } finally {
@@ -478,9 +474,10 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
         key={feedKey}
         ref={listRef}
         onScroll={(event) => {
-          setBackToTopFeed(
-            event.nativeEvent.contentOffset.y > 80 ? feedKey : null,
-          );
+          // 滚动中绝大多数事件与当前状态相同，React 对同值 setState 直接豁免，避免低端机滚动时全屏重渲染。
+          const beyond = event.nativeEvent.contentOffset.y > 80;
+          const next = beyond ? feedKey : null;
+          setBackToTopFeed((prev) => (prev === next ? prev : next));
         }}
         scrollEventThrottle={32}
         data={data as never[]}
@@ -534,6 +531,10 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
           if (hasMore && !loading && !loadingMore) void load(true);
         }}
         onEndReachedThreshold={0.4}
+        windowSize={5}
+        maxToRenderPerBatch={4}
+        updateCellsBatchingPeriod={50}
+        initialNumToRender={6}
       />
       {data.length > 0 && backToTopFeed === feedKey && (
         <Pressable
