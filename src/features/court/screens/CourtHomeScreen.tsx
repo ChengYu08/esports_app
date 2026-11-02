@@ -31,6 +31,10 @@ import {
 } from "react-native";
 import { showToast } from "@/shared/ui/app-toast";
 
+// 静态资源提为模块级常量，避免渲染时重复 require 且保证引用稳定
+const tabIndicatorSource = require("../../../../assets/court/tab-indicator.svg");
+const editSource = require("../../../../assets/court/edit.svg");
+
 const FEEDS: { key: CourtScope; label: string }[] = [
   { key: "ALL", label: "全部" },
   { key: "LATEST", label: "最新" },
@@ -216,250 +220,272 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
     [cases, pageType, tickets],
   );
 
-  async function vote(
-    item: CourtCase,
-    result: "PLAINTIFF_WIN" | "DEFENDANT_WIN",
-  ) {
-    if (!requireLogin() || pendingAction || voteInFlight.current) {
-      return;
-    }
-    voteInFlight.current = true;
-    setPendingAction({ caseId: String(item.caseId), type: "vote" });
-    try {
-      const outcome = await submitCourtVote(item, result);
-      if (accessToken !== useAuthStore.getState().accessToken) {
+  // useCallback 固定引用，作为 renderCase/renderTicket 的稳定依赖
+  const vote = useCallback(
+    async (item: CourtCase, result: "PLAINTIFF_WIN" | "DEFENDANT_WIN") => {
+      if (!requireLogin() || pendingAction || voteInFlight.current) {
         return;
       }
-      setIsReviewer(isCourtReviewerApproved(outcome.reviewerStatus));
-      if (outcome.type === "reviewer-required") {
-        setReviewerPromptVisible(true);
+      voteInFlight.current = true;
+      setPendingAction({ caseId: String(item.caseId), type: "vote" });
+      try {
+        const outcome = await submitCourtVote(item, result);
+        if (accessToken !== useAuthStore.getState().accessToken) {
+          return;
+        }
+        setIsReviewer(isCourtReviewerApproved(outcome.reviewerStatus));
+        if (outcome.type === "reviewer-required") {
+          setReviewerPromptVisible(true);
+          return;
+        }
+        setCases((current) =>
+          applyVoteToCases(current, item.caseId, result, outcome.voteCounts),
+        );
+        showToast("支持成功");
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : "投票失败");
+      } finally {
+        voteInFlight.current = false;
+        setPendingAction(null);
+      }
+    },
+    [requireLogin, pendingAction, accessToken],
+  );
+
+  const toggleFavorite = useCallback(
+    async (item: CourtCase) => {
+      if (!requireLogin() || pendingAction) {
         return;
       }
-      setCases((current) =>
-        applyVoteToCases(current, item.caseId, result, outcome.voteCounts),
-      );
-      showToast("支持成功");
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "投票失败");
-    } finally {
-      voteInFlight.current = false;
-      setPendingAction(null);
-    }
-  }
+      setPendingAction({ caseId: String(item.caseId), type: "favorite" });
+      try {
+        const result = await courtApi.favorite(item.caseId, !item.favorited);
+        setCases((current) =>
+          current
+            .filter(
+              (row) =>
+                scope !== "FAVORITE" ||
+                result.favorited !== false ||
+                String(row.caseId) !== String(item.caseId),
+            )
+            .map((row) =>
+              String(row.caseId) === String(item.caseId)
+                ? {
+                    ...row,
+                    favorited: result.favorited,
+                    favoriteCount: result.favoriteCount ?? row.favoriteCount,
+                  }
+                : row,
+            ),
+        );
+        showToast(result.favorited ? "收藏成功" : "已取消收藏");
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : "收藏失败");
+      } finally {
+        setPendingAction(null);
+      }
+    },
+    [requireLogin, pendingAction, scope],
+  );
 
-  async function toggleFavorite(item: CourtCase) {
-    if (!requireLogin() || pendingAction) {
-      return;
-    }
-    setPendingAction({ caseId: String(item.caseId), type: "favorite" });
-    try {
-      const result = await courtApi.favorite(item.caseId, !item.favorited);
-      setCases((current) =>
-        current
-          .filter(
-            (row) =>
-              scope !== "FAVORITE" ||
-              result.favorited !== false ||
-              String(row.caseId) !== String(item.caseId),
-          )
-          .map((row) =>
-            String(row.caseId) === String(item.caseId)
-              ? {
-                  ...row,
-                  favorited: result.favorited,
-                  favoriteCount: result.favoriteCount ?? row.favoriteCount,
-                }
-              : row,
-          ),
-      );
-      showToast(result.favorited ? "收藏成功" : "已取消收藏");
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "收藏失败");
-    } finally {
-      setPendingAction(null);
-    }
-  }
-
-  const openTicketForm = () => {
+  const openTicketForm = useCallback(() => {
     if (requireLogin()) router.push("/court/complaint?mode=ticket");
-  };
-  const openReviewForm = () => {
+  }, [requireLogin]);
+  const openReviewForm = useCallback(() => {
     if (!requireLogin()) {
       return;
     }
     router.push("/court/complaint?mode=court");
-  };
+  }, [requireLogin]);
 
-  const listHeader = (
-    <>
-      <View style={styles.sectionTabs}>
-        <Pressable
-          onPress={() => setPageType("court")}
-          style={styles.sectionTab}
-        >
-          <Text
-            style={[
-              styles.sectionText,
-              pageType === "court" && styles.sectionSelected,
-            ]}
+  // 头部为纯展示 + 内联跳转，用 useMemo 固定元素引用，避免父组件重渲染时整体重建
+  const listHeader = useMemo(
+    () => (
+      <>
+        <View style={styles.sectionTabs}>
+          <Pressable
+            onPress={() => setPageType("court")}
+            style={styles.sectionTab}
           >
-            小法庭
-          </Text>
-          {pageType === "court" && (
-            <CachedImage
-              source={require("../../../../assets/court/tab-indicator.svg")}
-              style={styles.sectionUnderline}
-            />
-          )}
-        </Pressable>
-        <Pressable
-          onPress={() => setPageType("ticket")}
-          style={styles.sectionTab}
-        >
-          <Text
-            style={[
-              styles.sectionText,
-              pageType === "ticket" && styles.sectionSelected,
-            ]}
+            <Text
+              style={[
+                styles.sectionText,
+                pageType === "court" && styles.sectionSelected,
+              ]}
+            >
+              小法庭
+            </Text>
+            {pageType === "court" && (
+              <CachedImage
+                source={tabIndicatorSource}
+                style={styles.sectionUnderline}
+              />
+            )}
+          </Pressable>
+          <Pressable
+            onPress={() => setPageType("ticket")}
+            style={styles.sectionTab}
           >
-            平台工单
-          </Text>
-          {pageType === "ticket" && (
+            <Text
+              style={[
+                styles.sectionText,
+                pageType === "ticket" && styles.sectionSelected,
+              ]}
+            >
+              平台工单
+            </Text>
+            {pageType === "ticket" && (
+              <CachedImage
+                source={tabIndicatorSource}
+                style={styles.sectionUnderline}
+              />
+            )}
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={pageType === "court" ? "发起评审" : "发起投诉"}
+            onPress={pageType === "court" ? openReviewForm : openTicketForm}
+            style={styles.reviewAction}
+          >
             <CachedImage
-              source={require("../../../../assets/court/tab-indicator.svg")}
-              style={styles.sectionUnderline}
+              accessible={false}
+              source={editSource}
+              contentFit="contain"
+              style={styles.reviewActionIcon}
             />
-          )}
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={pageType === "court" ? "发起评审" : "发起投诉"}
-          onPress={pageType === "court" ? openReviewForm : openTicketForm}
-          style={styles.reviewAction}
-        >
-          <CachedImage
-            accessible={false}
-            source={require("../../../../assets/court/edit.svg")}
-            contentFit="contain"
-            style={styles.reviewActionIcon}
-          />
-          <Text style={styles.reviewActionText}>
-            {pageType === "court" ? "发起评审" : "发起投诉"}
-          </Text>
-        </Pressable>
-      </View>
-      {pageType === "court" ? (
-        <>
+            <Text style={styles.reviewActionText}>
+              {pageType === "court" ? "发起评审" : "发起投诉"}
+            </Text>
+          </Pressable>
+        </View>
+        {pageType === "court" ? (
+          <>
+            <View style={styles.feedRow}>
+              <View style={styles.feedTabs}>
+                {FEEDS.map((tab) => (
+                  <Pressable
+                    key={tab.key}
+                    onPress={() => {
+                      if (
+                        (tab.key === "MY" || tab.key === "FAVORITE") &&
+                        !requireLogin()
+                      )
+                        return;
+                      setScope(tab.key);
+                    }}
+                    style={[
+                      styles.feedTab,
+                      scope === tab.key && styles.feedTabSelected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.feedText,
+                        scope === tab.key && styles.feedTextSelected,
+                      ]}
+                    >
+                      {tab.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+            {/* {isReviewer && scope !== "MY" && (
+              <View style={styles.statsRow}>
+                <Text style={styles.statsLabel}>
+                  今日已评审
+                  <Text style={styles.statsValue}>
+                    {reviewerStats.todayCount ?? 0}
+                  </Text>
+                </Text>
+                <Text style={styles.statsLabel}>
+                  累计评审
+                  <Text style={styles.statsValue}>
+                    {reviewerStats.totalCount ?? 0}
+                  </Text>
+                </Text>
+              </View>
+            )} */}
+          </>
+        ) : (
           <View style={styles.feedRow}>
-            <View style={styles.feedTabs}>
-              {FEEDS.map((tab) => (
+            <View accessibilityRole="tablist" style={styles.feedTabs}>
+              {[false, true].map((mine) => (
                 <Pressable
-                  key={tab.key}
+                  key={String(mine)}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: ticketMine === mine }}
                   onPress={() => {
-                    if (
-                      (tab.key === "MY" || tab.key === "FAVORITE") &&
-                      !requireLogin()
-                    )
+                    if (mine && !requireLogin()) {
                       return;
-                    setScope(tab.key);
+                    }
+                    setTicketMine(mine);
                   }}
                   style={[
                     styles.feedTab,
-                    scope === tab.key && styles.feedTabSelected,
+                    ticketMine === mine && styles.feedTabSelected,
                   ]}
                 >
                   <Text
                     style={[
                       styles.feedText,
-                      scope === tab.key && styles.feedTextSelected,
+                      ticketMine === mine && styles.feedTextSelected,
                     ]}
                   >
-                    {tab.label}
+                    {mine ? "我的" : "全部"}
                   </Text>
                 </Pressable>
               ))}
             </View>
           </View>
-          {/* {isReviewer && scope !== "MY" && (
-            <View style={styles.statsRow}>
-              <Text style={styles.statsLabel}>
-                今日已评审
-                <Text style={styles.statsValue}>
-                  {reviewerStats.todayCount ?? 0}
-                </Text>
-              </Text>
-              <Text style={styles.statsLabel}>
-                累计评审
-                <Text style={styles.statsValue}>
-                  {reviewerStats.totalCount ?? 0}
-                </Text>
-              </Text>
-            </View>
-          )} */}
-        </>
-      ) : (
-        <View style={styles.feedRow}>
-          <View accessibilityRole="tablist" style={styles.feedTabs}>
-            {[false, true].map((mine) => (
-              <Pressable
-                key={String(mine)}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: ticketMine === mine }}
-                onPress={() => {
-                  if (mine && !requireLogin()) {
-                    return;
-                  }
-                  setTicketMine(mine);
-                }}
-                style={[
-                  styles.feedTab,
-                  ticketMine === mine && styles.feedTabSelected,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.feedText,
-                    ticketMine === mine && styles.feedTextSelected,
-                  ]}
-                >
-                  {mine ? "我的" : "全部"}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      )}
-    </>
+        )}
+      </>
+    ),
+    [
+      pageType,
+      scope,
+      ticketMine,
+      requireLogin,
+      openReviewForm,
+      openTicketForm,
+    ],
   );
 
-  const renderCase = ({ item }: { item: CourtCase }) => (
-    <CourtCard
-      item={item}
-      onOpen={() =>
-        router.push({
-          pathname: "/court/[id]",
-          params: { id: String(item.caseId), mine: scope === "MY" ? "1" : "0" },
-        })
-      }
-      onVote={vote}
-      onFavorite={toggleFavorite}
-      pendingAction={
-        pendingAction?.caseId === String(item.caseId)
-          ? pendingAction.type
-          : null
-      }
-    />
+  // renderItem 稳定引用：依赖均为 useCallback/useMemo 产物，避免整列表随父组件重渲染
+  const renderCase = useCallback(
+    ({ item }: { item: CourtCase }) => (
+      <CourtCard
+        item={item}
+        onOpen={() =>
+          router.push({
+            pathname: "/court/[id]",
+            params: { id: String(item.caseId), mine: scope === "MY" ? "1" : "0" },
+          })
+        }
+        onVote={vote}
+        onFavorite={toggleFavorite}
+        pendingAction={
+          pendingAction?.caseId === String(item.caseId)
+            ? pendingAction.type
+            : null
+        }
+      />
+    ),
+    [scope, pendingAction, vote, toggleFavorite],
   );
-  const renderTicket = ({ item }: { item: PlatformTicket }) => (
-    <PlatformTicketCard
-      item={item}
-      mine={ticketMine}
-      onOpen={() =>
-        router.push(
-          `/court/ticket/${item.ticketId ?? item.ticketNo}?mine=${ticketMine ? "1" : "0"}`,
-        )
-      }
-    />
+  const renderTicket = useCallback(
+    ({ item }: { item: PlatformTicket }) => (
+      <PlatformTicketCard
+        item={item}
+        mine={ticketMine}
+        onOpen={() =>
+          router.push(
+            `/court/ticket/${item.ticketId ?? item.ticketNo}?mine=${ticketMine ? "1" : "0"}`,
+          )
+        }
+      />
+    ),
+    [ticketMine],
   );
 
   return (

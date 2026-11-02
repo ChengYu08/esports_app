@@ -6,7 +6,7 @@ import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { useAuthStore } from "@esports/auth";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   Pressable,
@@ -132,7 +132,11 @@ export default function OrderScreen() {
     confirmText?: string;
   } | null>(null);
   const cancelingPaymentRef = useRef(false);
-  const items = orders.data?.pages.flatMap((page) => page.items) ?? [];
+  // 扁平化结果用 useMemo 固定引用，避免父组件重渲染时生成新数组触发整列表重渲染
+  const items = useMemo(
+    () => orders.data?.pages.flatMap((page) => page.items) ?? [],
+    [orders.data],
+  );
   // 列表接口不回俱乐部名，按 companionClubId 批量解析（react-query 缓存，同俱乐部只查一次）。
   const clubNameById = useOrderClubNames(
     items
@@ -148,10 +152,9 @@ export default function OrderScreen() {
         ? "暂无订单"
         : `暂无${visibleFilter === "inProgress" ? "进行中" : visibleFilter === "completed" ? "已完成" : "已取消"}订单`;
 
-  const handleOrderAction = async (
-    item: OrderItemModel,
-    action: OrderActionKey,
-  ) => {
+  // 用 useCallback 固定回调引用，保证 OrderCard 的 memo 不被每次渲染的新闭包击穿
+  const handleOrderAction = useCallback(
+    async (item: OrderItemModel, action: OrderActionKey) => {
     if (action === "pay") {
       setPayTarget(item);
       return;
@@ -241,7 +244,9 @@ export default function OrderScreen() {
           userId: String(item.receiverUserId || ""),
         },
       });
-  };
+    },
+    [token, currentUser],
+  );
 
   const confirmCancel = async () => {
     if (!cancelTarget || !token) return;
@@ -330,6 +335,51 @@ export default function OrderScreen() {
     }
   };
 
+  // 点击卡片跳转：签名接收 item，保持稳定引用以配合 OrderCard 的 memo
+  const handleOrderPress = useCallback(
+    (order: OrderItemModel) => {
+      if (order.requestNo)
+        router.push(
+          `/order/dispatch/${encodeURIComponent(order.requestNo)}`,
+        );
+      else router.push(`/order/${order.id}?scope=${scope}`);
+    },
+    [scope],
+  );
+
+  // renderItem 稳定引用 + 空态收敛到 useMemo，避免无关重渲染波及列表
+  const renderOrderItem = useCallback(
+    ({ item }: { item: OrderItemModel }) => (
+      <OrderCard
+        item={item}
+        clubName={
+          item.clubName ??
+          (item.clubId != null ? clubNameById[item.clubId] : undefined)
+        }
+        actionPending={pendingOrderId === item.id}
+        onAction={handleOrderAction}
+        onPress={handleOrderPress}
+      />
+    ),
+    [clubNameById, pendingOrderId, handleOrderAction, handleOrderPress],
+  );
+
+  // refetch 在 react-query 中是稳定引用，解构后作为依赖可让 memo 长效命中
+  const refetchOrders = orders.refetch;
+  const listEmpty = useMemo(() => {
+    if (orders.isLoading) {
+      return <LoadingState />;
+    }
+    if (orders.isError) {
+      return <ErrorState onRetry={() => void refetchOrders()} />;
+    }
+    return (
+      <View style={styles.empty}>
+        <EmptyState message={emptyMessage} />
+      </View>
+    );
+  }, [orders.isLoading, orders.isError, refetchOrders, emptyMessage]);
+
   return (
     <View style={styles.screen}>
       <StatusBar style="dark" />
@@ -354,17 +404,7 @@ export default function OrderScreen() {
         data={items}
         ItemSeparatorComponent={OrderSeparator}
         keyExtractor={(item) => item.id}
-        ListEmptyComponent={
-          orders.isLoading ? (
-            <LoadingState />
-          ) : orders.isError ? (
-            <ErrorState onRetry={() => void orders.refetch()} />
-          ) : (
-            <View style={styles.empty}>
-              <EmptyState message={emptyMessage} />
-            </View>
-          )
-        }
+        ListEmptyComponent={listEmpty}
         ListFooterComponent={
           orders.isFetchingNextPage ? (
             <Text style={styles.listFooter}>加载中...</Text>
@@ -375,24 +415,7 @@ export default function OrderScreen() {
             void orders.fetchNextPage();
         }}
         onEndReachedThreshold={0.35}
-        renderItem={({ item }) => (
-          <OrderCard
-            item={item}
-            clubName={
-              item.clubName ??
-              (item.clubId != null ? clubNameById[item.clubId] : undefined)
-            }
-            actionPending={pendingOrderId === item.id}
-            onAction={handleOrderAction}
-            onPress={(order) => {
-              if (order.requestNo)
-                router.push(
-                  `/order/dispatch/${encodeURIComponent(order.requestNo)}`,
-                );
-              else router.push(`/order/${order.id}?scope=${scope}`);
-            }}
-          />
-        )}
+        renderItem={renderOrderItem}
         refreshControl={
           <RefreshControl
             refreshing={orders.isRefetching}

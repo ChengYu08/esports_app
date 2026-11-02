@@ -329,7 +329,19 @@ async function fetchImTokenWithRetry(accessToken: string, attemptEpoch: number) 
 async function emitReceived(message: RCIMIWMessage) {
   const enums = getSdkEnums();
   const peerId = normalizeSystemConversationId(message.senderUserId || message.targetId || '');
-  if (!enums || message.conversationType !== enums.conversationType || !peerId) return;
+  if (!enums || message.conversationType !== enums.conversationType || !peerId) {
+    // 重装回补场景下这里被丢弃的会话永远不会出现在列表里，必须留痕排查
+    logger.warn('RongCloud message dropped before reaching conversation list', {
+      stage: 'emit-received',
+      conversationType: message.conversationType,
+      expectedType: enums?.conversationType,
+      peerId,
+      senderUserId: message.senderUserId,
+      targetId: message.targetId,
+      sentTime: message.sentTime,
+    });
+    return;
+  }
   const mapped = toManagedMessage(message);
   if (!mapped) return;
   const conversation = await hydrateConversation(mapConversation({

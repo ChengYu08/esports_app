@@ -36,6 +36,7 @@ export default function MessageScreen() {
   const conversations = useMessageStore((state) => state.conversations);
   const blacklistedUserIds = useMessageStore((state) => state.blacklistedUserIds);
   const refreshConversations = useMessageStore((state) => state.refreshConversations);
+  const retryIfEmpty = useMessageStore((state) => state.retryIfEmpty);
   const refreshOnlineStatuses = useMessageStore((state) => state.refreshOnlineStatuses);
   const clearAllUnread = useMessageStore((state) => state.clearAllUnread);
 
@@ -47,8 +48,25 @@ export default function MessageScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!accessToken) return;
-      void refreshConversations(accessToken);
-    }, [accessToken, refreshConversations]),
+      let cancelled = false;
+      let retryTimer: ReturnType<typeof setTimeout> | undefined;
+      // 兜底：补偿消息可能晚于首次快照落库——等刷新/初始化完成后再延迟重读一次
+      // （store 内一次性闸门防循环；若在初始化完成前计时，非 ready 状态会让重试空跑）
+      void refreshConversations(accessToken).finally(() => {
+        if (cancelled) {
+          return;
+        }
+        retryTimer = setTimeout(() => {
+          void retryIfEmpty(accessToken);
+        }, 1500);
+      });
+      return () => {
+        cancelled = true;
+        if (retryTimer) {
+          clearTimeout(retryTimer);
+        }
+      };
+    }, [accessToken, refreshConversations, retryIfEmpty]),
   );
 
   useEffect(() => {
@@ -83,20 +101,36 @@ export default function MessageScreen() {
         }),
     [blacklistedUserIds, conversations, userId],
   );
-  const handleMessagePress = (item: MessageListItemModel) => {
-    if (item.kind !== "conversation" || isSelfConversationId(item.id, userId))
-      return;
-    const avatarUri = getConversationAvatarUri(item.avatar);
-    router.push({
-      pathname: "/chat/[id]",
-      params: {
-        id: normalizeSystemConversationId(item.id),
-        title: item.title,
-        clubId: item.clubId || "",
-        ...(avatarUri ? { avatar: avatarUri } : {}),
-      },
-    });
-  };
+  // useCallback 固定引用，配合 MessageListItem 的 memo，避免父组件重渲染击穿列表项
+  const handleMessagePress = useCallback(
+    (item: MessageListItemModel) => {
+      if (item.kind !== "conversation" || isSelfConversationId(item.id, userId))
+        return;
+      const avatarUri = getConversationAvatarUri(item.avatar);
+      router.push({
+        pathname: "/chat/[id]",
+        params: {
+          id: normalizeSystemConversationId(item.id),
+          title: item.title,
+          clubId: item.clubId || "",
+          ...(avatarUri ? { avatar: avatarUri } : {}),
+        },
+      });
+    },
+    [userId],
+  );
+
+  // renderItem 稳定引用：items 与 handleMessagePress 都是稳定引用时，列表项可完全命中 memo
+  const renderMessageItem = useCallback(
+    ({ item, index }: { item: MessageListItemModel; index: number }) => (
+      <MessageListItem
+        item={item}
+        isLast={index === items.length - 1}
+        onPress={handleMessagePress}
+      />
+    ),
+    [items, handleMessagePress],
+  );
 
   const stateMessage = !accessToken
     ? "登录后查看消息"
@@ -140,13 +174,7 @@ export default function MessageScreen() {
           contentContainerStyle={{ paddingBottom: 80 + insets.bottom }}
           data={items}
           keyExtractor={(item) => item.id}
-          renderItem={({ item, index }) => (
-            <MessageListItem
-              item={item}
-              isLast={index === items.length - 1}
-              onPress={handleMessagePress}
-            />
-          )}
+          renderItem={renderMessageItem}
           showsVerticalScrollIndicator={false}
         />
       )}
