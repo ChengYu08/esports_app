@@ -43,6 +43,7 @@ import {
   useClubCompanions,
   useClubDetail,
   useClubGameModes,
+  usePriceList,
 } from "../hooks/use-home-data";
 
 // 切图资源（新设计稿：俱乐部主页 455-68151 / 490-84520 / 557-88105）
@@ -111,6 +112,8 @@ export default function ClubDetailScreen() {
   const [selectedLevel, setSelectedLevel] = useState<number>();
   const clubQuery = useClubDetail(id);
   const club = clubQuery.data;
+  // 预拉价目表配置：页面被删除/停用时接口降级为空列表，点击价目表时直接弹"暂无价目表"而不是进报错页
+  const priceConfigQuery = usePriceList(club?.pageConfigGroupId);
   const games = club?.games ?? [];
   const selectedGame = game || String(games[0]?.id ?? "");
   const selectedGameInfo = games.find((item) => String(item.id) === selectedGame);
@@ -479,6 +482,8 @@ export default function ClubDetailScreen() {
           <Animated.View
             style={[
               styles.filterSheet,
+              // 兼容手势/三键导航条机型：底部预留安全区，避免最后一项被系统导航栏遮挡
+              { paddingBottom: Math.max(insets.bottom, 28) },
               { transform: [{ translateY: filterSheetTranslateY }] },
             ]}
           >
@@ -697,7 +702,11 @@ export default function ClubDetailScreen() {
         <Pressable
           style={styles.priceButton}
           onPress={() => {
-            if (!club.pageConfigGroupId) {
+            // 未配置价目表链接，或链接指向的页面配置已删除/停用（预拉结果为空）时，弹"暂无价目表"提示
+            if (
+              !club.pageConfigGroupId ||
+              (priceConfigQuery.isSuccess && priceConfigQuery.data.length === 0)
+            ) {
               setShowPriceEmptyModal(true);
               return;
             }
@@ -1086,7 +1095,6 @@ const styles = StyleSheet.create({
   },
   filterSheet: {
     maxHeight: "65%",
-    paddingBottom: 28,
     backgroundColor: COLORS.white,
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,

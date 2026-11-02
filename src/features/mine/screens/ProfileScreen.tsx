@@ -288,6 +288,7 @@ export default function ProfileScreen() {
         return;
       }
 
+      // push 进聊天；params 带 fromProfile 标记，聊天页返回主页时用 dismissTo 弹回，避免循环套娃
       router.push({
         pathname: "/chat/[id]",
         params: createProfileChatParams({

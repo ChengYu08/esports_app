@@ -42,7 +42,8 @@ const COLOR_GENDER_SELECTED_BG = "#EBF3FF";
 const COLOR_GENDER_SELECTED_BORDER = "#70A9FF";
 const COLOR_TITLE_UNDERLINE = "#FFC2C6";
 
-type Gender = 0 | 1;
+// 后端性别约定：0未知 1男 2女（UpdateProfileAction.gender）
+type Gender = 1 | 2;
 
 export default function ProfileOnboardingScreen() {
   const insets = useSafeAreaInsets();
@@ -266,9 +267,9 @@ export default function ProfileOnboardingScreen() {
                 <Pressable
                   style={[
                     styles.genderOption,
-                    gender === 0 ? styles.genderOptionSelected : null,
+                    gender === 2 ? styles.genderOptionSelected : null,
                   ]}
-                  onPress={() => setGender(0)}
+                  onPress={() => setGender(2)}
                 >
                   <Image source={genderFemaleIcon} style={styles.genderIcon} />
                   <Text style={styles.genderLabel}>女</Text>
