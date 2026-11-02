@@ -15,6 +15,17 @@ function normalizeEndpoint(endpoint: string) {
 }
 
 export async function uploadClientObject(sts: ClientOssSts, objectKey: string, input: UploadInput) {
+  // 凭证字段为 null/空时：请求头出现 null 会令原生 fetch 直接抛类型转换错误，
+  // 缺 token 的签名则会被 OSS 拒绝（403），提前拦截并给出可读提示。
+  if (
+    !sts.endpoint ||
+    !sts.bucketName ||
+    !sts.accessKeyId ||
+    !sts.accessKeySecret ||
+    !sts.securityToken
+  ) {
+    throw new Error("上传凭证不完整，请重新上传");
+  }
   const endpoint = normalizeEndpoint(sts.endpoint);
   const endpointUrl = new URL(endpoint);
   const uploadHost = endpointUrl.hostname.startsWith(`${sts.bucketName}.`)

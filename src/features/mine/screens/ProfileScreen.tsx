@@ -85,6 +85,7 @@ const femaleIcon = require("../../../../assets/mine/figma/mine-female.svg");
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const settingsIcon = require("../../../../assets/mine/figma/mine-settings.svg");
 const customerIcon = require("../../../../assets/coms/customer.svg");
+const clubIcon = require("../../../../assets/mine/figma/mine-club-flag.svg");
 const arrowDownIcon = require("../../../../assets/mine/figma/profile-arrow-down.svg");
 const diamondIcon = require("../../../../assets/message/order-assistant-coin-3f6fcf.webp");
 const idleStatusIcon = require("../../../../assets/home/club-detail/status-idle.svg");
@@ -1088,15 +1089,24 @@ function ProfileIdentity({
             </View>
           ) : null}
         </View>
-        <View style={styles.clubLine}>
-          <View style={styles.clubInfo}>
-            <Text style={styles.clubLabel}>成员</Text>
-            <Text style={styles.clubValue}>{profile.followCount}人</Text>
-          </View>
-          <View style={styles.clubInfo}>
-            <Text style={styles.clubLabel}>俱乐部ID</Text>
-            <Text style={styles.clubValue}>{profile.clubId || "暂无"}</Text>
-          </View>
+        <View style={styles.idClubRow}>
+          {profile.clubId > 0 ? (
+            <Pressable
+              style={styles.clubLine}
+              onPress={() =>
+                router.push({
+                  pathname: "/club/[id]",
+                  params: { id: String(profile.clubId) },
+                })
+              }
+            >
+              <Image source={clubIcon} style={styles.clubIcon} />
+              <Text numberOfLines={1} style={styles.clubName}>
+                {profile.clubName || "俱乐部"}
+              </Text>
+            </Pressable>
+          ) : null}
+          <Text style={styles.idRow}>ID：{profile.userId}</Text>
         </View>
       </View>
     </View>
@@ -1174,7 +1184,10 @@ function SkillsSummary({
 }
 
 function ImageGallery({ images }: { images: string[] }) {
-  if (images.length === 0) return <EmptyState message="暂无技能图片" />;
+  // 无图时保留插画空态，但压缩上方留白，避免大块空白把服务模式挤远
+  if (images.length === 0) {
+    return <EmptyState message="暂无技能图片" style={styles.galleryEmpty} />;
+  }
   const visibleImages = images.slice(0, 5);
 
   return (
@@ -1667,19 +1680,30 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: "500",
   },
-  clubLine: { flexDirection: "row", alignItems: "center", gap: 12 },
-  clubInfo: { flexDirection: "row", alignItems: "center", gap: 2 },
-  clubLabel: {
+  idClubRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  idRow: {
     color: "rgba(255,255,255,0.6)",
     fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
-  clubValue: {
-    color: "#FFFFFF",
+  clubLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    flexShrink: 1,
+  },
+  clubIcon: { width: 16, height: 16 },
+  clubName: {
+    color: "rgba(255,255,255,0.6)",
     fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
+    flexShrink: 1,
   },
   scrollIntro: {
     marginTop: -1,
@@ -1775,11 +1799,12 @@ const styles = StyleSheet.create({
   tabIndicator: {
     position: "absolute",
     bottom: -6,
-    left: 3,
-    right: 3,
-    height: 6,
-    borderRadius: 2,
-    backgroundColor: "#FFC2C6",
+    left: "50%",
+    marginLeft: -6,
+    width: 12,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: "#FE1F4C",
   },
   gameTags: { flexDirection: "row", gap: 10, marginTop: 12, paddingRight: 16 },
   gameTag: {
@@ -1825,6 +1850,8 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   gallery: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 14 },
+  // 默认空态 minHeight 240，这里收紧到插画+文案的紧凑高度
+  galleryEmpty: { minHeight: 150 },
   galleryItem: {
     width: 62,
     height: 62,

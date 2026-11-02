@@ -39,6 +39,15 @@ const defaultProtocolBaseUrlAndroid =
   environment === "production"
     ? "https://dj.panzhi.com"
     : "https://djpc.yingbowl.com";
+// 后端风控白名单要求 Android 的 Referer 带尾斜杠，iOS 不带
+const refererBase = isIos
+  ? ((extra.protocolBaseUrlIos as string | undefined) ??
+    process.env.EXPO_PUBLIC_PROTOCOL_BASE_URL_IOS ??
+    defaultProtocolBaseUrlIos)
+  : ((extra.protocolBaseUrlAndroid as string | undefined) ??
+    process.env.EXPO_PUBLIC_PROTOCOL_BASE_URL_ANDROID ??
+    defaultProtocolBaseUrlAndroid);
+const referer = isIos ? refererBase : `${refererBase}/`;
 
 export const env = envSchema.parse({
   apiBaseUrl: isIos
@@ -55,14 +64,8 @@ export const env = envSchema.parse({
     extra.protocolBaseUrlAndroid ??
     process.env.EXPO_PUBLIC_PROTOCOL_BASE_URL_ANDROID ??
     defaultProtocolBaseUrlAndroid,
-  // 必须带 Referer，否则会命中 WAF 被拦截（按平台取协议域名）
-  referer: isIos
-    ? ((extra.protocolBaseUrlIos as string | undefined) ??
-      process.env.EXPO_PUBLIC_PROTOCOL_BASE_URL_IOS ??
-      defaultProtocolBaseUrlIos)
-    : ((extra.protocolBaseUrlAndroid as string | undefined) ??
-      process.env.EXPO_PUBLIC_PROTOCOL_BASE_URL_ANDROID ??
-      defaultProtocolBaseUrlAndroid),
+  // 必须带 Referer，否则会命中 WAF 被拦截（Android 多一个尾斜杠以匹配风控白名单）
+  referer,
   environment,
   ssoClientAppId: isIos ? "dianjing-ios" : "dianjing-android",
   ssoClientSecret: isIos

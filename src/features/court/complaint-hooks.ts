@@ -14,14 +14,26 @@ export function toUploadItems(evidence?: Record<string, string>) {
 }
 
 // 加载可重新提交的评审案件（重新提交 / 申诉 / 补充举证共用），
-// 加载成功后通过 onLoaded 回填表单。
-export function useCaseDetail(caseId: string | undefined, onLoaded: (item: CourtCase) => void) {
+// 加载成功后通过 onLoaded 回填表单；按模式校验各自允许的操作码。
+const REQUIRED_ACTION_ERROR: Record<string, string> = {
+  RESUBMIT: "案件当前不可重新提交",
+  APPEAL: "案件当前不可申诉",
+  SUPPLEMENT_EVIDENCE: "案件当前不可补充举证",
+};
+
+export function useCaseDetail(
+  caseId: string | undefined,
+  requiredAction: "RESUBMIT" | "APPEAL" | "SUPPLEMENT_EVIDENCE",
+  onLoaded: (item: CourtCase) => void,
+) {
   const [detail, setDetail] = useState<CourtCase | null>(null);
   const onLoadedRef = useRef(onLoaded);
+  const requiredActionRef = useRef(requiredAction);
 
   useEffect(() => {
     onLoadedRef.current = onLoaded;
-  }, [onLoaded]);
+    requiredActionRef.current = requiredAction;
+  }, [onLoaded, requiredAction]);
 
   useEffect(() => {
     if (!caseId) {
@@ -32,8 +44,11 @@ export function useCaseDetail(caseId: string | undefined, onLoaded: (item: Court
       .getDetail(caseId, true)
       .then((item) => {
         if (!active) return;
-        if (caseId && !item.actions?.includes("RESUBMIT"))
-          throw new Error("案件当前不可重新提交");
+        if (caseId && !item.actions?.includes(requiredActionRef.current))
+          throw new Error(
+            REQUIRED_ACTION_ERROR[requiredActionRef.current] ||
+              "案件当前状态不支持该操作",
+          );
         setDetail(item);
         onLoadedRef.current(item);
       })

@@ -203,10 +203,11 @@ export function CourtCaseFormSection({
         </View>
       ))}
       <FormField label="个人诉求" required>
+        {/* 上限与 Web APPEAL_MAX 对齐：40 字，超出会被后端拒绝 */}
         <TextInput
           value={claim}
           onChangeText={onChangeClaim}
-          maxLength={50}
+          maxLength={40}
           multiline
           textAlignVertical="top"
           editable={!disabled}
@@ -214,7 +215,7 @@ export function CourtCaseFormSection({
           placeholderTextColor="#CCCCCC"
           style={styles.input}
         />
-        <Text style={styles.counter}>{claim.length}/50</Text>
+        <Text style={styles.counter}>{claim.length}/40</Text>
       </FormField>
     </>
   );
