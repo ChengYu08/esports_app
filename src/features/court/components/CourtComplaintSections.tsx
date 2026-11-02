@@ -1,11 +1,20 @@
-import { ChevronRight16Regular } from "@fluentui/react-native-icons";
-import { CourtSelectedReviewCard } from "@/features/court/components/CourtSelectedReviewCard";
 import { complaintStyles } from "@/features/court/complaint.styles";
-import { CachedImage } from "@/shared/ui/CachedImage";
-import type { CourtCaseType, CourtSource, TicketTarget } from "@/features/court/court.api";
+import { CourtSelectedReviewCard } from "@/features/court/components/CourtSelectedReviewCard";
 import { TICKET_REASONS } from "@/features/court/court-ticket";
+import type {
+  CourtCaseType,
+  CourtSource,
+  TicketTarget,
+} from "@/features/court/court.api";
+import { CachedImage } from "@/shared/ui/CachedImage";
+import { ChevronRight16Regular } from "@fluentui/react-native-icons";
 import type { ReactNode } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import {
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 
 const CASE_TYPES: { code: CourtCaseType; label: string }[] = [
   { code: "DELETE_REVIEW", label: "删除差评" },
@@ -37,7 +46,13 @@ export function FormField({
   );
 }
 
-export function FormLabel({ label, required }: { label: string; required?: boolean }) {
+export function FormLabel({
+  label,
+  required,
+}: {
+  label: string;
+  required?: boolean;
+}) {
   const styles = complaintStyles;
   return (
     <Text style={styles.requiredLabel}>
@@ -85,7 +100,10 @@ export function PublishTypeSection({
               accessibilityState={{ selected: mode === value }}
               disabled={disabled}
               onPress={() => onSelect(value)}
-              style={[styles.typeCard, mode === value && styles.typeCardSelected]}
+              style={[
+                styles.typeCard,
+                mode === value && styles.typeCardSelected,
+              ]}
             >
               <Text
                 style={[
@@ -141,7 +159,10 @@ export function CourtCaseFormSection({
               accessibilityState={{ selected: caseType === item.code }}
               disabled={disabled}
               onPress={() => onSelectCaseType(item.code)}
-              style={[styles.chip, caseType === item.code && styles.chipSelected]}
+              style={[
+                styles.chip,
+                caseType === item.code && styles.chipSelected,
+              ]}
             >
               <Text
                 style={[
@@ -177,31 +198,35 @@ export function CourtCaseFormSection({
           </View>
         </View>
       </Pressable>
-      {selectedSource && (isDeleteReview ? (
-        <CourtSelectedReviewCard source={selectedSource} disabled={disabled} />
-      ) : (
-        <View style={styles.sourceInfo}>
-          <CachedImage
-            source={
-              selectedSource.companionAvatar
-                ? { uri: selectedSource.companionAvatar }
-                : undefined
-            }
-            style={styles.sourceAvatar}
+      {selectedSource &&
+        (isDeleteReview ? (
+          <CourtSelectedReviewCard
+            source={selectedSource}
+            disabled={disabled}
           />
-          <View style={styles.sourceText}>
-            <Text style={styles.sourceName}>
-              {selectedSource.companionNickname ||
-                selectedSource.defendantNickname ||
-                "服务用户"}
-            </Text>
-            <Text style={styles.sourceSub}>
-              {selectedSource.gameName || "订单"} ·
-              {selectedSource.orderNo || selectedSource.orderId}
-            </Text>
+        ) : (
+          <View style={styles.sourceInfo}>
+            <CachedImage
+              source={
+                selectedSource.companionAvatar
+                  ? { uri: selectedSource.companionAvatar }
+                  : undefined
+              }
+              style={styles.sourceAvatar}
+            />
+            <View style={styles.sourceText}>
+              <Text style={styles.sourceName}>
+                {selectedSource.companionNickname ||
+                  selectedSource.defendantNickname ||
+                  "服务用户"}
+              </Text>
+              <Text style={styles.sourceSub}>
+                {selectedSource.gameName || "订单"} ·
+                {selectedSource.orderNo || selectedSource.orderId}
+              </Text>
+            </View>
           </View>
-        </View>
-      ))}
+        ))}
       <FormField label="个人诉求" required>
         {/* 上限与 Web APPEAL_MAX 对齐：40 字，超出会被后端拒绝 */}
         <TextInput
@@ -293,9 +318,7 @@ export function TicketFormSection({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={
-            target
-              ? `诉告对象：${target.nickname}，点击修改`
-              : "选择诉告对象"
+            target ? `诉告对象：${target.nickname}，点击修改` : "选择诉告对象"
           }
           disabled={disabled}
           onPress={onOpenTargets}
@@ -319,7 +342,12 @@ export function TicketFormSection({
             >
               {target?.nickname || "请选择"}
             </Text>
-            <ChevronRight16Regular color="#999999" width={18} height={18} style={styles.targetArrow} />
+            <ChevronRight16Regular
+              color="#999999"
+              width={18}
+              height={18}
+              style={styles.targetArrow}
+            />
           </View>
         </Pressable>
       )}

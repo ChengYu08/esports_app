@@ -3,10 +3,7 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -14,12 +11,18 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { router } from "expo-router";
+import {
+  KeyboardAwareScrollView,
+  KeyboardAvoidingView,
+} from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAuthStore } from "@esports/auth";
 
 import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
-import type { OrderReview } from "../order.api";
+import type { OrderReview, OrderReviewInput } from "../order.api";
+import { uploadReviewImage } from "../order-review-upload";
 
 const RATING_LABELS = ["非常差", "差", "一般", "好", "非常好"];
 const MAX_IMAGES = 5;
@@ -31,7 +34,7 @@ type Props = {
   readonly: boolean;
   detail?: OrderReview | null;
   onClose: () => void;
-  onSubmit: (rating: number, content: string) => Promise<void>;
+  onSubmit: (input: OrderReviewInput) => Promise<void>;
 };
 
 export function OrderReviewSheet({
@@ -42,6 +45,7 @@ export function OrderReviewSheet({
   onSubmit,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const accessToken = useAuthStore((state) => state.accessToken);
   const [rating, setRating] = useState(5);
   const [content, setContent] = useState("");
   const [images, setImages] = useState<string[]>([]);
@@ -67,7 +71,24 @@ export function OrderReviewSheet({
     if (submitting) return;
     setSubmitting(true);
     try {
-      await onSubmit(rating, content.trim());
+      // 本地图片先上传 OSS（与 Web 端选图即上传 bizType 111 一致），远端 URL 直接沿用
+      const imageUrls: string[] = [];
+      for (const uri of images) {
+        if (/^https?:\/\//i.test(uri)) {
+          imageUrls.push(uri);
+          continue;
+        }
+        if (!accessToken) {
+          throw new Error("登录状态已变化，请重新登录后提交");
+        }
+        imageUrls.push(await uploadReviewImage(accessToken, uri));
+      }
+      await onSubmit({
+        rating,
+        content: content.trim(),
+        anonymous,
+        imageUrls,
+      });
       Keyboard.dismiss();
       onClose();
     } catch (error) {
@@ -93,6 +114,9 @@ export function OrderReviewSheet({
     setImages((current) => [...current, ...picked].slice(0, MAX_IMAGES));
   };
 
+  // 与 Web 端 canSubmit 口径一致：评分有效即可提交，评价内容与图片均为选填
+  const canSubmit = rating >= 1 && rating <= 5;
+
   return (
     <BottomSheet
       fullScreen
@@ -101,10 +125,7 @@ export function OrderReviewSheet({
       dismissOnBackdropPress={!submitting}
       contentStyle={styles.frame}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.keyboardFrame}
-      >
+      <KeyboardAvoidingView behavior="padding" style={styles.keyboardFrame}>
         <View style={styles.screen}>
           <View style={[styles.header, { paddingTop: insets.top }]}>
             <Pressable
@@ -121,7 +142,7 @@ export function OrderReviewSheet({
             <View style={styles.headerSpacer} />
           </View>
 
-          <ScrollView
+          <KeyboardAwareScrollView
             bounces={false}
             contentContainerStyle={styles.form}
             keyboardShouldPersistTaps="handled"
@@ -255,16 +276,16 @@ export function OrderReviewSheet({
                 </View>
               </View>
             )}
-          </ScrollView>
+          </KeyboardAwareScrollView>
 
           {!readonly && (
             <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityState={{ disabled: submitting }}
-                disabled={submitting}
+                accessibilityState={{ disabled: submitting || !canSubmit, busy: submitting }}
+                disabled={submitting || !canSubmit}
                 onPress={() => void submit()}
-                style={[styles.submit, submitting && styles.submitDisabled]}
+                style={[styles.submit, (submitting || !canSubmit) && styles.submitDisabled]}
               >
                 {submitting ? (
                   <ActivityIndicator color="#FFFFFF" />
@@ -400,8 +421,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 8,
-    backgroundColor: "#FF708D",
+    // 可用态高亮红（与小法庭表单提交按钮同规范）
+    backgroundColor: "#FE1F4C",
   },
-  submitDisabled: { opacity: 0.65 },
+  submitDisabled: { backgroundColor: "#FF708D" },
   submitText: { color: "#FFFFFF", fontSize: 14, lineHeight: 22, fontWeight: "500" },
 });

@@ -188,9 +188,23 @@ export async function fetchAfterSaleMembers(clubId: number, token: string): Prom
   return Array.isArray(response.data) ? response.data : [];
 }
 
-export type OrderReview = { id?: number; rating: number; content?: string; imageUrls?: string[] };
-export async function submitOrderReview(orderNo: string, rating: number, content: string, token: string): Promise<void> {
-  const response = await apiClient<ApiEnvelope<unknown>>("/client/v1/afterSale/evaluate", { method: "POST", token, body: { action: { orderNo, rating, content } } });
+export type OrderReview = { id?: number; rating: number; content?: string; imageUrls?: string[]; anonymous?: boolean };
+export type OrderReviewInput = { rating: number; content: string; anonymous: boolean; imageUrls: string[] };
+export async function submitOrderReview(orderNo: string, input: OrderReviewInput, token: string): Promise<void> {
+  // 空内容/空图不传字段，与 Web 端 evaluate 的 undefined 口径一致
+  const response = await apiClient<ApiEnvelope<unknown>>("/client/v1/afterSale/evaluate", {
+    method: "POST",
+    token,
+    body: {
+      action: {
+        orderNo,
+        rating: input.rating,
+        anonymous: input.anonymous,
+        content: input.content || undefined,
+        imageUrls: input.imageUrls.length ? input.imageUrls : undefined,
+      },
+    },
+  });
   if (response.code !== "SUCCESS") throw new Error(response.info || "评价提交失败");
 }
 export async function fetchOrderReview(reviewId: number, token: string): Promise<OrderReview> {
