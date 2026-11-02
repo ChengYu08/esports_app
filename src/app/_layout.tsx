@@ -9,6 +9,7 @@ import { handlePendingPushClick } from "@/features/message/push-click-handler";
 import { RootSiblingParent } from "react-native-root-siblings";
 import { showToast } from "@/shared/ui/app-toast";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { setAuthExpiredHandler } from "@/core/network/api-client";
@@ -250,7 +251,8 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
         <GestureHandlerRootView style={{ flex: 1 }}>
-          <RootSiblingParent>
+          <KeyboardProvider>
+            <RootSiblingParent>
             <StatusBar style="dark" />
             {privacyAccepted ? (
               <PushyUpdateHost>
@@ -294,6 +296,7 @@ export default function RootLayout() {
             <OrderNotifySyncHost />
             <AppConfirmHost />
           </RootSiblingParent>
+          </KeyboardProvider>
         </GestureHandlerRootView>
       </SafeAreaProvider>
     </QueryClientProvider>

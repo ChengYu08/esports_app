@@ -90,17 +90,6 @@ export const CourtCard = memo(function CourtCard({
             {"\u00A0"}
             {item.contentSummary || item.content || "暂无投诉内容"}
           </Text>
-          {!!item.evidenceThumbnails?.length && (
-            <View style={styles.thumbnails}>
-              {item.evidenceThumbnails.slice(0, 5).map((uri, index) => (
-                <CachedImage
-                  key={`${uri}-${index}`}
-                  source={{ uri }}
-                  style={styles.thumbnail}
-                />
-              ))}
-            </View>
-          )}
         </View>
       </Pressable>
       <View style={styles.voteRow}>
@@ -259,13 +248,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   contentLabel: { color: COURT_COLORS.muted },
-  thumbnails: { flexDirection: "row", gap: 5, marginTop: 8 },
-  thumbnail: {
-    backgroundColor: "#EEEEEE",
-    borderRadius: 6,
-    height: 48,
-    width: 48,
-  },
   voteRow: { flexDirection: "row", marginTop: 12 },
   footer: {
     alignItems: "center",

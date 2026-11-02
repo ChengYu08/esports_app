@@ -8,11 +8,13 @@ import { courtVoteUnavailableReason, submitCourtVote } from "@/features/court/co
 import { CourtVoteButton } from "@/features/court/components/CourtVoteButton";
 import {
   courtApi,
+  courtServiceTypeText,
   formatCount,
   mapCaseStage,
   type CourtCase,
 } from "@/features/court/court.api";
 import { COURT_FONT_FAMILY } from "@/features/court/court.theme";
+import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { useAuthStore } from "@esports/auth";
@@ -214,7 +216,7 @@ export default function CourtDetailScreen() {
                     value={String(item.caseNo || item.caseId)}
                     onCopy={copyCaseId}
                   />
-                  <Metadata label="服务类型" value={item.serviceName || item.gameName || "服务订单"} />
+                  <Metadata label="服务类型" value={courtServiceTypeText(item)} />
                 </View>
                 <View style={styles.metadataRow}>
                   <Metadata label="接单人员" value={item.companionNickname || item.defendant?.nickname || "-"} />
@@ -253,11 +255,25 @@ export default function CourtDetailScreen() {
             {!!item.reviewImageUrls?.length && (
               <View style={[styles.imageRow, styles.complaintImages]}>
                 {item.reviewImageUrls.slice(0, 6).map((uri, index) => (
-                  <CachedImage
+                  <Pressable
                     key={`${uri}-${index}`}
-                    source={{ uri }}
-                    style={styles.imageThumb}
-                  />
+                    accessibilityRole="button"
+                    accessibilityLabel={`查看差评图片 ${index + 1}`}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/image-preview",
+                        params: createImagePreviewParams(
+                          item.reviewImageUrls ?? [],
+                          index,
+                        ),
+                      })
+                    }
+                  >
+                    <CachedImage
+                      source={{ uri }}
+                      style={styles.imageThumb}
+                    />
+                  </Pressable>
                 ))}
               </View>
             )}

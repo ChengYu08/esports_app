@@ -1,6 +1,8 @@
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
+  ChevronLeft24Regular,
+  MoreHorizontal24Regular,
   Search24Regular,
   Star16Filled,
   Star16Regular,
@@ -90,6 +92,8 @@ const arrowDownIcon = require("../../../../assets/mine/figma/profile-arrow-down.
 const diamondIcon = require("../../../../assets/message/order-assistant-coin-3f6fcf.webp");
 const idleStatusIcon = require("../../../../assets/home/club-detail/status-idle.svg");
 const playingStatusIcon = require("../../../../assets/home/club-detail/status-playing.svg");
+const NAV_BAR_CONTENT_HEIGHT = 44;
+const PROFILE_IDENTITY_TOP_GAP = 12;
 type ProfileTab = "技能" | "评价";
 type ProfileListItem = { key: string; content: ReactElement };
 
@@ -109,9 +113,9 @@ export default function ProfileScreen() {
   const [coverHeight, setCoverHeight] = useState(0);
   const [compactActive, setCompactActive] = useState(false);
   const scrollY = useMemo(() => new Animated.Value(0), []);
-  // 紧凑头部淡入区间：封面剩余 136→44px（92px 行程），滚动驱动走原生线程，
+  // 紧凑头部淡入区间：安全区下方封面剩余 136→44px（92px 行程），滚动驱动走原生线程，
   // 避免 JS 层每帧 setValue。封面未布局完成前恒为 0，防止紧凑头部闪现。
-  const fadeStart = coverHeight - 136;
+  const fadeStart = coverHeight - insets.top - 136;
   const headerFade = useMemo(
     () =>
       coverHeight === 0
@@ -331,6 +335,7 @@ export default function ProfileScreen() {
         key: "profile-cover",
         content: (
           <ProfileCover
+            topInset={insets.top}
             profile={profile}
             coverImageUrl={coverImageUrl}
             coverPreviewParams={coverPreviewParams}
@@ -360,146 +365,150 @@ export default function ProfileScreen() {
       },
     ];
 
-  if (games.length > 0) {
-    profileListItems.push({
-      key: "game-selector",
-      content: (
-        <View style={styles.scrollBody}>
-          <GameSelector
-            games={games}
-            selectedGameId={activeGameId}
-            onSelect={setSelectedGameId}
-          />
-        </View>
-      ),
-    });
+    if (games.length > 0) {
+      profileListItems.push({
+        key: "game-selector",
+        content: (
+          <View style={styles.scrollBody}>
+            <GameSelector
+              games={games}
+              selectedGameId={activeGameId}
+              onSelect={setSelectedGameId}
+            />
+          </View>
+        ),
+      });
 
-    if (tab === "技能") {
-      if (gameDetailQuery.isLoading) {
+      if (tab === "技能") {
+        if (gameDetailQuery.isLoading) {
+          profileListItems.push({
+            key: "skills-loading",
+            content: (
+              <View style={styles.scrollBody}>
+                <ProfileGameSkeleton />
+              </View>
+            ),
+          });
+        } else if (gameDetailQuery.isError || !gameDetail) {
+          profileListItems.push({
+            key: "skills-error",
+            content: (
+              <View style={styles.scrollBody}>
+                <InlineState
+                  text="游戏技能加载失败"
+                  actionLabel="重试"
+                  onAction={() => void gameDetailQuery.refetch()}
+                />
+              </View>
+            ),
+          });
+        } else {
+          profileListItems.push(
+            {
+              key: "skills-summary",
+              content: (
+                <View style={styles.scrollBody}>
+                  <SkillsSummary
+                    detail={gameDetail}
+                    onToggleVoice={toggleVoice}
+                    playingUrl={playingVoiceUrl}
+                  />
+                </View>
+              ),
+            },
+            {
+              key: "services-title",
+              content: (
+                <View style={styles.scrollBody}>
+                  <Text style={[styles.sectionTitle, styles.serviceTitle]}>
+                    陪玩服务
+                  </Text>
+                </View>
+              ),
+            },
+          );
+
+          if (gameDetail.skillCards.length > 0) {
+            profileListItems.push(
+              ...gameDetail.skillCards.map((card) => ({
+                key: `service-${card.companionServiceId}-${card.gameLevelId}`,
+                content: (
+                  <View style={styles.scrollBody}>
+                    <ServiceCard card={card} onOrder={openOrder} />
+                  </View>
+                ),
+              })),
+            );
+          } else {
+            profileListItems.push({
+              key: "services-empty",
+              content: (
+                <View style={styles.scrollBody}>
+                  <EmptyState message="暂无大神服务" />
+                </View>
+              ),
+            });
+          }
+        }
+      } else if (reviewQuery.isLoading) {
         profileListItems.push({
-          key: "skills-loading",
+          key: "reviews-loading",
           content: (
             <View style={styles.scrollBody}>
-              <ProfileGameSkeleton />
+              <ProfileGameSkeleton reviews />
             </View>
           ),
         });
-      } else if (gameDetailQuery.isError || !gameDetail) {
+      } else if (reviewQuery.isError) {
         profileListItems.push({
-          key: "skills-error",
+          key: "reviews-error",
           content: (
             <View style={styles.scrollBody}>
               <InlineState
-                text="游戏技能加载失败"
+                text="评价加载失败"
                 actionLabel="重试"
-                onAction={() => void gameDetailQuery.refetch()}
+                onAction={() => void reviewQuery.refetch()}
               />
             </View>
           ),
         });
       } else {
-        profileListItems.push(
-          {
-            key: "skills-summary",
+        const reviews = reviewQuery.data?.items ?? [];
+        if (reviews.length === 0) {
+          profileListItems.push({
+            key: "reviews-empty",
             content: (
               <View style={styles.scrollBody}>
-                <SkillsSummary
-                  detail={gameDetail}
-                  onToggleVoice={toggleVoice}
-                  playingUrl={playingVoiceUrl}
+                <EmptyState
+                  message="暂无评价"
+                  hint="完成订单后会显示评价内容"
                 />
               </View>
             ),
-          },
-          {
-            key: "services-title",
-            content: (
-              <View style={styles.scrollBody}>
-                <Text style={[styles.sectionTitle, styles.serviceTitle]}>
-                  陪玩服务
-                </Text>
-              </View>
-            ),
-          },
-        );
-
-        if (gameDetail.skillCards.length > 0) {
+          });
+        } else {
           profileListItems.push(
-            ...gameDetail.skillCards.map((card) => ({
-              key: `service-${card.companionServiceId}-${card.gameLevelId}`,
-              content: (
-                <View style={styles.scrollBody}>
-                  <ServiceCard card={card} onOrder={openOrder} />
-                </View>
-              ),
+            ...reviews.map((review, index) => ({
+              key: `review-${review.id}-${index}`,
+              content: <ReviewCard review={review} />,
             })),
           );
-        } else {
-          profileListItems.push({
-            key: "services-empty",
-            content: (
-              <View style={styles.scrollBody}>
-                <EmptyState message="暂无大神服务" />
-              </View>
-            ),
-          });
         }
       }
-    } else if (reviewQuery.isLoading) {
-      profileListItems.push({
-        key: "reviews-loading",
-        content: (
-          <View style={styles.scrollBody}>
-            <ProfileGameSkeleton reviews />
-          </View>
-        ),
-      });
-    } else if (reviewQuery.isError) {
-      profileListItems.push({
-        key: "reviews-error",
-        content: (
-          <View style={styles.scrollBody}>
-            <InlineState
-              text="评价加载失败"
-              actionLabel="重试"
-              onAction={() => void reviewQuery.refetch()}
-            />
-          </View>
-        ),
-      });
     } else {
-      const reviews = reviewQuery.data?.items ?? [];
-      if (reviews.length === 0) {
-        profileListItems.push({
-          key: "reviews-empty",
-          content: (
-            <View style={styles.scrollBody}>
-              <EmptyState message="暂无评价" hint="完成订单后会显示评价内容" />
-            </View>
-          ),
-        });
-      } else {
-        profileListItems.push(
-          ...reviews.map((review, index) => ({
-            key: `review-${review.id}-${index}`,
-            content: <ReviewCard review={review} />,
-          })),
-        );
-      }
+      profileListItems.push({
+        key: "games-empty",
+        content: (
+          <View style={styles.scrollBody}>
+            <EmptyState message="暂无支持的游戏" />
+          </View>
+        ),
+      });
     }
-  } else {
-    profileListItems.push({
-      key: "games-empty",
-      content: (
-        <View style={styles.scrollBody}>
-          <EmptyState message="暂无支持的游戏" />
-        </View>
-      ),
-    });
-  }
 
     return profileListItems;
   }, [
+    insets.top,
     profile,
     coverImageUrl,
     coverPreviewParams,
@@ -539,7 +548,7 @@ export default function ProfileScreen() {
             ? detailQuery.error.message
             : "个人主页加载失败"
         }
-        onRetry={() => void detailQuery.refetch()}
+        onRetry={detailQuery.refetch}
       />
     );
   }
@@ -560,7 +569,6 @@ export default function ProfileScreen() {
       <StatusBar style="light" />
       <Animated.View
         style={[
-          styles.navbar,
           styles.navbarOverlay,
           styles.navbarCompact,
           { paddingTop: insets.top },
@@ -571,7 +579,7 @@ export default function ProfileScreen() {
           style={[
             styles.navbarBg,
             {
-              height: insets.top + 92,
+              height: insets.top + NAV_BAR_CONTENT_HEIGHT + 48,
               overflow: "hidden",
               opacity: headerFade,
             },
@@ -599,9 +607,9 @@ export default function ProfileScreen() {
             accessibilityLabel="返回"
             hitSlop={12}
             onPress={() => router.back()}
-            style={[styles.navButton, { marginTop: 3 }]}
+            style={styles.navButton}
           >
-            <Image source={backIcon} style={styles.backIcon} />
+            <ChevronLeft24Regular color="#fff" width={24} height={24} />
           </Pressable>
           <Animated.View
             pointerEvents="none"
@@ -655,13 +663,26 @@ export default function ProfileScreen() {
                   accessibilityLabel="在线客服"
                   accessibilityState={{ busy: enteringCS }}
                   hitSlop={12}
-                  onPress={() => void openCustomerService()}
-                  style={[styles.navActionButton, { marginTop: 3 }]}
+                  onPress={openCustomerService}
+                  style={[styles.navActionButton, { marginTop: 1 }]}
                 >
                   <Image
                     source={customerIcon}
                     style={styles.navActionIcon}
                     contentFit="contain"
+                  />
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="更多操作"
+                  hitSlop={12}
+                  onPress={() => setProfileActionsVisible(true)}
+                  style={styles.navActionButton}
+                >
+                  <MoreHorizontal24Regular
+                    color="#fff"
+                    width={24}
+                    height={24}
                   />
                 </Pressable>
               </>
@@ -670,10 +691,7 @@ export default function ProfileScreen() {
         </View>
         <Animated.View
           pointerEvents={compactActive ? "box-none" : "none"}
-          style={[
-            styles.tabsBar,
-            { opacity: headerFade, marginHorizontal: -12 },
-          ]}
+          style={[styles.tabsBar, { opacity: headerFade }]}
         >
           <ProfileTabs tab={tab} onSelect={setTab} />
         </Animated.View>
@@ -763,7 +781,7 @@ export default function ProfileScreen() {
         onCancel={() => setBlacklistPromptVisible(false)}
         onConfirm={() => {
           setBlacklistPromptVisible(false);
-          void addToBlacklist(
+          addToBlacklist(
             {
               userId: String(profile.userId),
               nickname: profile.nickname,
@@ -772,9 +790,13 @@ export default function ProfileScreen() {
               clubId: String(profile.clubId),
             },
             useAuthStore.getState().accessToken ?? "",
-          ).then(() => {
-            showToast("加入黑名单成功");
-          });
+          )
+            .then(() => {
+              showToast("加入黑名单成功");
+            })
+            .catch((error: unknown) => {
+              showToast(error instanceof Error ? error.message : "操作失败");
+            });
         }}
       />
       {orderCard && gameDetail ? (
@@ -898,6 +920,7 @@ const ProfileTabs = memo(function ProfileTabs({
 
 // 头部封面独立组件：列表项内容引用稳定，滚动期不被父组件重渲染波及
 const ProfileCover = memo(function ProfileCover({
+  topInset,
   profile,
   coverImageUrl,
   coverPreviewParams,
@@ -906,6 +929,7 @@ const ProfileCover = memo(function ProfileCover({
   onSelectRelation,
   onMeasure,
 }: {
+  topInset: number;
   profile: ProfileDetail;
   coverImageUrl?: string;
   coverPreviewParams: ImagePreviewParams | null;
@@ -917,7 +941,13 @@ const ProfileCover = memo(function ProfileCover({
   const [introExpanded, setIntroExpanded] = useState(false);
   return (
     <View
-      style={styles.cover}
+      style={[
+        styles.cover,
+        {
+          paddingTop:
+            topInset + NAV_BAR_CONTENT_HEIGHT + PROFILE_IDENTITY_TOP_GAP,
+        },
+      ]}
       onLayout={(event) => onMeasure(event.nativeEvent.layout.height)}
     >
       {coverPreviewParams ? (
@@ -1054,12 +1084,6 @@ function ProfileIdentity({
             {profile.nickname}
           </Text>
 
-          {isBlacklisted ? (
-            <View accessibilityLabel="已加入黑名单" style={styles.blacklistTag}>
-              <Text style={styles.blacklistTagText}>已加入黑名单</Text>
-            </View>
-          ) : null}
-
           {profile.sex === 1 || profile.sex === 2 ? (
             <View style={styles.headerPill}>
               <Image
@@ -1106,7 +1130,14 @@ function ProfileIdentity({
               </Text>
             </Pressable>
           ) : null}
-          <Text style={styles.idRow}>ID：{profile.userId}</Text>
+          {profile.userId ? (
+            <Text style={styles.idRow}>ID：{profile.userId}</Text>
+          ) : null}
+          {isBlacklisted ? (
+            <View accessibilityLabel="已加入黑名单" style={styles.blacklistTag}>
+              <Text style={styles.blacklistTagText}>已加入黑名单</Text>
+            </View>
+          ) : null}
         </View>
       </View>
     </View>
@@ -1184,7 +1215,10 @@ function SkillsSummary({
 }
 
 function ImageGallery({ images }: { images: string[] }) {
-  if (images.length === 0) return <EmptyState message="暂无技能图片" />;
+  // 无图时保留插画空态，但压缩上方留白，避免大块空白把服务模式挤远
+  if (images.length === 0) {
+    return <EmptyState message="暂无技能图片" style={styles.galleryEmpty} />;
+  }
   const visibleImages = images.slice(0, 5);
 
   return (
@@ -1447,8 +1481,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "#617181",
     justifyContent: "flex-end",
-    // 头像顶部距屏幕顶部 92(含状态栏),与头像下方留白(92)一致
-    paddingTop: 92,
+    // 头像位于安全区和导航栏下方，与俱乐部主页保持 12 的间距。
     paddingHorizontal: 16,
     paddingBottom: 28,
   },
@@ -1520,7 +1553,6 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   navbarCompact: {
-    flex: 1,
     flexDirection: "column",
     overflow: "hidden",
   },
@@ -1532,7 +1564,7 @@ const styles = StyleSheet.create({
   navbarCompactRow: {
     flexDirection: "row",
     alignItems: "center",
-    height: 44,
+    height: NAV_BAR_CONTENT_HEIGHT,
     paddingHorizontal: 12,
     gap: 8,
   },
@@ -1579,11 +1611,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(24,35,47,0.52)",
   },
-  navbar: {
-    paddingHorizontal: 12,
-    flexDirection: "column",
-    alignItems: "stretch",
-  },
   navButton: {
     width: 24,
     height: 24,
@@ -1602,7 +1629,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   navActionIcon: { width: 24, height: 24, tintColor: "#FFFFFF" },
-  backIcon: { width: 24, height: 24, tintColor: "#fff" },
   identity: {
     flexDirection: "row",
     alignItems: "center",
@@ -1847,6 +1873,8 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   gallery: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 14 },
+  // 默认空态 minHeight 240，这里收紧到插画+文案的紧凑高度
+  galleryEmpty: { minHeight: 150 },
   galleryItem: {
     width: 62,
     height: 62,

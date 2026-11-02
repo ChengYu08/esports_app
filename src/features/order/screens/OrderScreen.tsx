@@ -460,18 +460,22 @@ export default function OrderScreen() {
         readonly={Boolean(reviewTarget?.reviewExists)}
         detail={reviewDetail}
         onClose={() => setReviewTarget(null)}
-        onSubmit={async (rating, content) => {
+        onSubmit={async (input) => {
           if (!reviewTarget || !token) return;
           await submitOrderReview(
             reviewTarget.orderNo || reviewTarget.id,
-            rating,
-            content,
+            input,
             token,
           );
           setReviewTarget((current) =>
             current ? { ...current, reviewExists: true } : current,
           );
-          setReviewDetail({ rating, content });
+          setReviewDetail({
+            rating: input.rating,
+            content: input.content,
+            imageUrls: input.imageUrls,
+            anonymous: input.anonymous,
+          });
           if (currentUser?.id) {
             // 评价后列表卡片需换成「已评价」，同样以详情为准就地刷新。
             await refreshOrderAfterAction(

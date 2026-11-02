@@ -235,6 +235,13 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         return;
       }
       const normalizedConversation = { ...conversation, id: normalizedPeerId, title: normalizedConversationTitle };
+      // 重装/换设备后的离线补偿会把窗口内的历史消息逐条重放（含已读的）。
+      // 这些消息的未读状态以融云会话快照为准（服务端已保存已读态），
+      // 这里不能再逐条 +1，否则已读消息会重新变成未读红点。
+      // 就绪后迟到的 offline 消息（sentAt 晚于本次登录就绪时间）仍按新消息计数。
+      const isReplayedHistory =
+        message.receivedOffline === true
+        && (sessionReadyAt === 0 || message.sentAt <= sessionReadyAt - BANNER_CLOCK_SKEW_MS);
       if (
         !isActive
         && !message.isMine
@@ -262,7 +269,11 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           avatar: existing?.avatar || normalizedConversation.avatar,
           preview: preview || normalizedConversation.preview,
           isOnline: message.isMine ? existing?.isOnline : true,
-          unreadCount: isActive ? 0 : message.isMine ? (existing?.unreadCount || 0) : (existing?.unreadCount || 0) + 1,
+          unreadCount: isActive
+            ? 0
+            : message.isMine || isReplayedHistory
+              ? (existing?.unreadCount || 0)
+              : (existing?.unreadCount || 0) + 1,
           updatedAt: message.sentAt,
         };
         const conversations = isActive
