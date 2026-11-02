@@ -49,7 +49,8 @@ export function mapOrder(
     : rawStatus === "PROCESSING" ? "paid"
     : "pendingPayment";
   const id = stringValue(item, "id", "orderId", "orderNo") ?? `order-${index}`;
-  const total = stringValue(item, "realPayAmount", "totalPrice", "payAmount", "amount") ?? "0";
+  // 合计优先取订单总价；待支付订单的实付金额为零，不能用它覆盖应付总价。
+  const total = stringValue(item, "totalPrice", "realPayAmount", "payAmount", "amount") ?? "0";
   // 接口分别返回模式、等级和服务，不能只取服务名或用旧标题覆盖。
   const serviceParts = ["gameModeName", "gameLevelName", "serviceName"]
     .map((key) => stringValue(item, key)?.trim())

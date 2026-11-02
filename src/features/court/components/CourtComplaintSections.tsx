@@ -135,6 +135,7 @@ export function CourtCaseFormSection({
   onSelectCaseType,
   onOpenSources,
   onChangeClaim,
+  onFocusClaim,
 }: {
   caseType: CourtCaseType;
   selectedSource: CourtSource | null;
@@ -144,6 +145,7 @@ export function CourtCaseFormSection({
   onSelectCaseType: (caseType: CourtCaseType) => void;
   onOpenSources: () => void;
   onChangeClaim: (claim: string) => void;
+  onFocusClaim: () => void;
 }) {
   const styles = complaintStyles;
   const isDeleteReview = caseType === "DELETE_REVIEW";
@@ -230,6 +232,7 @@ export function CourtCaseFormSection({
       <FormField label="个人诉求" required>
         {/* 上限与 Web APPEAL_MAX 对齐：40 字，超出会被后端拒绝 */}
         <TextInput
+          onFocus={onFocusClaim}
           value={claim}
           onChangeText={onChangeClaim}
           maxLength={40}

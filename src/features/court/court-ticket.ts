@@ -1,13 +1,8 @@
 import { useAuthStore } from "@esports/auth";
 import { courtApi, makeIdempotencyKey, type TicketInput, type TicketTarget } from "./court.api";
+import { TICKET_REASONS } from "./platform-ticket-display";
 
-export const TICKET_REASONS = [
-  ["RULE_VIOLATION", "违反平台规定"],
-  ["ORDER_DISPUTE", "订单纠纷"],
-  ["CHAT_DISPUTE", "聊天纠纷"],
-  ["OTHER", "其他"],
-  ["PLATFORM_SUGGESTION", "平台建议"],
-] as const;
+export { TICKET_REASONS } from "./platform-ticket-display";
 
 export type TicketDraft = {
   reasonType: string;

@@ -177,6 +177,17 @@ export type TicketInput = {
   idempotencyKey?: string;
 };
 
+export type PlatformTicketMessage = {
+  messageId?: string | number;
+  senderType?: string;
+  messageType?: string;
+  visibility?: string;
+  senderId?: string | number;
+  senderName?: string;
+  content?: string;
+  createdAt?: string;
+};
+
 export type PlatformTicket = {
   ticketId?: string | number;
   ticketNo?: string;
@@ -194,13 +205,7 @@ export type PlatformTicket = {
   repliedAt?: string;
   closedAt?: string;
   evidenceThumbnails?: string[];
-  messageList?: {
-    senderType?: string;
-    messageType?: string;
-    visibility?: string;
-    content?: string;
-    createdAt?: string;
-  }[];
+  messageList?: PlatformTicketMessage[];
 };
 
 type Envelope<T> = { code?: string; info?: string; data?: T };

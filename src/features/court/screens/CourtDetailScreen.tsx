@@ -46,6 +46,7 @@ export default function CourtDetailScreen() {
   const busy = pendingAction !== null;
   const [reviewerPromptVisible, setReviewerPromptVisible] = useState(false);
   const voteInFlight = useRef(false);
+  const favoriteInFlight = useRef(false);
   const isMine = mine === "1";
   const loadRequestRef = useRef(0);
 
@@ -145,26 +146,32 @@ export default function CourtDetailScreen() {
       router.push("/login");
       return;
     }
-    if (!item || busy) {
+    if (!item || busy || favoriteInFlight.current) {
       return;
     }
+    favoriteInFlight.current = true;
     setPendingAction("favorite");
     try {
       const result = await courtApi.favorite(item.caseId, !item.favorited);
+      if (accessToken !== useAuthStore.getState().accessToken) {
+        return;
+      }
       setItem((current) => {
         if (!current || String(current.caseId) !== String(item.caseId)) {
           return current;
         }
+        const favoriteDelta = Number(result.favorited) - Number(Boolean(current.favorited));
         return {
           ...current,
           favorited: result.favorited,
-          favoriteCount: result.favoriteCount ?? current.favoriteCount,
+          favoriteCount: result.favoriteCount ?? Math.max(0, (current.favoriteCount ?? 0) + favoriteDelta),
         };
       });
       showToast(result.favorited ? "收藏成功" : "已取消收藏");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "收藏失败");
     } finally {
+      favoriteInFlight.current = false;
       setPendingAction(null);
     }
   }
@@ -306,10 +313,18 @@ export default function CourtDetailScreen() {
               <CachedImage source={require("../../../../assets/court/eye.svg")} style={styles.statIcon} />
               <Text style={styles.statText}>{formatCount(item.viewCount)}</Text>
             </View>
-            <View style={styles.stat}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={item.favorited ? "取消收藏" : "收藏案件"}
+              accessibilityState={{ disabled: busy, busy: pendingAction === "favorite" }}
+              disabled={busy}
+              hitSlop={8}
+              onPress={favorite}
+              style={styles.stat}
+            >
               <CachedImage source={item.favorited ? require("../../../../assets/court/star-filled.svg") : require("../../../../assets/court/star.svg")} style={styles.statIcon} />
               <Text style={styles.statText}>{formatCount(item.favoriteCount)}</Text>
-            </View>
+            </Pressable>
           </View>
         </View>
 
@@ -390,6 +405,8 @@ export default function CourtDetailScreen() {
         )}
         {!isMine && (
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={item.favorited ? "取消收藏" : "收藏案件"}
             onPress={favorite}
             accessibilityState={{ disabled: busy, busy: pendingAction === "favorite" }}
             disabled={busy}
