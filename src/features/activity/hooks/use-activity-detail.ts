@@ -6,7 +6,7 @@ import { fetchActivityDetail } from "../api/activity.api";
 import { initCountdownState } from "./countdown";
 
 export const activityDetailQueryKey = (activityCode: string) =>
-  ["activity-seckill", "detail", activityCode] as const;
+  ["activity", "detail", activityCode] as const;
 
 /** 秒杀活动详情查询。 */
 export function useActivityDetail(activityCode: string) {

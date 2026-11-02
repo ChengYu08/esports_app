@@ -14,14 +14,14 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ApiError } from "@/core/network/api-client";
-import { computeActivityStatus } from "@/features/activity-seckill/activity-status";
-import { publishActivity } from "@/features/activity-seckill/api/activity.api";
-import { ActivityRulesModal } from "@/features/activity-seckill/components/ActivityRulesModal";
+import { computeActivityStatus } from "@/features/activity/activity-status";
+import { publishActivity } from "@/features/activity/api/activity.api";
+import { ActivityRulesModal } from "@/features/activity/components/ActivityRulesModal";
 import {
   formatCountdown,
   useActivityCountdown,
   useActivityDetail,
-} from "@/features/activity-seckill/hooks/use-activity-detail";
+} from "@/features/activity/hooks/use-activity-detail";
 import { openAuditionRoom } from "@/features/match/enter-audition-room";
 import { requireLogin } from "@/shared/navigation/require-login";
 import { showToast } from "@/shared/ui/app-toast";
@@ -41,7 +41,7 @@ function formatStartAt(iso: string): string {
   return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-export default function SeckillLandingScreen({ activityCode }: { activityCode: string }) {
+export default function ActivityLandingScreen({ activityCode }: { activityCode: string }) {
   const insets = useSafeAreaInsets();
   const token = useAuthStore((state) => state.accessToken);
   const detailQuery = useActivityDetail(activityCode);

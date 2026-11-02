@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
 
+import { logger } from "@/core/logging/logger";
 import type { Banner } from "@/features/home/api/home.types";
 import { getBannerAction } from "@/features/home/home-banner.contract";
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
@@ -18,6 +19,8 @@ export function HomeBannerCard({ banner, label, style }: HomeBannerCardProps) {
   const interactive = action.type !== "none";
 
   async function handlePress() {
+    // 排查跳转问题：打印点击的 Banner 原始下发数据（含 linkConfig 按端协议）。
+    logger.info("[home-banner] banner clicked", { banner: JSON.stringify(banner) });
     if (action.type === "image") {
       router.push({ pathname: "/image-preview", params: createImagePreviewParams([action.url], 0) });
     } else if (action.type === "route") {

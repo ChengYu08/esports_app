@@ -11,6 +11,7 @@ type ApiBanner = {
   displayImageUrl?: string | null;
   contentImageUrl?: string | null;
   linkUrl?: string | null;
+  linkConfig?: Record<string, unknown> | null;
   sort?: number | null;
 };
 
@@ -57,6 +58,7 @@ export async function fetchBanners(signal?: AbortSignal): Promise<HomeBannerSlot
             title: banner.materialName?.trim() || undefined,
             contentImageUrl: banner.contentImageUrl?.trim() || undefined,
             linkUrl: banner.linkUrl?.trim() || undefined,
+            linkConfig: banner.linkConfig ?? undefined,
           }];
         }),
     }];

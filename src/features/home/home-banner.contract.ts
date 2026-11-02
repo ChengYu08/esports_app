@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 
-import type { Banner, HomeBannerSlotCode } from "./api/home.types";
+import type { Banner, BannerJumpConfig, HomeBannerSlotCode } from "./api/home.types";
 
 export const HOME_BANNER_SLOT_CODES: HomeBannerSlotCode[] = [
   "APP_HOME_FLOOR1",
@@ -19,8 +19,8 @@ type BannerAction =
   | { type: "route"; path: string; params: Record<string, string> }
   | { type: "none" };
 
-/** 后台按端配置的跳转协议结构（linkUrl 内的 JSON，后端原样透传）。 */
-type BannerJumpConfig = {
+/** 后台按端配置的跳转协议结构（linkConfig 内的端 key 对应的节点）。 */
+type BannerJumpNode = {
   jumpType?: unknown;
   jumpUrl?: unknown;
   params?: unknown;
@@ -62,33 +62,24 @@ function parseJumpParams(raw: unknown): Record<string, string> {
 }
 
 /**
- * 解析按端跳转协议：linkUrl 里可能存的是后台按端配置的 JSON（如秒杀入口）。
- * 任何一步不合法（JSON 解析失败 / 非对象 / 缺端 key / 缺或非法 jumpType /
- * ROUTE 缺以 / 开头的 jumpUrl / URL 缺合法外链）一律返回 none，由调用方回退存量逻辑。
+ * 解析按端跳转协议：后台 linkConfig 独立结构化字段（如活动入口）。
+ * 任何一步不合法（缺端 key / 缺或非法 jumpType / ROUTE 缺以 / 开头的
+ * jumpUrl / URL 缺合法外链）一律返回 none，由调用方回退存量逻辑。
  */
-export function parseBannerJump(linkUrl?: string): BannerJump {
-  if (!linkUrl) {
+export function parseBannerJump(linkConfig?: BannerJumpConfig | null): BannerJump {
+  if (!linkConfig) {
     return { type: "none" };
   }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(linkUrl);
-  } catch {
+  const node = linkConfig[getPlatformKey()];
+  if (typeof node !== "object" || node === null || Array.isArray(node)) {
     return { type: "none" };
   }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    return { type: "none" };
-  }
-  const config = (parsed as Record<string, unknown>)[getPlatformKey()];
-  if (typeof config !== "object" || config === null || Array.isArray(config)) {
-    return { type: "none" };
-  }
-  const { jumpType, jumpUrl } = config as BannerJumpConfig;
+  const { jumpType, jumpUrl } = node as BannerJumpNode;
   if (jumpType === "ROUTE") {
     if (typeof jumpUrl !== "string" || !jumpUrl.startsWith("/")) {
       return { type: "none" };
     }
-    return { type: "route", path: jumpUrl, params: parseJumpParams((config as BannerJumpConfig).params) };
+    return { type: "route", path: jumpUrl, params: parseJumpParams((node as BannerJumpNode).params) };
   }
   if (jumpType === "URL") {
     if (typeof jumpUrl !== "string" || !isValidHttpUrl(jumpUrl)) {
@@ -99,10 +90,10 @@ export function parseBannerJump(linkUrl?: string): BannerJump {
   return { type: "none" };
 }
 
-/** 按后台约定优先展示内容图，其次跳转链接，未配置点击内容时仅展示素材。 */
+/** 按后台约定优先解析 linkConfig 按端跳转协议，其次展示内容图，再跳转链接，未配置点击内容时仅展示素材。 */
 export function getBannerAction(banner: Banner): BannerAction {
-  // 优先解析按端跳转协议（秒杀等活动入口走这里）。
-  const jump = parseBannerJump(banner.linkUrl);
+  // 优先解析按端跳转协议（活动入口走这里）。
+  const jump = parseBannerJump(banner.linkConfig);
   if (jump.type === "route") {
     return { type: "route", path: jump.path, params: jump.params };
   }

@@ -20,7 +20,9 @@ describe("首页活动轮播下发", () => {
         { slotCode: "APP_HOME_FLOOR3", slotName: "APP首页三楼", displayMode: "TILE", items: [
           { deliveryId: 8, materialId: 21, displayImageUrl: "https://cdn.example.com/b.jpg", sort: 2 },
           { deliveryId: 8, materialId: 22, displayImageUrl: " https://cdn.example.com/a.jpg ", sort: 1,
-            materialName: " 活动详情 ", contentImageUrl: " https://cdn.example.com/detail.jpg ", linkUrl: "https://example.com/activity" },
+            materialName: " 活动详情 ", contentImageUrl: " https://cdn.example.com/detail.jpg ",
+            linkUrl: "https://example.com/activity",
+            linkConfig: { PC: { jumpType: "URL", jumpUrl: "https://pc.example.com" }, IOS: { jumpType: "ROUTE", jumpUrl: "/activity", params: { activityCode: "X" } } } },
           { deliveryId: 8, materialId: 23, displayImageUrl: "  ", sort: 3 },
           { deliveryId: 8, materialId: 24, displayImageUrl: null, sort: 4 },
         ] },
@@ -43,7 +45,8 @@ describe("首页活动轮播下发", () => {
     expect(slots[2]).toMatchObject({ displayMode: "TILE", intervalMs: 5000 });
     expect(slots[2].items).toEqual([
       expect.objectContaining({ id: "8-22", imageUrl: "https://cdn.example.com/a.jpg", title: "活动详情",
-        contentImageUrl: "https://cdn.example.com/detail.jpg", linkUrl: "https://example.com/activity" }),
+        contentImageUrl: "https://cdn.example.com/detail.jpg", linkUrl: "https://example.com/activity",
+        linkConfig: { PC: { jumpType: "URL", jumpUrl: "https://pc.example.com" }, IOS: { jumpType: "ROUTE", jumpUrl: "/activity", params: { activityCode: "X" } } } }),
       expect.objectContaining({ id: "8-21", imageUrl: "https://cdn.example.com/b.jpg" }),
     ]);
     expect(apiClient).toHaveBeenCalledWith("/client/v1/ad/slot/list", {

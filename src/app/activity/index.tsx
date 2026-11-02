@@ -1,11 +1,11 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";
 
-import SeckillLandingScreen from "@/features/activity-seckill/screens/SeckillLandingScreen";
+import ActivityLandingScreen from "@/features/activity/screens/ActivityLandingScreen";
 import { showToast } from "@/shared/ui/app-toast";
 
-/** 秒杀活动落地页路由：/activity-seckill?activityCode=xxx（首页 Banner 按端协议进入）。 */
-export default function ActivitySeckillRoute() {
+/** 通用活动落地页路由：/activity?activityCode=xxx（首页 Banner 按端协议进入）。 */
+export default function ActivityRoute() {
   const params = useLocalSearchParams<{ activityCode?: string | string[] }>();
   const raw = Array.isArray(params.activityCode) ? params.activityCode[0] : params.activityCode;
   const activityCode = (raw || "").trim();
@@ -27,5 +27,5 @@ export default function ActivitySeckillRoute() {
     return null;
   }
 
-  return <SeckillLandingScreen activityCode={activityCode} />;
+  return <ActivityLandingScreen activityCode={activityCode} />;
 }
