@@ -96,7 +96,14 @@ export default function CourtComplaintScreen() {
     removeImage,
     uploadAll,
   } = evidence;
-  const caseDetail = useCaseDetail(params.caseId, (item) => {
+  // 重新提交 / 申诉 / 补充举证各自校验不同的操作码；发起投诉（无 caseId）不加载。
+  const requiredAction =
+    mode === "evidence"
+      ? ("SUPPLEMENT_EVIDENCE" as const)
+      : mode === "appeal"
+        ? ("APPEAL" as const)
+        : ("RESUBMIT" as const);
+  const caseDetail = useCaseDetail(params.caseId, requiredAction, (item) => {
     if (item.content) setContent(item.content);
     if (item.claim) setClaim(item.claim);
     if (item.caseType) setCaseType(item.caseType as CourtCaseType);
