@@ -9,6 +9,7 @@ import {
 } from "@/features/court/court.api";
 import { COURT_COLORS, COURT_FONT_FAMILY } from "@/features/court/court.theme";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 type Props = {
@@ -24,7 +25,8 @@ const eye = require("../../../../assets/court/eye.svg");
 const star = require("../../../../assets/court/star.svg");
 const starFilled = require("../../../../assets/court/star-filled.svg");
 
-export function CourtCard({
+// 列表行组件：父组件交互态（收藏/刷新/切 tab）变化时未变的卡片跳过重渲
+export const CourtCard = memo(function CourtCard({
   item,
   onOpen,
   onVote,
@@ -143,7 +145,7 @@ export function CourtCard({
       </View>
     </View>
   );
-}
+});
 
 function Party({
   party,

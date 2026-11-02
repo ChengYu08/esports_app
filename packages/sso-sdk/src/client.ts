@@ -17,7 +17,11 @@ import { QuickLoginCancelledError, SsoError } from "./types";
 
 export class SsoClient {
   private readonly config: SsoClientConfig;
+  private readonly referer: string;
   private readonly axiosInstance: ReturnType<typeof axios.create>;
+  /** 服务器时间偏移（毫秒），模块级缓存；签名要求 PZTimestamp 接近服务端时间，安卓设备时钟不准会被签名校验拒绝 */
+  private timeDiffMs: number | null = null;
+  private timeDiffPromise: Promise<void> | null = null;
 
   constructor(config: SsoClientConfig) {
     this.config = {
@@ -27,10 +31,37 @@ export class SsoClient {
         config.sourceType ??
         (config.os === "iOS" ? "dianjing-ios" : "dianjing-android"),
     };
+    const defaultReferer =
+      this.config.os === "iOS"
+        ? "https://djpc.jlgkj.top"
+        : "https://dj.panzhi.com";
+    // 后端风控白名单要求 Android 的 Referer 带尾斜杠，iOS 不带
+    this.referer =
+      this.config.referer ??
+      (this.config.os === "iOS" ? defaultReferer : `${defaultReferer}/`);
     this.axiosInstance = axios.create({
       baseURL: this.config.baseUrl,
       timeout: this.config.timeoutMs ?? 15_000,
     });
+  }
+
+  /** 与服务器时间对齐：只同步一次并缓存偏移，失败时回退本地时间（对齐 PC apiClient 的 getTimestamp） */
+  private async getTimestamp(): Promise<number> {
+    if (this.timeDiffMs !== null) return Date.now() + this.timeDiffMs;
+    if (!this.timeDiffPromise) {
+      this.timeDiffPromise = fetch(`${this.config.baseUrl}/api/server/time`)
+        .then(async (res) => {
+          const data = await res.json();
+          const serverTime = data?.data;
+          this.timeDiffMs =
+            typeof serverTime === "number" ? serverTime - Date.now() : 0;
+        })
+        .catch(() => {
+          this.timeDiffMs = 0;
+        });
+    }
+    await this.timeDiffPromise;
+    return Date.now() + (this.timeDiffMs ?? 0);
   }
 
   async request<T = unknown>(
@@ -53,6 +84,7 @@ export class SsoClient {
         ...event,
       });
     };
+    const timestamp = await this.getTimestamp();
     const controller = new AbortController();
     const timeout = setTimeout(
       () => controller.abort(),
@@ -78,13 +110,9 @@ export class SsoClient {
 
     try {
       const headers = {
-        ...createSignature(data, method, this.config),
-        // 必须带 Referer，否则会命中 WAF 被拦截（默认按平台取协议域名）
-        Referer:
-          this.config.referer ??
-          (this.config.os === "iOS"
-            ? "https://djpc.jlgkj.top"
-            : "https://dj.panzhi.com"),
+        ...createSignature(data, method, this.config, timestamp),
+        // 必须带 Referer，否则会命中 WAF 被拦截（Android 多一个尾斜杠以匹配风控白名单）
+        Referer: this.referer,
         AUTHORIZATION: `basic ${this.config.clientSecret}`,
         ...(options.headers ?? {}),
       };

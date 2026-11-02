@@ -93,6 +93,8 @@ export type MessageStoreState = {
   lastError: string | null;
   refreshOnlineStatuses: (token: string) => Promise<void>;
   refreshConversations: (token: string) => Promise<void>;
+  /** 兜底：进入消息页发现列表为空时，延迟重读一次快照（每次登录会话最多一次） */
+  retryIfEmpty: (token: string) => Promise<void>;
   initialize: (token: string) => Promise<void>;
   setChatForeground: (visible: boolean) => void;
   openConversation: (conversation: Pick<MessageConversation, 'id' | 'title' | 'avatar' | 'clubId' | 'isCustomerService'>) => Promise<void>;
@@ -183,6 +185,8 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
   let lifecycleRevision = 0;
   // 本次登录会话的就绪时间：离线补偿的历史消息（含已读）晚于它到达，但 sentAt 在它之前
   let sessionReadyAt = 0;
+  // 空列表延迟重读的一次性闸门：避免每次聚焦消息页都重读（用户可能本来就 0 会话）
+  let emptyListRetryUsed = false;
   // 允许少量设备间时钟误差，避免"刚好就绪时刻"的新消息被误判为补偿消息
   const BANNER_CLOCK_SKEW_MS = 5_000;
 
@@ -465,6 +469,28 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         await get().initialize(token);
       },
 
+      retryIfEmpty: async (token) => {
+        if (!token) return;
+        if (emptyListRetryUsed) return;
+        if (get().connectionState !== 'ready') return;
+        if (get().conversations.length > 0) return;
+        // reset 的异步断开窗口内 connectionState 仍是 ready，但会话已失效——拒绝旧 token 的重试
+        if (onlineStatusToken !== token) return;
+        emptyListRetryUsed = true;
+        logger.info('Retrying empty conversation snapshot', {
+          stage: 'empty-list-retry',
+          connectionState: get().connectionState,
+        });
+        try {
+          await syncConversations(lifecycleRevision);
+        } catch (error) {
+          logger.warn('Empty conversation snapshot retry failed', {
+            stage: 'empty-list-retry',
+            errorName: error instanceof Error ? error.name : typeof error,
+          });
+        }
+      },
+
       initialize: async (token) => {
         // 同步闸门：在任何 await 之前先占位，避免 useEffect / 多个调用方重入。
         // 否则在 await readBlacklist 期间,RootLayout 的 effect 可能再次触发 initialize,
@@ -532,12 +558,6 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           });
         }
         set({ connectionState: 'connecting', lastError: null });
-        initializeInProgress = true;
-        conversationSyncPending = false;
-        logger.info('RongCloud initialize starting', {
-          stage: 'message-store-initialize',
-          attempt: reconnectAttempts,
-        });
         try {
           const ready = await adapter.initialize(token);
           if (initializationRevision !== lifecycleRevision) {
@@ -573,6 +593,12 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           initializeInProgress = false;
           sessionReadyAt = Date.now();
           set({ connectionState: 'ready', lastError: null });
+          // 离线同步完成事件若恰好在上面最后一次同步执行期间到达，会被
+          // subscribeConversationSync 回调标记 pending 但无人消费——这里兜底再读一次快照。
+          if (conversationSyncPending) {
+            conversationSyncPending = false;
+            void syncConversations(initializationRevision).catch(() => undefined);
+          }
         } catch (error) {
           if (initializationRevision !== lifecycleRevision) {
             initializeInProgress = false;
@@ -789,6 +815,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         conversationSyncPending = false;
         reconnectAttempts = 0;
         sessionReadyAt = 0;
+        emptyListRetryUsed = false;
         clearCsInviteClaimStates();
         if (reconnectTimer) clearTimeout(reconnectTimer);
         reconnectTimer = undefined;

@@ -9,10 +9,17 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+} from "react";
 import {
   Animated,
-  FlatList,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -54,7 +61,10 @@ import {
   useToggleUserFollow,
   useUserFollowState,
 } from "@/features/mine/hooks/use-user-follow";
-import { createImagePreviewParams } from "@/features/mine/image-preview.params";
+import {
+  createImagePreviewParams,
+  type ImagePreviewParams,
+} from "@/features/mine/image-preview.params";
 import { createProfileAvatarPreviewParams } from "@/features/mine/profile-avatar-preview";
 import { createProfileChatParams } from "@/features/mine/profile-chat";
 import { calculateAge } from "@/features/mine/profile-utils";
@@ -75,12 +85,16 @@ const femaleIcon = require("../../../../assets/mine/figma/mine-female.svg");
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const settingsIcon = require("../../../../assets/mine/figma/mine-settings.svg");
 const customerIcon = require("../../../../assets/coms/customer.svg");
+const clubIcon = require("../../../../assets/mine/figma/mine-club-flag.svg");
 const arrowDownIcon = require("../../../../assets/mine/figma/profile-arrow-down.svg");
 const diamondIcon = require("../../../../assets/message/order-assistant-coin-3f6fcf.webp");
 const idleStatusIcon = require("../../../../assets/home/club-detail/status-idle.svg");
 const playingStatusIcon = require("../../../../assets/home/club-detail/status-playing.svg");
 type ProfileTab = "技能" | "评价";
 type ProfileListItem = { key: string; content: ReactElement };
+
+const profileKeyExtractor = (item: ProfileListItem) => item.key;
+const profileRenderItem = ({ item }: { item: ProfileListItem }) => item.content;
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -93,10 +107,37 @@ export default function ProfileScreen() {
   const isMine = !routeParams || String(user?.id ?? "") === routeParams.userId;
   const [tab, setTab] = useState<ProfileTab>("技能");
   const [coverHeight, setCoverHeight] = useState(0);
-  const headerFade = useMemo(() => new Animated.Value(0), []);
   const [compactActive, setCompactActive] = useState(false);
+  const scrollY = useMemo(() => new Animated.Value(0), []);
+  // 紧凑头部淡入区间：封面剩余 136→44px（92px 行程），滚动驱动走原生线程，
+  // 避免 JS 层每帧 setValue。封面未布局完成前恒为 0，防止紧凑头部闪现。
+  const fadeStart = coverHeight - 136;
+  const headerFade = useMemo(
+    () =>
+      coverHeight === 0
+        ? new Animated.Value(0)
+        : scrollY.interpolate({
+            inputRange: [fadeStart, fadeStart + 92],
+            outputRange: [0, 1],
+            extrapolate: "clamp",
+          }),
+    [scrollY, coverHeight, fadeStart],
+  );
+  // 滚动走原生驱动；JS 侧仅在跨越紧凑头部阈值时 setState 一次（同值自动豁免）。
+  const handleScroll = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+        useNativeDriver: true,
+        listener: (event: {
+          nativeEvent: { contentOffset: { y: number } };
+        }) => {
+          const active = event.nativeEvent.contentOffset.y >= fadeStart + 92;
+          setCompactActive((prev) => (prev === active ? prev : active));
+        },
+      }),
+    [scrollY, fadeStart],
+  );
   const [selectedGameId, setSelectedGameId] = useState("");
-  const [introExpanded, setIntroExpanded] = useState(false);
   const [orderCard, setOrderCard] = useState<ProfileSkillCard | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [paymentOrder, setPaymentOrder] = useState<{
@@ -146,6 +187,9 @@ export default function ProfileScreen() {
   );
   const localProfile = useMemo(() => toLocalProfile(user), [user]);
   const profile = detail ?? localProfile;
+  const measureCover = useCallback((height: number) => {
+    setCoverHeight((prev) => (Math.abs(height - prev) > 1 ? height : prev));
+  }, []);
 
   useEffect(() => {
     if (isMine || profile.userId <= 0) return;
@@ -180,32 +224,38 @@ export default function ProfileScreen() {
   }, [isMine, profile.userId]);
 
   const gameDetail = gameDetailQuery.data;
-  const games = detail?.games ?? [];
+  const games = useMemo(() => detail?.games ?? [], [detail]);
   const coverImageUrl = gameDetail?.backgroundUrl?.trim();
   const voicePlayer = useVoicePlayer();
   const stopVoice = voicePlayer.stop;
-  const coverPreviewParams = coverImageUrl
-    ? createImagePreviewParams([coverImageUrl], 0)
-    : null;
+  const toggleVoice = voicePlayer.toggle;
+  const playingVoiceUrl = voicePlayer.playingUrl;
+  const coverPreviewParams = useMemo(
+    () => (coverImageUrl ? createImagePreviewParams([coverImageUrl], 0) : null),
+    [coverImageUrl],
+  );
 
   useEffect(() => {
     if (tab !== "技能") stopVoice();
   }, [tab, stopVoice]);
-  const openProfileRelation = (type: "following" | "fans") => {
-    if (profile.userId <= 0) return;
-    router.push({
-      pathname: "/profile-relations",
-      params: {
-        userId: String(profile.userId),
-        type,
-        ...(profile.clubId > 0
-          ? { clubId: String(profile.clubId) }
-          : routeParams?.clubId
-            ? { clubId: routeParams.clubId }
-            : {}),
-      },
-    });
-  };
+  const openProfileRelation = useCallback(
+    (type: "following" | "fans") => {
+      if (profile.userId <= 0) return;
+      router.push({
+        pathname: "/profile-relations",
+        params: {
+          userId: String(profile.userId),
+          type,
+          ...(profile.clubId > 0
+            ? { clubId: String(profile.clubId) }
+            : routeParams?.clubId
+              ? { clubId: routeParams.clubId }
+              : {}),
+        },
+      });
+    },
+    [profile, routeParams],
+  );
   const handleFollowPress = async () => {
     if (!requireLogin() || !detail || followMutation.isPending) return;
     const session = useAuthStore.getState();
@@ -250,177 +300,65 @@ export default function ProfileScreen() {
     }
   };
 
-  if (routeParams && detailQuery.isLoading) {
-    return (
-      <ProfileSkeleton
-        topInset={insets.top}
-        bottomInset={insets.bottom}
-        isMine={isMine}
-      />
-    );
-  }
-
-  if (routeParams && (detailQuery.isError || !detail)) {
-    return (
-      <ProfileErrorState
-        topInset={insets.top}
-        message={
-          detailQuery.error instanceof Error && detailQuery.error.message
-            ? detailQuery.error.message
-            : "个人主页加载失败"
+  const openOrder = useCallback(
+    async (card: ProfileSkillCard) => {
+      if (!requireLogin()) return;
+      try {
+        if (await isUserBlacklisted(profile.userId)) {
+          showToast("该用户已在黑名单中，无法下单");
+          return;
         }
-        onRetry={() => void detailQuery.refetch()}
-      />
-    );
-  }
-
-  const tabsContent = (
-    <View style={styles.tabs}>
-      {(["技能", "评价"] as ProfileTab[]).map((item) => (
-        <Pressable
-          key={item}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: tab === item }}
-          onPress={() => setTab(item)}
-          style={styles.tabButton}
-        >
-          {tab === item && (
-            <Image source={fallbackAvatar} style={styles.tabAvatar} />
-          )}
-          <Text style={[styles.tabText, tab === item && styles.tabTextActive]}>
-            {item}
-          </Text>
-          {tab === item ? <View style={styles.tabIndicator} /> : null}
-        </Pressable>
-      ))}
-    </View>
-  );
-
-  // 默认头部中的标签栏:紧凑头部淡入时反向淡出
-  const tabsInverseFade = headerFade.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0],
-  });
-
-  const profileCover = (
-    <View
-      style={styles.cover}
-      onLayout={(event) => {
-        const height = event.nativeEvent.layout.height;
-        if (Math.abs(height - coverHeight) > 1) setCoverHeight(height);
-      }}
-    >
-      {coverPreviewParams ? (
-        <Pressable
-          accessibilityLabel="预览主页背景图"
-          accessibilityRole="button"
-          onPress={() =>
-            router.push({
-              pathname: "/image-preview",
-              params: coverPreviewParams,
-            })
-          }
-          style={StyleSheet.absoluteFill}
-        >
-          <Image
-            source={{ uri: coverImageUrl }}
-            contentFit="cover"
-            style={StyleSheet.absoluteFill}
-          />
-        </Pressable>
-      ) : (
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Image
-            source={background}
-            contentFit="cover"
-            style={StyleSheet.absoluteFill}
-          />
-        </View>
-      )}
-      <LinearGradient
-        pointerEvents="none"
-        style={StyleSheet.absoluteFill}
-        colors={["#3B79BA00", "#3B79BA", "#3B79BA"]}
-        locations={[0, 0.6, 1]}
-      />
-      <LinearGradient
-        pointerEvents="none"
-        style={StyleSheet.absoluteFill}
-        colors={["rgba(0,0,0,0.2)", "rgba(0,0,0,0.8)"]}
-      />
-      <ProfileIdentity
-        profile={profile}
-        isBlacklisted={
-          !isMine &&
-          blacklistStatus.userId === String(profile.userId) &&
-          blacklistStatus.isBlacklisted
-        }
-      />
-      <View style={styles.headerStats}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`关注列表，${profile.followCount}人`}
-          onPress={() => openProfileRelation("following")}
-          style={styles.headerStat}
-        >
-          <Text style={styles.headerStatValue}>{profile.followCount}</Text>
-          <Text style={styles.headerStatLabel}>关注</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`粉丝列表，${profile.fansCount}人`}
-          onPress={() => openProfileRelation("fans")}
-          style={styles.headerStat}
-        >
-          <Text style={styles.headerStatValue}>{profile.fansCount}</Text>
-          <Text style={styles.headerStatLabel}>粉丝</Text>
-        </Pressable>
-      </View>
-      <View style={styles.introBlock}>
-        <Text
-          numberOfLines={introExpanded ? undefined : 2}
-          ellipsizeMode="tail"
-          style={styles.headerIntro}
-        >
-          {profile.signature || "暂无个人简介"}
-        </Text>
-        {profile.signature ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={introExpanded ? "收起简介" : "展开简介"}
-            hitSlop={6}
-            onPress={() => setIntroExpanded((prev) => !prev)}
-            style={styles.introToggle}
-          >
-            <Image
-              source={arrowDownIcon}
-              style={[
-                styles.introToggleIcon,
-                introExpanded && styles.introToggleIconUp,
-              ]}
-            />
-          </Pressable>
-        ) : null}
-      </View>
-    </View>
-  );
-
-  const profileListItems: ProfileListItem[] = [
-    { key: "profile-cover", content: profileCover },
-    {
-      key: "profile-tabs",
-      content: (
-        <View style={styles.tabsBackdrop}>
-          <Animated.View
-            pointerEvents={compactActive ? "none" : "box-none"}
-            style={[styles.tabsBar, { opacity: tabsInverseFade }]}
-          >
-            {tabsContent}
-          </Animated.View>
-        </View>
-      ),
+        setOrderCard(card);
+      } catch {
+        showToast("黑名单状态读取失败，请稍后重试");
+      }
     },
-  ];
+    [profile.userId],
+  );
+  // 默认头部中的标签栏:紧凑头部淡入时反向淡出
+  const tabsInverseFade = useMemo(
+    () =>
+      headerFade.interpolate({
+        inputRange: [0, 1],
+        outputRange: [1, 0],
+      }),
+    [headerFade],
+  );
+
+  const profileListItems = useMemo<ProfileListItem[]>(() => {
+    const profileListItems: ProfileListItem[] = [
+      {
+        key: "profile-cover",
+        content: (
+          <ProfileCover
+            profile={profile}
+            coverImageUrl={coverImageUrl}
+            coverPreviewParams={coverPreviewParams}
+            isMine={isMine}
+            isBlacklisted={
+              !isMine &&
+              blacklistStatus.userId === String(profile.userId) &&
+              blacklistStatus.isBlacklisted
+            }
+            onSelectRelation={openProfileRelation}
+            onMeasure={measureCover}
+          />
+        ),
+      },
+      {
+        key: "profile-tabs",
+        content: (
+          <View style={styles.tabsBackdrop}>
+            <Animated.View
+              pointerEvents={compactActive ? "none" : "box-none"}
+              style={[styles.tabsBar, { opacity: tabsInverseFade }]}
+            >
+              <ProfileTabs tab={tab} onSelect={setTab} />
+            </Animated.View>
+          </View>
+        ),
+      },
+    ];
 
   if (games.length > 0) {
     profileListItems.push({
@@ -465,7 +403,11 @@ export default function ProfileScreen() {
             key: "skills-summary",
             content: (
               <View style={styles.scrollBody}>
-                <SkillsSummary detail={gameDetail} voicePlayer={voicePlayer} />
+                <SkillsSummary
+                  detail={gameDetail}
+                  onToggleVoice={toggleVoice}
+                  playingUrl={playingVoiceUrl}
+                />
               </View>
             ),
           },
@@ -487,10 +429,7 @@ export default function ProfileScreen() {
               key: `service-${card.companionServiceId}-${card.gameLevelId}`,
               content: (
                 <View style={styles.scrollBody}>
-                  <ServiceCard
-                    card={card}
-                    onOrder={() => void openOrder(card)}
-                  />
+                  <ServiceCard card={card} onOrder={openOrder} />
                 </View>
               ),
             })),
@@ -557,6 +496,52 @@ export default function ProfileScreen() {
         </View>
       ),
     });
+  }
+
+    return profileListItems;
+  }, [
+    profile,
+    coverImageUrl,
+    coverPreviewParams,
+    isMine,
+    blacklistStatus,
+    openProfileRelation,
+    measureCover,
+    compactActive,
+    tabsInverseFade,
+    tab,
+    games,
+    activeGameId,
+    gameDetailQuery,
+    gameDetail,
+    reviewQuery,
+    toggleVoice,
+    playingVoiceUrl,
+    openOrder,
+  ]);
+
+  if (routeParams && detailQuery.isLoading) {
+    return (
+      <ProfileSkeleton
+        topInset={insets.top}
+        bottomInset={insets.bottom}
+        isMine={isMine}
+      />
+    );
+  }
+
+  if (routeParams && (detailQuery.isError || !detail)) {
+    return (
+      <ProfileErrorState
+        topInset={insets.top}
+        message={
+          detailQuery.error instanceof Error && detailQuery.error.message
+            ? detailQuery.error.message
+            : "个人主页加载失败"
+        }
+        onRetry={() => void detailQuery.refetch()}
+      />
+    );
   }
 
   const editProfileButton = isMine ? (
@@ -690,28 +675,18 @@ export default function ProfileScreen() {
             { opacity: headerFade, marginHorizontal: -12 },
           ]}
         >
-          {tabsContent}
+          <ProfileTabs tab={tab} onSelect={setTab} />
         </Animated.View>
       </Animated.View>
-      <FlatList
+      <Animated.FlatList
         style={styles.scrollView}
         data={profileListItems}
-        keyExtractor={(item) => item.key}
-        renderItem={({ item }) => item.content}
+        keyExtractor={profileKeyExtractor}
+        renderItem={profileRenderItem}
         initialNumToRender={6}
         maxToRenderPerBatch={5}
         windowSize={5}
-        onScroll={(event) => {
-          // 头像块剩余 136→44px 区间内,紧凑头部淡入(透明度渐变)
-          const fadeStart = coverHeight - 136;
-          const progress = Math.max(
-            0,
-            Math.min(1, (event.nativeEvent.contentOffset.y - fadeStart) / 92),
-          );
-          headerFade.setValue(progress);
-          const active = progress >= 1;
-          if (active !== compactActive) setCompactActive(active);
-        }}
+        onScroll={handleScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
@@ -888,20 +863,151 @@ export default function ProfileScreen() {
       paymentCancelingRef.current = false;
     }
   }
-
-  async function openOrder(card: ProfileSkillCard) {
-    if (!requireLogin()) return;
-    try {
-      if (await isUserBlacklisted(profile.userId)) {
-        showToast("该用户已在黑名单中，无法下单");
-        return;
-      }
-      setOrderCard(card);
-    } catch {
-      showToast("黑名单状态读取失败，请稍后重试");
-    }
-  }
 }
+
+// 头部标签栏独立组件：滚动阈值切换等无关重渲染时保持元素引用稳定
+const ProfileTabs = memo(function ProfileTabs({
+  tab,
+  onSelect,
+}: {
+  tab: ProfileTab;
+  onSelect: (tab: ProfileTab) => void;
+}) {
+  return (
+    <View style={styles.tabs}>
+      {(["技能", "评价"] as ProfileTab[]).map((item) => (
+        <Pressable
+          key={item}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: tab === item }}
+          onPress={() => onSelect(item)}
+          style={styles.tabButton}
+        >
+          {tab === item && (
+            <Image source={fallbackAvatar} style={styles.tabAvatar} />
+          )}
+          <Text style={[styles.tabText, tab === item && styles.tabTextActive]}>
+            {item}
+          </Text>
+          {tab === item ? <View style={styles.tabIndicator} /> : null}
+        </Pressable>
+      ))}
+    </View>
+  );
+});
+
+// 头部封面独立组件：列表项内容引用稳定，滚动期不被父组件重渲染波及
+const ProfileCover = memo(function ProfileCover({
+  profile,
+  coverImageUrl,
+  coverPreviewParams,
+  isMine,
+  isBlacklisted,
+  onSelectRelation,
+  onMeasure,
+}: {
+  profile: ProfileDetail;
+  coverImageUrl?: string;
+  coverPreviewParams: ImagePreviewParams | null;
+  isMine: boolean;
+  isBlacklisted: boolean;
+  onSelectRelation: (type: "following" | "fans") => void;
+  onMeasure: (height: number) => void;
+}) {
+  const [introExpanded, setIntroExpanded] = useState(false);
+  return (
+    <View
+      style={styles.cover}
+      onLayout={(event) => onMeasure(event.nativeEvent.layout.height)}
+    >
+      {coverPreviewParams ? (
+        <Pressable
+          accessibilityLabel="预览主页背景图"
+          accessibilityRole="button"
+          onPress={() =>
+            router.push({
+              pathname: "/image-preview",
+              params: coverPreviewParams,
+            })
+          }
+          style={StyleSheet.absoluteFill}
+        >
+          <Image
+            source={{ uri: coverImageUrl }}
+            contentFit="cover"
+            style={StyleSheet.absoluteFill}
+          />
+        </Pressable>
+      ) : (
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Image
+            source={background}
+            contentFit="cover"
+            style={StyleSheet.absoluteFill}
+          />
+        </View>
+      )}
+      <LinearGradient
+        pointerEvents="none"
+        style={StyleSheet.absoluteFill}
+        colors={["#3B79BA00", "#3B79BA", "#3B79BA"]}
+        locations={[0, 0.6, 1]}
+      />
+      <LinearGradient
+        pointerEvents="none"
+        style={StyleSheet.absoluteFill}
+        colors={["rgba(0,0,0,0.2)", "rgba(0,0,0,0.8)"]}
+      />
+      <ProfileIdentity profile={profile} isBlacklisted={isBlacklisted} />
+      <View style={styles.headerStats}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`关注列表，${profile.followCount}人`}
+          onPress={() => onSelectRelation("following")}
+          style={styles.headerStat}
+        >
+          <Text style={styles.headerStatValue}>{profile.followCount}</Text>
+          <Text style={styles.headerStatLabel}>关注</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`粉丝列表，${profile.fansCount}人`}
+          onPress={() => onSelectRelation("fans")}
+          style={styles.headerStat}
+        >
+          <Text style={styles.headerStatValue}>{profile.fansCount}</Text>
+          <Text style={styles.headerStatLabel}>粉丝</Text>
+        </Pressable>
+      </View>
+      <View style={styles.introBlock}>
+        <Text
+          numberOfLines={introExpanded ? undefined : 2}
+          ellipsizeMode="tail"
+          style={styles.headerIntro}
+        >
+          {profile.signature || "暂无个人简介"}
+        </Text>
+        {profile.signature ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={introExpanded ? "收起简介" : "展开简介"}
+            hitSlop={6}
+            onPress={() => setIntroExpanded((prev) => !prev)}
+            style={styles.introToggle}
+          >
+            <Image
+              source={arrowDownIcon}
+              style={[
+                styles.introToggleIcon,
+                introExpanded && styles.introToggleIconUp,
+              ]}
+            />
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
+  );
+});
 
 function ProfileIdentity({
   profile,
@@ -983,15 +1089,24 @@ function ProfileIdentity({
             </View>
           ) : null}
         </View>
-        <View style={styles.clubLine}>
-          <View style={styles.clubInfo}>
-            <Text style={styles.clubLabel}>成员</Text>
-            <Text style={styles.clubValue}>{profile.followCount}人</Text>
-          </View>
-          <View style={styles.clubInfo}>
-            <Text style={styles.clubLabel}>俱乐部ID</Text>
-            <Text style={styles.clubValue}>{profile.clubId || "暂无"}</Text>
-          </View>
+        <View style={styles.idClubRow}>
+          {profile.clubId > 0 ? (
+            <Pressable
+              style={styles.clubLine}
+              onPress={() =>
+                router.push({
+                  pathname: "/club/[id]",
+                  params: { id: String(profile.clubId) },
+                })
+              }
+            >
+              <Image source={clubIcon} style={styles.clubIcon} />
+              <Text numberOfLines={1} style={styles.clubName}>
+                {profile.clubName || "俱乐部"}
+              </Text>
+            </Pressable>
+          ) : null}
+          <Text style={styles.idRow}>ID：{profile.userId}</Text>
         </View>
       </View>
     </View>
@@ -1039,10 +1154,12 @@ function GameSelector({
 
 function SkillsSummary({
   detail,
-  voicePlayer,
+  onToggleVoice,
+  playingUrl,
 }: {
   detail: ProfileGameDetail;
-  voicePlayer: ReturnType<typeof useVoicePlayer>;
+  onToggleVoice: (voiceUrl: string) => void;
+  playingUrl: string | null;
 }) {
   return (
     <>
@@ -1052,8 +1169,8 @@ function SkillsSummary({
           <VoicePlayButton
             duration={detail.voiceDurationSeconds}
             inline
-            onToggleVoice={voicePlayer.toggle}
-            playingUrl={voicePlayer.playingUrl}
+            onToggleVoice={onToggleVoice}
+            playingUrl={playingUrl}
             url={detail.voiceUrl}
           />
         ) : null}
@@ -1103,12 +1220,12 @@ function ImageGallery({ images }: { images: string[] }) {
   );
 }
 
-function ServiceCard({
+const ServiceCard = memo(function ServiceCard({
   card,
   onOrder,
 }: {
   card: ProfileSkillCard;
-  onOrder: () => void;
+  onOrder: (card: ProfileSkillCard) => void;
 }) {
   return (
     <View style={styles.serviceCard}>
@@ -1126,14 +1243,18 @@ function ServiceCard({
           ) : null}
         </View>
       </View>
-      <Pressable style={styles.orderButton} onPress={onOrder}>
+      <Pressable style={styles.orderButton} onPress={() => onOrder(card)}>
         <Text style={styles.orderText}>下单</Text>
       </Pressable>
     </View>
   );
-}
+});
 
-function ReviewCard({ review }: { review: ProfileReview }) {
+const ReviewCard = memo(function ReviewCard({
+  review,
+}: {
+  review: ProfileReview;
+}) {
   return (
     <View style={styles.reviewCard}>
       <Image
@@ -1199,7 +1320,7 @@ function ReviewCard({ review }: { review: ProfileReview }) {
       </View>
     </View>
   );
-}
+});
 
 function ProfileErrorState({
   topInset,
@@ -1559,19 +1680,30 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: "500",
   },
-  clubLine: { flexDirection: "row", alignItems: "center", gap: 12 },
-  clubInfo: { flexDirection: "row", alignItems: "center", gap: 2 },
-  clubLabel: {
+  idClubRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  idRow: {
     color: "rgba(255,255,255,0.6)",
     fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
-  clubValue: {
-    color: "#FFFFFF",
+  clubLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    flexShrink: 1,
+  },
+  clubIcon: { width: 16, height: 16 },
+  clubName: {
+    color: "rgba(255,255,255,0.6)",
     fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
+    flexShrink: 1,
   },
   scrollIntro: {
     marginTop: -1,
@@ -1667,11 +1799,12 @@ const styles = StyleSheet.create({
   tabIndicator: {
     position: "absolute",
     bottom: -6,
-    left: 3,
-    right: 3,
-    height: 6,
-    borderRadius: 2,
-    backgroundColor: "#FFC2C6",
+    left: "50%",
+    marginLeft: -6,
+    width: 12,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: "#FE1F4C",
   },
   gameTags: { flexDirection: "row", gap: 10, marginTop: 12, paddingRight: 16 },
   gameTag: {
