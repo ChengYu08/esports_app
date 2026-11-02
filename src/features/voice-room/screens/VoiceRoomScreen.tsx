@@ -39,6 +39,7 @@ import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAppConfirm } from "@/shared/ui/app-confirm";
+import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 
 import { VoiceRoomBackground, VOICE_ROOM_BG_BASE } from "../components/VoiceRoomBackground";
 import { VoiceRoomConversationsSheet } from "../components/VoiceRoomConversationsSheet";
@@ -148,7 +149,27 @@ function displayMessage(message: VoiceRoomMessage) {
   return (
     <View style={styles.messageRow}>
       <Text style={styles.messageName}>{message.nickname || "用户"}</Text>
-      <Text style={styles.messageBody}>{message.text}</Text>
+      {message.imageUrl ? (
+        <Pressable
+          accessibilityRole="imagebutton"
+          accessibilityLabel="查看图片"
+          onPress={() =>
+            router.push({
+              pathname: "/image-preview",
+              params: createImagePreviewParams([message.imageUrl as string], 0),
+            })
+          }
+        >
+          <Image
+            source={{ uri: message.imageUrl }}
+            style={styles.messageImage}
+            contentFit="cover"
+            transition={120}
+          />
+        </Pressable>
+      ) : (
+        <Text style={styles.messageBody}>{message.text}</Text>
+      )}
     </View>
   );
 }
@@ -1668,4 +1689,5 @@ const styles = StyleSheet.create({
   messageRow: { flexDirection: "row", marginBottom: 8, paddingRight: 12 },
   messageName: { color: "#B892FF", fontSize: 12, marginRight: 6 },
   messageBody: { color: "#E9EAF5", fontSize: 12, flex: 1, lineHeight: 18 },
+  messageImage: { width: 132, height: 132, borderRadius: 8, marginTop: 4 },
 });

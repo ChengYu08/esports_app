@@ -853,11 +853,15 @@ const ChatComposer = memo(function ChatComposer({
         </View>
       </View>
       <EmojiPicker
-        defaultHeight={340}
+        // 库内用的是 RN SafeAreaView（Android 不生效），需手动叠加底部安全区，避免emoji底行被导航条遮挡
+        defaultHeight={340 + bottomInset}
         enableRecentlyUsed
+        // 不需要分类标题栏（默认显示英文如 Smileys & Emotion）
+        hideHeader
         onClose={() => setEmojiPickerOpen(false)}
         onEmojiSelected={selectEmoji}
         open={emojiPickerOpen}
+        styles={{ container: { paddingBottom: bottomInset } }}
         theme={{
           backdrop: "rgba(0, 0, 0, 0.18)",
           knob: "#CCCCCC",
