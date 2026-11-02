@@ -142,6 +142,134 @@ describe('message store', () => {
     await store.getState().reset();
   });
 
+  it('re-reads the snapshot once when the ready list is empty (retryIfEmpty)', async () => {
+    // 场景：初始化读快照为空（补偿消息尚未落库），retryIfEmpty 延迟重读后拿到会话
+    const adapter = makeAdapter({
+      getConversations: vi.fn().mockResolvedValueOnce([]).mockResolvedValue([conversation]),
+    });
+    const store = createMessageStore(adapter);
+    await store.getState().initialize('token');
+    expect(store.getState().conversations).toEqual([]);
+    await store.getState().retryIfEmpty('token');
+    expect(store.getState().conversations).toEqual([expect.objectContaining({ id: '42' })]);
+  });
+
+  it('does not re-read when the list already has conversations', async () => {
+    const adapter = makeAdapter({
+      getConversations: vi.fn().mockResolvedValue([conversation]),
+    });
+    const store = createMessageStore(adapter);
+    await store.getState().initialize('token');
+    const callsBefore = (adapter.getConversations as ReturnType<typeof vi.fn>).mock.calls.length;
+    await store.getState().retryIfEmpty('token');
+    expect((adapter.getConversations as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsBefore);
+  });
+
+  it('does not re-read twice even if the retry also finds an empty list', async () => {
+    const adapter = makeAdapter({
+      getConversations: vi.fn().mockResolvedValue([]),
+    });
+    const store = createMessageStore(adapter);
+    await store.getState().initialize('token');
+    await store.getState().retryIfEmpty('token');
+    const callsAfterFirst = (adapter.getConversations as ReturnType<typeof vi.fn>).mock.calls.length;
+    await store.getState().retryIfEmpty('token');
+    expect((adapter.getConversations as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsAfterFirst);
+  });
+
+  it('does not re-read when the connection is not ready', async () => {
+    const adapter = makeAdapter({
+      available: () => false,
+      getConversations: vi.fn().mockResolvedValue([conversation]),
+    });
+    const store = createMessageStore(adapter);
+    await store.getState().initialize('token');
+    expect(store.getState().connectionState).toBe('unavailable');
+    await store.getState().retryIfEmpty('token');
+    // unavailable 分支的 initialize 提前返回，getConversations 从未被调用过
+    expect(adapter.getConversations).not.toHaveBeenCalled();
+  });
+
+  it('keeps incoming live messages when the delayed retry finishes afterwards', async () => {
+    // 冲突场景：retryIfEmpty 重读期间用户收到实时消息——重读结果不得把实时消息会话冲掉
+    let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
+    let completeSnapshot!: (value: MessageConversation[]) => void;
+    const adapter = makeAdapter({
+      getConversations: vi.fn()
+        .mockResolvedValueOnce([])
+        .mockImplementationOnce(() => new Promise<MessageConversation[]>((resolve) => { completeSnapshot = resolve; })),
+      subscribeMessages: (listener) => { receiveMessage = listener; return () => undefined; },
+    });
+    const store = createMessageStore(adapter);
+    await store.getState().initialize('token');
+    const retry = store.getState().retryIfEmpty('token');
+    receiveMessage?.('42', { ...sentMessage, isMine: false }, { ...conversation, preview: 'hello' });
+    completeSnapshot([]);
+    await retry;
+    const list = store.getState().conversations;
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ id: '42', preview: 'hello' });
+    await store.getState().reset();
+  });
+
+  it('claims the one-shot retry gate before awaiting (concurrent calls)', async () => {
+    let completeSnapshot!: (value: MessageConversation[]) => void;
+    const adapter = makeAdapter({
+      getConversations: vi.fn()
+        .mockResolvedValueOnce([])
+        .mockImplementationOnce(() => new Promise<MessageConversation[]>((resolve) => { completeSnapshot = resolve; })),
+    });
+    const store = createMessageStore(adapter);
+    await store.getState().initialize('token');
+    const first = store.getState().retryIfEmpty('token');
+    const second = store.getState().retryIfEmpty('token');
+    completeSnapshot([]);
+    await Promise.all([first, second]);
+    // 初始化 1 次 + 重试 1 次；并发的第二次不得再读
+    expect(adapter.getConversations).toHaveBeenCalledTimes(2);
+    await store.getState().reset();
+  });
+
+  it('rejects a retry from the old session during asynchronous reset', async () => {
+    let finishDisconnect!: () => void;
+    const adapter = makeAdapter({
+      getConversations: vi.fn().mockResolvedValue([]),
+      disconnect: vi.fn(() => new Promise<void>((resolve) => { finishDisconnect = resolve; })),
+    });
+    const store = createMessageStore(adapter);
+    await store.getState().initialize('token');
+    const resetting = store.getState().reset();
+    await store.getState().retryIfEmpty('token');
+    expect(adapter.getConversations).toHaveBeenCalledTimes(1);
+    finishDisconnect();
+    await resetting;
+  });
+
+  it('rechecks again if offline sync completes during the final initialization sync', async () => {
+    let synchronized: (() => void) | undefined;
+    let completeFirst!: (value: MessageConversation[]) => void;
+    let completeSecond!: (value: MessageConversation[]) => void;
+    const adapter = makeAdapter({
+      getConversations: vi.fn()
+        .mockImplementationOnce(() => new Promise<MessageConversation[]>((resolve) => { completeFirst = resolve; }))
+        .mockImplementationOnce(() => new Promise<MessageConversation[]>((resolve) => { completeSecond = resolve; }))
+        .mockResolvedValue([conversation]),
+      subscribeConversationSync: (listener) => { synchronized = listener; return () => undefined; },
+    });
+    const store = createMessageStore(adapter);
+    const initializing = store.getState().initialize('token');
+    await vi.waitFor(() => expect(completeFirst).toBeDefined());
+    synchronized?.();
+    completeFirst([]);
+    await vi.waitFor(() => expect(completeSecond).toBeDefined());
+    // 第二次（pending）同步执行中再次完成——原窗口会丢重读
+    synchronized?.();
+    completeSecond([]);
+    await initializing;
+    expect(store.getState().conversations).toEqual([expect.objectContaining(conversation)]);
+    await store.getState().reset();
+  });
+
   it('does not create a local message while IM is unavailable', async () => {
     const store = createMessageStore(makeAdapter({ available: () => false }));
     await store.getState().initialize('token');

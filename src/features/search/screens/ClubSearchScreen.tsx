@@ -48,6 +48,11 @@ function limitSearchInput(value: string) {
   return value.slice(0, MAX_SEARCH_LENGTH).replace(/[\uD800-\uDBFF]$/, "");
 }
 
+// 模块级分隔符组件，保证 ItemSeparatorComponent 引用稳定
+function MessageSearchSeparator() {
+  return <View style={styles.separator} />;
+}
+
 export default function ClubSearchScreen() {
   const insets = useSafeAreaInsets();
   const { type, clubId } = useLocalSearchParams<{
@@ -152,8 +157,12 @@ export default function ClubSearchScreen() {
     [blacklistedUserIds, conversations, keyword, userId],
   );
   const search = searchType === "club" ? clubSearch : userSearch;
-  const items =
-    searchType === "message" ? messageItems : (search.data?.items ?? []);
+  // 用 useMemo 固定 data 引用，避免父组件重渲染时新数组触发整列表重渲染
+  const items = useMemo<SearchResult[]>(
+    () =>
+      searchType === "message" ? messageItems : (search.data?.items ?? []),
+    [searchType, messageItems, search.data],
+  );
   const placeholder = searchType === "message" ? "搜索聊天用户" : "搜索俱乐部或陪玩";
 
   const retrySearch = () => {
@@ -248,7 +257,7 @@ export default function ClubSearchScreen() {
               />
             )
           }
-          ItemSeparatorComponent={searchType === "message" ? () => <View style={styles.separator} /> : undefined}
+          ItemSeparatorComponent={searchType === "message" ? MessageSearchSeparator : undefined}
           initialNumToRender={searchType === "message" ? undefined : 8}
           windowSize={searchType === "message" ? undefined : 5}
           keyboardShouldPersistTaps="handled"

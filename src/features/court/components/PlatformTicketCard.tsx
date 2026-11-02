@@ -1,6 +1,7 @@
 import { formatTime, type PlatformTicket } from "@/features/court/court.api";
 import { COURT_COLORS, COURT_FONT_FAMILY } from "@/features/court/court.theme";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 type Props = {
@@ -26,7 +27,12 @@ const STATUS_LABELS: Record<string, string> = {
   CLOSED: "已关闭",
 };
 
-export function PlatformTicketCard({ item, mine, onOpen }: Props) {
+// 列表行组件：工单 tab 切换等父组件状态变化时未变的卡片跳过重渲
+export const PlatformTicketCard = memo(function PlatformTicketCard({
+  item,
+  mine,
+  onOpen,
+}: Props) {
   const orderDispute = item.reasonType === "ORDER_DISPUTE";
   const typeLabel = TYPE_LABELS[item.reasonType ?? ""] ?? "其他";
   const typeColor = orderDispute ? "#F5821D" : COURT_COLORS.defendant;
@@ -96,7 +102,7 @@ export function PlatformTicketCard({ item, mine, onOpen }: Props) {
       )}
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {

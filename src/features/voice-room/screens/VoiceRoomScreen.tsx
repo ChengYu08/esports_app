@@ -20,7 +20,7 @@ import {
 import { Image } from "expo-image";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -151,6 +151,66 @@ function displayMessage(message: VoiceRoomMessage) {
   );
 }
 
+const messageKeyExtractor = (item: VoiceRoomMessage) => item.id;
+const renderMessageItem = ({ item }: { item: VoiceRoomMessage }) =>
+  displayMessage(item);
+
+// 成员槽位独立 memo 组件：消息到达/输入框打字等父组件重渲染时麦位不参与重渲，
+// 仅 speaking/micOpen 变化的槽位更新。
+const MemberSlot = memo(function MemberSlot({
+  member,
+  columns,
+  ring,
+  micOpen,
+  speaking,
+  onPress,
+}: {
+  member: VoiceRoomMember;
+  columns: number;
+  ring?: number;
+  micOpen: boolean;
+  speaking: boolean;
+  onPress: (member: VoiceRoomMember) => void;
+}) {
+  const invite = member.userId === "invite";
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={
+        invite
+          ? "邀请用户"
+          : `查看${member.nickname}的资料，${micOpen ? "已开麦" : "已闭麦"}${speaking ? "，正在说话" : ""}`
+      }
+      style={[styles.memberSlot, { width: `${100 / columns}%` }]}
+      onPress={() => onPress(member)}
+    >
+      <View style={styles.avatarWrap}>
+        {!invite ? <VoiceRoomSpeakingHalo active={speaking} /> : null}
+        {ring ? <Image source={ring} style={styles.ring} /> : null}
+        {invite ? (
+          <Image source={ringInvite} style={styles.inviteRing} />
+        ) : (
+          <Image source={avatarSource(member)} style={styles.avatar} />
+        )}
+        {!invite ? <VoiceRoomSpeakingWaves active={speaking} /> : null}
+        {!invite ? (
+          <VoiceRoomMicBadge muted={!micOpen} speaking={speaking} />
+        ) : null}
+        {invite ? <Image source={inviteIcon} style={styles.inviteBadge} /> : null}
+      </View>
+      <Text
+        numberOfLines={1}
+        style={[styles.memberName, invite && styles.inviteName]}
+      >
+        {invite ? "邀请用户" : member.nickname}
+      </Text>
+      {member.role === "owner" ? (
+        <Text style={styles.roleLabel}>房主</Text>
+      ) : null}
+    </Pressable>
+  );
+});
+
 export default function VoiceRoomScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
@@ -259,6 +319,17 @@ export default function VoiceRoomScreen() {
   const chatroomId = room?.rongChatroomId;
   const roomTitle = room?.roomName || "语聊房";
   const memberColumns = members.length <= 2 ? 2 : members.length === 3 ? 3 : 4;
+  // 麦位点击回调：setState 均为稳定引用，供 MemberSlot memo 生效
+  const handleSlotPress = useCallback((member: VoiceRoomMember) => {
+    Keyboard.dismiss();
+    if (member.userId === "invite") {
+      setConversationsSheetMode("invite");
+      setConversationsSheetVisible(true);
+      return;
+    }
+    setSelectedMember(member);
+    setMemberSheetVisible(true);
+  }, []);
   const isOwner =
     Boolean(currentUser?.id) &&
     String(room?.creatorUserId ?? "") === String(currentUser?.id);
@@ -866,14 +937,23 @@ export default function VoiceRoomScreen() {
                   setSpeakingUserIds((prev) => prev.filter((v) => v !== id));
                 }, 500);
               });
-              // 远端说话人必然开着麦，兜底纠正进房前漏掉的 mute 状态
-              setMembers((items) =>
-                items.map((item) =>
-                  item.userId !== selfId && speakingIds.includes(item.userId) && !item.micOpen
-                    ? { ...item, micOpen: true }
-                    : item,
-                ),
-              );
+              // 远端说话人必然开着麦，兜底纠正进房前漏掉的 mute 状态。
+              // 无 micOpen 翻转时返回原数组，避免 5Hz 音量回调触发整屏重渲染。
+              setMembers((items) => {
+                let changed = false;
+                const next = items.map((item) => {
+                  if (
+                    item.userId !== selfId &&
+                    speakingIds.includes(item.userId) &&
+                    !item.micOpen
+                  ) {
+                    changed = true;
+                    return { ...item, micOpen: true };
+                  }
+                  return item;
+                });
+                return changed ? next : items;
+              });
             },
           },
         });
@@ -1389,65 +1469,15 @@ export default function VoiceRoomScreen() {
             const speaking =
               rtcReady && speakingUserIds.includes(member.userId);
             return (
-              <Pressable
+              <MemberSlot
                 key={`${member.userId}-${index}`}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  invite
-                    ? "邀请用户"
-                    : `查看${member.nickname}的资料，${micOpen ? "已开麦" : "已闭麦"}${speaking ? "，正在说话" : ""}`
-                }
-                style={[
-                  styles.memberSlot,
-                  { width: `${100 / memberColumns}%` },
-                ]}
-                onPress={
-                  invite
-                    ? () => {
-                        Keyboard.dismiss();
-                        setConversationsSheetMode("invite");
-                        setConversationsSheetVisible(true);
-                      }
-                    : () => {
-                        Keyboard.dismiss();
-                        setSelectedMember(member);
-                        setMemberSheetVisible(true);
-                      }
-                }
-              >
-                <View style={styles.avatarWrap}>
-                  {!invite ? (
-                    <VoiceRoomSpeakingHalo active={speaking} />
-                  ) : null}
-                  {ring ? <Image source={ring} style={styles.ring} /> : null}
-                  {invite ? (
-                    <Image source={ringInvite} style={styles.inviteRing} />
-                  ) : (
-                    <Image
-                      source={avatarSource(member)}
-                      style={styles.avatar}
-                    />
-                  )}
-                  {!invite ? (
-                    <VoiceRoomSpeakingWaves active={speaking} />
-                  ) : null}
-                  {!invite ? (
-                    <VoiceRoomMicBadge muted={!micOpen} speaking={speaking} />
-                  ) : null}
-                  {invite ? (
-                    <Image source={inviteIcon} style={styles.inviteBadge} />
-                  ) : null}
-                </View>
-                <Text
-                  numberOfLines={1}
-                  style={[styles.memberName, invite && styles.inviteName]}
-                >
-                  {invite ? "邀请用户" : member.nickname}
-                </Text>
-                {member.role === "owner" ? (
-                  <Text style={styles.roleLabel}>房主</Text>
-                ) : null}
-              </Pressable>
+                member={member}
+                columns={memberColumns}
+                ring={ring}
+                micOpen={micOpen}
+                speaking={speaking}
+                onPress={handleSlotPress}
+              />
             );
           })}
         </View>
@@ -1459,8 +1489,8 @@ export default function VoiceRoomScreen() {
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           <FlatList
             data={messages}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => displayMessage(item)}
+            keyExtractor={messageKeyExtractor}
+            renderItem={renderMessageItem}
             contentContainerStyle={styles.messageList}
             showsVerticalScrollIndicator={false}
           />
