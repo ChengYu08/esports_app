@@ -375,6 +375,38 @@ describe('message store', () => {
     await store.getState().reset();
   });
 
+  it('does not re-count replayed read messages as unread after reinstall', async () => {
+    let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
+    const historySentAt = Date.now() - 60_000;
+    // 重装后融云会话快照只把真正未读的那条算进来（服务端保存了已读态），
+    // 本地不能因为补偿重放了几条历史消息就把它重新累加成未读。
+    const store = createMessageStore(makeAdapter({
+      getConversations: vi.fn()
+        .mockResolvedValueOnce([conversation])
+        .mockResolvedValue([{ ...conversation, unreadCount: 1, updatedAt: historySentAt + 2_000 }]),
+      subscribeMessages: vi.fn((listener) => { receiveMessage = listener; return () => undefined; }),
+    }));
+    await store.getState().initialize('token');
+    receiveMessage?.('42', { ...sentMessage, id: 'history-1', isMine: false, sentAt: historySentAt, receivedOffline: true }, { ...conversation, preview: 'old', updatedAt: historySentAt });
+    receiveMessage?.('42', { ...sentMessage, id: 'history-2', isMine: false, sentAt: historySentAt + 1_000, receivedOffline: true }, { ...conversation, preview: 'old-2', updatedAt: historySentAt + 1_000 });
+    expect(store.getState().conversations[0].unreadCount).toBe(0);
+    await store.getState().refreshConversations('token');
+    expect(store.getState().conversations[0].unreadCount).toBe(1);
+    await store.getState().reset();
+  });
+
+  it('counts an offline message that arrives after the session is ready', async () => {
+    let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
+    const store = createMessageStore(makeAdapter({
+      getConversations: vi.fn(async () => [conversation]),
+      subscribeMessages: vi.fn((listener) => { receiveMessage = listener; return () => undefined; }),
+    }));
+    await store.getState().initialize('token');
+    receiveMessage?.('42', { ...sentMessage, id: 'late-1', isMine: false, sentAt: Date.now(), receivedOffline: true }, { ...conversation, preview: 'late', updatedAt: Date.now() });
+    expect(store.getState().conversations[0].unreadCount).toBe(1);
+    await store.getState().reset();
+  });
+
   it('clears unread when another device reports the conversation as read', async () => {
     let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
     let reportRead: ((peerId: string, timestamp: number) => void) | undefined;
@@ -399,11 +431,11 @@ describe('message store', () => {
     const store = createMessageStore(adapter);
     useInAppNotification.getState().dismiss();
     await store.getState().initialize('token');
-    // 模拟重装后离线补偿：sentAt 早于本次登录就绪时间
-    receiveMessage?.('42', { ...sentMessage, isMine: false, sentAt: 10 }, conversation);
+    // 模拟重装后离线补偿：sentAt 早于本次登录就绪时间，且带补偿标记
+    receiveMessage?.('42', { ...sentMessage, isMine: false, sentAt: 10, receivedOffline: true }, conversation);
     expect(useInAppNotification.getState().notification).toBeNull();
-    // 不弹横幅但仍计入未读，列表红点正常
-    expect(store.getState().conversations[0]).toMatchObject({ id: '42', unreadCount: 1 });
+    // 补偿的历史消息不再计入未读，红点由融云会话快照提供
+    expect(store.getState().conversations[0]).toMatchObject({ id: '42', unreadCount: 0 });
     await store.getState().reset();
   });
 

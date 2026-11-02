@@ -326,7 +326,7 @@ async function fetchImTokenWithRetry(accessToken: string, attemptEpoch: number) 
   return null;
 }
 
-async function emitReceived(message: RCIMIWMessage) {
+async function emitReceived(message: RCIMIWMessage, offline: boolean) {
   const enums = getSdkEnums();
   const peerId = normalizeSystemConversationId(message.senderUserId || message.targetId || '');
   if (!enums || message.conversationType !== enums.conversationType || !peerId) {
@@ -344,6 +344,9 @@ async function emitReceived(message: RCIMIWMessage) {
   }
   const mapped = toManagedMessage(message);
   if (!mapped) return;
+  if (offline) {
+    mapped.receivedOffline = true;
+  }
   const conversation = await hydrateConversation(mapConversation({
     targetId: getRongConversationTargetId(peerId),
     conversationType: message.conversationType,
@@ -359,7 +362,7 @@ function installListeners() {
   engine.setOnOfflineMessageSyncCompletedListener(() => {
     conversationSyncListeners.forEach((listener) => listener());
   });
-  engine.setOnMessageReceivedListener((message) => {
+  engine.setOnMessageReceivedListener((message, _left, offline) => {
     const sdk = loadSdk();
     if (sdk && message.messageType === sdk.RCIMIWMessageType.COMMAND) {
       const command = parseRongCommand(message, {
@@ -382,7 +385,7 @@ function installListeners() {
       chatRoomMessageListeners.forEach((listener) => listener(roomId, message));
       return;
     }
-    void emitReceived(message);
+    void emitReceived(message, offline);
   });
   engine.setOnChatRoomMemberChangedListener((roomId, actions) => {
     chatRoomMemberListeners.forEach((listener) => listener(roomId, actions));
