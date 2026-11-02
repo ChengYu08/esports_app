@@ -1,4 +1,5 @@
 import type { RCIMIWMessage, RCIMIWTextMessage } from '@rongcloud/react-native-im-wrapper';
+import type { RongSdkMessage } from '@/features/message/chat-message';
 
 import {
   initializeRongCloud,
@@ -10,7 +11,7 @@ import {
 } from '@/features/message/rongcloud-im';
 
 type RongSdk = typeof import('@rongcloud/react-native-im-wrapper');
-type RoomMessage = { id: string; userId?: string; nickname?: string; text: string; sentAt: number };
+type RoomMessage = { id: string; userId?: string; nickname?: string; text: string; imageUrl?: string; sentAt: number };
 
 const roomMessageListeners = new Set<(chatroomId: string, message: RoomMessage) => void>();
 const roomMemberListeners = new Set<(targetId: string, actions: { userId?: string; actionType?: number }[]) => void>();
@@ -40,13 +41,21 @@ function installRoomListeners() {
   });
 }
 
+// PC 端语聊房会发 RC:ImgMsg（融云 ImageMessage，imageUri 在 remote 上），
+// 只认 text 会把图片消息整个丢弃，这里按 SDK 枚举识别图片类型
 function normalizeRoomMessage(message: RCIMIWMessage): RoomMessage | null {
-  const text = (message as RCIMIWTextMessage).text;
-  if (!text) return null;
+  const sdk = loadSdk();
+  const sdkMessage = message as RCIMIWTextMessage & RongSdkMessage;
+  const isImage = sdk != null && sdkMessage.messageType === sdk.RCIMIWMessageType.IMAGE;
+  const text = sdkMessage.text ?? "";
+  const imageUrl = sdkMessage.local || sdkMessage.remote || sdkMessage.mediaUrl;
+  if (!text && !(isImage && imageUrl)) return null;
   return {
     id: String(message.messageUId || message.messageId || message.sentTime),
     userId: message.senderUserId,
+    nickname: sdkMessage.name,
     text,
+    ...(isImage && imageUrl ? { imageUrl } : {}),
     sentAt: message.sentTime || Date.now(),
   };
 }

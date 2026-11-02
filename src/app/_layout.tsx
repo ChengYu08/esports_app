@@ -287,7 +287,7 @@ export default function RootLayout() {
                   <Stack.Screen name="account-settings" />
                   <Stack.Screen name="about" />
                 </Stack>
-                {/* 青少年模式启动门：enabled 时整屏锁定，未开启按每日规则弹促销窗 */}
+                {/* 青少年模式启动门：开启且在 22:00-06:00 生效时段内整屏锁定，未开启按每日规则弹促销窗 */}
                 <TeenModeGate />
               </PushyUpdateHost>
             ) : (
