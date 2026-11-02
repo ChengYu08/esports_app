@@ -29,6 +29,39 @@ const partialFreeOrder = {
   refundAmount: 470,
 };
 
+it.each([1, 10])("派单取消支付后，单价为 %i 的待支付订单展示订单总价而非零实付", (price) => {
+  const order = mapOrder({
+    id: 42,
+    orderStatus: "PENDING_PAY",
+    price,
+    quantity: 1,
+    totalPrice: price,
+    realPayAmount: 0,
+  });
+  expect(order.status).toBe("pendingPayment");
+  expect(order.unitPrice).toBe(String(price));
+  expect(order.totalPrice).toBe(String(price));
+  expect(computeOrderPayableStars(order)).toBe(price);
+  expect(order.actions.map(({ key }) => key)).toEqual(["cancel", "pay"]);
+});
+
+it("订单总价保留接口的小数和数量口径，不使用实付金额覆盖", () => {
+  const order = mapOrder({
+    orderStatus: "PENDING_PAY",
+    price: "9.99",
+    quantity: 2,
+    totalPrice: "19.98",
+    realPayAmount: "0.00",
+  });
+  expect(order.totalPrice).toBe("19.98");
+  expect(computeOrderPayableStars(order)).toBe(19.98);
+});
+
+it("已支付订单同样按订单总价展示合计，真实零总价也不会被实付金额替换", () => {
+  expect(mapOrder({ orderStatus: "PAID", totalPrice: 100, realPayAmount: 80 }).totalPrice).toBe("100");
+  expect(mapOrder({ orderStatus: "PAID", totalPrice: 0, realPayAmount: 80 }).totalPrice).toBe("0");
+});
+
 it("部分免单同时保留原价与免单后的应收金额", () => {
   const order = mapOrder({ id: 42, orderStatus: "IN_SERVICE", realPayAmount: 800, isFreeOrder: true, refundAmount: 200 }, 0, "accept");
   expect(order.totalPrice).toBe("800");
