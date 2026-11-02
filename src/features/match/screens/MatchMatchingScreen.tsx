@@ -14,7 +14,6 @@ import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
-  isActivityQuickMatch,
   isMultiCompanionRequest,
   type MatchGame,
 } from "@/features/match/api/match.types";
@@ -67,8 +66,6 @@ export default function MatchMatchingScreen({
   });
 
   const hasCandidates = session.candidates.length > 0;
-  /** 活动模式判定：只认 activityCode 非空，普通模式行为零变化 */
-  const activity = isActivityQuickMatch(session.detail);
 
   // 首个陪玩出现时短暂播一段庆祝动效（一次性）
   useEffect(() => {
@@ -172,7 +169,6 @@ export default function MatchMatchingScreen({
             selectedGrabIds={session.selectedGrabIds}
             submitting={session.submitting}
             multiCompanion={isMultiCompanionRequest(session.detail)}
-            cardItems={activity ? session.detail?.cardItems : undefined}
             onSelect={session.toggleGrab}
             onConfirm={selectAndPay.handleConfirm}
           />

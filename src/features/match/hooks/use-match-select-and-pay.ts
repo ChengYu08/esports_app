@@ -46,8 +46,8 @@ export function useMatchSelectAndPay(options: UseMatchSelectAndPayOptions) {
 
   const [payVisible, setPayVisible] = useState(false);
   const [payTotal, setPayTotal] = useState(0);
-  /** 活动模式建单时的抢单 id，供 MatchPaySheet 调 pay/preview 展示优惠 */
-  const [activityGrabIds, setActivityGrabIds] = useState<string[]>([]);
+  const [discountAmount, setDiscountAmount] = useState<number | undefined>();
+  const [realPayAmount, setRealPayAmount] = useState<number | undefined>();
 
   /** 建单结果快照（带 requestNo，容器复用换单时天然失效，无需 render 期重置） */
   const paidOrderRef = useRef<{ requestNo: string; orderId: string | null }>({
@@ -96,7 +96,8 @@ export function useMatchSelectAndPay(options: UseMatchSelectAndPayOptions) {
     setLastRequestNo(requestNo);
     setPayVisible(false);
     setPayTotal(0);
-    setActivityGrabIds([]);
+    setDiscountAmount(undefined);
+    setRealPayAmount(undefined);
   }
 
   const activity = isActivityQuickMatch(detail);
@@ -124,8 +125,6 @@ export function useMatchSelectAndPay(options: UseMatchSelectAndPayOptions) {
     const firstCompanionUserId = candidatesRef.current.find(
       (item) => item.id === firstGrabId,
     )?.companionUserId;
-    const detailValue = detailRef.current;
-    const activityMode = isActivityQuickMatch(detailValue);
     submittingRef.current = true;
     setSubmitting(true);
     try {
@@ -136,8 +135,9 @@ export function useMatchSelectAndPay(options: UseMatchSelectAndPayOptions) {
       paidOrderRef.current = { requestNo, orderId: matchedOrder?.orderId ?? null };
       orderPendingRef.current = { requestNo, pending: true };
       setOrderPendingRef.current?.(true);
-      setActivityGrabIds(activityMode ? grabIds : []);
       setPayTotal(created.totalPrice);
+      setDiscountAmount(created.discountAmount);
+      setRealPayAmount(created.realPayAmount);
       setPayVisible(true);
     } catch (error) {
       showToast(error instanceof Error ? error.message : "创建订单失败");
@@ -167,7 +167,9 @@ export function useMatchSelectAndPay(options: UseMatchSelectAndPayOptions) {
     requestNo,
     token,
     fallbackTotal: payTotal,
-    ...(activityGrabIds.length > 0 ? { activityGrabIds } : {}),
+    isActivity: activity,
+    discountAmount,
+    realPayAmount,
     onClose: handlePayClose,
     onPaid: handlePayPaid,
   };

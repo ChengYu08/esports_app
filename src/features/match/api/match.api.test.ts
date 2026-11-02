@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { apiClient } from "@/core/network/api-client";
 
 import {
-  fetchPayPreview,
   fetchQuickMatchDetail,
   selectAndCreateOrder,
 } from "./match.api";
@@ -130,62 +129,5 @@ describe("selectAndCreateOrder：请求只带 requestNo 与 grabIds", () => {
       realPayAmount: undefined,
       orders: [{ orderId: "8002" }],
     });
-  });
-});
-
-describe("fetchPayPreview（仅活动订单调用）", () => {
-  it("请求体 {action:{requestNo, grabIds, paymentMethodCode:'DIAMOND'}}，映射金额与优惠券", async () => {
-    vi.mocked(apiClient).mockResolvedValue({
-      code: "SUCCESS",
-      data: {
-        totalPrice: "9.9",
-        paymentMethods: [
-          {
-            code: "DIAMOND",
-            name: "星钻",
-            balance: "3",
-            discountAmount: "5.00",
-            payableAmount: 4.9,
-            coupons: [
-              { userCouponId: 9001, couponName: "新人立减券", discountAmount: "5" },
-            ],
-          },
-        ],
-      },
-    });
-
-    const preview = await fetchPayPreview("QM1", ["101", "102"], "token");
-
-    expect(apiClient).toHaveBeenCalledWith("/client/v1/pay/preview", {
-      method: "POST",
-      token: "token",
-      signal: undefined,
-      body: {
-        action: {
-          requestNo: "QM1",
-          grabIds: [101, 102],
-          paymentMethodCode: "DIAMOND",
-        },
-      },
-    });
-    expect(preview.totalPrice).toBe(9.9);
-    expect(preview.paymentMethods).toEqual([
-      {
-        code: "DIAMOND",
-        name: "星钻",
-        balance: 3,
-        discountAmount: 5,
-        payableAmount: 4.9,
-        coupons: [
-          { userCouponId: "9001", couponName: "新人立减券", discountAmount: 5 },
-        ],
-      },
-    ]);
-  });
-
-  it("信封业务失败时抛出后端 info", async () => {
-    vi.mocked(apiClient).mockResolvedValue({ code: "FAILED", info: "支付预览失败" });
-
-    await expect(fetchPayPreview("QM1", ["101"], "token")).rejects.toThrow("支付预览失败");
   });
 });

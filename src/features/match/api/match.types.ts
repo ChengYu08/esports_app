@@ -85,29 +85,6 @@ export type QuickMatchCardItem = {
   value: { text: string };
 };
 
-/** 支付预览优惠券明细 */
-export type PayPreviewCoupon = {
-  userCouponId: string;
-  couponName: string;
-  discountAmount: number;
-};
-
-/** 支付预览支付方式（当前仅星钻 DIAMOND） */
-export type PayPreviewMethod = {
-  code: string;
-  name: string;
-  balance: number;
-  discountAmount: number;
-  payableAmount: number;
-  coupons: PayPreviewCoupon[];
-};
-
-/** 支付预览响应（仅活动订单调用，普通订单保持 batchPay/payable 流程） */
-export type PayPreview = {
-  totalPrice: number;
-  paymentMethods: PayPreviewMethod[];
-};
-
 export type QuickMatchRequestDetail = {
   requestNo: string;
   clubId?: string;

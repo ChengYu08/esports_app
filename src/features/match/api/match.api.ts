@@ -14,7 +14,6 @@ import type {
   QuickMatchPayable,
   QuickMatchPublishResult,
   QuickMatchRequestDetail,
-  PayPreview,
 } from "./match.types";
 
 type ApiEnvelope<T> = { success?: boolean; code?: string; info?: string; data?: T };
@@ -116,26 +115,6 @@ type ApiCreatedOrders = {
   discountAmount?: number | string;
   realPayAmount?: number | string;
   orders?: ApiCreatedOrder[];
-};
-
-type ApiPayPreviewCoupon = {
-  userCouponId?: number | string;
-  couponName?: string;
-  discountAmount?: number | string;
-};
-
-type ApiPayPreviewMethod = {
-  code?: string;
-  name?: string;
-  balance?: number | string;
-  discountAmount?: number | string;
-  payableAmount?: number | string;
-  coupons?: ApiPayPreviewCoupon[];
-};
-
-type ApiPayPreview = {
-  totalPrice?: number | string;
-  paymentMethods?: ApiPayPreviewMethod[];
 };
 
 function requireSuccess<T>(response: ApiEnvelope<T>, fallback: string): T {
@@ -475,46 +454,6 @@ export async function selectAndCreateOrder(
     discountAmount: toOptionalNumber(data.discountAmount),
     realPayAmount: toOptionalNumber(data.realPayAmount),
     orders,
-  };
-}
-
-/**
- * 支付预览（仅活动订单调用）：建单后展示优惠金额、应付与优惠券明细。
- * 普通订单不调用（前端先上线时后端未部署，规避 404）。
- */
-export async function fetchPayPreview(
-  requestNo: string,
-  grabIds: string[],
-  token: string,
-  signal?: AbortSignal,
-): Promise<PayPreview> {
-  const response = await apiClient<ApiEnvelope<ApiPayPreview>>("/client/v1/pay/preview", {
-    method: "POST",
-    token,
-    body: {
-      action: {
-        requestNo,
-        grabIds: grabIds.map((id) => toNumber(id)),
-        paymentMethodCode: "DIAMOND",
-      },
-    },
-    signal,
-  });
-  const data = requireSuccess(response, "支付信息查询失败");
-  return {
-    totalPrice: toNumber(data.totalPrice),
-    paymentMethods: (data.paymentMethods ?? []).map((method) => ({
-      code: method.code || "",
-      name: method.name || "",
-      balance: toNumber(method.balance),
-      discountAmount: toNumber(method.discountAmount),
-      payableAmount: toNumber(method.payableAmount),
-      coupons: (method.coupons ?? []).map((coupon) => ({
-        userCouponId: toOptionalString(coupon.userCouponId) ?? "",
-        couponName: coupon.couponName || "",
-        discountAmount: toNumber(coupon.discountAmount),
-      })),
-    })),
   };
 }
 

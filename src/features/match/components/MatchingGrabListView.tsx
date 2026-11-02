@@ -13,7 +13,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import type { QuickMatchCardItem, QuickMatchGrabItem } from "@/features/match/api/match.types";
+import type { QuickMatchGrabItem } from "@/features/match/api/match.types";
 import { MatchLinearGradient } from "@/features/match/components/MatchLinearGradient";
 import { MatchingCountdownText } from "@/features/match/components/MatchingCountdownText";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
@@ -42,8 +42,6 @@ type MatchingGrabListViewProps = {
   submitting: boolean;
   /** 技能类型为一陪多单时展示选人提示文案 */
   multiCompanion?: boolean;
-  /** 活动卡逐行文案（仅活动模式传入，普通模式不渲染） */
-  cardItems?: QuickMatchCardItem[];
   onSelect: (grabId: string) => void;
   onConfirm: () => void;
 };
@@ -168,7 +166,6 @@ export function MatchingGrabListView({
   selectedGrabIds,
   submitting,
   multiCompanion,
-  cardItems,
   onSelect,
   onConfirm,
 }: MatchingGrabListViewProps) {
@@ -190,25 +187,6 @@ export function MatchingGrabListView({
             seconds={countdownSec}
           />
         </View>
-
-        {/* 活动卡：逐行展示活动信息，普通模式不渲染 */}
-        {cardItems && cardItems.length > 0 ? (
-          <View style={styles.activityCard}>
-            {cardItems.map((item, index) => {
-              return (
-                <View
-                  key={`${item.label}-${index}`}
-                  style={styles.activityRow}
-                >
-                  <Text style={styles.activityLabel}>{item.label}</Text>
-                  <Text style={styles.activityValue} numberOfLines={1}>
-                    {item.value.text}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-        ) : null}
 
         <View style={styles.list}>
           {candidates.map((item, index) => (
@@ -282,35 +260,6 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: 16,
-  },
-  activityCard: {
-    marginHorizontal: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    gap: 8,
-  },
-  activityRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  activityLabel: {
-    fontFamily: DOUYIN_SANS,
-    fontSize: 12,
-    lineHeight: 18,
-    color: "rgba(255,255,255,0.6)",
-  },
-  activityValue: {
-    flex: 1,
-    fontFamily: DOUYIN_SANS,
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: "500",
-    color: "#FFFFFF",
-    textAlign: "right",
   },
   card: {
     flexDirection: "row",
