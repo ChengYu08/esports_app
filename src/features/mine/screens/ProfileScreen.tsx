@@ -2,6 +2,7 @@ import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
   ChevronLeft24Regular,
+  MoreHorizontal24Regular,
   Search24Regular,
   Star16Filled,
   Star16Regular,
@@ -671,6 +672,19 @@ export default function ProfileScreen() {
                     contentFit="contain"
                   />
                 </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="更多操作"
+                  hitSlop={12}
+                  onPress={() => setProfileActionsVisible(true)}
+                  style={styles.navActionButton}
+                >
+                  <MoreHorizontal24Regular
+                    color="#fff"
+                    width={24}
+                    height={24}
+                  />
+                </Pressable>
               </>
             )}
           </View>
@@ -767,7 +781,7 @@ export default function ProfileScreen() {
         onCancel={() => setBlacklistPromptVisible(false)}
         onConfirm={() => {
           setBlacklistPromptVisible(false);
-          void addToBlacklist(
+          addToBlacklist(
             {
               userId: String(profile.userId),
               nickname: profile.nickname,
@@ -776,9 +790,13 @@ export default function ProfileScreen() {
               clubId: String(profile.clubId),
             },
             useAuthStore.getState().accessToken ?? "",
-          ).then(() => {
-            showToast("加入黑名单成功");
-          });
+          )
+            .then(() => {
+              showToast("加入黑名单成功");
+            })
+            .catch((error: unknown) => {
+              showToast(error instanceof Error ? error.message : "操作失败");
+            });
         }}
       />
       {orderCard && gameDetail ? (
@@ -1066,12 +1084,6 @@ function ProfileIdentity({
             {profile.nickname}
           </Text>
 
-          {isBlacklisted ? (
-            <View accessibilityLabel="已加入黑名单" style={styles.blacklistTag}>
-              <Text style={styles.blacklistTagText}>已加入黑名单</Text>
-            </View>
-          ) : null}
-
           {profile.sex === 1 || profile.sex === 2 ? (
             <View style={styles.headerPill}>
               <Image
@@ -1118,7 +1130,14 @@ function ProfileIdentity({
               </Text>
             </Pressable>
           ) : null}
-          <Text style={styles.idRow}>ID：{profile.userId}</Text>
+          {profile.userId ? (
+            <Text style={styles.idRow}>ID：{profile.userId}</Text>
+          ) : null}
+          {isBlacklisted ? (
+            <View accessibilityLabel="已加入黑名单" style={styles.blacklistTag}>
+              <Text style={styles.blacklistTagText}>已加入黑名单</Text>
+            </View>
+          ) : null}
         </View>
       </View>
     </View>

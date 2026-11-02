@@ -41,8 +41,10 @@ import {
   View,
 } from "react-native";
 import {
-  KeyboardAvoidingView,
   KeyboardAwareScrollView,
+  KeyboardEvents,
+  KeyboardStickyView,
+  type KeyboardAwareScrollViewRef,
 } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -72,6 +74,8 @@ export default function CourtComplaintScreen() {
   const [ticketReason, setTicketReason] = useState<string>("RULE_VIOLATION");
   const [claim, setClaim] = useState("");
   const [content, setContent] = useState("");
+  const [footerHeight, setFooterHeight] = useState(0);
+  const formScrollRef = useRef<KeyboardAwareScrollViewRef>(null);
   const [sourceSessionId] = useState(() => makeIdempotencyKey("court-source"));
   const [targetSessionId] = useState(() => makeIdempotencyKey("ticket-target"));
   const [submitTicket] = useState(createTicketSubmitter);
@@ -87,6 +91,19 @@ export default function CourtComplaintScreen() {
       : null,
   );
   const [submitting, setSubmitting] = useState(false);
+
+  const revealFocusedInput = useCallback(() => {
+    formScrollRef.current?.assureFocusedInputVisible();
+  }, []);
+
+  useEffect(() => {
+    // 键盘完全展开后重新测量，兼容首次聚焦及输入法高度变化。
+    const subscription = KeyboardEvents.addListener(
+      "keyboardDidShow",
+      revealFocusedInput,
+    );
+    return () => subscription.remove();
+  }, [revealFocusedInput]);
 
   const evidence = useEvidenceImages(accessToken, checkAccount);
   const {
@@ -375,9 +392,8 @@ export default function CourtComplaintScreen() {
   }
 
   return (
-    // keyboard-controller 的 KeyboardAvoidingView 在 Android 上同样生效（基于原生键盘插值），
-    // 弹键盘时整列收缩、底部提交栏抬到键盘上方；配合 KeyboardAwareScrollView 自动把聚焦输入框滚入可视区
-    <KeyboardAvoidingView behavior="padding" style={styles.screen}>
+    // 滚动区域保持稳定，由自动滚动避让输入框，底部操作栏单独跟随键盘移动。
+    <View style={styles.screen}>
       <ScreenHeader
         title={title}
         onBack={() => {
@@ -395,6 +411,9 @@ export default function CourtComplaintScreen() {
         }}
       />
       <KeyboardAwareScrollView
+        ref={formScrollRef}
+        // 提交栏随键盘上移，输入光标还需避开提交栏并保留少量间距。
+        bottomOffset={footerHeight + 12}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
@@ -442,6 +461,7 @@ export default function CourtComplaintScreen() {
                 }}
                 onOpenSources={openSources}
                 onChangeClaim={setClaim}
+                onFocusClaim={revealFocusedInput}
               />
             ) : (
               <TicketFormSection
@@ -500,6 +520,7 @@ export default function CourtComplaintScreen() {
           required
         >
           <TextInput
+            onFocus={revealFocusedInput}
             value={content}
             onChangeText={setContent}
             multiline
@@ -536,7 +557,8 @@ export default function CourtComplaintScreen() {
             </Text>
           )}
       </KeyboardAwareScrollView>
-      <View
+      <KeyboardStickyView
+        onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
         style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}
       >
         {(mode === "court" || mode === "ticket") && (
@@ -595,7 +617,7 @@ export default function CourtComplaintScreen() {
             )}
           </Pressable>
         </View>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardStickyView>
+    </View>
   );
 }

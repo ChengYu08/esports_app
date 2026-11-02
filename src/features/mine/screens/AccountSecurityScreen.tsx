@@ -79,6 +79,18 @@ export default function AccountSecurityScreen() {
             <Image source={arrowIcon} style={styles.arrow} />
           </View>
         </Pressable>
+        <View style={styles.divider} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="黑名单"
+          onPress={() => router.push("/blacklist")}
+          style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+        >
+          <Text style={styles.label}>黑名单</Text>
+          <View style={styles.rowRight}>
+            <Image source={arrowIcon} style={styles.arrow} />
+          </View>
+        </Pressable>
       </View>
       <Pressable
         accessibilityRole="button"

@@ -1,15 +1,23 @@
 import { ChevronLeft24Regular, Copy16Regular } from "@fluentui/react-native-icons";
 import {
   courtApi,
-  formatTime,
   type PlatformTicket,
 } from "@/features/court/court.api";
+import { PlatformTicketTimeline } from "@/features/court/components/PlatformTicketTimeline";
+import {
+  canReplyToPlatformTicket,
+  formatTicketTime,
+  platformTicketMessages,
+  platformTicketReasonLabel,
+  platformTicketStatusLabel,
+} from "@/features/court/platform-ticket-display";
 import { COURT_FONT_FAMILY } from "@/features/court/court.theme";
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import { useAuthStore } from "@esports/auth";
 import * as Clipboard from "expo-clipboard";
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -24,6 +32,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function CourtTicketDetailScreen() {
   const insets = useSafeAreaInsets();
+  const currentUserId = useAuthStore((state) => state.user?.id);
   const { id, mine } = useLocalSearchParams<{ id: string; mine?: string }>();
   const [ticket, setTicket] = useState<PlatformTicket | null>(null);
   const [loadError, setLoadError] = useState("");
@@ -32,6 +41,11 @@ export default function CourtTicketDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const isMine = mine === "1";
+  const messages = useMemo(
+    () => ticket ? platformTicketMessages(ticket, isMine, currentUserId) : [],
+    [ticket, isMine, currentUserId],
+  );
+  const canReply = ticket ? canReplyToPlatformTicket(ticket, isMine, messages) : false;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -53,7 +67,7 @@ export default function CourtTicketDetailScreen() {
   }, [load]);
 
   async function sendReply() {
-    if (!isMine || !reply.trim() || !ticket?.ticketId || submitting) {
+    if (!canReply || !reply.trim() || !ticket?.ticketId || submitting) {
       return;
     }
     setSubmitting(true);
@@ -71,24 +85,13 @@ export default function CourtTicketDetailScreen() {
 
   const images = ticket?.evidenceThumbnails?.filter(Boolean) ?? [];
   const ticketNumber = String(ticket?.ticketNo || ticket?.ticketId || "");
-  const officialReplies = ticket?.adminReply
-    ? [ticket.adminReply]
-    : (ticket?.messageList ?? [])
-        .filter(
-          (message) =>
-            message.senderType === "ADMIN" &&
-            (isMine || message.visibility !== "HIDDEN"),
-        )
-        .map((message) => message.content)
-        .filter((content): content is string => Boolean(content));
-
   async function copyTicketNumber() {
     if (!ticketNumber) {
       return;
     }
     try {
       await Clipboard.setStringAsync(ticketNumber);
-      showToast("案件 ID 已复制");
+      showToast("工单编号已复制");
     } catch {
       showToast("复制失败，请重试");
     }
@@ -142,14 +145,19 @@ export default function CourtTicketDetailScreen() {
             {ticket && (
               <>
                 <View style={styles.summary}>
-                  <Text style={styles.heading}>{label(ticket.reasonType)}</Text>
+                  <View style={styles.headingRow}>
+                    <Text style={styles.heading}>{platformTicketReasonLabel(ticket.reasonType)}</Text>
+                    <View style={styles.statusBadge}>
+                      <Text style={styles.statusText}>{platformTicketStatusLabel(ticket.status)}</Text>
+                    </View>
+                  </View>
                   <View style={styles.metadata}>
                     <View style={styles.row}>
                       <View style={styles.metadataCell}>
-                        <Text style={styles.metadataLabel}>案件ID</Text>
+                        <Text style={styles.metadataLabel}>工单编号</Text>
                         <Pressable
                           accessibilityRole="button"
-                          accessibilityLabel={`复制案件 ID ${ticketNumber}`}
+                          accessibilityLabel={`复制工单编号 ${ticketNumber}`}
                           disabled={!ticketNumber}
                           onPress={copyTicketNumber}
                           hitSlop={8}
@@ -161,14 +169,24 @@ export default function CourtTicketDetailScreen() {
                           <Copy16Regular color="#ABABAD" width={12} height={12} style={styles.copyIcon} />
                         </Pressable>
                       </View>
-                      <View style={styles.metadataCell}>
-                        <Text style={styles.metadataLabel}>
-                          {ticket.closedAt ? "办结时间" : "提交时间"}
-                        </Text>
-                        <Text style={styles.metadataValue}>
-                          {formatTime(ticket.closedAt || ticket.createdAt)}
-                        </Text>
+                    </View>
+                    <View style={styles.timeGrid}>
+                      <View style={styles.timeCell}>
+                        <Text style={styles.timeLabel}>提交时间</Text>
+                        <Text style={styles.timeValue}>{formatTicketTime(ticket.createdAt)}</Text>
                       </View>
+                      {!!ticket.repliedAt && (
+                        <View style={styles.timeCell}>
+                          <Text style={styles.timeLabel}>回复时间</Text>
+                          <Text style={styles.timeValue}>{formatTicketTime(ticket.repliedAt)}</Text>
+                        </View>
+                      )}
+                      {!!ticket.closedAt && (
+                        <View style={styles.timeCell}>
+                          <Text style={styles.timeLabel}>关闭时间</Text>
+                          <Text style={styles.timeValue}>{formatTicketTime(ticket.closedAt)}</Text>
+                        </View>
+                      )}
                     </View>
                     {!!(ticket.targetNickname || ticket.targetUid) &&
                       ticket.reasonType !== "ORDER_DISPUTE" && (
@@ -223,43 +241,7 @@ export default function CourtTicketDetailScreen() {
                     )}
                   </View>
                 </View>
-                <View style={styles.officialSection}>
-                  <Text style={styles.sectionTitle}>官方回复</Text>
-                  {officialReplies.length ? (
-                    officialReplies.map((content, index) => (
-                      <Text key={index} style={styles.replyBody}>
-                        {content}
-                      </Text>
-                    ))
-                  ) : (
-                    <Text style={styles.replyBody}>暂无官方回复</Text>
-                  )}
-                </View>
-                {isMine && Boolean(ticket.messageList?.length) && (
-                  <View style={styles.officialSection}>
-                    <Text style={styles.sectionTitle}>
-                      处理进度 · {statusText(ticket.status)}
-                    </Text>
-                    {(ticket.messageList ?? []).map((message, index) => (
-                      <View
-                        key={`${message.createdAt}-${index}`}
-                        style={styles.message}
-                      >
-                        <Text style={styles.messageSender}>
-                          {message.senderType === "ADMIN"
-                            ? "平台客服"
-                            : message.senderType === "SYSTEM"
-                              ? "系统通知"
-                              : "我"}
-                        </Text>
-                        <Text style={styles.body}>{message.content || ""}</Text>
-                        <Text style={styles.messageTime}>
-                          {formatTime(message.createdAt)}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
+                <PlatformTicketTimeline messages={messages} />
                 {isMine && ticket.status === "REJECTED" && (
                   <View style={styles.rejection}>
                     <Text style={styles.rejectionTitle}>驳回原因</Text>
@@ -282,7 +264,7 @@ export default function CourtTicketDetailScreen() {
               </>
             )}
           </ScrollView>
-          {isMine && ticket?.status === "TO_USER_REPLY" && (
+          {canReply && (
             <View
               style={[
                 styles.replyBox,
@@ -316,34 +298,6 @@ export default function CourtTicketDetailScreen() {
   );
 }
 
-function label(value?: string) {
-  return (
-    (
-      {
-        RULE_VIOLATION: "用户投诉",
-        ORDER_DISPUTE: "订单存在纠纷",
-        CHAT_DISPUTE: "用户投诉",
-        OTHER: "用户投诉",
-        PLATFORM_SUGGESTION: "平台建议",
-      } as Record<string, string>
-    )[value || ""] || "平台工单"
-  );
-}
-function statusText(value?: string) {
-  return (
-    (
-      {
-        SUBMITTED: "已提交",
-        REJECTED: "已驳回",
-        PROCESSING: "处理中",
-        TO_USER_REPLY: "待补充",
-        RESOLVED: "已解决",
-        CLOSED: "已关闭",
-      } as Record<string, string>
-    )[value || ""] || "处理中"
-  );
-}
-
 const styles = StyleSheet.create({
   screen: { backgroundColor: "#F5F6F7", flex: 1 },
   header: {
@@ -369,14 +323,17 @@ const styles = StyleSheet.create({
   },
   content: { paddingTop: 8, gap: 8 },
   summary: { backgroundColor: "#fff", padding: 16, gap: 16 },
+  headingRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8 },
   heading: {
     color: "#0D0D0F",
     fontFamily: COURT_FONT_FAMILY,
     fontSize: 24,
     fontWeight: "600",
     lineHeight: 30,
-    marginBottom: 8,
+    flexShrink: 1,
   },
+  statusBadge: { backgroundColor: "#F5F6F7", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
+  statusText: { color: "#656566", fontFamily: COURT_FONT_FAMILY, fontSize: 12, lineHeight: 18 },
   metadata: { gap: 8 },
   row: { alignItems: "flex-start", flexDirection: "row", gap: 8 },
   metadataCell: { flex: 1, minWidth: 0, flexDirection: "row", gap: 2 },
@@ -394,6 +351,10 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     flexShrink: 1,
   },
+  timeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  timeCell: { gap: 4, minWidth: 140, flexGrow: 1 },
+  timeLabel: { color: "#979799", fontFamily: COURT_FONT_FAMILY, fontSize: 11, lineHeight: 16 },
+  timeValue: { color: "#0D0D0F", fontFamily: COURT_FONT_FAMILY, fontSize: 11, lineHeight: 16 },
   copyButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -412,39 +373,11 @@ const styles = StyleSheet.create({
   },
   images: { flexDirection: "row", flexWrap: "wrap", gap: 4, maxWidth: 326 },
   image: { borderRadius: 6, backgroundColor: "#F5F6F7" },
-  officialSection: {
-    backgroundColor: "#fff",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 6,
-  },
-  sectionTitle: {
-    color: "#0D0D0F",
-    fontFamily: COURT_FONT_FAMILY,
-    fontSize: 16,
-    fontWeight: "600",
-    lineHeight: 22,
-    paddingVertical: 4,
-  },
   replyBody: {
     color: "#656566",
     fontFamily: COURT_FONT_FAMILY,
     fontSize: 14,
     lineHeight: 22,
-  },
-  message: { gap: 6, paddingVertical: 8 },
-  messageSender: {
-    color: "#656566",
-    fontFamily: COURT_FONT_FAMILY,
-    fontSize: 12,
-    fontWeight: "600",
-    lineHeight: 18,
-  },
-  messageTime: {
-    color: "#979799",
-    fontFamily: COURT_FONT_FAMILY,
-    fontSize: 11,
-    lineHeight: 16,
   },
   rejection: { backgroundColor: "#fff", padding: 16, gap: 8 },
   rejectionTitle: {
