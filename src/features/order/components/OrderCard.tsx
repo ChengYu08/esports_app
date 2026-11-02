@@ -35,6 +35,8 @@ const STATUS_COLORS: Record<OrderStatus, string> = {
 
 type OrderCardProps = {
   item: OrderItemModel;
+  /** 列表未携带 clubName 时由外部按 companionClubId 解析后传入 */
+  clubName?: string;
   onAction: (item: OrderItemModel, action: OrderActionKey) => void;
   onPress?: (item: OrderItemModel) => void;
   actionPending?: boolean;
@@ -42,10 +44,12 @@ type OrderCardProps = {
 
 export const OrderCard = memo(function OrderCard({
   item,
+  clubName,
   onAction,
   onPress,
   actionPending = false,
 }: OrderCardProps) {
+  const resolvedClubName = item.clubName ?? clubName;
   const freeSummary = formatOrderFreeSummary(item);
   const copyOrderNo = async () => {
     const orderNo = item.orderNo ?? item.id;
@@ -86,9 +90,9 @@ export const OrderCard = memo(function OrderCard({
                   </Text>
                 ) : null}
               </View>
-              {item.clubName ? (
+              {resolvedClubName ? (
                 <Text numberOfLines={1} style={styles.clubName}>
-                  {item.clubName}
+                  {resolvedClubName}
                 </Text>
               ) : null}
             </View>

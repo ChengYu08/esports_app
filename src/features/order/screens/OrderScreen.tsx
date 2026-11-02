@@ -37,6 +37,7 @@ import {
   computeOrderPayableStars,
 } from "../free-amount";
 import { useOrderPage } from "../hooks/use-order-page";
+import { useOrderClubNames } from "../hooks/use-order-club-names";
 import {
   invalidateOrderQueries,
   refreshOrderAfterAction,
@@ -132,6 +133,12 @@ export default function OrderScreen() {
   } | null>(null);
   const cancelingPaymentRef = useRef(false);
   const items = orders.data?.pages.flatMap((page) => page.items) ?? [];
+  // 列表接口不回俱乐部名，按 companionClubId 批量解析（react-query 缓存，同俱乐部只查一次）。
+  const clubNameById = useOrderClubNames(
+    items
+      .filter((item) => !item.clubName && item.clubId != null)
+      .map((item) => Number(item.clubId)),
+  );
   const emptyMessage =
     scope === "dispatch"
       ? visibleFilter === "history"
@@ -371,6 +378,10 @@ export default function OrderScreen() {
         renderItem={({ item }) => (
           <OrderCard
             item={item}
+            clubName={
+              item.clubName ??
+              (item.clubId != null ? clubNameById[item.clubId] : undefined)
+            }
             actionPending={pendingOrderId === item.id}
             onAction={handleOrderAction}
             onPress={(order) => {

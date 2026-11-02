@@ -14,12 +14,15 @@ import {
 export function OrderDetailInfoBlocks({
   order,
   scope,
+  clubName,
   orderNumber,
   onCopy,
   onChat,
 }: {
   order: OrderItemModel;
   scope: "accept" | "place";
+  /** 陪玩师所属俱乐部名（详情接口只回 id，由外部解析后传入） */
+  clubName?: string;
   orderNumber: string;
   onCopy: () => void;
   onChat: () => void;
@@ -50,9 +53,9 @@ export function OrderDetailInfoBlocks({
             >
               {order.sellerName}
             </Text>
-            {scope !== "accept" && (
-              <Text style={styles.muted}>盼之电竞自营俱乐部</Text>
-            )}
+            {clubName ? (
+              <Text style={styles.muted}>{clubName}</Text>
+            ) : null}
           </View>
           <Pressable
             accessibilityRole="button"

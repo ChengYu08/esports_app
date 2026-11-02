@@ -25,13 +25,24 @@ describe("client auth contract unwrap", () => {
     await expect(api.exchangeIdToken("id-token")).rejects.toThrow();
   });
 
-  it("keeps void endpoints lenient when success carries no data", async () => {
+  it("keeps logout lenient when success carries no data", async () => {
     const api = createClientAuthContract(
       requesterWith({ success: true, code: "SUCCESS", info: "操作成功" }),
     );
 
     await expect(api.logout("token")).resolves.toBeUndefined();
-    await expect(api.cancelAccount("token", "123456")).resolves.toBeUndefined();
+  });
+
+  it("cancelAccount 要求返回冷静期截止时间，缺失 data 时报错", async () => {
+    const api = createClientAuthContract(
+      requesterWith({ success: true, code: "SUCCESS", data: "2026-11-05 12:00:00" }),
+    );
+
+    await expect(api.cancelAccount("token", "123456")).resolves.toBe("2026-11-05 12:00:00");
+    await expect(
+      createClientAuthContract(requesterWith({ success: true, code: "SUCCESS", info: "操作成功" }))
+        .cancelAccount("token", "123456"),
+    ).rejects.toThrow("响应数据缺失，请稍后重试");
   });
 
   it("propagates business errors with the server message", async () => {
