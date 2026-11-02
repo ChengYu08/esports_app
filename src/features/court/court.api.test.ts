@@ -1,40 +1,92 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { apiClient } from "@/core/network/api-client";
-import { courtApi } from "./court.api";
+import { courtApi, courtServiceTypeText } from "./court.api";
 import { getEvidenceUploadFile } from "./court-evidence-image";
 import { uploadClientObject } from "@/features/auth/oss-upload";
 
 const session = vi.hoisted(() => ({ accessToken: null as string | null }));
+const getOssSts = vi.hoisted(() => vi.fn());
 
 vi.mock("@esports/auth", () => ({
   useAuthStore: { getState: () => session },
 }));
 vi.mock("@/core/network/api-client", () => ({ apiClient: vi.fn() }));
 vi.mock("@/features/auth/oss-upload", () => ({ uploadClientObject: vi.fn() }));
+vi.mock("@/features/auth/client-auth.api", () => ({ clientAuthApi: { getOssSts } }));
 vi.mock("@/features/court/court-evidence-image", () => ({ getEvidenceUploadFile: vi.fn() }));
 
 const request = vi.mocked(apiClient);
 
 describe("evidence image upload", () => {
+  const fullSts = (objectList: string[]) => ({
+    objectList,
+    endpoint: "https://oss-cn-hangzhou.aliyuncs.com",
+    bucketName: "pz-bucket",
+    accessKeyId: "key-id",
+    accessKeySecret: "key-secret",
+    securityToken: "security-token",
+    regionId: "cn-hangzhou",
+    domain: "https://cdn.example.com",
+  });
+
   beforeEach(() => {
     request.mockReset();
     vi.mocked(getEvidenceUploadFile).mockReset();
     vi.mocked(uploadClientObject).mockReset();
+    getOssSts.mockReset();
     session.accessToken = "viewer-token";
   });
 
   it("uses the actual image format for both the STS filename and OSS Content-Type", async () => {
     const image = { uri: "file:///export.heic", name: "IMG_1001.jpg", mimeType: "image/jpeg" };
     vi.mocked(getEvidenceUploadFile).mockReturnValue(image);
-    const sts = { objectList: ["court/evidence/IMG_1001.jpg"] };
+    const sts = fullSts(["court/evidence/IMG_1001.jpg"]);
     request.mockResolvedValue({ code: "SUCCESS", data: sts });
 
     expect(await courtApi.uploadEvidence(image.uri, "IMG_1001.HEIC")).toBe(sts.objectList[0]);
     expect(request).toHaveBeenCalledWith("/client/v1/court/evidence/sts", {
       method: "POST", token: "viewer-token", body: { action: { objectNames: ["IMG_1001.jpg"] } },
     });
+    expect(getOssSts).not.toHaveBeenCalled();
     expect(uploadClientObject).toHaveBeenCalledWith(sts, sts.objectList[0], { uri: image.uri, mimeType: "image/jpeg" });
+  });
+
+  it("falls back to the generic OSS STS when the court STS omits the security token", async () => {
+    const image = { uri: "file:///photo.jpg", name: "photo.jpg", mimeType: "image/jpeg" };
+    vi.mocked(getEvidenceUploadFile).mockReturnValue(image);
+    request.mockResolvedValue({
+      code: "SUCCESS",
+      // securityToken 为 null：按完整凭证口径视为不可用，走通用 STS 兜底
+      data: { objectList: ["court/evidence/photo.jpg"], endpoint: "https://oss.example.com", bucketName: "pz-bucket", accessKeyId: "key-id", accessKeySecret: "key-secret", securityToken: null },
+    });
+    const fallback = fullSts(["images/photo.jpg"]);
+    getOssSts.mockResolvedValue(fallback);
+
+    expect(await courtApi.uploadEvidence(image.uri, "photo.jpg")).toBe(fallback.objectList[0]);
+    expect(getOssSts).toHaveBeenCalledWith("viewer-token", "111", ["photo.jpg"]);
+    expect(uploadClientObject).toHaveBeenCalledWith(fallback, fallback.objectList[0], { uri: image.uri, mimeType: "image/jpeg" });
+  });
+
+  it("falls back to the generic OSS STS when the court STS request fails", async () => {
+    const image = { uri: "file:///photo.jpg", name: "photo.jpg", mimeType: "image/jpeg" };
+    vi.mocked(getEvidenceUploadFile).mockReturnValue(image);
+    request.mockResolvedValue({ code: "FAIL", info: "专用凭证不可用" });
+    const fallback = fullSts(["images/photo.jpg"]);
+    getOssSts.mockResolvedValue(fallback);
+
+    expect(await courtApi.uploadEvidence(image.uri, "photo.jpg")).toBe(fallback.objectList[0]);
+    expect(getOssSts).toHaveBeenCalledWith("viewer-token", "111", ["photo.jpg"]);
+  });
+
+  it("surfaces the fallback error when both credential endpoints fail", async () => {
+    const image = { uri: "file:///photo.jpg", name: "photo.jpg", mimeType: "image/jpeg" };
+    vi.mocked(getEvidenceUploadFile).mockReturnValue(image);
+    request.mockResolvedValue({ code: "SUCCESS", data: { objectList: ["court/evidence/photo.jpg"] } });
+    getOssSts.mockRejectedValue(new Error("通用凭证获取失败"));
+
+    await expect(courtApi.uploadEvidence(image.uri, "photo.jpg")).rejects.toThrow("通用凭证获取失败");
+    expect(uploadClientObject).not.toHaveBeenCalled();
   });
 
   it("rejects unsupported files before requesting credentials or uploading", async () => {
@@ -221,5 +273,54 @@ describe("court favorite responses", () => {
     request.mockResolvedValue({ code: "FAIL", info: "收藏失败" });
 
     await expect(courtApi.favorite(42, true)).rejects.toThrow("收藏失败");
+  });
+});
+
+describe("courtServiceTypeText", () => {
+  it("joins mode, level and service name then appends the time-based amount", () => {
+    expect(
+      courtServiceTypeText({
+        modeName: "带飞",
+        levelName: "王者",
+        serviceName: "陪玩",
+        totalPrice: 88,
+        quantity: 2,
+        unitDurationMinutes: 60,
+      }),
+    ).toBe("带飞-王者-陪玩 88钻石-2小时");
+  });
+
+  it("uses the billing unit name when the service has no per-unit duration", () => {
+    expect(
+      courtServiceTypeText({
+        modeName: "上分",
+        serviceName: "陪玩",
+        totalPrice: 30,
+        quantity: 3,
+        billingUnitName: "局",
+      }),
+    ).toBe("上分-陪玩 30钻石-3局");
+  });
+
+  it("falls back to the game name and omits the amount when the detail has no service fields", () => {
+    expect(courtServiceTypeText({ gameName: "王者荣耀" })).toBe("王者荣耀");
+    expect(courtServiceTypeText({})).toBe("服务订单");
+  });
+
+  it("drops empty service parts instead of producing stray separators", () => {
+    expect(
+      courtServiceTypeText({ modeName: " ", serviceName: "陪玩", totalPrice: 6 }),
+    ).toBe("陪玩 6钻石");
+  });
+
+  it("formats minutes that are not whole hours as minutes", () => {
+    expect(
+      courtServiceTypeText({
+        serviceName: "语音",
+        totalPrice: 10,
+        quantity: 2,
+        unitDurationMinutes: 15,
+      }),
+    ).toBe("语音 10钻石-30分钟");
   });
 });

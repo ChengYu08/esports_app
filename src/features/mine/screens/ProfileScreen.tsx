@@ -1067,7 +1067,10 @@ function SkillsSummary({
 }
 
 function ImageGallery({ images }: { images: string[] }) {
-  if (images.length === 0) return <EmptyState message="暂无技能图片" />;
+  // 无图时保留插画空态，但压缩上方留白，避免大块空白把服务模式挤远
+  if (images.length === 0) {
+    return <EmptyState message="暂无技能图片" style={styles.galleryEmpty} />;
+  }
   const visibleImages = images.slice(0, 5);
 
   return (
@@ -1714,6 +1717,8 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   gallery: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 14 },
+  // 默认空态 minHeight 240，这里收紧到插画+文案的紧凑高度
+  galleryEmpty: { minHeight: 150 },
   galleryItem: {
     width: 62,
     height: 62,

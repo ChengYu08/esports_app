@@ -1,4 +1,5 @@
 import { apiClient } from "@/core/network/api-client";
+import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { uploadClientObject } from "@/features/auth/oss-upload";
 import { getEvidenceUploadFile } from "@/features/court/court-evidence-image";
 import { useAuthStore } from "@esports/auth";
@@ -57,6 +58,7 @@ export type CourtCase = {
   totalPrice?: number | string;
   quantity?: number;
   billingUnitName?: string;
+  unitDurationMinutes?: number;
   companionNickname?: string;
   companionAvatar?: string;
   gameName?: string;
@@ -120,6 +122,44 @@ export type CourtSource = {
   reviewRating?: number;
   reviewImageUrls?: string[];
 };
+
+/**
+ * 案件「服务类型」完整文案（对齐 Web joinServiceText + formatServiceAmount）：
+ * 「模式-等级-服务类型 88钻石-2小时」；接口未回时逐级回落。
+ */
+export function courtServiceTypeText(item: {
+  gameName?: string;
+  modeName?: string;
+  levelName?: string;
+  serviceName?: string;
+  totalPrice?: number | string;
+  quantity?: number;
+  billingUnitName?: string;
+  unitDurationMinutes?: number;
+}): string {
+  const parts = [item.modeName, item.levelName, item.serviceName]
+    .map((part) => (part == null ? "" : String(part).trim()))
+    .filter(Boolean);
+  const serviceText = parts.length
+    ? parts.join("-")
+    : item.gameName || "服务订单";
+  const total =
+    item.totalPrice == null || item.totalPrice === ""
+      ? ""
+      : `${item.totalPrice}钻石`;
+  let amount = total;
+  if (item.quantity && item.quantity > 0) {
+    if (item.unitDurationMinutes && item.unitDurationMinutes > 0) {
+      const minutes = item.quantity * item.unitDurationMinutes;
+      amount = `${total}-${
+        minutes % 60 === 0 ? `${minutes / 60}小时` : `${minutes}分钟`
+      }`;
+    } else if (item.billingUnitName) {
+      amount = `${total}-${item.quantity}${item.billingUnitName}`;
+    }
+  }
+  return amount ? `${serviceText} ${amount}` : serviceText;
+}
 export type Page<T> = {
   records?: T[];
   list?: T[];
@@ -351,13 +391,49 @@ export const courtApi = {
   applyReviewer() {
     return post("/client/v1/court/reviewer/apply");
   },
+  /**
+   * 小法庭证据直传凭证：优先专用 STS；请求失败或凭证不完整（如 securityToken 为 null，
+   * 会令 OSS 直传 403 或原生 fetch 崩溃）时回退通用 OSS STS，对齐 Web 的 bizType=111 兜底。
+   */
   async getEvidenceSts(objectName: string) {
-    const data = await postRequireData<
-      Parameters<typeof uploadClientObject>[0] & { objectList?: string[] }
-    >("/client/v1/court/evidence/sts", {
-      action: { objectNames: [objectName] },
-    });
-    return data;
+    type EvidenceSts = Parameters<typeof uploadClientObject>[0] & {
+      objectList?: string[];
+    };
+    let courtError: unknown;
+    try {
+      const data = await postRequireData<EvidenceSts>(
+        "/client/v1/court/evidence/sts",
+        {
+          action: { objectNames: [objectName] },
+        },
+      );
+      if (
+        data?.securityToken &&
+        data.accessKeyId &&
+        data.accessKeySecret &&
+        data.bucketName &&
+        data.endpoint
+      ) {
+        return data;
+      }
+    } catch (error) {
+      courtError = error;
+    }
+    const token = useAuthStore.getState().accessToken;
+    if (!token) {
+      throw courtError instanceof Error
+        ? courtError
+        : new Error("请先登录");
+    }
+    try {
+      return await clientAuthApi.getOssSts(token, "111", [objectName]);
+    } catch (fallbackError) {
+      throw fallbackError instanceof Error
+        ? fallbackError
+        : courtError instanceof Error
+          ? courtError
+          : new Error("获取证据上传凭证失败");
+    }
   },
   async uploadEvidence(uri: string, name: string) {
     const image = getEvidenceUploadFile(uri, name);
