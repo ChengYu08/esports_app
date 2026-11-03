@@ -296,6 +296,11 @@ export default function OrderScreen() {
         params: {
           clubId: String(item.clubId || ""),
           userId: String(item.receiverUserId || ""),
+          reorderGame: item.gameName,
+          reorderMode: item.gameModeName ?? "",
+          reorderLevel: item.gameLevelName ?? "",
+          reorderService: item.orderServiceName ?? "",
+          reorderQuantity: String(item.quantity),
         },
       });
     },

@@ -280,6 +280,8 @@ export default function VoiceRoomScreen() {
       sentAt: 2,
     },
   ]);
+  const messageListRef = useRef<FlatList<VoiceRoomMessage>>(null);
+  const followLatestRef = useRef(true);
   const [input, setInput] = useState("");
   // 键盘可见性来自 keyboard-controller 原生事件，顶起由 KeyboardAvoidingView 处理
   const keyboardOpen = useKeyboardState((state) => state.isVisible);
@@ -1305,6 +1307,7 @@ export default function VoiceRoomScreen() {
   const sendMessage = async () => {
     const text = input.trim();
     if (!text) return;
+    followLatestRef.current = true;
     setInput("");
     const local = {
       id: `local-${Date.now()}`,
@@ -1513,11 +1516,27 @@ export default function VoiceRoomScreen() {
           ) : null}
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           <FlatList
+            ref={messageListRef}
             data={messages}
             keyExtractor={messageKeyExtractor}
             renderItem={renderMessageItem}
             contentContainerStyle={styles.messageList}
             showsVerticalScrollIndicator={false}
+            onScroll={(event) => {
+              const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+              followLatestRef.current = contentSize.height - contentOffset.y - layoutMeasurement.height <= 48;
+            }}
+            scrollEventThrottle={16}
+            onContentSizeChange={() => {
+              if (followLatestRef.current) {
+                messageListRef.current?.scrollToEnd({ animated: false });
+              }
+            }}
+            onLayout={() => {
+              if (followLatestRef.current) {
+                messageListRef.current?.scrollToEnd({ animated: false });
+              }
+            }}
           />
         </View>
 

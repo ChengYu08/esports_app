@@ -107,6 +107,11 @@ export default function ProfileScreen() {
     clubId?: string | string[];
     userId?: string | string[];
     fromSearch?: string | string[];
+    reorderGame?: string;
+    reorderMode?: string;
+    reorderLevel?: string;
+    reorderService?: string;
+    reorderQuantity?: string;
   }>();
   const routeParams = getProfileRouteParams(route);
   const fromSearchPage = route.fromSearch === "1";
@@ -146,6 +151,8 @@ export default function ProfileScreen() {
   );
   const [selectedGameId, setSelectedGameId] = useState("");
   const [orderCard, setOrderCard] = useState<ProfileSkillCard | null>(null);
+  const [reorderActive, setReorderActive] = useState(false);
+  const reorderHandled = useRef(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [paymentOrder, setPaymentOrder] = useState<{
     orderId: number;
@@ -176,7 +183,7 @@ export default function ProfileScreen() {
     (game) => String(game.gameId) === selectedGameId,
   )
     ? selectedGameId
-    : firstGameId;
+    : String(detail?.games.find((game) => game.gameName === route.reorderGame)?.gameId ?? firstGameId);
 
   const gameDetailQuery = useProfileGameDetail(
     routeParams && (detail?.clubId || routeParams.clubId) && activeGameId
@@ -323,6 +330,43 @@ export default function ProfileScreen() {
     },
     [profile.userId],
   );
+  useEffect(() => {
+    if (!route.reorderGame || reorderHandled.current || !detail) {
+      return;
+    }
+    const matchingGames = detail.games.filter((game) => game.gameName === route.reorderGame);
+    if (matchingGames.length !== 1) {
+      reorderHandled.current = true;
+      showToast("原订单游戏已变更，请重新选择服务");
+      return;
+    }
+    const gameId = String(matchingGames[0].gameId);
+    if (activeGameId !== gameId) {
+      return;
+    }
+    if (gameDetailQuery.isError) {
+      reorderHandled.current = true;
+      showToast("服务加载失败，请重新选择服务");
+      return;
+    }
+    if (!gameDetail || String(gameDetail.gameId) !== gameId) {
+      return;
+    }
+    const cards = gameDetail.skillCards.filter((card) =>
+      card.modeName === route.reorderMode && card.levelName === route.reorderLevel,
+    );
+    const levelIds = new Set(cards.map((card) => card.gameLevelId));
+    if (levelIds.size !== 1 || !route.reorderService) {
+      reorderHandled.current = true;
+      showToast("原订单服务已变更，请重新选择服务");
+      return;
+    }
+    reorderHandled.current = true;
+    Promise.resolve().then(() => {
+      setReorderActive(true);
+      openOrder(cards[0]);
+    });
+  }, [activeGameId, detail, gameDetail, gameDetailQuery.isError, openOrder, route.reorderGame, route.reorderLevel, route.reorderMode, route.reorderService]);
   // 默认头部中的标签栏:紧凑头部淡入时反向淡出
   const tabsInverseFade = useMemo(
     () =>
@@ -821,12 +865,18 @@ export default function ProfileScreen() {
             buyerUserId: Number(user?.id) || 0,
           }}
           token={useAuthStore.getState().accessToken}
-          onClose={() => setOrderCard(null)}
+          initialServiceName={reorderActive ? route.reorderService : undefined}
+          initialQuantity={reorderActive ? Number(route.reorderQuantity) : undefined}
+          onClose={() => {
+            setOrderCard(null);
+            setReorderActive(false);
+          }}
           onRealNameVerificationRequired={() =>
             router.push("/account-settings")
           }
           onOrderCreated={(order) => {
             setOrderCard(null);
+            setReorderActive(false);
             setPaymentError(null);
             setPaymentOrder(order);
             setPaymentSheetVisible(true);

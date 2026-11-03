@@ -35,6 +35,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { fetchCompanionTags } from "../api/home.api";
 import type { Companion, CompanionFilters, GameKey } from "../api/home.types";
 import {
   useClubCompanions,
@@ -74,7 +75,14 @@ const COLORS = {
   border: "#E9E9EB",
 } as const;
 
-type FilterKey = "mode" | "level" | "gender" | "advanced" | "status" | "price";
+type FilterKey =
+  | "mode"
+  | "level"
+  | "gender"
+  | "advanced"
+  | "status"
+  | "price"
+  | "tag";
 
 /** 设计稿筛选栏 4 维度：模式 / 等级 / 性别 / 筛选（筛选聚合状态+价格） */
 const filterDefinitions: { key: FilterKey; label: string }[] = [
@@ -82,6 +90,7 @@ const filterDefinitions: { key: FilterKey; label: string }[] = [
   { key: "level", label: "等级" },
   { key: "gender", label: "性别" },
   { key: "advanced", label: "筛选" },
+  { key: "tag", label: "标签" },
 ];
 
 const memberKeyExtractor = (member: Companion) => String(member.profileId);
@@ -117,8 +126,14 @@ export default function ClubDetailScreen() {
     useState<CompanionFilters["gameStatus"]>();
   const [selectedMode, setSelectedMode] = useState<number>();
   const [selectedLevel, setSelectedLevel] = useState<number>();
+  const [selectedTag, setSelectedTag] = useState<number>();
   const clubQuery = useClubDetail(id);
   const club = clubQuery.data;
+  const tagsQuery = useQuery({
+    queryKey: ["companion-tags", club?.id],
+    queryFn: ({ signal }) => fetchCompanionTags(club!.id, signal),
+    enabled: Boolean(club?.id),
+  });
   // 预拉价目表配置：页面被删除/停用时接口降级为空列表，点击价目表时直接弹"暂无价目表"而不是进报错页
   const priceConfigQuery = usePriceList(club?.pageConfigGroupId);
   const games = club?.games ?? [];
@@ -126,7 +141,7 @@ export default function ClubDetailScreen() {
   const selectedGameInfo = games.find(
     (item) => String(item.id) === selectedGame,
   );
-  const modesQuery = useClubGameModes(selectedGame);
+  const modesQuery = useClubGameModes(selectedGame, club?.id);
   // 等级列表依赖已选模式（接口按 gameModeId 查询），且需要登录态
   const levelsQuery = useQuery({
     queryKey: ["club-game-levels", selectedMode, accessToken],
@@ -148,6 +163,7 @@ export default function ClubDetailScreen() {
             onlineOnly: selectedStatus !== undefined ? true : undefined,
             gameModeId: selectedMode,
             gameLevelId: selectedLevel,
+            tagId: selectedTag,
           }
         : null,
     [
@@ -158,6 +174,7 @@ export default function ClubDetailScreen() {
       selectedMode,
       selectedSex,
       selectedStatus,
+      selectedTag,
     ],
   );
   const companionsQuery = useClubCompanions(companionFilters);
@@ -459,39 +476,46 @@ export default function ClubDetailScreen() {
           style={styles.listScroll}
           ListHeaderComponent={
             <View style={styles.filterBar}>
-              {filterDefinitions.map(({ key, label }) => {
-                const hasSelection =
-                  (key === "gender" && selectedSex !== undefined) ||
-                  (key === "mode" && selectedMode !== undefined) ||
-                  (key === "level" && selectedLevel !== undefined) ||
-                  (key === "advanced" &&
-                    (selectedStatus !== undefined || priceSort !== "DEFAULT"));
-                const selecting = openFilter === key;
-                return (
-                  <Pressable
-                    key={key}
-                    accessibilityLabel={`筛选${label}`}
-                    accessibilityState={{ selected: hasSelection }}
-                    style={styles.filterOption}
-                    onPress={() => openFilterSheet(key)}
-                  >
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.filterOptionText,
-                        hasSelection && styles.filterOptionTextSelected,
-                        selecting && styles.filterOptionTextSelecting,
-                      ]}
+              {filterDefinitions
+                .filter(
+                  ({ key }) =>
+                    key !== "tag" || (tagsQuery.data?.length ?? 0) > 0,
+                )
+                .map(({ key, label }) => {
+                  const hasSelection =
+                    (key === "gender" && selectedSex !== undefined) ||
+                    (key === "mode" && selectedMode !== undefined) ||
+                    (key === "level" && selectedLevel !== undefined) ||
+                    (key === "tag" && selectedTag !== undefined) ||
+                    (key === "advanced" &&
+                      (selectedStatus !== undefined ||
+                        priceSort !== "DEFAULT"));
+                  const selecting = openFilter === key;
+                  return (
+                    <Pressable
+                      key={key}
+                      accessibilityLabel={`筛选${label}`}
+                      accessibilityState={{ selected: hasSelection }}
+                      style={styles.filterOption}
+                      onPress={() => openFilterSheet(key)}
                     >
-                      {label}
-                    </Text>
-                    <Image
-                      source={selecting ? arrowUpRedIcon : arrowDownIcon}
-                      style={styles.filterArrowIcon}
-                    />
-                  </Pressable>
-                );
-              })}
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.filterOptionText,
+                          hasSelection && styles.filterOptionTextSelected,
+                          selecting && styles.filterOptionTextSelecting,
+                        ]}
+                      >
+                        {label}
+                      </Text>
+                      <Image
+                        source={selecting ? arrowUpRedIcon : arrowDownIcon}
+                        style={styles.filterArrowIcon}
+                      />
+                    </Pressable>
+                  );
+                })}
             </View>
           }
           ListEmptyComponent={
@@ -541,6 +565,29 @@ export default function ClubDetailScreen() {
               showsVerticalScrollIndicator={false}
               style={styles.filterSheetBody}
             >
+              {openFilter === "tag" && (
+                <>
+                  <FilterOption
+                    label="不限"
+                    selected={selectedTag === undefined}
+                    onPress={() => {
+                      setSelectedTag(undefined);
+                      closeFilterSheet();
+                    }}
+                  />
+                  {tagsQuery.data?.map((tag) => (
+                    <FilterOption
+                      key={tag.id}
+                      label={tag.name}
+                      selected={selectedTag === tag.id}
+                      onPress={() => {
+                        setSelectedTag(tag.id);
+                        closeFilterSheet();
+                      }}
+                    />
+                  ))}
+                </>
+              )}
               {openFilter === "gender" && (
                 <>
                   <FilterOption

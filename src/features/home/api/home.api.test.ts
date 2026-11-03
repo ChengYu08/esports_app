@@ -1,11 +1,21 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { apiClient } from "@/core/network/api-client";
-import { fetchBanners, fetchClubOnlineCount, fetchClubPage, fetchCompanionPage, fetchGameCategories, fetchGames } from "./home.api";
+import { fetchBanners, fetchClubGameCompanionCounts, fetchClubGameModes, fetchClubOnlineCount, fetchClubPage, fetchCompanionPage, fetchGameCategories, fetchGames } from "./home.api";
 
 vi.mock("@/core/network/api-client", () => ({ apiClient: vi.fn() }));
 
 afterEach(() => vi.clearAllMocks());
+
+it("俱乐部模式筛选只包含当前俱乐部及未指定俱乐部的模式", async () => {
+  vi.mocked(apiClient).mockResolvedValue({ code: "SUCCESS", data: [
+    { id: 1, clubId: 10, modeName: "排位", status: 1 },
+    { id: 2, clubId: 20, modeName: "其他俱乐部", status: 1 },
+    { id: 3, modeName: "通用", status: 1 },
+    { id: 4, clubId: 10, modeName: "已停用", status: 0 },
+  ] });
+  expect((await fetchClubGameModes("8", "10")).map((mode) => mode.id)).toEqual([1, 3]);
+});
 
 describe("首页活动轮播下发", () => {
   it("批量查询 App 三层资源位，按楼层和素材顺序展示，不混入 PC 素材", async () => {
@@ -242,6 +252,18 @@ describe("俱乐部陪玩列表字段映射", () => {
 });
 
 describe("首页在线陪玩人数", () => {
+  it("按俱乐部和游戏获取去重后的陪玩总数", async () => {
+    vi.mocked(apiClient)
+      .mockResolvedValueOnce({ code: "SUCCESS", data: { total: 7 } })
+      .mockResolvedValueOnce({ code: "SUCCESS", data: { total: 2 } });
+    expect(await fetchClubGameCompanionCounts("1000004", [14, 15, 14])).toEqual({ 14: 7, 15: 2 });
+    expect(apiClient).toHaveBeenCalledTimes(2);
+    expect(apiClient).toHaveBeenCalledWith("/client/v1/companion/public/page", {
+      method: "POST",
+      body: { page: 1, pageSize: 1, action: { clubId: 1000004, gameId: 14 } },
+      signal: undefined,
+    });
+  });
   it("统计范围保留没有图标的启用游戏，排除停用游戏并去重", async () => {
     vi.mocked(apiClient).mockResolvedValue({ code: "SUCCESS", data: { records: [
       { id: 1000004, clubGames: [

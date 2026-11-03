@@ -247,6 +247,11 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
         params: {
           clubId: String(order.clubId || ""),
           userId: String(order.receiverUserId || ""),
+          reorderGame: order.gameName,
+          reorderMode: order.gameModeName ?? "",
+          reorderLevel: order.gameLevelName ?? "",
+          reorderService: order.orderServiceName ?? "",
+          reorderQuantity: String(order.quantity),
         },
       });
     }

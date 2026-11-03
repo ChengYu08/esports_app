@@ -56,6 +56,9 @@ export type OrderItemModel = {
   gameIcon?: ImageSource;
   serviceName: string;
   gameName: string;
+  gameModeName?: string;
+  gameLevelName?: string;
+  orderServiceName?: string;
   billingUnitName?: string;
   requestNo?: string;
   voiceTag?: string;
