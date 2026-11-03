@@ -19,7 +19,7 @@ import { validateSignature } from "@/features/mine/utils/signature-rules";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
-const SIGNATURE_MAX_LENGTH = 100;
+const SIGNATURE_MAX_LENGTH = 60;
 // 设计稿 361-40424：计数达到上限时数字变红
 const LIMIT_COLOR = "#FF4754";
 
@@ -121,7 +121,7 @@ export default function EditSignatureScreen() {
             </View>
           </View>
           <Text style={styles.hintText}>
-            {"最多100字，7天内可修改3次简介"}
+            {"最多60字，7天内可修改3次简介"}
           </Text>
         </View>
       </ScrollView>
