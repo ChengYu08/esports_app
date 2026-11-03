@@ -145,7 +145,11 @@ function normalizeMembers(
 
 function displayMessage(message: VoiceRoomMessage) {
   if (message.kind === "notice")
-    return <Text style={styles.noticeText}>{message.text}</Text>;
+    return (
+      <View style={styles.noticeBubble}>
+        <Text style={styles.noticeText}>{message.text}</Text>
+      </View>
+    );
   return (
     <View style={styles.messageRow}>
       <Text style={styles.messageName}>{message.nickname || "用户"}</Text>
@@ -270,14 +274,8 @@ export default function VoiceRoomScreen() {
     {
       id: "welcome",
       kind: "notice",
-      text: "欢迎来到语聊房，和大家一起开黑吧",
+      text: "系统：官方倡导绿色互动，请勿发布违法、低俗暴力、广告等内容，禁止违规私下交易，频道内容采取24小时人工巡查，如有任何违规信息，请及时举报，以防上当受骗！",
       sentAt: 1,
-    },
-    {
-      id: "tips",
-      kind: "system",
-      text: "房间内请文明交流，友善互动",
-      sentAt: 2,
     },
   ]);
   const [input, setInput] = useState("");
@@ -1680,11 +1678,19 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 10,
   },
-  noticeText: {
-    color: "#9EA7D1",
-    fontSize: 12,
-    lineHeight: 20,
+  noticeBubble: {
+    alignSelf: "stretch",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     marginBottom: 8,
+  },
+  noticeText: {
+    color: "#55C9D4",
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 18,
   },
   messageRow: { flexDirection: "row", marginBottom: 8, paddingRight: 12 },
   messageName: { color: "#B892FF", fontSize: 12, marginRight: 6 },
