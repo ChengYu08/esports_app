@@ -13,7 +13,6 @@ import { OrderDetailBottomBar } from "@/features/order/components/OrderDetailBot
 import { OrderDetailInfoBlocks } from "@/features/order/components/OrderDetailInfoBlocks";
 import { OrderDetailStatusBar } from "@/features/order/components/OrderDetailStatusBar";
 import { OrderFreeConfirmFlow } from "@/features/order/components/OrderFreeConfirmFlow";
-import { OrderProgressSteps } from "@/features/order/components/OrderProgressSteps";
 import { OrderReviewSheet } from "@/features/order/components/OrderReviewSheet";
 import { formatOrderFreeSummary } from "@/features/order/free-amount";
 import { useOrderDetailActions } from "@/features/order/hooks/use-order-detail-actions";
@@ -213,9 +212,6 @@ export function OrderDetailScreen({
           showDispatchCountdown={showDispatchCountdown}
           dispatchCountdown={dispatchCountdown}
         />
-        {scope === "place" && !isCancelled ? (
-          <OrderProgressSteps status={order.status} scope={scope} />
-        ) : null}
         <OrderDetailInfoBlocks
           order={order}
           scope={scope}

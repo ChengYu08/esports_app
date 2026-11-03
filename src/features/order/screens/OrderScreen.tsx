@@ -23,6 +23,7 @@ import {
   payCompanionOrder,
 } from "@/features/mine/api/companion-order.api";
 import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
+import { useHomeGames } from "@/features/home/hooks/use-home-data";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
 import { buildAfterSalePayload } from "../after-sale-card";
 import { OrderAfterSaleSheet } from "../components/OrderAfterSaleSheet";
@@ -72,6 +73,17 @@ import type {
 } from "../order.types";
 
 export default function OrderScreen() {
+  const games = useHomeGames();
+  const gameIconsByName = useMemo(() => {
+    const icons = new Map<string, string | null>();
+    for (const game of games.data ?? []) {
+      if (!game.name || !game.iconUrl) {
+        continue;
+      }
+      icons.set(game.name, icons.has(game.name) ? null : game.iconUrl);
+    }
+    return icons;
+  }, [games.data]);
   const insets = useSafeAreaInsets();
   const { scope: requestedScope } = useLocalSearchParams<{ scope?: string }>();
   const isCompanion = useAuthStore((state) => state.isCompanion);
@@ -438,6 +450,8 @@ export default function OrderScreen() {
     ({ item }: { item: OrderItemModel }) => (
       <OrderCard
         item={item}
+        scope={scope}
+        gameIcon={gameIconsByName.get(item.gameName) ? { uri: gameIconsByName.get(item.gameName)! } : undefined}
         clubName={
           item.clubName ??
           (item.clubId != null ? clubNameById[item.clubId] : undefined)
@@ -448,7 +462,7 @@ export default function OrderScreen() {
         onPaymentExpired={handlePaymentExpired}
       />
     ),
-    [clubNameById, pendingOrderId, handleOrderAction, handleOrderPress, handlePaymentExpired],
+    [clubNameById, pendingOrderId, handleOrderAction, handleOrderPress, handlePaymentExpired, scope, gameIconsByName],
   );
 
   // refetch 在 react-query 中是稳定引用，解构后作为依赖可让 memo 长效命中
