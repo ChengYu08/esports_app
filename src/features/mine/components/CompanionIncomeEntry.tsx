@@ -26,8 +26,8 @@ export const CompanionIncomeEntry = memo(function CompanionIncomeEntry({
             <Text style={[styles.unit, amountColor]}>竹子</Text>
           </View>
         </View>
-        {/* 当前的余额接口不会返回单项条目的余额，无数据时按 0 展示。 */}
-        <LedgerRow label="剩余竹子" value={format(entry.remainAmount ?? 0)} />
+        {/* 剩余竹子是该笔流水后的余额快照（balanceAfter），非当前账户总余额 */}
+        <LedgerRow label="剩余竹子" value={format(entry.balanceAfter)} />
         <LedgerRow
           label="类型"
           value={entry.transactionTypeDesc || entry.transactionType || "未知"}

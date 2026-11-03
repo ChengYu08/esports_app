@@ -1,8 +1,8 @@
 import { Copy16Regular } from "@fluentui/react-native-icons";
 import * as Clipboard from "expo-clipboard";
 import { LinearGradient } from "expo-linear-gradient";
-import { memo, type ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { memo, useEffect, useState, type ReactNode } from "react";
+import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
 import Toast from "react-native-root-toast";
 
 import {
@@ -11,6 +11,7 @@ import {
   formatStar,
 } from "@/features/order/free-amount";
 import { formatOrderTime } from "@/features/order/order-detail-format";
+import { formatPaymentCountdown, getPaymentDeadline } from "../payment-countdown";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import type {
@@ -40,6 +41,7 @@ type OrderCardProps = {
   onAction: (item: OrderItemModel, action: OrderActionKey) => void;
   onPress?: (item: OrderItemModel) => void;
   actionPending?: boolean;
+  onPaymentExpired?: () => void;
 };
 
 export const OrderCard = memo(function OrderCard({
@@ -48,7 +50,9 @@ export const OrderCard = memo(function OrderCard({
   onAction,
   onPress,
   actionPending = false,
+  onPaymentExpired,
 }: OrderCardProps) {
+  const paymentDeadline = getPaymentDeadline(item);
   const resolvedClubName = item.clubName ?? clubName;
   const freeSummary = formatOrderFreeSummary(item);
   const copyOrderNo = async () => {
@@ -205,7 +209,16 @@ export const OrderCard = memo(function OrderCard({
 
       {item.actions.length > 0 && (
         <View style={styles.actions}>
-          {item.actions.map((action) => (
+          {item.actions.map((action) => action.key === "pay" && paymentDeadline !== null ? (
+            <PaymentActionButton
+              key={`${action.key}:${paymentDeadline}`}
+              action={action}
+              deadline={paymentDeadline}
+              disabled={actionPending}
+              onPress={() => onAction(item, action.key)}
+              onExpired={onPaymentExpired}
+            />
+          ) : (
             <ActionButton
               action={action}
               key={action.key}
@@ -231,6 +244,61 @@ function OrderDetailRow({
       <Text style={styles.detailLabel}>{label}</Text>
       <View style={styles.detailContent}>{children}</View>
     </View>
+  );
+}
+
+// 每秒仅更新支付按钮，避免触发整个订单列表和卡片重渲染。
+function PaymentActionButton({
+  action,
+  deadline,
+  disabled,
+  onPress,
+  onExpired,
+}: {
+  action: OrderAction;
+  deadline: number;
+  disabled: boolean;
+  onPress: () => void;
+  onExpired?: () => void;
+}) {
+  const [now, setNow] = useState(Date.now);
+
+  useEffect(() => {
+    let expired = false;
+    const update = () => {
+      if (expired) {
+        return;
+      }
+      const current = Date.now();
+      setNow(current);
+      if (current >= deadline) {
+        expired = true;
+        clearInterval(timer);
+        onExpired?.();
+      }
+    };
+    const timer = setInterval(() => {
+      if (AppState.currentState === "active") {
+        update();
+      }
+    }, 1000);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        update();
+      }
+    });
+    return () => {
+      clearInterval(timer);
+      subscription.remove();
+    };
+  }, [deadline, onExpired]);
+
+  return (
+    <ActionButton
+      action={{ ...action, label: `${action.label} ${formatPaymentCountdown(deadline, now)}` }}
+      disabled={disabled}
+      onPress={onPress}
+    />
   );
 }
 

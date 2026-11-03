@@ -88,6 +88,9 @@ export function VoiceRoomToolbar({
           value={input}
           onChangeText={onChangeText}
           onSubmitEditing={onSend}
+          multiline
+          maxLength={1000}
+          submitBehavior="submit"
           returnKeyType="send"
           placeholder="聊聊"
           placeholderTextColor="#979799"
@@ -272,7 +275,7 @@ const styles = StyleSheet.create({
   composer: {
     flex: 1,
     minWidth: 0,
-    height: 36,
+    minHeight: 36,
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
@@ -284,8 +287,11 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     minWidth: 0,
-    height: 36,
-    padding: 0,
+    minHeight: 36,
+    maxHeight: 180,
+    paddingVertical: 9,
+    paddingHorizontal: 0,
+    textAlignVertical: "center",
     color: "#FFFFFF",
     fontSize: 12,
   },

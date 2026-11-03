@@ -1,5 +1,6 @@
-import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
+import { showToast } from "@/shared/ui/app-toast";
 import { useAuthStore } from "@esports/auth";
+import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -16,16 +17,17 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { publishQuickMatch } from "@/features/match/api/match.api";
-import { openAuditionRoom } from "@/features/match/enter-audition-room";
 import { ClubSelectSheet } from "@/features/match/components/ClubSelectSheet";
 import { FieldLabel } from "@/features/match/components/FieldLabel";
+import { MatchClubSelectChip } from "@/features/match/components/MatchClubSelectChip";
+import { MatchGameOptionChip } from "@/features/match/components/MatchGameOptionChip";
 import { MatchLinearGradient } from "@/features/match/components/MatchLinearGradient";
 import { MatchOptionChip } from "@/features/match/components/MatchOptionChip";
 import { MatchStepper } from "@/features/match/components/MatchStepper";
+import { openAuditionRoom } from "@/features/match/enter-audition-room";
 import {
   MATCH_COMPANION_PREFERENCE_OPTIONS,
   MATCH_GENDER_OPTIONS,
@@ -40,10 +42,9 @@ import {
   voiceRoomApi,
 } from "@/features/voice-room/voice-room.api";
 import type { VoiceRoomDetail } from "@/features/voice-room/voice-room.types";
-import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { AppPrompt } from "@/shared/ui/AppPrompt";
 
-const arrowDownIcon = require("../../../../assets/svgs/icon-arrow-down.svg");
 const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
 
 const BG_GRADIENT = ["#0C0C2E", "#120D2B"] as const;
@@ -314,14 +315,13 @@ export default function MatchPublishScreen() {
                       <HintText text={form.token ? "暂无可选游戏" : "请先登录"} />
                     ) : (
                       form.games.map((game) => (
-                        <MatchOptionChip
+                        <MatchGameOptionChip
                           key={game.id}
                           label={game.name}
                           icon={game.iconUrl ? { uri: game.iconUrl } : undefined}
                           iconFallback
                           selected={form.gameId === game.id}
                           onPress={() => form.selectGame(game.id)}
-                          style={styles.gameChip}
                         />
                       ))
                     )}
@@ -334,7 +334,7 @@ export default function MatchPublishScreen() {
                     {form.clubsLoading && !form.club ? (
                       <ActivityIndicator color="#FE4267" />
                     ) : (
-                      <MatchOptionChip
+                      <MatchClubSelectChip
                         label={form.club?.name ?? "请选择俱乐部"}
                         selected={Boolean(form.club)}
                         onPress={() => {
@@ -344,7 +344,6 @@ export default function MatchPublishScreen() {
                           }
                           setClubSheetVisible(true);
                         }}
-                        trailing={<Image source={arrowDownIcon} style={styles.arrowIcon} />}
                       />
                     )}
                   </View>
@@ -508,11 +507,6 @@ export default function MatchPublishScreen() {
               <View
                 style={[styles.footer, { paddingBottom: insets.bottom + FOOTER_CONTENT_BOTTOM }]}
               >
-                <View style={styles.etaRow}>
-                  <Text style={styles.etaMuted}>预计</Text>
-                  <Text style={styles.etaAccent}>30s</Text>
-                  <Text style={styles.etaMuted}>内匹配成功</Text>
-                </View>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="立即发布，匹配陪玩"
@@ -605,7 +599,6 @@ const styles = StyleSheet.create({
   },
   navTitle: {
     flex: 1,
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "600",
@@ -653,13 +646,6 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
     alignItems: "center",
-  },
-  gameChip: {
-    minWidth: 116,
-  },
-  arrowIcon: {
-    width: 16,
-    height: 16,
   },
   hintText: {
     fontFamily: DOUYIN_SANS,
@@ -712,25 +698,6 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingHorizontal: 16,
     gap: 12,
-  },
-  etaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-  },
-  etaMuted: {
-    fontFamily: DOUYIN_SANS,
-    fontSize: 12,
-    lineHeight: 18,
-    color: "rgba(255,255,255,0.6)",
-  },
-  etaAccent: {
-    fontFamily: DOUYIN_SANS,
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: "500",
-    color: "#FE4267",
   },
   publishWrap: {
     width: "100%",
