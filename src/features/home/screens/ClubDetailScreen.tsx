@@ -482,6 +482,44 @@ export default function ClubDetailScreen() {
                     key !== "tag" || (tagsQuery.data?.length ?? 0) > 0,
                 )
                 .map(({ key, label }) => {
+                  // 已选值文案：对齐大神首页筛选栏的「标签·值」展示
+                  let selectedText: string | undefined;
+                  if (key === "gender") {
+                    selectedText =
+                      selectedSex === 1
+                        ? "男"
+                        : selectedSex === 2
+                          ? "女"
+                          : undefined;
+                  } else if (key === "mode") {
+                    selectedText = modesQuery.data?.find(
+                      (mode) => mode.id === selectedMode,
+                    )?.modeName;
+                  } else if (key === "level") {
+                    selectedText = levelsQuery.data?.find(
+                      (level) => Number(level.id) === selectedLevel,
+                    )?.name;
+                  } else if (key === "tag") {
+                    selectedText = tagsQuery.data?.find(
+                      (tag) => tag.id === selectedTag,
+                    )?.name;
+                  } else if (key === "advanced") {
+                    const statusText =
+                      selectedStatus === 0
+                        ? "空闲中"
+                        : selectedStatus === 1
+                          ? "游戏中"
+                          : undefined;
+                    const priceText =
+                      priceSort === "ASC"
+                        ? "从低到高"
+                        : priceSort === "DESC"
+                          ? "从高到低"
+                          : undefined;
+                    selectedText = [statusText, priceText]
+                      .filter(Boolean)
+                      .join("/");
+                  }
                   const hasSelection =
                     (key === "gender" && selectedSex !== undefined) ||
                     (key === "mode" && selectedMode !== undefined) ||
@@ -494,7 +532,11 @@ export default function ClubDetailScreen() {
                   return (
                     <Pressable
                       key={key}
-                      accessibilityLabel={`筛选${label}`}
+                      accessibilityLabel={
+                        hasSelection && selectedText
+                          ? `筛选${label}，已选${selectedText}`
+                          : `筛选${label}`
+                      }
                       accessibilityState={{ selected: hasSelection }}
                       style={styles.filterOption}
                       onPress={() => openFilterSheet(key)}
@@ -507,7 +549,7 @@ export default function ClubDetailScreen() {
                           selecting && styles.filterOptionTextSelecting,
                         ]}
                       >
-                        {label}
+                        {hasSelection && selectedText ? selectedText : label}
                       </Text>
                       <Image
                         source={selecting ? arrowUpRedIcon : arrowDownIcon}
@@ -1144,13 +1186,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   filterOption: {
+    // 筛选项等分屏幕宽度，防止某项文案过长挤压其他选项；超长文案由 numberOfLines 截断
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 2,
     paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     minWidth: 0,
   },
   filterOptionText: {
