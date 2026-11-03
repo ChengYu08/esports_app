@@ -113,15 +113,16 @@ export default function ProfileScreen() {
   const [coverHeight, setCoverHeight] = useState(0);
   const [compactActive, setCompactActive] = useState(false);
   const scrollY = useMemo(() => new Animated.Value(0), []);
-  // 紧凑头部淡入区间：安全区下方封面剩余 136→44px（92px 行程），滚动驱动走原生线程，
-  // 避免 JS 层每帧 setValue。封面未布局完成前恒为 0，防止紧凑头部闪现。
-  const fadeStart = coverHeight - insets.top - 136;
+  // 紧凑头部切换阈值：列表内标签行（两侧圆角的技能/评价栏）与固定标签行对齐时立刻切换。
+  // 用 1px 行程做原生驱动的阶跃淡入淡出，达到阈值即默认头部马上隐藏、紧凑头部马上出现，
+  // 不做渐变过渡（渐变会在两头部间产生同屏叠显）。封面未布局完成前恒为 0，防止闪现。
+  const fadeStart = coverHeight - insets.top - NAV_BAR_CONTENT_HEIGHT;
   const headerFade = useMemo(
     () =>
       coverHeight === 0
         ? new Animated.Value(0)
         : scrollY.interpolate({
-            inputRange: [fadeStart, fadeStart + 92],
+            inputRange: [fadeStart - 1, fadeStart],
             outputRange: [0, 1],
             extrapolate: "clamp",
           }),
@@ -135,7 +136,7 @@ export default function ProfileScreen() {
         listener: (event: {
           nativeEvent: { contentOffset: { y: number } };
         }) => {
-          const active = event.nativeEvent.contentOffset.y >= fadeStart + 92;
+          const active = event.nativeEvent.contentOffset.y >= fadeStart;
           setCompactActive((prev) => (prev === active ? prev : active));
         },
       }),
@@ -940,6 +941,7 @@ const ProfileCover = memo(function ProfileCover({
   onMeasure: (height: number) => void;
 }) {
   const [introExpanded, setIntroExpanded] = useState(false);
+  const [introOverflows, setIntroOverflows] = useState(false);
   return (
     <View
       style={[
@@ -1015,10 +1017,16 @@ const ProfileCover = memo(function ProfileCover({
           numberOfLines={introExpanded ? undefined : 2}
           ellipsizeMode="tail"
           style={styles.headerIntro}
+          onTextLayout={(event) => {
+            // 收起态下可见行数达到 2 行说明被截断，此时才展示展开/收起按钮
+            if (introExpanded) return;
+            const overflows = event.nativeEvent.lines.length >= 2;
+            setIntroOverflows((prev) => (prev === overflows ? prev : overflows));
+          }}
         >
           {profile.signature || "暂无个人简介"}
         </Text>
-        {profile.signature ? (
+        {profile.signature && (introExpanded || introOverflows) ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={introExpanded ? "收起简介" : "展开简介"}
@@ -1115,6 +1123,17 @@ function ProfileIdentity({
           ) : null}
         </View>
         <View style={styles.idClubRow}>
+          {profile.tagName ? (
+            <View
+              accessibilityLabel={`大神标签：${profile.tagName}`}
+              style={[
+                styles.companionTag,
+                { backgroundColor: profile.tagColor || "#C0C4CC" },
+              ]}
+            >
+              <Text style={styles.companionTagText}>{profile.tagName}</Text>
+            </View>
+          ) : null}
           {profile.clubId > 0 ? (
             <Pressable
               style={styles.clubLine}
@@ -1423,6 +1442,8 @@ function toLocalProfile(
     orderCount: 0,
     onlineStatus: 0,
     gameStatus: 0,
+    tagName: "",
+    tagColor: "",
     games: [],
   };
 }
@@ -1709,6 +1730,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
+  // 大神标签：与陪玩卡片标签保持一致的尺寸与排版
+  companionTag: {
+    borderRadius: 2,
+    paddingHorizontal: 2,
+    height: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  companionTagText: {
+    color: "#FFF",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: "500",
+    includeFontPadding: false,
+    textAlignVertical: "center",
+  },
   idRow: {
     color: "rgba(255,255,255,0.6)",
     fontFamily: DOUYIN_SANS,
@@ -1830,7 +1868,9 @@ const styles = StyleSheet.create({
     borderRadius: 1.5,
     backgroundColor: "#FE1F4C",
   },
-  gameTags: { flexDirection: "row", gap: 10, marginTop: 12, paddingRight: 16 },
+  // paddingBottom 1：部分 Android 屏幕密度下 32dp 取整后最后 1px 物理行落在
+  // 横向 ScrollView 裁剪区外，选中态的圆角边框底部会被裁掉，留 1px 余量兼容
+  gameTags: { flexDirection: "row", gap: 10, marginTop: 12, paddingRight: 16, paddingBottom: 1 },
   gameTag: {
     height: 32,
     paddingHorizontal: 6,

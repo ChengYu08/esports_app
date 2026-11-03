@@ -42,6 +42,11 @@ type ApiProfileDetail = {
   orderCount?: number;
   onlineStatus?: number;
   gameStatus?: number;
+  tagId?: number;
+  tagName?: string;
+  tagIconUrl?: string;
+  tagBackgroundColor?: string;
+  tagMobileBackgroundColor?: string;
   games?: ApiProfileGame[];
 };
 
@@ -129,6 +134,9 @@ function mapProfileDetail(data: ApiProfileDetail): ProfileDetail {
     orderCount: data.orderCount ?? 0,
     onlineStatus: data.onlineStatus ?? 0,
     gameStatus: data.gameStatus ?? 0,
+    tagName: data.tagName || "",
+    // 与大神列表实际展示一致：列表接口对冯nimo 仅返回 tagBackgroundColor，详情若优先取移动端色会出现色调不一致
+    tagColor: data.tagBackgroundColor || data.tagMobileBackgroundColor || "",
     games: (data.games ?? [])
       .filter((game) => game.gameId !== undefined)
       .map((game) => ({
