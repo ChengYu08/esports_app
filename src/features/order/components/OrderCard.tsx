@@ -262,17 +262,19 @@ function PaymentActionButton({
   onExpired?: () => void;
 }) {
   const [now, setNow] = useState(Date.now);
+  const [expired, setExpired] = useState(false);
 
   useEffect(() => {
-    let expired = false;
+    let stopped = false;
     const update = () => {
-      if (expired) {
+      if (stopped) {
         return;
       }
       const current = Date.now();
       setNow(current);
       if (current >= deadline) {
-        expired = true;
+        stopped = true;
+        setExpired(true);
         clearInterval(timer);
         onExpired?.();
       }
@@ -296,7 +298,7 @@ function PaymentActionButton({
   return (
     <ActionButton
       action={{ ...action, label: `${action.label} ${formatPaymentCountdown(deadline, now)}` }}
-      disabled={disabled}
+      disabled={disabled || expired}
       onPress={onPress}
     />
   );

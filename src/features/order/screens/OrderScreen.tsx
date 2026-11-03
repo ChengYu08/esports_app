@@ -64,6 +64,7 @@ import {
   multiCompanionNeedSelect,
   needsMultiCompanionSelect,
 } from "../multi-companion";
+import { getPaymentDeadline } from "../payment-countdown";
 import type {
   OrderActionKey,
   OrderFilter,
@@ -165,10 +166,36 @@ export default function OrderScreen() {
         ? "暂无订单"
         : `暂无${visibleFilter === "inProgress" ? "进行中" : visibleFilter === "completed" ? "已完成" : "已取消"}订单`;
 
+  const handlePaymentExpired = useCallback(() => {
+    // 同时到期的订单复用进行中的列表请求，状态以服务端结果为准。
+    // 服务端延迟消息关单比客户端倒计时归零晚几秒，一次重拉可能抢在关单前，错峰补拉两轮。
+    const refetch = () =>
+      queryClient
+        .refetchQueries(
+          {
+            queryKey: ["orders", scope, visibleFilter, currentUserId],
+            exact: true,
+            type: "active",
+          },
+          { cancelRefetch: false },
+        )
+        .catch(() => undefined);
+    refetch();
+    setTimeout(refetch, 4000);
+    setTimeout(refetch, 12000);
+  }, [scope, visibleFilter, currentUserId]);
+
   // 用 useCallback 固定回调引用，保证 OrderCard 的 memo 不被每次渲染的新闭包击穿
   const handleOrderAction = useCallback(
     async (item: OrderItemModel, action: OrderActionKey) => {
     if (action === "pay") {
+      const deadline = getPaymentDeadline(item);
+      if (deadline !== null && Date.now() >= deadline) {
+        // 已过支付截止时间：服务端自动关单有秒级延迟，刷新列表取已取消状态
+        showToast("订单支付已超时");
+        handlePaymentExpired();
+        return;
+      }
       setPayTarget(item);
       return;
     }
@@ -272,7 +299,7 @@ export default function OrderScreen() {
         },
       });
     },
-    [token, currentUser],
+    [token, currentUser, handlePaymentExpired],
   );
 
   /** 一单多陪选人确认：提交参与陪玩后立即开始服务，就地刷新该单卡片 */
@@ -400,14 +427,6 @@ export default function OrderScreen() {
     },
     [scope],
   );
-
-  const handlePaymentExpired = useCallback(() => {
-    // 同时到期的订单复用进行中的列表请求，状态以服务端结果为准。
-    queryClient.refetchQueries(
-      { queryKey: ["orders", scope, visibleFilter, currentUserId], exact: true, type: "active" },
-      { cancelRefetch: false },
-    ).catch(() => undefined);
-  }, [scope, visibleFilter, currentUserId]);
 
   // renderItem 稳定引用 + 空态收敛到 useMemo，避免无关重渲染波及列表
   const renderOrderItem = useCallback(
