@@ -1,3 +1,4 @@
+import { Image, type ImageSource } from "expo-image";
 import type { ReactNode } from "react";
 import {
   Pressable,
@@ -7,9 +8,6 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import { Image, type ImageSource } from "expo-image";
-
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 type MatchOptionChipProps = {
   label: string;
@@ -57,18 +55,19 @@ export function MatchOptionChip({
 
 const styles = StyleSheet.create({
   chip: {
-    minHeight: 40,
+    height: 32,
+    minWidth: 72,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
+    gap: 2,
     paddingHorizontal: 12,
-    paddingVertical: 8,
     borderRadius: 4,
     backgroundColor: "rgba(255,255,255,0.1)",
     borderWidth: 0.5,
     borderColor: "transparent",
     flexShrink: 0,
+    overflow: "hidden",
   },
   chipSelected: {
     borderColor: "#FE4267",
@@ -87,22 +86,21 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.15)",
   },
   iconInitial: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 16,
     fontWeight: "600",
     color: "rgba(255,255,255,0.85)",
   },
   label: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: "400",
     color: "rgba(255,255,255,0.6)",
+    textAlign: "center",
     flexShrink: 0,
   },
   labelSelected: {
     fontWeight: "500",
-    color: "#FFFFFF",
+    color: "#F5F6F7",
   },
 });
