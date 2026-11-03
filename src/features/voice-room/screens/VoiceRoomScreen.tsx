@@ -38,7 +38,6 @@ import { VoiceRoomConversationsSheet } from "../components/VoiceRoomConversation
 import { VoiceRoomExitDialog } from "../components/VoiceRoomExitDialog";
 import { VoiceRoomMemberSheet } from "../components/VoiceRoomMemberSheet";
 import { VoiceRoomMicBadge } from "../components/VoiceRoomMicrophone";
-import { VoiceRoomSpeakingHalo } from "../components/VoiceRoomSpeakingHalo";
 import { VoiceRoomSpeakingWaves } from "../components/VoiceRoomSpeakingWaves";
 import { VoiceRoomToolbar } from "../components/VoiceRoomToolbar";
 import { exitVoiceRoom } from "../exit-voice-room";
@@ -77,7 +76,6 @@ const closeIcon = require("../../../../assets/voice-room/navbar-exit.svg");
 const inviteIcon = require("../../../../assets/voice-room/toolbar-invite.svg");
 const invitePlaceholderIcon = require("../../../../assets/voice-room/game.svg");
 const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
-const ringOwner = require("../../../../assets/voice-room/ring-owner.svg");
 
 function avatarSource(member: VoiceRoomMember) {
   const avatar = member.avatar?.trim();
@@ -91,7 +89,6 @@ function avatarSource(member: VoiceRoomMember) {
 const MemberSlot = memo(function MemberSlot({
   member,
   columns,
-  ring,
   micOpen,
   speaking,
   inviteLabel,
@@ -99,7 +96,6 @@ const MemberSlot = memo(function MemberSlot({
 }: {
   member: VoiceRoomMember;
   columns: number;
-  ring?: number;
   micOpen: boolean;
   speaking: boolean;
   inviteLabel: string;
@@ -119,8 +115,6 @@ const MemberSlot = memo(function MemberSlot({
       onPress={() => onPress(member)}
     >
       <View style={styles.avatarWrap}>
-        {!invite ? <VoiceRoomSpeakingHalo active={speaking} /> : null}
-        {ring ? <Image source={ring} style={styles.ring} /> : null}
         {invite ? (
           <View style={styles.inviteAvatar}>
             <Image
@@ -865,12 +859,6 @@ export default function VoiceRoomScreen() {
   };
 
   const seatSlots = members.map((member, index) => {
-    const invite = member.userId === "invite";
-    const ring = invite
-      ? undefined
-      : member.role === "owner"
-        ? ringOwner
-        : undefined;
     const micOpen =
       rtcReady &&
       (member.userId === String(currentUser?.id)
@@ -884,7 +872,6 @@ export default function VoiceRoomScreen() {
         key={`${member.userId}-${index}`}
         member={member}
         columns={memberColumns}
-        ring={ring}
         micOpen={micOpen}
         speaking={speaking}
         inviteLabel={inviteSlotLabel}
@@ -1100,7 +1087,6 @@ const styles = StyleSheet.create({
     overflow: "visible",
   },
   avatar: { width: 48, height: 48, borderRadius: 24 },
-  ring: { position: "absolute", width: 58, height: 58 },
   inviteAvatar: {
     width: 48,
     height: 48,
