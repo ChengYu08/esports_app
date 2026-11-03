@@ -71,7 +71,6 @@ import { createProfileAvatarPreviewParams } from "@/features/mine/profile-avatar
 import { createProfileChatParams } from "@/features/mine/profile-chat";
 import { calculateAge } from "@/features/mine/profile-utils";
 import { invalidateOrderQueries } from "@/features/order/order-query";
-import { cancelOrder } from "@/features/order/order.api";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { requireLogin } from "@/shared/navigation/require-login";
@@ -165,10 +164,6 @@ export default function ProfileScreen() {
     userId: "",
     isBlacklisted: false,
   });
-  const [paymentCancelError, setPaymentCancelError] = useState<string | null>(
-    null,
-  );
-  const paymentCancelingRef = useRef(false);
   const chatCheckPendingRef = useRef(false);
   const { entering: enteringCS, openCustomerService } =
     useCustomerServiceEntry();
@@ -891,7 +886,10 @@ export default function ProfileScreen() {
           visible={paymentSheetVisible}
           token={useAuthStore.getState().accessToken}
           onClose={() => {
-            void cancelPendingPaymentOrder();
+            const orderId = paymentOrder.orderId;
+            setPaymentSheetVisible(false);
+            setPaymentOrder(null);
+            invalidateOrderQueries(orderId);
           }}
           onPaid={() => {
             const paidOrderId = paymentOrder.orderId;
@@ -913,37 +911,9 @@ export default function ProfileScreen() {
         message={paymentError ?? ""}
         onConfirm={() => setPaymentError(null)}
       />
-      <AppPrompt
-        visible={Boolean(paymentCancelError)}
-        title="订单取消失败"
-        message={paymentCancelError ?? ""}
-        onConfirm={() => setPaymentCancelError(null)}
-      />
     </View>
   );
 
-  async function cancelPendingPaymentOrder() {
-    const pendingOrder = paymentOrder;
-    const token = useAuthStore.getState().accessToken;
-    if (paymentCancelingRef.current) return;
-    setPaymentSheetVisible(false);
-    setPaymentOrder(null);
-    if (!pendingOrder || !token) return;
-    paymentCancelingRef.current = true;
-    try {
-      await cancelOrder(String(pendingOrder.orderId), token);
-      void invalidateOrderQueries(pendingOrder.orderId);
-    } catch (error) {
-      setPaymentOrder(null);
-      // The payment sheet is already dismissed; surface a cancellation error
-      // without allowing the user to retry payment for the same order.
-      setPaymentCancelError(
-        error instanceof Error ? error.message : "订单取消失败",
-      );
-    } finally {
-      paymentCancelingRef.current = false;
-    }
-  }
 }
 
 // 头部标签栏独立组件：滚动阈值切换等无关重渲染时保持元素引用稳定
