@@ -249,6 +249,7 @@ export default function VoiceRoomScreen() {
     messageKeyExtractor,
     handleMessageScroll,
     handleMessageContentSizeChange,
+    followLatestMessage,
   } = useVoiceRoomMessages(roleByUserId);
 
   const isOwner =
@@ -735,6 +736,7 @@ export default function VoiceRoomScreen() {
   const sendMessage = async () => {
     const text = input.trim();
     if (!text) return;
+    followLatestMessage();
     setInput("");
     const local = {
       id: `local-${Date.now()}`,
@@ -964,6 +966,7 @@ export default function VoiceRoomScreen() {
             onScroll={handleMessageScroll}
             scrollEventThrottle={16}
             onContentSizeChange={handleMessageContentSizeChange}
+            onLayout={handleMessageContentSizeChange}
           />
         </View>
 

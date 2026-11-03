@@ -1,5 +1,5 @@
 import { complaintStyles } from "@/features/court/complaint.styles";
-import { preparePickedEvidenceImage } from "@/features/court/court-evidence-image";
+import { EvidenceImageTooLargeError, preparePickedEvidenceImage } from "@/features/court/court-evidence-image";
 import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
@@ -66,17 +66,26 @@ export function useEvidenceImages(
       }
       const picked: UploadItem[] = [];
       let failed = 0;
+      let tooLarge = 0;
       for (const imageUri of pickedUris) {
         try {
           picked.push(await preparePickedEvidenceImage(imageUri));
-        } catch {
-          failed += 1;
+        } catch (error) {
+          if (error instanceof EvidenceImageTooLargeError) {
+            tooLarge += 1;
+          } else {
+            failed += 1;
+          }
         }
       }
       checkAccountRef.current();
       setImages((current) => [...current, ...picked].slice(0, MAX_IMAGES));
-      if (failed > 0) {
-        showToast(`${failed}张图片无法读取或转换，请重新选择或截图后上传`, {
+      if (failed > 0 || tooLarge > 0) {
+        const reasons = [
+          tooLarge > 0 ? `${tooLarge}张图片超过10MB` : "",
+          failed > 0 ? `${failed}张图片无法读取或转换` : "",
+        ].filter(Boolean).join("，");
+        showToast(`${reasons}，请重新选择`, {
           duration: toastDurations.LONG,
         });
       }

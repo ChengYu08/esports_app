@@ -3,11 +3,22 @@ import test from "node:test";
 import {
   createCompanionManagementApi,
   formatManagementNumber,
+  sortManagedServices,
   walletNextPage,
 } from "./companion-management.contract.ts";
 
 const context = { userId: "51", clubId: "100", gameId: "8" };
 const token = "test-session";
+test("服务开关变化和接口返回顺序不改变展示排序", () => {
+  const services = [
+    { companionServiceId: 3, price: 30, status: 1 },
+    { companionServiceId: 2, price: 10, status: 0 },
+    { companionServiceId: 1, price: 10, status: 1 },
+  ];
+  const ids = (items) => sortManagedServices(items).map((item) => item.companionServiceId);
+  assert.deepEqual(ids(services), [1, 2, 3]);
+  assert.deepEqual(ids(services.toReversed().map((item) => ({ ...item, status: 1 - item.status }))), [1, 2, 3]);
+});
 function setup(data) {
   const calls = [];
   const api = createCompanionManagementApi(async (path, options) => {
