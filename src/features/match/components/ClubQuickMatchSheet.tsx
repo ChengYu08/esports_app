@@ -610,7 +610,7 @@ export function ClubQuickMatchSheet({
           ) : null}
 
           <View style={[styles.field, styles.fieldCenter]}>
-            <LightFieldLabel label="备注" required />
+            <LightFieldLabel label="备注" />
             <View style={styles.remarkBox}>
               <TextInput
                 value={form.remark}

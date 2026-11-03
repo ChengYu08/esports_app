@@ -38,14 +38,14 @@ const RING_PATH_INSET = RING_STROKE / 2;
 
 /** 雷达头像位置 */
 const DECOR_SLOTS = [
-  { left: 64, top: 13, size: 56, bordered: true },
-  { left: 220, top: 77, size: 58 },
-  { left: 182, top: 26, size: 24 },
-  { left: 182, top: 198, size: 29 },
-  { left: 249, top: 170, size: 20 },
-  { left: 18, top: 204, size: 20 },
-  { left: 2, top: 102, size: 40 },
-  { left: 64, top: 213, size: 52 },
+  { left: 64, top: 13, size: 56, bordered: true, source: require("../../../../assets/images/radar-avatar-1.png") },
+  { left: 220, top: 77, size: 58, source: require("../../../../assets/images/radar-avatar-2.png") },
+  { left: 182, top: 26, size: 24, source: require("../../../../assets/images/radar-avatar-3.png") },
+  { left: 182, top: 198, size: 29, source: require("../../../../assets/images/radar-avatar-4.png") },
+  { left: 249, top: 170, size: 20, source: require("../../../../assets/images/radar-avatar-5.png") },
+  { left: 18, top: 204, size: 20, source: require("../../../../assets/images/radar-avatar-6.png") },
+  { left: 2, top: 102, size: 40, source: require("../../../../assets/images/radar-avatar-7.png") },
+  { left: 64, top: 213, size: 52, source: require("../../../../assets/images/radar-avatar-8.png") },
 ] as const;
 
 /** 扩散圈从中心 logo 外圈扩到雷达外缘的缩放起点（logo 直径 76） */
@@ -60,7 +60,6 @@ type MatchingWaitingViewProps = {
   countdownSec: number;
   /** 发布页选中的游戏；无 icon 时显示名称首字 */
   game?: Pick<MatchGame, "name" | "iconUrl"> | null;
-  avatars?: readonly { userId: number; headImage: string }[];
   onCancel?: () => void;
 };
 
@@ -186,11 +185,9 @@ function RadarSweep() {
 function DecorAvatar({
   slot,
   index,
-  uri,
 }: {
   slot: (typeof DECOR_SLOTS)[number];
   index: number;
-  uri: string;
 }) {
   const floatOffset = useSharedValue(0);
 
@@ -227,7 +224,7 @@ function DecorAvatar({
     >
       <Animated.View style={floatStyle}>
         <Image
-          source={{ uri }}
+          source={slot.source}
           style={[
             styles.decorAvatar,
             "bordered" in slot && slot.bordered ? styles.decorAvatarBorder : null,
@@ -327,7 +324,6 @@ export function MatchingWaitingView({
   countdownText,
   countdownSec,
   game,
-  avatars = [],
   onCancel,
 }: MatchingWaitingViewProps) {
   const insets = useSafeAreaInsets();
@@ -354,8 +350,8 @@ export function MatchingWaitingView({
             <RadarRipple delay={1600} />
           </View>
 
-          {avatars.slice(0, DECOR_SLOTS.length).map((avatar, index) => (
-            <DecorAvatar key={avatar.userId} slot={DECOR_SLOTS[index]} index={index} uri={avatar.headImage} />
+          {DECOR_SLOTS.map((slot, index) => (
+            <DecorAvatar key={index} slot={slot} index={index} />
           ))}
 
           <View style={styles.logoWrap}>
