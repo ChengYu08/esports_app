@@ -32,6 +32,12 @@ export type OrderAction = {
   variant: "primary" | "secondary";
 };
 
+export type MultiCompanionCandidateModel = {
+  userId: string;
+  nickname?: string;
+  headImage?: string;
+};
+
 export type OrderItemModel = {
   id: string;
   orderNo?: string;
@@ -57,10 +63,12 @@ export type OrderItemModel = {
   unitPrice: string;
   quantity: number;
   totalPrice: string;
-  /** 已免单的星钻金额，来自订单退款信息 */
+  /** 已免单的钻石金额，来自订单退款信息 */
   freeAmount?: string;
   remark?: string;
   createTime?: string;
+  /** 待支付订单的支付截止时间，优先使用服务端值 */
+  payDeadline?: string;
   paidTime?: string;
   acceptedTime?: string;
   dispatchTime?: string;
@@ -68,6 +76,12 @@ export type OrderItemModel = {
   serviceStartTime?: string;
   serviceEndTime?: string;
   completedTime?: string;
+  /** 是否一单多陪 */
+  multiCompanion?: boolean;
+  /** 一单多陪总人数（含主单，2~4） */
+  multiCompanionCount?: number;
+  /** 参与陪玩（不含主单）；未选满时开始服务需先弹选人 */
+  companions?: MultiCompanionCandidateModel[];
   actions: readonly OrderAction[];
 };
 

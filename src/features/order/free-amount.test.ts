@@ -28,7 +28,7 @@ describe("computeOrderPayableStars", () => {
     expect(computeOrderPayableStars({ totalPrice: "800", freeAmount: "900" })).toBe(0);
   });
 
-  it("小数金额按星钻精度计算，无效金额不显示为 NaN", () => {
+  it("小数金额按钻石精度计算，无效金额不显示为 NaN", () => {
     expect(computeOrderPayableStars({ totalPrice: "9.99", freeAmount: "0.3" })).toBe(9.69);
     expect(computeOrderPayableStars({ totalPrice: "未知" })).toBe(0);
   });
@@ -53,7 +53,7 @@ describe("computeFreeUnitPrice", () => {
 });
 
 describe("computeFreeStarAmount", () => {
-  it("时长乘单价换算星钻", () => {
+  it("时长乘单价换算钻石", () => {
     expect(computeFreeStarAmount(order, 1.5)).toBe(30);
   });
 

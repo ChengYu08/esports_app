@@ -323,12 +323,12 @@ export default function MineScreen() {
           <View style={styles.stats}>
             <Pressable
               accessibilityRole="link"
-              accessibilityLabel="星钻余额，点击充值"
+              accessibilityLabel="钻石余额，点击充值"
               onPress={openStarRecharge}
               style={styles.stat}
             >
               <Text style={styles.statValue}>{user?.starBalance ?? "--"}</Text>
-              <Text style={styles.statLabel}>星钻</Text>
+              <Text style={styles.statLabel}>钻石</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"

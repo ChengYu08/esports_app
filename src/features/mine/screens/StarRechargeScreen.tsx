@@ -78,14 +78,14 @@ export default function StarRechargeScreen() {
     refreshBalance();
     setPrompt({
       title: "充值成功",
-      message: "星钻已到账，可用于平台服务消费。",
+      message: "钻石已到账，可用于平台服务消费。",
     });
   }, [refreshBalance]);
 
   const handlePending = useCallback(() => {
     setPrompt({
       title: "充值处理中",
-      message: "系统将自动补发，请稍后查询星钻余额。",
+      message: "系统将自动补发，请稍后查询钻石余额。",
     });
   }, []);
 
@@ -171,7 +171,7 @@ export default function StarRechargeScreen() {
       />
 
       <ScreenHeader
-        title="星钻充值"
+        title="钻石充值"
         onBack={() => router.back()}
         backgroundColor="transparent"
         backIconColor="#0D0D0F"
@@ -183,7 +183,7 @@ export default function StarRechargeScreen() {
         <Text style={styles.balanceValue}>
           {balance === null ? "--" : formatAmount(balance)}
         </Text>
-        <Text style={styles.balanceLabel}>我的星钻余额</Text>
+        <Text style={styles.balanceLabel}>我的钻石余额</Text>
       </View>
 
       <View style={styles.contentSection}>
@@ -194,12 +194,12 @@ export default function StarRechargeScreen() {
               <>
                 还需充值{" "}
                 <Text style={styles.shortfallValue}>
-                  {formatAmount(shortfall)}星钻
+                  {formatAmount(shortfall)}钻石
                 </Text>{" "}
                 以购买本次服务
               </>
             ) : (
-              "星钻可用于平台服务消费"
+              "钻石可用于平台服务消费"
             )}
           </Text>
         </View>
@@ -321,7 +321,7 @@ function RechargeOption({
     <Pressable
       accessibilityRole="radio"
       accessibilityState={{ selected }}
-      accessibilityLabel={`${diamonds} 星钻，${price}`}
+      accessibilityLabel={`${diamonds} 钻石，${price}`}
       onPress={onPress}
       style={[styles.packageCard, selected && styles.packageCardSelected]}
     >

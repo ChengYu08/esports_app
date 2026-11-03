@@ -24,7 +24,8 @@ export const ClubSearchCard = memo(function ClubSearchCard({
   const matchesId = /^\d+$/.test(keyword) && clubId.includes(keyword);
   const openClub = () => {
     onSelect(club);
-    router.push({ pathname: "/club/[id]", params: { id: club.id } });
+    // fromSearch 标记来自搜索页，俱乐部页再点搜索时弹回该搜索页，避免无限套娃
+    router.push({ pathname: "/club/[id]", params: { id: club.id, fromSearch: "1" } });
   };
 
   return (

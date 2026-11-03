@@ -1,29 +1,27 @@
-import { ChevronLeft24Regular, Search24Regular } from "@fluentui/react-native-icons";
-import { useAuthStore } from "@esports/auth";
-import { useQuery } from "@tanstack/react-query";
-import { useVoicePlayer } from "@/shared/audio/use-voice-player";
-import { SYSTEM_FONT } from "@/shared/theme/typography";
-import { EmptyState, ErrorState } from "@/shared/ui/AsyncStates";
-import { CachedImage } from "@/shared/ui/CachedImage";
-import { CompanionCard } from "@/shared/ui/CompanionCard";
-import { fetchClubGameLevels } from "@/features/match/api/match.api";
 import {
   ClubDetailMemberSkeletonList,
   ClubDetailSkeleton,
 } from "@/features/home/components/ClubDetailSkeleton";
+import { fetchClubGameLevels } from "@/features/match/api/match.api";
 import { ClubQuickMatchSheet } from "@/features/match/components/ClubQuickMatchSheet";
-import { useCustomerDispatch } from "@/features/voice-room/use-customer-dispatch";
 import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
+import { useCustomerDispatch } from "@/features/voice-room/use-customer-dispatch";
+import { useVoicePlayer } from "@/shared/audio/use-voice-player";
+import { SYSTEM_FONT } from "@/shared/theme/typography";
+import { showToast } from "@/shared/ui/app-toast";
+import { EmptyState, ErrorState } from "@/shared/ui/AsyncStates";
+import { CachedImage } from "@/shared/ui/CachedImage";
+import { CompanionCard } from "@/shared/ui/CompanionCard";
+import { useAuthStore } from "@esports/auth";
+import {
+  ChevronLeft24Regular,
+  Search24Regular,
+} from "@fluentui/react-native-icons";
+import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Easing,
@@ -36,7 +34,6 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Companion, CompanionFilters, GameKey } from "../api/home.types";
 import {
@@ -90,7 +87,17 @@ const memberKeyExtractor = (member: Companion) => String(member.profileId);
 
 export default function ClubDetailScreen() {
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { height: windowHeight } = useWindowDimensions();
+  const { id, fromUserId, fromSearch } = useLocalSearchParams<{
+    id?: string;
+    fromUserId?: string | string[];
+    fromSearch?: string | string[];
+  }>();
+  const fromClubUserId =
+    typeof fromUserId === "string" && fromUserId.trim()
+      ? fromUserId
+      : undefined;
+  const fromSearchPage = fromSearch === "1";
   const [game, setGame] = useState<GameKey>("");
   // 简介展开状态：默认收起两行，点击右下角按钮切换
   const [introExpanded, setIntroExpanded] = useState(false);
@@ -113,7 +120,9 @@ export default function ClubDetailScreen() {
   const club = clubQuery.data;
   const games = club?.games ?? [];
   const selectedGame = game || String(games[0]?.id ?? "");
-  const selectedGameInfo = games.find((item) => String(item.id) === selectedGame);
+  const selectedGameInfo = games.find(
+    (item) => String(item.id) === selectedGame,
+  );
   const modesQuery = useClubGameModes(selectedGame);
   // 等级列表依赖已选模式（接口按 gameModeId 查询），且需要登录态
   const levelsQuery = useQuery({
@@ -221,15 +230,32 @@ export default function ClubDetailScreen() {
         voiceDurationSeconds={item.voiceDurationSeconds ?? null}
         voicePlayingUrl={voicePlayer.playingUrl}
         onToggleVoice={voicePlayer.toggle}
-        onPress={() =>
+        onPress={() => {
+          if (fromClubUserId && fromClubUserId === String(item.userId)) {
+            router.back();
+            return;
+          }
           router.push({
             pathname: "/profile",
-            params: { clubId, userId: String(item.userId) },
-          })
-        }
+            params: {
+              clubId,
+              userId: String(item.userId),
+              fromClubId: clubId,
+              ...(fromSearchPage ? { fromSearch: "1" } : {}),
+            },
+          });
+        }}
       />
     ),
-    [clubId, selectedGameInfo?.iconUrl, selectedGameInfo?.name, voicePlayer.playingUrl, voicePlayer.toggle],
+    [
+      clubId,
+      fromClubUserId,
+      fromSearchPage,
+      selectedGameInfo?.iconUrl,
+      selectedGameInfo?.name,
+      voicePlayer.playingUrl,
+      voicePlayer.toggle,
+    ],
   );
   // 性别/状态/价格筛选的当前值，统一映射到接口参数
   function openFilterSheet(filter: FilterKey) {
@@ -278,10 +304,7 @@ export default function ClubDetailScreen() {
 
   if (clubQuery.isLoading) {
     return (
-      <ClubDetailSkeleton
-        topInset={insets.top}
-        bottomInset={insets.bottom}
-      />
+      <ClubDetailSkeleton topInset={insets.top} bottomInset={insets.bottom} />
     );
   }
   if (clubQuery.isError || !club) {
@@ -298,7 +321,15 @@ export default function ClubDetailScreen() {
         pointerEvents="none"
       />
       {/* 导航栏：返回 + 搜索 + 客服 */}
-      <View style={[styles.nav, { paddingTop: insets.top, height: insets.top + NAV_BAR_CONTENT_HEIGHT }]}>
+      <View
+        style={[
+          styles.nav,
+          {
+            paddingTop: insets.top,
+            height: insets.top + NAV_BAR_CONTENT_HEIGHT,
+          },
+        ]}
+      >
         <Pressable
           accessibilityLabel="返回"
           hitSlop={10}
@@ -310,12 +341,20 @@ export default function ClubDetailScreen() {
           <Pressable
             accessibilityLabel="搜索"
             hitSlop={10}
-            onPress={() =>
+            onPress={() => {
+              // 搜索页已在栈内时弹回它，避免 搜索/俱乐部/个人主页 反复跳转无限套娃
+              if (fromSearchPage) {
+                router.dismissTo({
+                  pathname: "/search",
+                  params: { type: "user", clubId: club.id },
+                });
+                return;
+              }
               router.push({
                 pathname: "/search",
                 params: { type: "user", clubId: club.id },
-              })
-            }
+              });
+            }}
           >
             <Search24Regular color={COLORS.white} width={24} height={24} />
           </Pressable>
@@ -403,63 +442,63 @@ export default function ClubDetailScreen() {
       <View style={styles.listWrap}>
         <FlatList
           data={members}
-        keyExtractor={memberKeyExtractor}
-        renderItem={renderMember}
-        ItemSeparatorComponent={MemberCardSeparator}
-        initialNumToRender={8}
-        maxToRenderPerBatch={8}
-        windowSize={7}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.listContent,
-          { paddingBottom: 92 + insets.bottom },
-        ]}
-        style={styles.listScroll}
-        ListHeaderComponent={
-          <View style={styles.filterBar}>
-            {filterDefinitions.map(({ key, label }) => {
-              const hasSelection =
-                (key === "gender" && selectedSex !== undefined) ||
-                (key === "mode" && selectedMode !== undefined) ||
-                (key === "level" && selectedLevel !== undefined) ||
-                (key === "advanced" &&
-                  (selectedStatus !== undefined || priceSort !== "DEFAULT"));
-              const selecting = openFilter === key;
-              return (
-                <Pressable
-                  key={key}
-                  accessibilityLabel={`筛选${label}`}
-                  accessibilityState={{ selected: hasSelection }}
-                  style={styles.filterOption}
-                  onPress={() => openFilterSheet(key)}
-                >
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.filterOptionText,
-                      hasSelection && styles.filterOptionTextSelected,
-                      selecting && styles.filterOptionTextSelecting,
-                    ]}
+          keyExtractor={memberKeyExtractor}
+          renderItem={renderMember}
+          ItemSeparatorComponent={MemberCardSeparator}
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingBottom: 92 + insets.bottom },
+          ]}
+          style={styles.listScroll}
+          ListHeaderComponent={
+            <View style={styles.filterBar}>
+              {filterDefinitions.map(({ key, label }) => {
+                const hasSelection =
+                  (key === "gender" && selectedSex !== undefined) ||
+                  (key === "mode" && selectedMode !== undefined) ||
+                  (key === "level" && selectedLevel !== undefined) ||
+                  (key === "advanced" &&
+                    (selectedStatus !== undefined || priceSort !== "DEFAULT"));
+                const selecting = openFilter === key;
+                return (
+                  <Pressable
+                    key={key}
+                    accessibilityLabel={`筛选${label}`}
+                    accessibilityState={{ selected: hasSelection }}
+                    style={styles.filterOption}
+                    onPress={() => openFilterSheet(key)}
                   >
-                    {label}
-                  </Text>
-                  <Image
-                    source={selecting ? arrowUpRedIcon : arrowDownIcon}
-                    style={styles.filterArrowIcon}
-                  />
-                </Pressable>
-              );
-            })}
-          </View>
-        }
-        ListEmptyComponent={
-          companionsQuery.isLoading ? (
-            <ClubDetailMemberSkeletonList />
-          ) : (
-            <EmptyState message="暂无大神" style={styles.memberEmpty} />
-          )
-        }
-      />
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.filterOptionText,
+                        hasSelection && styles.filterOptionTextSelected,
+                        selecting && styles.filterOptionTextSelecting,
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                    <Image
+                      source={selecting ? arrowUpRedIcon : arrowDownIcon}
+                      style={styles.filterArrowIcon}
+                    />
+                  </Pressable>
+                );
+              })}
+            </View>
+          }
+          ListEmptyComponent={
+            companionsQuery.isLoading ? (
+              <ClubDetailMemberSkeletonList />
+            ) : (
+              <EmptyState message="暂无大神" style={styles.memberEmpty} />
+            )
+          }
+        />
       </View>
       {/* 筛选底部弹窗（原始实现） */}
       <Modal
@@ -551,39 +590,36 @@ export default function ClubDetailScreen() {
                   ))}
                 </>
               )}
-              {openFilter === "level" && (
-                  !selectedMode ? (
-                    <Text style={styles.filterSheetHint}>
-                      请先选择「模式」后再选择等级
-                    </Text>
-                  ) : !accessToken ? (
-                    <Text style={styles.filterSheetHint}>
-                      登录后可选择等级
-                    </Text>
-                  ) : (
-                    <>
+              {openFilter === "level" &&
+                (!selectedMode ? (
+                  <Text style={styles.filterSheetHint}>
+                    请先选择「模式」后再选择等级
+                  </Text>
+                ) : !accessToken ? (
+                  <Text style={styles.filterSheetHint}>登录后可选择等级</Text>
+                ) : (
+                  <>
+                    <FilterOption
+                      label="不限"
+                      selected={!selectedLevel}
+                      onPress={() => {
+                        setSelectedLevel(undefined);
+                        closeFilterSheet();
+                      }}
+                    />
+                    {levelsQuery.data?.map((level) => (
                       <FilterOption
-                        label="不限"
-                        selected={!selectedLevel}
+                        key={level.id}
+                        label={level.name}
+                        selected={selectedLevel === Number(level.id)}
                         onPress={() => {
-                          setSelectedLevel(undefined);
+                          setSelectedLevel(Number(level.id));
                           closeFilterSheet();
                         }}
                       />
-                      {levelsQuery.data?.map((level) => (
-                        <FilterOption
-                          key={level.id}
-                          label={level.name}
-                          selected={selectedLevel === Number(level.id)}
-                          onPress={() => {
-                            setSelectedLevel(Number(level.id));
-                            closeFilterSheet();
-                          }}
-                        />
-                      ))}
-                    </>
-                  )
-              )}
+                    ))}
+                  </>
+                ))}
               {openFilter === "advanced" && (
                 <>
                   <Text style={styles.filterSectionTitle}>状态</Text>
@@ -769,7 +805,10 @@ function GameTab({
       >
         <View style={styles.gameTabIcon}>
           {iconUrl ? (
-            <CachedImage source={{ uri: iconUrl }} style={styles.gameTabIconImage} />
+            <CachedImage
+              source={{ uri: iconUrl }}
+              style={styles.gameTabIconImage}
+            />
           ) : (
             <View style={styles.gameTabIconFallback} />
           )}

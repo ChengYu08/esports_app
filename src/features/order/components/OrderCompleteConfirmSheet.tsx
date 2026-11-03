@@ -75,7 +75,7 @@ export function OrderCompleteConfirmSheet({
     : exceedsAmount
       ? "免单金额不能超过剩余应收金额"
       : "";
-  // 输入个数实时折算为免单星钻，从剩余应收中扣除做预览
+  // 输入个数实时折算为免单钻石，从剩余应收中扣除做预览
   const previewFreeStars = freeOrder ? (freeStars ?? 0) : 0;
   const payableStars = freeOrder
     ? roundStar(Math.max(0, basePayableStars - previewFreeStars))

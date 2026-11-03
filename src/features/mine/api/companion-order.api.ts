@@ -80,7 +80,7 @@ export async function fetchStarBalance(token: string): Promise<number> {
     "/client/v1/pay/starBalance",
     { method: "POST", token, body: {} },
   );
-  return Number(requireSuccess(response, "星钻余额查询失败").starBalance) || 0;
+  return Number(requireSuccess(response, "钻石余额查询失败").starBalance) || 0;
 }
 
 export async function payCompanionOrder(orderId: number, token: string): Promise<void> {

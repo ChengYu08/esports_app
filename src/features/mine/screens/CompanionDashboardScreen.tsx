@@ -498,7 +498,7 @@ function ServiceRow({
           {service.clubGameServiceName || "未命名服务"}
         </Text>
         <View style={styles.priceRow}>
-          <Text style={styles.price}>{format(service.price)}星钻</Text>
+          <Text style={styles.price}>{format(service.price)}钻石</Text>
           {service.unit ? (
             <Text style={styles.unit}>/{service.unit}</Text>
           ) : null}
