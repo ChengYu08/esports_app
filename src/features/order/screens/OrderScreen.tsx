@@ -145,7 +145,6 @@ export default function OrderScreen() {
     message: string;
     confirmText?: string;
   } | null>(null);
-  const cancelingPaymentRef = useRef(false);
   // 扁平化结果用 useMemo 固定引用，避免父组件重渲染时生成新数组触发整列表重渲染
   const items = useMemo(
     () => orders.data?.pages.flatMap((page) => page.items) ?? [],
@@ -629,32 +628,11 @@ export default function OrderScreen() {
         onPaymentFailed={(message) => setPrompt({ title: "支付失败", message })}
         onClose={() => {
           const target = payTarget;
+          // 关闭支付弹窗只结束本次支付，取消订单由订单卡片的独立操作处理。
           setPayTarget(null);
-          if (!target || !token || cancelingPaymentRef.current) return;
-          // 快速匹配单取消支付只结束本次支付，订单保留待支付（对齐 Web：5分钟内未支付才自动取消）
-          if (target.requestNo) {
+          if (target?.requestNo && token) {
             showToast("请在订单创建后5分钟内完成支付");
-            return;
           }
-          cancelingPaymentRef.current = true;
-          void cancelOrderRequest(target.id, token)
-            .then(async () => {
-              if (currentUser?.id) {
-                // 普通单关闭支付即取消订单：取消后以详情为准就地刷新该单卡片。
-                await refreshOrderAfterAction(target.id, token, currentUser.id);
-              } else {
-                await invalidateOrderQueries(target.id);
-              }
-            })
-            .catch((error) =>
-              setPrompt({
-                title: "取消订单失败",
-                message: error instanceof Error ? error.message : "请稍后重试",
-              }),
-            )
-            .finally(() => {
-              cancelingPaymentRef.current = false;
-            });
         }}
         onPaid={() => {
           const paid = payTarget;
@@ -704,7 +682,7 @@ function StarPaymentPrompt({
 }: {
   item: OrderItemModel | null;
   token: string | null;
-  onClose: () => void | Promise<void>;
+  onClose: () => void;
   onPaid: () => void;
   onPaymentFailed: (message: string) => void;
 }) {
@@ -738,7 +716,7 @@ function StarPaymentPrompt({
       onPaymentFailed(errorMessage);
       if (!settledRef.current) {
         settledRef.current = true;
-        await onClose();
+        onClose();
       }
     } finally {
       setPaying(false);
@@ -750,7 +728,7 @@ function StarPaymentPrompt({
       <BottomSheet
         scrollable
         visible={Boolean(item)}
-        onClose={() => void onClose()}
+        onClose={onClose}
         contentStyle={[
           styles.paymentSheet,
           { paddingBottom: 24 + insets.bottom },
@@ -766,14 +744,14 @@ function StarPaymentPrompt({
         <View style={styles.paymentActions}>
           <Pressable
             style={styles.paymentCancel}
-            onPress={() => void onClose()}
+            onPress={onClose}
           >
             <Text>取消</Text>
           </Pressable>
           <Pressable
             style={styles.paymentConfirm}
             disabled={paying || balance === null}
-            onPress={() => void pay()}
+            onPress={pay}
           >
             <Text style={styles.paymentConfirmText}>
               {paying ? "支付中..." : "确认支付"}
