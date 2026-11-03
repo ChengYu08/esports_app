@@ -2,8 +2,14 @@ import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useIsFocused } from "expo-router";
-import { useCallback, useEffect, useMemo } from "react";
-import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+  type LayoutChangeEvent,
+} from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   clamp,
@@ -20,12 +26,19 @@ const controllerImage = require("../../../../assets/images/quick-order-controlle
 const glowImage = require("../../../../assets/svgs/quick-order-glow.svg");
 const shadowImage = require("../../../../assets/svgs/quick-order-shadow.svg");
 
-/** Figma 1184:152732 快速下单 */
+/** Figma 1184:152732 快速下单 66×60 */
 const FAB_WIDTH = 66;
 const FAB_HEIGHT = 60;
 const EDGE_MARGIN = 8;
+/** 与 AppTabBar 一致：内容区 58 + 底部安全区 */
 const TAB_CONTENT_HEIGHT = 58;
-const ABOVE_TAB_GAP = 12;
+/**
+ * Figma 812 画布：FAB 底边 y=668 → 距屏幕底 144；
+ * Tabbar 顶 y=732 → FAB 底到 Tab 顶间距 64。
+ * 用「距屏幕底」定位，避免 Tab 场景高度是否含 Tab 时重复扣减。
+ */
+const FIGMA_FAB_BOTTOM_FROM_SCREEN = 144;
+const MIN_GAP_ABOVE_TAB = 8;
 const DRAG_THRESHOLD = 6;
 
 const RED_GRADIENT = {
@@ -40,23 +53,46 @@ const BLUE_GLOW_GRADIENT = {
   end: { x: 0.9, y: 0.8 },
 };
 
+type HostLayout = {
+  width: number;
+  height: number;
+  pageX: number;
+  pageY: number;
+};
+
 export function MatchQuickOrderFab() {
   const focused = useIsFocused();
   const insets = useSafeAreaInsets();
-  const { width, height } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const isAuthenticated = useAuthStore((state) =>
     Boolean(state.accessToken && state.user),
   );
+  const overlayRef = useRef<View>(null);
+  const [host, setHost] = useState<HostLayout | null>(null);
 
-  const minX = EDGE_MARGIN + insets.left;
-  const maxX = Math.max(minX, width - EDGE_MARGIN - insets.right - FAB_WIDTH);
-  const minY = insets.top + EDGE_MARGIN;
+  const tabBarHeight = TAB_CONTENT_HEIGHT + insets.bottom;
+  const tabTopInWindow = windowHeight - tabBarHeight;
+  /** 对齐 Figma 距底 144，且不压到 Tab（至少留 MIN_GAP_ABOVE_TAB） */
+  const fabBottomInWindow = Math.min(
+    windowHeight - FIGMA_FAB_BOTTOM_FROM_SCREEN,
+    tabTopInWindow - MIN_GAP_ABOVE_TAB,
+  );
+
+  const hostWidth = host?.width ?? windowWidth;
+  const hostPageY = host?.pageY ?? 0;
+
+  const minX = EDGE_MARGIN;
+  const maxX = Math.max(minX, hostWidth - EDGE_MARGIN - FAB_WIDTH);
+  const minY = Math.max(EDGE_MARGIN, insets.top - hostPageY + EDGE_MARGIN);
   const maxY = Math.max(
     minY,
-    height - insets.bottom - TAB_CONTENT_HEIGHT - ABOVE_TAB_GAP - FAB_HEIGHT,
+    tabTopInWindow - MIN_GAP_ABOVE_TAB - FAB_HEIGHT - hostPageY,
   );
   const defaultX = maxX;
-  const defaultY = maxY;
+  const defaultY = Math.min(
+    maxY,
+    Math.max(minY, fabBottomInWindow - FAB_HEIGHT - hostPageY),
+  );
 
   const left = useSharedValue(defaultX);
   const top = useSharedValue(defaultY);
@@ -67,14 +103,35 @@ export function MatchQuickOrderFab() {
   const boundsMaxX = useSharedValue(maxX);
   const boundsMinY = useSharedValue(minY);
   const boundsMaxY = useSharedValue(maxY);
-  const screenWidth = useSharedValue(width);
+  const snapWidth = useSharedValue(hostWidth);
+
+  const syncHostLayout = useCallback(() => {
+    overlayRef.current?.measureInWindow((pageX, pageY, width, height) => {
+      if (width <= 0 || height <= 0) return;
+      setHost({ width, height, pageX, pageY });
+    });
+  }, []);
+
+  const onOverlayLayout = useCallback(
+    (_event: LayoutChangeEvent) => {
+      syncHostLayout();
+    },
+    [syncHostLayout],
+  );
 
   useEffect(() => {
+    if (!focused) return;
+    syncHostLayout();
+  }, [focused, syncHostLayout, windowHeight, windowWidth, insets.bottom]);
+
+  useEffect(() => {
+    if (!host) return;
+
     boundsMinX.value = minX;
     boundsMaxX.value = maxX;
     boundsMinY.value = minY;
     boundsMaxY.value = maxY;
-    screenWidth.value = width;
+    snapWidth.value = hostWidth;
 
     if (initialized.value) {
       left.value = Math.min(maxX, Math.max(minX, left.value));
@@ -91,15 +148,16 @@ export function MatchQuickOrderFab() {
     boundsMinY,
     defaultX,
     defaultY,
+    host,
+    hostWidth,
     initialized,
     left,
     maxX,
     maxY,
     minX,
     minY,
-    screenWidth,
+    snapWidth,
     top,
-    width,
   ]);
 
   const openMatch = useCallback(() => {
@@ -116,12 +174,8 @@ export function MatchQuickOrderFab() {
       .minDistance(DRAG_THRESHOLD)
       .maxPointers(1)
       .onStart(() => {
-        dragStartX.set(
-          clamp(left.get(), boundsMinX.get(), boundsMaxX.get()),
-        );
-        dragStartY.set(
-          clamp(top.get(), boundsMinY.get(), boundsMaxY.get()),
-        );
+        dragStartX.set(clamp(left.get(), boundsMinX.get(), boundsMaxX.get()));
+        dragStartY.set(clamp(top.get(), boundsMinY.get(), boundsMaxY.get()));
       })
       .onUpdate((event) => {
         left.set(
@@ -141,7 +195,7 @@ export function MatchQuickOrderFab() {
       })
       .onEnd(() => {
         const centerX = left.get() + FAB_WIDTH / 2;
-        const snapToLeft = centerX < screenWidth.get() / 2;
+        const snapToLeft = centerX < snapWidth.get() / 2;
         left.set(
           withSpring(snapToLeft ? boundsMinX.get() : boundsMaxX.get(), {
             damping: 26,
@@ -168,7 +222,7 @@ export function MatchQuickOrderFab() {
     dragStartY,
     left,
     openMatch,
-    screenWidth,
+    snapWidth,
     top,
   ]);
 
@@ -180,52 +234,59 @@ export function MatchQuickOrderFab() {
   if (!focused) return null;
 
   return (
-    <View pointerEvents="box-none" style={styles.overlay}>
-      <GestureDetector gesture={gesture}>
-        <Animated.View
-          collapsable={false}
-          accessible
-          accessibilityRole="button"
-          accessibilityLabel="快速下单"
-          accessibilityHint="点击进入快速匹配，可拖动到左右边缘"
-          onAccessibilityTap={openMatch}
-          style={[styles.fab, { left: defaultX, top: defaultY }, positionStyle]}
-        >
-          <View style={styles.blueGlowWrap} pointerEvents="none">
-            <LinearGradient
-              colors={[...BLUE_GLOW_GRADIENT.colors]}
-              start={BLUE_GLOW_GRADIENT.start}
-              end={BLUE_GLOW_GRADIENT.end}
-              style={styles.blueGlow}
+    <View
+      ref={overlayRef}
+      pointerEvents="box-none"
+      style={styles.overlay}
+      onLayout={onOverlayLayout}
+    >
+      {host ? (
+        <GestureDetector gesture={gesture}>
+          <Animated.View
+            collapsable={false}
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="快速下单"
+            accessibilityHint="点击进入快速匹配，可拖动到左右边缘"
+            onAccessibilityTap={openMatch}
+            style={[styles.fab, { left: defaultX, top: defaultY }, positionStyle]}
+          >
+            <View style={styles.blueGlowWrap} pointerEvents="none">
+              <LinearGradient
+                colors={[...BLUE_GLOW_GRADIENT.colors]}
+                start={BLUE_GLOW_GRADIENT.start}
+                end={BLUE_GLOW_GRADIENT.end}
+                style={styles.blueGlow}
+              />
+            </View>
+            <Image
+              source={shadowImage}
+              contentFit="contain"
+              style={styles.shadow}
             />
-          </View>
-          <Image
-            source={shadowImage}
-            contentFit="contain"
-            style={styles.shadow}
-          />
-          <Image
-            source={glowImage}
-            contentFit="contain"
-            style={styles.controllerGlow}
-          />
-          <Image
-            source={controllerImage}
-            contentFit="contain"
-            style={styles.controller}
-          />
-          <View style={styles.pillWrap} pointerEvents="none">
-            <LinearGradient
-              colors={[...RED_GRADIENT.colors]}
-              start={RED_GRADIENT.start}
-              end={RED_GRADIENT.end}
-              style={styles.pill}
-            >
-              <Text style={styles.pillText}>快速下单</Text>
-            </LinearGradient>
-          </View>
-        </Animated.View>
-      </GestureDetector>
+            <Image
+              source={glowImage}
+              contentFit="contain"
+              style={styles.controllerGlow}
+            />
+            <Image
+              source={controllerImage}
+              contentFit="contain"
+              style={styles.controller}
+            />
+            <View style={styles.pillWrap} pointerEvents="none">
+              <LinearGradient
+                colors={[...RED_GRADIENT.colors]}
+                start={RED_GRADIENT.start}
+                end={RED_GRADIENT.end}
+                style={styles.pill}
+              >
+                <Text style={styles.pillText}>快速下单</Text>
+              </LinearGradient>
+            </View>
+          </Animated.View>
+        </GestureDetector>
+      ) : null}
     </View>
   );
 }
