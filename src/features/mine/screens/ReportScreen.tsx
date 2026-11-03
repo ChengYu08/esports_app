@@ -1,4 +1,3 @@
-import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
@@ -18,6 +17,7 @@ import { useAuthStore } from "@esports/auth";
 
 import { submitReport } from "@/features/mine/api/report.api";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 const REPORT_REASONS = [
   "政治",
@@ -75,24 +75,17 @@ export default function ReportScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       style={styles.screen}
     >
-      <View
-        style={[
-          styles.header,
-          { height: insets.top + 44, paddingTop: insets.top },
-        ]}
-      >
-        <Pressable
-          accessibilityLabel="返回"
-          accessibilityRole="button"
-          hitSlop={10}
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <ChevronLeft24Regular color="#111111" width={24} height={24} style={styles.backIcon} />
-        </Pressable>
-        <Text style={styles.headerTitle}>举报</Text>
-        <View style={styles.headerEnd} />
-      </View>
+      <ScreenHeader
+        title="举报"
+        onBack={() => router.back()}
+        backIconColor="#111111"
+        titleStyle={styles.headerTitle}
+        style={{
+          paddingTop: insets.top,
+          height: insets.top + 44,
+          paddingHorizontal: 16,
+        }}
+      />
 
       <ScrollView
         keyboardShouldPersistTaps="handled"
@@ -170,27 +163,12 @@ export default function ReportScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F7F7" },
-  header: {
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-  },
-  backButton: {
-    alignItems: "center",
-    height: 28,
-    justifyContent: "center",
-    width: 28,
-  },
-  backIcon: { height: 24, width: 24 },
   headerTitle: {
     color: "#111111",
     fontFamily: DOUYIN_SANS,
     fontSize: 17,
     fontWeight: "600",
   },
-  headerEnd: { height: 28, width: 28 },
   content: { paddingHorizontal: 16, paddingTop: 24 },
   sectionTitle: {
     color: "#111111",

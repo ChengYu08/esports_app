@@ -48,6 +48,11 @@ function limitSearchInput(value: string) {
   return value.slice(0, MAX_SEARCH_LENGTH).replace(/[\uD800-\uDBFF]$/, "");
 }
 
+// 模块级分隔符组件，保证 ItemSeparatorComponent 引用稳定
+function MessageSearchSeparator() {
+  return <View style={styles.separator} />;
+}
+
 export default function ClubSearchScreen() {
   const insets = useSafeAreaInsets();
   const { type, clubId } = useLocalSearchParams<{
@@ -55,6 +60,14 @@ export default function ClubSearchScreen() {
     clubId?: string;
   }>();
   const [category, setCategory] = useState<SearchCategory>(type === "user" ? "user" : "club");
+  // 从俱乐部/个人主页弹回本页时 dismissTo 会更新参数，渲染期同步切换分类（避免 effect 里 setState）
+  const [lastType, setLastType] = useState(type);
+  if (type !== lastType) {
+    setLastType(type);
+    if (type === "user" || type === "club") {
+      setCategory(type);
+    }
+  }
   const searchType: SearchType = type === "message" ? "message" : category;
   const [input, setInput] = useState("");
   const [keyword, setKeyword] = useState("");
@@ -152,8 +165,12 @@ export default function ClubSearchScreen() {
     [blacklistedUserIds, conversations, keyword, userId],
   );
   const search = searchType === "club" ? clubSearch : userSearch;
-  const items =
-    searchType === "message" ? messageItems : (search.data?.items ?? []);
+  // 用 useMemo 固定 data 引用，避免父组件重渲染时新数组触发整列表重渲染
+  const items = useMemo<SearchResult[]>(
+    () =>
+      searchType === "message" ? messageItems : (search.data?.items ?? []),
+    [searchType, messageItems, search.data],
+  );
   const placeholder = searchType === "message" ? "搜索聊天用户" : "搜索俱乐部或陪玩";
 
   const retrySearch = () => {
@@ -201,7 +218,12 @@ export default function ClubSearchScreen() {
           onPress={handleSubmit}
           style={styles.submit}
         >
-          <Text style={[styles.submitText, input.trim().length > 0 && styles.submitActive]}>搜索</Text>
+          <Text
+            numberOfLines={1}
+            style={[styles.submitText, input.trim().length > 0 && styles.submitActive]}
+          >
+            搜索
+          </Text>
         </Pressable>
       </View>
       {searching && searchType !== "message" ? (
@@ -243,7 +265,7 @@ export default function ClubSearchScreen() {
               />
             )
           }
-          ItemSeparatorComponent={searchType === "message" ? () => <View style={styles.separator} /> : undefined}
+          ItemSeparatorComponent={searchType === "message" ? MessageSearchSeparator : undefined}
           initialNumToRender={searchType === "message" ? undefined : 8}
           windowSize={searchType === "message" ? undefined : 5}
           keyboardShouldPersistTaps="handled"
@@ -275,7 +297,15 @@ const styles = StyleSheet.create({
     color: "#111",
     textAlignVertical: "center",
   },
-  submit: { width: 56, height: 44, paddingLeft: 12, paddingRight: 16, alignItems: "center", justifyContent: "center" },
+  // 不写死宽度：固定 56 减去左右内边距后只剩 28pt，两个 14pt 汉字会被挤成两行
+  submit: {
+    height: 44,
+    flexShrink: 0,
+    paddingLeft: 12,
+    paddingRight: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   submitText: {
     ...searchTypography.medium14,
     color: "#FF708D",

@@ -15,6 +15,7 @@ import {
 import {
   applyGrabSelection,
   isQuickMatchActive,
+  pruneSelectedIds,
   resolveMaxSelectableCount,
   type QuickMatchGrabItem,
   type QuickMatchRequestDetail,
@@ -192,6 +193,12 @@ export function useQuickMatchSession(
   /** 建单后支付中：迟到的超时/结束信令不得清会话 */
   const [orderPending, setOrderPending] = useState(false);
 
+  /** 支付确认中冻结选择：轮询剔除与手动改选均不生效 */
+  const selectionLockedRef = useRef(false);
+  const setSelectionLocked = useCallback((locked: boolean) => {
+    selectionLockedRef.current = locked;
+  }, []);
+
   const expireAtRef = useRef(0);
   const generationRef = useRef(0);
   const pollBusyRef = useRef(false);
@@ -277,6 +284,7 @@ export function useQuickMatchSession(
     setNewCandidateIds(new Set());
     setDetail(null);
     setOrderPending(false);
+    selectionLockedRef.current = false;
     prevGrabIdsRef.current = new Set();
     if (clearNewMarkTimerRef.current) {
       clearTimeout(clearNewMarkTimerRef.current);
@@ -328,12 +336,10 @@ export function useQuickMatchSession(
         return;
       }
       setCandidates(list);
-      // 过滤已被后端移除的候选人选中项，并同步镜像
-      const nextSelected = selectedGrabIdsRef.current.filter((id) =>
-        list.some((item) => item.id === id),
+      // 支付确认冻结期间保持选中；否则剔除已消失候选人（ref 由 selectedGrabIds effect 同步）
+      setSelectedGrabIds((prev) =>
+        selectionLockedRef.current ? prev : pruneSelectedIds(prev, list),
       );
-      selectedGrabIdsRef.current = nextSelected;
-      setSelectedGrabIds(nextSelected);
 
       // diff 出本次新出现的候选人，触发一次性金色描边
       const prevIds = prevGrabIdsRef.current;
@@ -429,6 +435,7 @@ export function useQuickMatchSession(
 
   // 选人：活动模式单选（maxSelectableCount，点其他直接切换），普通模式维持 3 人多选
   const toggleGrab = useCallback((grabId: string) => {
+    if (selectionLockedRef.current) return;
     const maxSelectable = resolveMaxSelectableCount(detailRef.current);
     const result = applyGrabSelection(selectedGrabIdsRef.current, grabId, maxSelectable);
     selectedGrabIdsRef.current = result.ids;
@@ -450,6 +457,7 @@ export function useQuickMatchSession(
     orderPending,
     setSubmitting,
     setOrderPending,
+    setSelectionLocked,
     cancelMatching,
     closeAuditionRoom,
     toggleGrab,

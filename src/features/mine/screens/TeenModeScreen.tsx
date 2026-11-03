@@ -23,6 +23,7 @@ import {
 } from "@/features/mine/api/teen-mode.api";
 import type { TeenModeStatus } from "@/features/mine/api/teen-mode.contract";
 import { saveLastTeenEnabled } from "@/features/mine/teen-mode-store";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { colors } from "@/shared/theme/tokens";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 
@@ -53,6 +54,7 @@ export default function TeenModeScreen({
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
   const token = useAuthStore((state) => state.accessToken);
+  const userId = useAuthStore((state) => state.user?.id ?? null);
   const [status, setStatus] = useState<TeenModeStatus | null>(null);
   const [phase, setPhase] = useState<Phase>("overview");
   const [code, setCode] = useState("");
@@ -64,7 +66,7 @@ export default function TeenModeScreen({
 
   const applyStatus = (next: TeenModeStatus) => {
     setStatus(next);
-    void saveLastTeenEnabled(next.enabled);
+    void saveLastTeenEnabled(next.enabled, userId);
     onStatusChanged?.(next);
   };
 
@@ -117,8 +119,9 @@ export default function TeenModeScreen({
           }
           // 未设过密码：open 同时完成「设置密码 + 开启」
           applyStatus(await teenModeApi.open(token, code, code));
-          setPhase("overview");
-          showToast("青少年模式已开启");
+          // 开启成功不停留说明页：限制只在 17:00-次日 6:00 生效，直接返回上一页并提示
+          router.back();
+          showToast("青少年模式已开启，每日 17:00-6:00 期间限制核心功能");
           return;
         }
         if (
@@ -133,8 +136,9 @@ export default function TeenModeScreen({
             return;
           }
           applyStatus(await teenModeApi.open(token, code));
-          setPhase("overview");
-          showToast("青少年模式已开启");
+          // 与首设密码路径一致：开启成功直接返回上一页并提示，不停留说明页
+          router.back();
+          showToast("青少年模式已开启，每日 17:00-6:00 期间限制核心功能");
           return;
         }
         if (phase === "disable") {
@@ -335,26 +339,13 @@ export default function TeenModeScreen({
 
   return (
     <View style={styles.screen}>
-      <View
-        style={[
-          styles.header,
-          { height: 44 + insets.top, paddingTop: insets.top },
-        ]}
-      >
-        {locked ? (
-          <View style={styles.backButton} />
-        ) : (
-          <Pressable
-            accessibilityLabel="返回"
-            accessibilityRole="button"
-            onPress={() => router.back()}
-            style={styles.backButton}
-          >
-            <Image source={backIcon} style={styles.backIcon} />
-          </Pressable>
-        )}
-        <View style={styles.headerEnd} />
-      </View>
+      {/* 锁定态作为启动门禁覆盖层使用：不提供返回，标题为空保持原有无页头标题的视觉 */}
+      <ScreenHeader
+        title=""
+        onBack={locked ? undefined : () => router.back()}
+        backIcon={backIcon}
+        style={{ paddingTop: insets.top, height: insets.top + 44 }}
+      />
       {status === null ? null : phase === "overview"
         ? renderOverview()
         : renderPassword()}
@@ -364,20 +355,6 @@ export default function TeenModeScreen({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#FFF" },
-  header: {
-    backgroundColor: "#FFF",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  backButton: {
-    width: 48,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
-  headerEnd: { width: 16 },
   overviewContent: {
     flex: 1,
     padding: 32,

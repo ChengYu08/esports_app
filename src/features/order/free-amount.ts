@@ -3,12 +3,12 @@ import type { OrderItemModel } from "@/features/order/order.types";
 /** 免单时长步长，与 Web 端保持一致 */
 export const FREE_STEP = 0.1;
 
-/** 星钻金额保留最多两位小数 */
+/** 钻石金额保留最多两位小数 */
 export function roundStar(n: number) {
   return Number(n.toFixed(2));
 }
 
-/** 已免单的金额从实付款中扣除，确认完成时显示剩余应收星钻 */
+/** 已免单的金额从实付款中扣除，确认完成时显示剩余应收钻石 */
 export function computeOrderPayableStars(
   order: Pick<OrderItemModel, "totalPrice" | "freeAmount">,
 ) {
@@ -74,7 +74,7 @@ export function computeFreeUnitPrice(order: FreePriceSource) {
   return 0;
 }
 
-/** 免单时长换算星钻，结果只保留最多两位小数；无效返回 null */
+/** 免单时长换算钻石，结果只保留最多两位小数；无效返回 null */
 export function computeFreeStarAmount(
   order: FreePriceSource,
   freeHours: number,
@@ -108,7 +108,7 @@ export function computeFreeSubmitAmount(
   return roundStar(base * ratio);
 }
 
-/** 订单保留下单数量，已免数量按退款星钻与原单价折算，单独展示。 */
+/** 订单保留下单数量，已免数量按退款钻石与原单价折算，单独展示。 */
 export function formatOrderFreeSummary(
   order: FreePriceSource &
     Pick<OrderItemModel, "freeAmount" | "billingUnitName">,
@@ -118,7 +118,7 @@ export function formatOrderFreeSummary(
     return undefined;
   }
   const unitPrice = computeFreeUnitPrice(order);
-  const amountText = `${formatStar(freeAmount)}星钻`;
+  const amountText = `${formatStar(freeAmount)}钻石`;
   if (unitPrice <= 0) {
     return amountText;
   }

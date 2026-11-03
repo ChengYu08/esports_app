@@ -9,6 +9,7 @@ import {
 } from "@/features/court/court.api";
 import { COURT_COLORS, COURT_FONT_FAMILY } from "@/features/court/court.theme";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 type Props = {
@@ -24,7 +25,8 @@ const eye = require("../../../../assets/court/eye.svg");
 const star = require("../../../../assets/court/star.svg");
 const starFilled = require("../../../../assets/court/star-filled.svg");
 
-export function CourtCard({
+// 列表行组件：父组件交互态（收藏/刷新/切 tab）变化时未变的卡片跳过重渲
+export const CourtCard = memo(function CourtCard({
   item,
   onOpen,
   onVote,
@@ -88,17 +90,6 @@ export function CourtCard({
             {"\u00A0"}
             {item.contentSummary || item.content || "暂无投诉内容"}
           </Text>
-          {!!item.evidenceThumbnails?.length && (
-            <View style={styles.thumbnails}>
-              {item.evidenceThumbnails.slice(0, 5).map((uri, index) => (
-                <CachedImage
-                  key={`${uri}-${index}`}
-                  source={{ uri }}
-                  style={styles.thumbnail}
-                />
-              ))}
-            </View>
-          )}
         </View>
       </Pressable>
       <View style={styles.voteRow}>
@@ -154,7 +145,7 @@ export function CourtCard({
       </View>
     </View>
   );
-}
+});
 
 function Party({
   party,
@@ -257,13 +248,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   contentLabel: { color: COURT_COLORS.muted },
-  thumbnails: { flexDirection: "row", gap: 5, marginTop: 8 },
-  thumbnail: {
-    backgroundColor: "#EEEEEE",
-    borderRadius: 6,
-    height: 48,
-    width: 48,
-  },
   voteRow: { flexDirection: "row", marginTop: 12 },
   footer: {
     alignItems: "center",

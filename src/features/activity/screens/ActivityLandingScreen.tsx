@@ -1,6 +1,6 @@
 import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { useAuthStore } from "@esports/auth";
-import { Stack, router } from "expo-router";
+import { Stack, router, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -95,7 +95,8 @@ export default function ActivityLandingScreen({ activityCode }: { activityCode: 
       return;
     }
     setPendingActivityRules(detail.rules);
-    router.push("/activity/rules");
+    // typedRoutes 生成滞后时 /activity/rules 可能尚未入库，运行时路由文件已存在
+    router.push("/activity/rules" as Href);
   }, [detail?.rules]);
 
   const retry = useCallback(() => {

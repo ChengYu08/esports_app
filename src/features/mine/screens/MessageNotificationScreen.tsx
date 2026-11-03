@@ -1,4 +1,3 @@
-import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useEffect, type ReactNode } from "react";
 import Animated, {
@@ -9,6 +8,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { showToast } from "@/shared/ui/app-toast";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -59,23 +59,13 @@ function MessageNotificationScreenImpl() {
 
   return (
     <View style={styles.screen}>
-      <View
-        style={[
-          styles.header,
-          { paddingTop: insets.top, height: insets.top + 44 },
-        ]}
-      >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="返回"
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Image source={backIcon} style={styles.backIcon} />
-        </Pressable>
-        <Text style={styles.headerTitle}>消息通知</Text>
-        <View style={styles.headerEnd} />
-      </View>
+      <ScreenHeader
+        title="消息通知"
+        onBack={() => router.back()}
+        backIcon={backIcon}
+        titleStyle={styles.headerTitle}
+        style={{ paddingTop: insets.top, height: insets.top + 44 }}
+      />
 
       <ScrollView
         contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) }}
@@ -169,26 +159,12 @@ export default MessageNotificationScreenImpl;
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F7F7" },
-  header: {
-    backgroundColor: "#FFF",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  backButton: {
-    width: 48,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  backIcon: { width: 24, height: 24, tintColor: "#0A0A0A" },
   headerTitle: {
     color: "#0A0A0A",
     fontWeight: "500",
     fontSize: 16,
     lineHeight: 24,
   },
-  headerEnd: { width: 16 },
   settingsGroup: { marginTop: 8, backgroundColor: "#FFF" },
   row: {
     paddingLeft: 16,

@@ -30,32 +30,22 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const FOOTER_CONTENT_BOTTOM = 22;
 
-/** Figma 532:105048~055 导出的小图（@2x，单张约 3~24KB） */
-const avatar1 = require("../../../../assets/images/radar-avatar-1.png");
-const avatar2 = require("../../../../assets/images/radar-avatar-2.png");
-const avatar3 = require("../../../../assets/images/radar-avatar-3.png");
-const avatar4 = require("../../../../assets/images/radar-avatar-4.png");
-const avatar5 = require("../../../../assets/images/radar-avatar-5.png");
-const avatar6 = require("../../../../assets/images/radar-avatar-6.png");
-const avatar7 = require("../../../../assets/images/radar-avatar-7.png");
-const avatar8 = require("../../../../assets/images/radar-avatar-8.png");
-
 /** Figma 532:105041 雷达尺寸 */
 const RADAR_SIZE = 279;
 /** Figma Ellipse 33791 / 33790：stroke 16，路径相对外框内缩 8 */
 const RING_STROKE = 16;
 const RING_PATH_INSET = RING_STROKE / 2;
 
-/** Figma 532:105047 头像位：坐标 + 导出图 */
+/** 雷达头像位置 */
 const DECOR_SLOTS = [
-  { left: 64, top: 13, size: 56, source: avatar1, bordered: true },
-  { left: 220, top: 77, size: 58, source: avatar2 },
-  { left: 182, top: 26, size: 24, source: avatar3 },
-  { left: 182, top: 198, size: 29, source: avatar4 },
-  { left: 249, top: 170, size: 20, source: avatar5 },
-  { left: 18, top: 204, size: 20, source: avatar6 },
-  { left: 2, top: 102, size: 40, source: avatar7 },
-  { left: 64, top: 213, size: 52, source: avatar8 },
+  { left: 64, top: 13, size: 56, bordered: true, source: require("../../../../assets/images/radar-avatar-1.png") },
+  { left: 220, top: 77, size: 58, source: require("../../../../assets/images/radar-avatar-2.png") },
+  { left: 182, top: 26, size: 24, source: require("../../../../assets/images/radar-avatar-3.png") },
+  { left: 182, top: 198, size: 29, source: require("../../../../assets/images/radar-avatar-4.png") },
+  { left: 249, top: 170, size: 20, source: require("../../../../assets/images/radar-avatar-5.png") },
+  { left: 18, top: 204, size: 20, source: require("../../../../assets/images/radar-avatar-6.png") },
+  { left: 2, top: 102, size: 40, source: require("../../../../assets/images/radar-avatar-7.png") },
+  { left: 64, top: 213, size: 52, source: require("../../../../assets/images/radar-avatar-8.png") },
 ] as const;
 
 /** 扩散圈从中心 logo 外圈扩到雷达外缘的缩放起点（logo 直径 76） */
@@ -149,7 +139,7 @@ function RadarRipple({ delay }: { delay: number }) {
 function RadarSweep() {
   const rotation = useSharedValue(0);
   const center = RADAR_SIZE / 2;
-  /** 楔形尖端超出画布，靠雷达容器 overflow:hidden 裁剪 */
+  /** 楔形尖端超出画布，靠 radarClip overflow:hidden 裁剪 */
   const wedgeWidth = RADAR_SIZE * 2;
 
   useEffect(() => {
@@ -351,14 +341,17 @@ export function MatchingWaitingView({
         </View>
 
         <View style={styles.radar}>
-          <RadarRings />
-          <RadarSweep />
-          <RadarRipple delay={0} />
-          <RadarRipple delay={800} />
-          <RadarRipple delay={1600} />
+          {/* 圆环/扫描/波纹需要圆形裁剪；装饰头像在环缘，不可放进同一裁剪层 */}
+          <View style={styles.radarClip} pointerEvents="none">
+            <RadarRings />
+            <RadarSweep />
+            <RadarRipple delay={0} />
+            <RadarRipple delay={800} />
+            <RadarRipple delay={1600} />
+          </View>
 
-          {DECOR_SLOTS.map((item, index) => (
-            <DecorAvatar key={`avatar-${index}`} slot={item} index={index} />
+          {DECOR_SLOTS.map((slot, index) => (
+            <DecorAvatar key={index} slot={slot} index={index} />
           ))}
 
           <View style={styles.logoWrap}>
@@ -446,6 +439,11 @@ const styles = StyleSheet.create({
     width: RADAR_SIZE,
     height: RADAR_SIZE,
     position: "relative",
+    overflow: "visible",
+  },
+  /** 仅裁剪扫描楔形与波纹，避免环缘头像被圆形 mask 切掉 */
+  radarClip: {
+    ...StyleSheet.absoluteFill,
     overflow: "hidden",
     borderRadius: RADAR_SIZE / 2,
   },

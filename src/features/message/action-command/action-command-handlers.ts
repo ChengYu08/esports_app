@@ -1,8 +1,9 @@
-import { useAuthStore } from "@esports/auth";
-import { router } from "expo-router";
 import { logger } from "@/core/logging/logger";
 import { showToast } from "@/shared/ui/app-toast";
+import { useAuthStore } from "@esports/auth";
+import { router } from "expo-router";
 
+import { grabQuickMatchAndEnterAudition } from "@/features/match/grab-quick-match-flow";
 import type { RongCommand } from "@/features/message/rongcloud-command";
 import {
   parseOrderNotifyPopup,
@@ -10,10 +11,9 @@ import {
   parseQuickMatchNotice,
   PLATFORM_NOTICE_USER_ID,
 } from "@/features/message/rongcloud-commands";
-import { formatServerDateTime } from "@/shared/time/server-date";
-import { grabQuickMatchAndEnterAudition } from "@/features/match/grab-quick-match-flow";
 import { refreshDispatchForRemoteChange } from "@/features/order/order-query";
 import { acceptOrder } from "@/features/order/order.api";
+import { formatServerDateTime } from "@/shared/time/server-date";
 import { actionNotice } from "@/shared/ui/action-notice/action-notice-store";
 import { TRADE_NOTICE_ICON } from "@/shared/ui/action-notice/trade-notice-icon";
 
@@ -95,12 +95,17 @@ export function handleQuickMatchNotice(command: RongCommand, now = Date.now()) {
 
   const payload = parseQuickMatchNotice(command.data);
   if (!payload) {
-    logger.warn("QUICK_MATCH_NOTICE 缺少 requestNo", { senderId: command.senderId });
+    logger.warn("QUICK_MATCH_NOTICE 缺少 requestNo", {
+      senderId: command.senderId,
+    });
     return;
   }
 
-  const expired = Number.isFinite(payload.expireAtMs) && payload.expireAtMs - now <= 0;
-  const stale = command.sentTime != null && now - command.sentTime > QUICK_MATCH_NOTICE_STALE_MAX_MS;
+  const expired =
+    Number.isFinite(payload.expireAtMs) && payload.expireAtMs - now <= 0;
+  const stale =
+    command.sentTime != null &&
+    now - command.sentTime > QUICK_MATCH_NOTICE_STALE_MAX_MS;
   logger.info("QUICK_MATCH_NOTICE", {
     requestNo: payload.requestNo,
     expired,
@@ -109,7 +114,10 @@ export function handleQuickMatchNotice(command: RongCommand, now = Date.now()) {
     expireAt: Number.isFinite(payload.expireAtMs)
       ? formatServerDateTime(payload.expireAtMs)
       : undefined,
-    sentTime: command.sentTime != null ? formatServerDateTime(command.sentTime) : undefined,
+    sentTime:
+      command.sentTime != null
+        ? formatServerDateTime(command.sentTime)
+        : undefined,
   });
 
   // 无论是否弹条（重复/已过期/离线重放）都让派单中心失效：可见时立即重拉，否则下次进入再拉
@@ -177,10 +185,15 @@ export function handleOrderNotifyPopup(command: RongCommand, now = Date.now()) {
           await acceptOrder(payload.orderId, accessToken);
           actionNotice.dismiss(noticeId);
           showToast("接单成功");
-          router.push({ pathname: "/order/[id]", params: { id: payload.orderId } });
+          router.push({
+            pathname: "/order/[id]",
+            params: { id: payload.orderId, scope: "accept" },
+          });
         } catch (error) {
           showToast(
-            error instanceof Error && error.message ? error.message : "接单失败，请稍后重试",
+            error instanceof Error && error.message
+              ? error.message
+              : "接单失败，请稍后重试",
           );
         }
       },

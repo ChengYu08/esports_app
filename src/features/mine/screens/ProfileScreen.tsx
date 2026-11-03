@@ -1,6 +1,8 @@
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
+  ChevronLeft24Regular,
+  MoreHorizontal24Regular,
   Search24Regular,
   Star16Filled,
   Star16Regular,
@@ -9,10 +11,17 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+} from "react";
 import {
   Animated,
-  FlatList,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -54,12 +63,14 @@ import {
   useToggleUserFollow,
   useUserFollowState,
 } from "@/features/mine/hooks/use-user-follow";
-import { createImagePreviewParams } from "@/features/mine/image-preview.params";
+import {
+  createImagePreviewParams,
+  type ImagePreviewParams,
+} from "@/features/mine/image-preview.params";
 import { createProfileAvatarPreviewParams } from "@/features/mine/profile-avatar-preview";
 import { createProfileChatParams } from "@/features/mine/profile-chat";
 import { calculateAge } from "@/features/mine/profile-utils";
 import { invalidateOrderQueries } from "@/features/order/order-query";
-import { cancelOrder } from "@/features/order/order.api";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { requireLogin } from "@/shared/navigation/require-login";
@@ -75,12 +86,18 @@ const femaleIcon = require("../../../../assets/mine/figma/mine-female.svg");
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const settingsIcon = require("../../../../assets/mine/figma/mine-settings.svg");
 const customerIcon = require("../../../../assets/coms/customer.svg");
+const clubIcon = require("../../../../assets/mine/figma/mine-club-flag.svg");
 const arrowDownIcon = require("../../../../assets/mine/figma/profile-arrow-down.svg");
 const diamondIcon = require("../../../../assets/message/order-assistant-coin-3f6fcf.webp");
 const idleStatusIcon = require("../../../../assets/home/club-detail/status-idle.svg");
 const playingStatusIcon = require("../../../../assets/home/club-detail/status-playing.svg");
+const NAV_BAR_CONTENT_HEIGHT = 44;
+const PROFILE_IDENTITY_TOP_GAP = 12;
 type ProfileTab = "技能" | "评价";
 type ProfileListItem = { key: string; content: ReactElement };
+
+const profileKeyExtractor = (item: ProfileListItem) => item.key;
+const profileRenderItem = ({ item }: { item: ProfileListItem }) => item.content;
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -88,16 +105,53 @@ export default function ProfileScreen() {
   const route = useLocalSearchParams<{
     clubId?: string | string[];
     userId?: string | string[];
+    fromSearch?: string | string[];
+    reorderGame?: string;
+    reorderMode?: string;
+    reorderLevel?: string;
+    reorderService?: string;
+    reorderQuantity?: string;
   }>();
   const routeParams = getProfileRouteParams(route);
+  const fromSearchPage = route.fromSearch === "1";
   const isMine = !routeParams || String(user?.id ?? "") === routeParams.userId;
   const [tab, setTab] = useState<ProfileTab>("技能");
   const [coverHeight, setCoverHeight] = useState(0);
-  const headerFade = useMemo(() => new Animated.Value(0), []);
   const [compactActive, setCompactActive] = useState(false);
+  const scrollY = useMemo(() => new Animated.Value(0), []);
+  // 紧凑头部切换阈值：列表内标签行（两侧圆角的技能/评价栏）与固定标签行对齐时立刻切换。
+  // 用 1px 行程做原生驱动的阶跃淡入淡出，达到阈值即默认头部马上隐藏、紧凑头部马上出现，
+  // 不做渐变过渡（渐变会在两头部间产生同屏叠显）。封面未布局完成前恒为 0，防止闪现。
+  const fadeStart = coverHeight - insets.top - NAV_BAR_CONTENT_HEIGHT;
+  const headerFade = useMemo(
+    () =>
+      coverHeight === 0
+        ? new Animated.Value(0)
+        : scrollY.interpolate({
+            inputRange: [fadeStart - 1, fadeStart],
+            outputRange: [0, 1],
+            extrapolate: "clamp",
+          }),
+    [scrollY, coverHeight, fadeStart],
+  );
+  // 滚动走原生驱动；JS 侧仅在跨越紧凑头部阈值时 setState 一次（同值自动豁免）。
+  const handleScroll = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+        useNativeDriver: true,
+        listener: (event: {
+          nativeEvent: { contentOffset: { y: number } };
+        }) => {
+          const active = event.nativeEvent.contentOffset.y >= fadeStart;
+          setCompactActive((prev) => (prev === active ? prev : active));
+        },
+      }),
+    [scrollY, fadeStart],
+  );
   const [selectedGameId, setSelectedGameId] = useState("");
-  const [introExpanded, setIntroExpanded] = useState(false);
   const [orderCard, setOrderCard] = useState<ProfileSkillCard | null>(null);
+  const [reorderActive, setReorderActive] = useState(false);
+  const reorderHandled = useRef(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [paymentOrder, setPaymentOrder] = useState<{
     orderId: number;
@@ -110,10 +164,6 @@ export default function ProfileScreen() {
     userId: "",
     isBlacklisted: false,
   });
-  const [paymentCancelError, setPaymentCancelError] = useState<string | null>(
-    null,
-  );
-  const paymentCancelingRef = useRef(false);
   const chatCheckPendingRef = useRef(false);
   const { entering: enteringCS, openCustomerService } =
     useCustomerServiceEntry();
@@ -128,7 +178,7 @@ export default function ProfileScreen() {
     (game) => String(game.gameId) === selectedGameId,
   )
     ? selectedGameId
-    : firstGameId;
+    : String(detail?.games.find((game) => game.gameName === route.reorderGame)?.gameId ?? firstGameId);
 
   const gameDetailQuery = useProfileGameDetail(
     routeParams && (detail?.clubId || routeParams.clubId) && activeGameId
@@ -139,13 +189,17 @@ export default function ProfileScreen() {
         }
       : null,
   );
+  // 评价按陪玩师整体拉取（全部游戏），不做游戏分类过滤
   const reviewQuery = useProfileReviews(
-    tab === "评价" && routeParams && activeGameId
-      ? { gameId: activeGameId, companionUserId: routeParams.userId }
+    tab === "评价" && routeParams
+      ? { companionUserId: routeParams.userId }
       : null,
   );
   const localProfile = useMemo(() => toLocalProfile(user), [user]);
   const profile = detail ?? localProfile;
+  const measureCover = useCallback((height: number) => {
+    setCoverHeight((prev) => (Math.abs(height - prev) > 1 ? height : prev));
+  }, []);
 
   useEffect(() => {
     if (isMine || profile.userId <= 0) return;
@@ -180,32 +234,38 @@ export default function ProfileScreen() {
   }, [isMine, profile.userId]);
 
   const gameDetail = gameDetailQuery.data;
-  const games = detail?.games ?? [];
+  const games = useMemo(() => detail?.games ?? [], [detail]);
   const coverImageUrl = gameDetail?.backgroundUrl?.trim();
   const voicePlayer = useVoicePlayer();
   const stopVoice = voicePlayer.stop;
-  const coverPreviewParams = coverImageUrl
-    ? createImagePreviewParams([coverImageUrl], 0)
-    : null;
+  const toggleVoice = voicePlayer.toggle;
+  const playingVoiceUrl = voicePlayer.playingUrl;
+  const coverPreviewParams = useMemo(
+    () => (coverImageUrl ? createImagePreviewParams([coverImageUrl], 0) : null),
+    [coverImageUrl],
+  );
 
   useEffect(() => {
     if (tab !== "技能") stopVoice();
   }, [tab, stopVoice]);
-  const openProfileRelation = (type: "following" | "fans") => {
-    if (profile.userId <= 0) return;
-    router.push({
-      pathname: "/profile-relations",
-      params: {
-        userId: String(profile.userId),
-        type,
-        ...(profile.clubId > 0
-          ? { clubId: String(profile.clubId) }
-          : routeParams?.clubId
-            ? { clubId: routeParams.clubId }
-            : {}),
-      },
-    });
-  };
+  const openProfileRelation = useCallback(
+    (type: "following" | "fans") => {
+      if (profile.userId <= 0) return;
+      router.push({
+        pathname: "/profile-relations",
+        params: {
+          userId: String(profile.userId),
+          type,
+          ...(profile.clubId > 0
+            ? { clubId: String(profile.clubId) }
+            : routeParams?.clubId
+              ? { clubId: routeParams.clubId }
+              : {}),
+        },
+      });
+    },
+    [profile, routeParams],
+  );
   const handleFollowPress = async () => {
     if (!requireLogin() || !detail || followMutation.isPending) return;
     const session = useAuthStore.getState();
@@ -234,6 +294,7 @@ export default function ProfileScreen() {
         return;
       }
 
+      // push 进聊天；params 带 fromProfile 标记，聊天页返回主页时用 dismissTo 弹回，避免循环套娃
       router.push({
         pathname: "/chat/[id]",
         params: createProfileChatParams({
@@ -250,260 +311,198 @@ export default function ProfileScreen() {
     }
   };
 
-  if (routeParams && detailQuery.isLoading) {
-    return (
-      <ProfileSkeleton
-        topInset={insets.top}
-        bottomInset={insets.bottom}
-        isMine={isMine}
-      />
-    );
-  }
-
-  if (routeParams && (detailQuery.isError || !detail)) {
-    return (
-      <ProfileErrorState
-        topInset={insets.top}
-        message={
-          detailQuery.error instanceof Error && detailQuery.error.message
-            ? detailQuery.error.message
-            : "个人主页加载失败"
+  const openOrder = useCallback(
+    async (card: ProfileSkillCard) => {
+      if (!requireLogin()) return;
+      try {
+        if (await isUserBlacklisted(profile.userId)) {
+          showToast("该用户已在黑名单中，无法下单");
+          return;
         }
-        onRetry={() => void detailQuery.refetch()}
-      />
-    );
-  }
-
-  const tabsContent = (
-    <View style={styles.tabs}>
-      {(["技能", "评价"] as ProfileTab[]).map((item) => (
-        <Pressable
-          key={item}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: tab === item }}
-          onPress={() => setTab(item)}
-          style={styles.tabButton}
-        >
-          {tab === item && (
-            <Image source={fallbackAvatar} style={styles.tabAvatar} />
-          )}
-          <Text style={[styles.tabText, tab === item && styles.tabTextActive]}>
-            {item}
-          </Text>
-          {tab === item ? <View style={styles.tabIndicator} /> : null}
-        </Pressable>
-      ))}
-    </View>
-  );
-
-  // 默认头部中的标签栏:紧凑头部淡入时反向淡出
-  const tabsInverseFade = headerFade.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 0],
-  });
-
-  const profileCover = (
-    <View
-      style={styles.cover}
-      onLayout={(event) => {
-        const height = event.nativeEvent.layout.height;
-        if (Math.abs(height - coverHeight) > 1) setCoverHeight(height);
-      }}
-    >
-      {coverPreviewParams ? (
-        <Pressable
-          accessibilityLabel="预览主页背景图"
-          accessibilityRole="button"
-          onPress={() =>
-            router.push({
-              pathname: "/image-preview",
-              params: coverPreviewParams,
-            })
-          }
-          style={StyleSheet.absoluteFill}
-        >
-          <Image
-            source={{ uri: coverImageUrl }}
-            contentFit="cover"
-            style={StyleSheet.absoluteFill}
-          />
-        </Pressable>
-      ) : (
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Image
-            source={background}
-            contentFit="cover"
-            style={StyleSheet.absoluteFill}
-          />
-        </View>
-      )}
-      <LinearGradient
-        pointerEvents="none"
-        style={StyleSheet.absoluteFill}
-        colors={["#3B79BA00", "#3B79BA", "#3B79BA"]}
-        locations={[0, 0.6, 1]}
-      />
-      <LinearGradient
-        pointerEvents="none"
-        style={StyleSheet.absoluteFill}
-        colors={["rgba(0,0,0,0.2)", "rgba(0,0,0,0.8)"]}
-      />
-      <ProfileIdentity
-        profile={profile}
-        isBlacklisted={
-          !isMine &&
-          blacklistStatus.userId === String(profile.userId) &&
-          blacklistStatus.isBlacklisted
-        }
-      />
-      <View style={styles.headerStats}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`关注列表，${profile.followCount}人`}
-          onPress={() => openProfileRelation("following")}
-          style={styles.headerStat}
-        >
-          <Text style={styles.headerStatValue}>{profile.followCount}</Text>
-          <Text style={styles.headerStatLabel}>关注</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`粉丝列表，${profile.fansCount}人`}
-          onPress={() => openProfileRelation("fans")}
-          style={styles.headerStat}
-        >
-          <Text style={styles.headerStatValue}>{profile.fansCount}</Text>
-          <Text style={styles.headerStatLabel}>粉丝</Text>
-        </Pressable>
-      </View>
-      <View style={styles.introBlock}>
-        <Text
-          numberOfLines={introExpanded ? undefined : 2}
-          ellipsizeMode="tail"
-          style={styles.headerIntro}
-        >
-          {profile.signature || "暂无个人简介"}
-        </Text>
-        {profile.signature ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={introExpanded ? "收起简介" : "展开简介"}
-            hitSlop={6}
-            onPress={() => setIntroExpanded((prev) => !prev)}
-            style={styles.introToggle}
-          >
-            <Image
-              source={arrowDownIcon}
-              style={[
-                styles.introToggleIcon,
-                introExpanded && styles.introToggleIconUp,
-              ]}
-            />
-          </Pressable>
-        ) : null}
-      </View>
-    </View>
-  );
-
-  const profileListItems: ProfileListItem[] = [
-    { key: "profile-cover", content: profileCover },
-    {
-      key: "profile-tabs",
-      content: (
-        <View style={styles.tabsBackdrop}>
-          <Animated.View
-            pointerEvents={compactActive ? "none" : "box-none"}
-            style={[styles.tabsBar, { opacity: tabsInverseFade }]}
-          >
-            {tabsContent}
-          </Animated.View>
-        </View>
-      ),
+        setOrderCard(card);
+      } catch {
+        showToast("黑名单状态读取失败，请稍后重试");
+      }
     },
-  ];
-
-  if (games.length > 0) {
-    profileListItems.push({
-      key: "game-selector",
-      content: (
-        <View style={styles.scrollBody}>
-          <GameSelector
-            games={games}
-            selectedGameId={activeGameId}
-            onSelect={setSelectedGameId}
-          />
-        </View>
-      ),
+    [profile.userId],
+  );
+  useEffect(() => {
+    if (!route.reorderGame || reorderHandled.current || !detail) {
+      return;
+    }
+    const matchingGames = detail.games.filter((game) => game.gameName === route.reorderGame);
+    if (matchingGames.length !== 1) {
+      reorderHandled.current = true;
+      showToast("原订单游戏已变更，请重新选择服务");
+      return;
+    }
+    const gameId = String(matchingGames[0].gameId);
+    if (activeGameId !== gameId) {
+      return;
+    }
+    if (gameDetailQuery.isError) {
+      reorderHandled.current = true;
+      showToast("服务加载失败，请重新选择服务");
+      return;
+    }
+    if (!gameDetail || String(gameDetail.gameId) !== gameId) {
+      return;
+    }
+    const cards = gameDetail.skillCards.filter((card) =>
+      card.modeName === route.reorderMode && card.levelName === route.reorderLevel,
+    );
+    const levelIds = new Set(cards.map((card) => card.gameLevelId));
+    if (levelIds.size !== 1 || !route.reorderService) {
+      reorderHandled.current = true;
+      showToast("原订单服务已变更，请重新选择服务");
+      return;
+    }
+    reorderHandled.current = true;
+    Promise.resolve().then(() => {
+      setReorderActive(true);
+      openOrder(cards[0]);
     });
+  }, [activeGameId, detail, gameDetail, gameDetailQuery.isError, openOrder, route.reorderGame, route.reorderLevel, route.reorderMode, route.reorderService]);
+  // 默认头部中的标签栏:紧凑头部淡入时反向淡出
+  const tabsInverseFade = useMemo(
+    () =>
+      headerFade.interpolate({
+        inputRange: [0, 1],
+        outputRange: [1, 0],
+      }),
+    [headerFade],
+  );
 
+  const profileListItems = useMemo<ProfileListItem[]>(() => {
+    const profileListItems: ProfileListItem[] = [
+      {
+        key: "profile-cover",
+        content: (
+          <ProfileCover
+            topInset={insets.top}
+            profile={profile}
+            coverImageUrl={coverImageUrl}
+            coverPreviewParams={coverPreviewParams}
+            isMine={isMine}
+            isBlacklisted={
+              !isMine &&
+              blacklistStatus.userId === String(profile.userId) &&
+              blacklistStatus.isBlacklisted
+            }
+            onSelectRelation={openProfileRelation}
+            onMeasure={measureCover}
+          />
+        ),
+      },
+      {
+        key: "profile-tabs",
+        content: (
+          <View style={styles.tabsBackdrop}>
+            <Animated.View
+              pointerEvents={compactActive ? "none" : "box-none"}
+              style={[styles.tabsBar, { opacity: tabsInverseFade }]}
+            >
+              <ProfileTabs tab={tab} onSelect={setTab} />
+            </Animated.View>
+          </View>
+        ),
+      },
+    ];
+
+    // 游戏筛选栏仅服务技能 tab；评价 tab 拉取陪玩师全部评价，不按游戏分类
     if (tab === "技能") {
-      if (gameDetailQuery.isLoading) {
+      if (games.length === 0) {
         profileListItems.push({
-          key: "skills-loading",
+          key: "games-empty",
           content: (
             <View style={styles.scrollBody}>
-              <ProfileGameSkeleton />
-            </View>
-          ),
-        });
-      } else if (gameDetailQuery.isError || !gameDetail) {
-        profileListItems.push({
-          key: "skills-error",
-          content: (
-            <View style={styles.scrollBody}>
-              <InlineState
-                text="游戏技能加载失败"
-                actionLabel="重试"
-                onAction={() => void gameDetailQuery.refetch()}
-              />
+              <EmptyState message="暂无支持的游戏" />
             </View>
           ),
         });
       } else {
-        profileListItems.push(
-          {
-            key: "skills-summary",
-            content: (
-              <View style={styles.scrollBody}>
-                <SkillsSummary detail={gameDetail} voicePlayer={voicePlayer} />
-              </View>
-            ),
-          },
-          {
-            key: "services-title",
-            content: (
-              <View style={styles.scrollBody}>
-                <Text style={[styles.sectionTitle, styles.serviceTitle]}>
-                  陪玩服务
-                </Text>
-              </View>
-            ),
-          },
-        );
+        profileListItems.push({
+          key: "game-selector",
+          content: (
+            <View style={styles.scrollBody}>
+              <GameSelector
+                games={games}
+                selectedGameId={activeGameId}
+                onSelect={setSelectedGameId}
+              />
+            </View>
+          ),
+        });
 
-        if (gameDetail.skillCards.length > 0) {
-          profileListItems.push(
-            ...gameDetail.skillCards.map((card) => ({
-              key: `service-${card.companionServiceId}-${card.gameLevelId}`,
-              content: (
-                <View style={styles.scrollBody}>
-                  <ServiceCard
-                    card={card}
-                    onOrder={() => void openOrder(card)}
-                  />
-                </View>
-              ),
-            })),
-          );
-        } else {
+        if (gameDetailQuery.isLoading) {
           profileListItems.push({
-            key: "services-empty",
+            key: "skills-loading",
             content: (
               <View style={styles.scrollBody}>
-                <EmptyState message="暂无大神服务" />
+                <ProfileGameSkeleton />
               </View>
             ),
           });
+        } else if (gameDetailQuery.isError || !gameDetail) {
+          profileListItems.push({
+            key: "skills-error",
+            content: (
+              <View style={styles.scrollBody}>
+                <InlineState
+                  text="游戏技能加载失败"
+                  actionLabel="重试"
+                  onAction={() => void gameDetailQuery.refetch()}
+                />
+              </View>
+            ),
+          });
+        } else {
+          profileListItems.push(
+            {
+              key: "skills-summary",
+              content: (
+                <View style={styles.scrollBody}>
+                  <SkillsSummary
+                    detail={gameDetail}
+                    onToggleVoice={toggleVoice}
+                    playingUrl={playingVoiceUrl}
+                  />
+                </View>
+              ),
+            },
+            {
+              key: "services-title",
+              content: (
+                <View style={styles.scrollBody}>
+                  <Text style={[styles.sectionTitle, styles.serviceTitle]}>
+                    陪玩服务
+                  </Text>
+                </View>
+              ),
+            },
+          );
+
+          if (gameDetail.skillCards.length > 0) {
+            profileListItems.push(
+              ...gameDetail.skillCards.map((card) => ({
+                key: `service-${card.companionServiceId}-${card.gameLevelId}`,
+                content: (
+                  <View style={styles.scrollBody}>
+                    <ServiceCard card={card} onOrder={openOrder} />
+                  </View>
+                ),
+              })),
+            );
+          } else {
+            profileListItems.push({
+              key: "services-empty",
+              content: (
+                <View style={styles.scrollBody}>
+                  <EmptyState message="暂无大神服务" />
+                </View>
+              ),
+            });
+          }
         }
       }
     } else if (reviewQuery.isLoading) {
@@ -535,7 +534,10 @@ export default function ProfileScreen() {
           key: "reviews-empty",
           content: (
             <View style={styles.scrollBody}>
-              <EmptyState message="暂无评价" hint="完成订单后会显示评价内容" />
+              <EmptyState
+                message="暂无评价"
+                hint="完成订单后会显示评价内容"
+              />
             </View>
           ),
         });
@@ -548,15 +550,52 @@ export default function ProfileScreen() {
         );
       }
     }
-  } else {
-    profileListItems.push({
-      key: "games-empty",
-      content: (
-        <View style={styles.scrollBody}>
-          <EmptyState message="暂无支持的游戏" />
-        </View>
-      ),
-    });
+
+    return profileListItems;
+  }, [
+    insets.top,
+    profile,
+    coverImageUrl,
+    coverPreviewParams,
+    isMine,
+    blacklistStatus,
+    openProfileRelation,
+    measureCover,
+    compactActive,
+    tabsInverseFade,
+    tab,
+    games,
+    activeGameId,
+    gameDetailQuery,
+    gameDetail,
+    reviewQuery,
+    toggleVoice,
+    playingVoiceUrl,
+    openOrder,
+  ]);
+
+  if (routeParams && detailQuery.isLoading) {
+    return (
+      <ProfileSkeleton
+        topInset={insets.top}
+        bottomInset={insets.bottom}
+        isMine={isMine}
+      />
+    );
+  }
+
+  if (routeParams && (detailQuery.isError || !detail)) {
+    return (
+      <ProfileErrorState
+        topInset={insets.top}
+        message={
+          detailQuery.error instanceof Error && detailQuery.error.message
+            ? detailQuery.error.message
+            : "个人主页加载失败"
+        }
+        onRetry={detailQuery.refetch}
+      />
+    );
   }
 
   const editProfileButton = isMine ? (
@@ -575,7 +614,6 @@ export default function ProfileScreen() {
       <StatusBar style="light" />
       <Animated.View
         style={[
-          styles.navbar,
           styles.navbarOverlay,
           styles.navbarCompact,
           { paddingTop: insets.top },
@@ -586,7 +624,7 @@ export default function ProfileScreen() {
           style={[
             styles.navbarBg,
             {
-              height: insets.top + 92,
+              height: insets.top + NAV_BAR_CONTENT_HEIGHT + 48,
               overflow: "hidden",
               opacity: headerFade,
             },
@@ -614,9 +652,9 @@ export default function ProfileScreen() {
             accessibilityLabel="返回"
             hitSlop={12}
             onPress={() => router.back()}
-            style={[styles.navButton, { marginTop: 3 }]}
+            style={styles.navButton}
           >
-            <Image source={backIcon} style={styles.backIcon} />
+            <ChevronLeft24Regular color="#fff" width={24} height={24} />
           </Pressable>
           <Animated.View
             pointerEvents="none"
@@ -653,14 +691,17 @@ export default function ProfileScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="搜索"
                   hitSlop={12}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/search",
-                      params: routeParams?.clubId
-                        ? { type: "user", clubId: routeParams.clubId }
-                        : { type: "user" },
-                    })
-                  }
+                  onPress={() => {
+                    const searchParams = routeParams?.clubId
+                      ? { type: "user" as const, clubId: routeParams.clubId }
+                      : { type: "user" as const };
+                    // 搜索页已在栈内时弹回它，避免 搜索/俱乐部/个人主页 反复跳转无限套娃
+                    if (fromSearchPage) {
+                      router.dismissTo({ pathname: "/search", params: searchParams });
+                      return;
+                    }
+                    router.push({ pathname: "/search", params: searchParams });
+                  }}
                   style={styles.navActionButton}
                 >
                   <Search24Regular color="#fff" width={24} height={24} />
@@ -670,13 +711,26 @@ export default function ProfileScreen() {
                   accessibilityLabel="在线客服"
                   accessibilityState={{ busy: enteringCS }}
                   hitSlop={12}
-                  onPress={() => void openCustomerService()}
-                  style={[styles.navActionButton, { marginTop: 3 }]}
+                  onPress={openCustomerService}
+                  style={[styles.navActionButton, { marginTop: 1 }]}
                 >
                   <Image
                     source={customerIcon}
                     style={styles.navActionIcon}
                     contentFit="contain"
+                  />
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="更多操作"
+                  hitSlop={12}
+                  onPress={() => setProfileActionsVisible(true)}
+                  style={styles.navActionButton}
+                >
+                  <MoreHorizontal24Regular
+                    color="#fff"
+                    width={24}
+                    height={24}
                   />
                 </Pressable>
               </>
@@ -685,33 +739,20 @@ export default function ProfileScreen() {
         </View>
         <Animated.View
           pointerEvents={compactActive ? "box-none" : "none"}
-          style={[
-            styles.tabsBar,
-            { opacity: headerFade, marginHorizontal: -12 },
-          ]}
+          style={[styles.tabsBar, { opacity: headerFade }]}
         >
-          {tabsContent}
+          <ProfileTabs tab={tab} onSelect={setTab} />
         </Animated.View>
       </Animated.View>
-      <FlatList
+      <Animated.FlatList
         style={styles.scrollView}
         data={profileListItems}
-        keyExtractor={(item) => item.key}
-        renderItem={({ item }) => item.content}
+        keyExtractor={profileKeyExtractor}
+        renderItem={profileRenderItem}
         initialNumToRender={6}
         maxToRenderPerBatch={5}
         windowSize={5}
-        onScroll={(event) => {
-          // 头像块剩余 136→44px 区间内,紧凑头部淡入(透明度渐变)
-          const fadeStart = coverHeight - 136;
-          const progress = Math.max(
-            0,
-            Math.min(1, (event.nativeEvent.contentOffset.y - fadeStart) / 92),
-          );
-          headerFade.setValue(progress);
-          const active = progress >= 1;
-          if (active !== compactActive) setCompactActive(active);
-        }}
+        onScroll={handleScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
@@ -788,7 +829,7 @@ export default function ProfileScreen() {
         onCancel={() => setBlacklistPromptVisible(false)}
         onConfirm={() => {
           setBlacklistPromptVisible(false);
-          void addToBlacklist(
+          addToBlacklist(
             {
               userId: String(profile.userId),
               nickname: profile.nickname,
@@ -797,9 +838,13 @@ export default function ProfileScreen() {
               clubId: String(profile.clubId),
             },
             useAuthStore.getState().accessToken ?? "",
-          ).then(() => {
-            showToast("加入黑名单成功");
-          });
+          )
+            .then(() => {
+              showToast("加入黑名单成功");
+            })
+            .catch((error: unknown) => {
+              showToast(error instanceof Error ? error.message : "操作失败");
+            });
         }}
       />
       {orderCard && gameDetail ? (
@@ -817,12 +862,18 @@ export default function ProfileScreen() {
             buyerUserId: Number(user?.id) || 0,
           }}
           token={useAuthStore.getState().accessToken}
-          onClose={() => setOrderCard(null)}
+          initialServiceName={reorderActive ? route.reorderService : undefined}
+          initialQuantity={reorderActive ? Number(route.reorderQuantity) : undefined}
+          onClose={() => {
+            setOrderCard(null);
+            setReorderActive(false);
+          }}
           onRealNameVerificationRequired={() =>
             router.push("/account-settings")
           }
           onOrderCreated={(order) => {
             setOrderCard(null);
+            setReorderActive(false);
             setPaymentError(null);
             setPaymentOrder(order);
             setPaymentSheetVisible(true);
@@ -835,7 +886,10 @@ export default function ProfileScreen() {
           visible={paymentSheetVisible}
           token={useAuthStore.getState().accessToken}
           onClose={() => {
-            void cancelPendingPaymentOrder();
+            const orderId = paymentOrder.orderId;
+            setPaymentSheetVisible(false);
+            setPaymentOrder(null);
+            invalidateOrderQueries(orderId);
           }}
           onPaid={() => {
             const paidOrderId = paymentOrder.orderId;
@@ -857,51 +911,166 @@ export default function ProfileScreen() {
         message={paymentError ?? ""}
         onConfirm={() => setPaymentError(null)}
       />
-      <AppPrompt
-        visible={Boolean(paymentCancelError)}
-        title="订单取消失败"
-        message={paymentCancelError ?? ""}
-        onConfirm={() => setPaymentCancelError(null)}
-      />
     </View>
   );
 
-  async function cancelPendingPaymentOrder() {
-    const pendingOrder = paymentOrder;
-    const token = useAuthStore.getState().accessToken;
-    if (paymentCancelingRef.current) return;
-    setPaymentSheetVisible(false);
-    setPaymentOrder(null);
-    if (!pendingOrder || !token) return;
-    paymentCancelingRef.current = true;
-    try {
-      await cancelOrder(String(pendingOrder.orderId), token);
-      void invalidateOrderQueries(pendingOrder.orderId);
-    } catch (error) {
-      setPaymentOrder(null);
-      // The payment sheet is already dismissed; surface a cancellation error
-      // without allowing the user to retry payment for the same order.
-      setPaymentCancelError(
-        error instanceof Error ? error.message : "订单取消失败",
-      );
-    } finally {
-      paymentCancelingRef.current = false;
-    }
-  }
-
-  async function openOrder(card: ProfileSkillCard) {
-    if (!requireLogin()) return;
-    try {
-      if (await isUserBlacklisted(profile.userId)) {
-        showToast("该用户已在黑名单中，无法下单");
-        return;
-      }
-      setOrderCard(card);
-    } catch {
-      showToast("黑名单状态读取失败，请稍后重试");
-    }
-  }
 }
+
+// 头部标签栏独立组件：滚动阈值切换等无关重渲染时保持元素引用稳定
+const ProfileTabs = memo(function ProfileTabs({
+  tab,
+  onSelect,
+}: {
+  tab: ProfileTab;
+  onSelect: (tab: ProfileTab) => void;
+}) {
+  return (
+    <View style={styles.tabs}>
+      {(["技能", "评价"] as ProfileTab[]).map((item) => (
+        <Pressable
+          key={item}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: tab === item }}
+          onPress={() => onSelect(item)}
+          style={styles.tabButton}
+        >
+          <Text style={[styles.tabText, tab === item && styles.tabTextActive]}>
+            {item}
+          </Text>
+          {tab === item ? <View style={styles.tabIndicator} /> : null}
+        </Pressable>
+      ))}
+    </View>
+  );
+});
+
+// 头部封面独立组件：列表项内容引用稳定，滚动期不被父组件重渲染波及
+const ProfileCover = memo(function ProfileCover({
+  topInset,
+  profile,
+  coverImageUrl,
+  coverPreviewParams,
+  isMine,
+  isBlacklisted,
+  onSelectRelation,
+  onMeasure,
+}: {
+  topInset: number;
+  profile: ProfileDetail;
+  coverImageUrl?: string;
+  coverPreviewParams: ImagePreviewParams | null;
+  isMine: boolean;
+  isBlacklisted: boolean;
+  onSelectRelation: (type: "following" | "fans") => void;
+  onMeasure: (height: number) => void;
+}) {
+  const [introExpanded, setIntroExpanded] = useState(false);
+  const [introOverflows, setIntroOverflows] = useState(false);
+  return (
+    <View
+      style={[
+        styles.cover,
+        {
+          paddingTop:
+            topInset + NAV_BAR_CONTENT_HEIGHT + PROFILE_IDENTITY_TOP_GAP,
+        },
+      ]}
+      onLayout={(event) => onMeasure(event.nativeEvent.layout.height)}
+    >
+      {coverPreviewParams ? (
+        <Pressable
+          accessibilityLabel="预览主页背景图"
+          accessibilityRole="button"
+          onPress={() =>
+            router.push({
+              pathname: "/image-preview",
+              params: coverPreviewParams,
+            })
+          }
+          style={StyleSheet.absoluteFill}
+        >
+          <Image
+            source={{ uri: coverImageUrl }}
+            contentFit="cover"
+            style={StyleSheet.absoluteFill}
+          />
+        </Pressable>
+      ) : (
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Image
+            source={background}
+            contentFit="cover"
+            style={StyleSheet.absoluteFill}
+          />
+        </View>
+      )}
+      <LinearGradient
+        pointerEvents="none"
+        style={StyleSheet.absoluteFill}
+        colors={["#3B79BA00", "#3B79BA", "#3B79BA"]}
+        locations={[0, 0.6, 1]}
+      />
+      <LinearGradient
+        pointerEvents="none"
+        style={StyleSheet.absoluteFill}
+        colors={["rgba(0,0,0,0.2)", "rgba(0,0,0,0.8)"]}
+      />
+      <ProfileIdentity profile={profile} isBlacklisted={isBlacklisted} />
+      <View style={styles.headerStats}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`关注列表，${profile.followCount}人`}
+          onPress={() => onSelectRelation("following")}
+          style={styles.headerStat}
+        >
+          <Text style={styles.headerStatValue}>{profile.followCount}</Text>
+          <Text style={styles.headerStatLabel}>关注</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`粉丝列表，${profile.fansCount}人`}
+          onPress={() => onSelectRelation("fans")}
+          style={styles.headerStat}
+        >
+          <Text style={styles.headerStatValue}>{profile.fansCount}</Text>
+          <Text style={styles.headerStatLabel}>粉丝</Text>
+        </Pressable>
+      </View>
+      <View style={styles.introBlock}>
+        <Text
+          numberOfLines={introExpanded ? undefined : 2}
+          ellipsizeMode="tail"
+          style={styles.headerIntro}
+          onTextLayout={(event) => {
+            // 收起态下可见行数达到 2 行说明被截断，此时才展示展开/收起按钮
+            if (introExpanded) return;
+            const overflows = event.nativeEvent.lines.length >= 2;
+            setIntroOverflows((prev) => (prev === overflows ? prev : overflows));
+          }}
+        >
+          {profile.signature || "暂无个人简介"}
+        </Text>
+        {profile.signature && (introExpanded || introOverflows) ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={introExpanded ? "收起简介" : "展开简介"}
+            hitSlop={6}
+            onPress={() => setIntroExpanded((prev) => !prev)}
+            style={styles.introToggle}
+          >
+            <Image
+              source={arrowDownIcon}
+              style={[
+                styles.introToggleIcon,
+                introExpanded && styles.introToggleIconUp,
+              ]}
+            />
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
+  );
+});
 
 function ProfileIdentity({
   profile,
@@ -910,6 +1079,13 @@ function ProfileIdentity({
   profile: ProfileDetail;
   isBlacklisted: boolean;
 }) {
+  const route = useLocalSearchParams<{
+    fromClubId?: string | string[];
+    fromSearch?: string | string[];
+  }>();
+  const fromClubId =
+    typeof route.fromClubId === "string" ? route.fromClubId : undefined;
+  const fromSearch = route.fromSearch === "1";
   const status = getStatus(profile.onlineStatus, profile.gameStatus);
   const age = profile.birth ? calculateAge(profile.birth) : "";
   const avatarPreviewParams = createProfileAvatarPreviewParams(
@@ -948,12 +1124,6 @@ function ProfileIdentity({
             {profile.nickname}
           </Text>
 
-          {isBlacklisted ? (
-            <View accessibilityLabel="已加入黑名单" style={styles.blacklistTag}>
-              <Text style={styles.blacklistTagText}>已加入黑名单</Text>
-            </View>
-          ) : null}
-
           {profile.sex === 1 || profile.sex === 2 ? (
             <View style={styles.headerPill}>
               <Image
@@ -983,15 +1153,52 @@ function ProfileIdentity({
             </View>
           ) : null}
         </View>
-        <View style={styles.clubLine}>
-          <View style={styles.clubInfo}>
-            <Text style={styles.clubLabel}>成员</Text>
-            <Text style={styles.clubValue}>{profile.followCount}人</Text>
-          </View>
-          <View style={styles.clubInfo}>
-            <Text style={styles.clubLabel}>俱乐部ID</Text>
-            <Text style={styles.clubValue}>{profile.clubId || "暂无"}</Text>
-          </View>
+        <View style={styles.idClubRow}>
+          {profile.tagName ? (
+            <View
+              accessibilityLabel={`大神标签：${profile.tagName}`}
+              style={[
+                styles.companionTag,
+                { backgroundColor: profile.tagColor || "#C0C4CC" },
+              ]}
+            >
+              <Text style={styles.companionTagText}>{profile.tagName}</Text>
+            </View>
+          ) : null}
+          {profile.clubId > 0 ? (
+            <Pressable
+              style={styles.clubLine}
+              onPress={() => {
+                // 来源就是这家俱乐部主页时直接出栈回退，俱乐部/个人主页来回点不再无限堆栈
+                if (fromClubId && fromClubId === String(profile.clubId)) {
+                  router.back();
+                  return;
+                }
+                router.push({
+                  pathname: "/club/[id]",
+                  // fromUserId 标记来源个人主页，俱乐部页点回该成员时直接出栈，避免套娃
+                  params: {
+                    id: String(profile.clubId),
+                    fromUserId: String(profile.userId),
+                    ...(fromSearch ? { fromSearch: "1" } : {}),
+                  },
+                });
+              }}
+            >
+              <Image source={clubIcon} style={styles.clubIcon} />
+              <Text numberOfLines={1} style={styles.clubName}>
+                {profile.clubName || "俱乐部"}
+              </Text>
+            </Pressable>
+          ) : null}
+          {profile.userId ? (
+            <Text style={styles.idRow}>ID：{profile.userId}</Text>
+          ) : null}
+          {isBlacklisted ? (
+            <View accessibilityLabel="已加入黑名单" style={styles.blacklistTag}>
+              <Text style={styles.blacklistTagText}>已加入黑名单</Text>
+            </View>
+          ) : null}
         </View>
       </View>
     </View>
@@ -1039,10 +1246,12 @@ function GameSelector({
 
 function SkillsSummary({
   detail,
-  voicePlayer,
+  onToggleVoice,
+  playingUrl,
 }: {
   detail: ProfileGameDetail;
-  voicePlayer: ReturnType<typeof useVoicePlayer>;
+  onToggleVoice: (voiceUrl: string) => void;
+  playingUrl: string | null;
 }) {
   return (
     <>
@@ -1052,8 +1261,8 @@ function SkillsSummary({
           <VoicePlayButton
             duration={detail.voiceDurationSeconds}
             inline
-            onToggleVoice={voicePlayer.toggle}
-            playingUrl={voicePlayer.playingUrl}
+            onToggleVoice={onToggleVoice}
+            playingUrl={playingUrl}
             url={detail.voiceUrl}
           />
         ) : null}
@@ -1067,7 +1276,10 @@ function SkillsSummary({
 }
 
 function ImageGallery({ images }: { images: string[] }) {
-  if (images.length === 0) return <EmptyState message="暂无技能图片" />;
+  // 无图时保留插画空态，但压缩上方留白，避免大块空白把服务模式挤远
+  if (images.length === 0) {
+    return <EmptyState message="暂无技能图片" style={styles.galleryEmpty} />;
+  }
   const visibleImages = images.slice(0, 5);
 
   return (
@@ -1100,12 +1312,12 @@ function ImageGallery({ images }: { images: string[] }) {
   );
 }
 
-function ServiceCard({
+const ServiceCard = memo(function ServiceCard({
   card,
   onOrder,
 }: {
   card: ProfileSkillCard;
-  onOrder: () => void;
+  onOrder: (card: ProfileSkillCard) => void;
 }) {
   return (
     <View style={styles.serviceCard}>
@@ -1123,14 +1335,18 @@ function ServiceCard({
           ) : null}
         </View>
       </View>
-      <Pressable style={styles.orderButton} onPress={onOrder}>
+      <Pressable style={styles.orderButton} onPress={() => onOrder(card)}>
         <Text style={styles.orderText}>下单</Text>
       </Pressable>
     </View>
   );
-}
+});
 
-function ReviewCard({ review }: { review: ProfileReview }) {
+const ReviewCard = memo(function ReviewCard({
+  review,
+}: {
+  review: ProfileReview;
+}) {
   return (
     <View style={styles.reviewCard}>
       <Image
@@ -1196,7 +1412,7 @@ function ReviewCard({ review }: { review: ProfileReview }) {
       </View>
     </View>
   );
-}
+});
 
 function ProfileErrorState({
   topInset,
@@ -1267,14 +1483,22 @@ function toLocalProfile(
     orderCount: 0,
     onlineStatus: 0,
     gameStatus: 0,
+    tagName: "",
+    tagColor: "",
     games: [],
   };
 }
 
+// 状态口径与 Web getCompanionStatus 对齐：必须先确认在线，
+// 离线时残留的 gameStatus=1 不能覆盖成「游戏中」。
 function getStatus(onlineStatus: number, gameStatus: number) {
-  if (gameStatus === 1) return { label: "游戏中", color: "#F5821D" };
-  if (onlineStatus === 1) return { label: "空闲中", color: "#14A357" };
-  return null;
+  if (onlineStatus !== 1) {
+    return null;
+  }
+  if (gameStatus === 1) {
+    return { label: "游戏中", color: "#F5821D" };
+  }
+  return { label: "空闲中", color: "#14A357" };
 }
 
 function formatReviewDate(value?: string) {
@@ -1320,8 +1544,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "#617181",
     justifyContent: "flex-end",
-    // 头像顶部距屏幕顶部 92(含状态栏),与头像下方留白(92)一致
-    paddingTop: 92,
+    // 头像位于安全区和导航栏下方，与俱乐部主页保持 12 的间距。
     paddingHorizontal: 16,
     paddingBottom: 28,
   },
@@ -1393,7 +1616,6 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   navbarCompact: {
-    flex: 1,
     flexDirection: "column",
     overflow: "hidden",
   },
@@ -1405,7 +1627,7 @@ const styles = StyleSheet.create({
   navbarCompactRow: {
     flexDirection: "row",
     alignItems: "center",
-    height: 44,
+    height: NAV_BAR_CONTENT_HEIGHT,
     paddingHorizontal: 12,
     gap: 8,
   },
@@ -1452,11 +1674,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(24,35,47,0.52)",
   },
-  navbar: {
-    paddingHorizontal: 12,
-    flexDirection: "column",
-    alignItems: "stretch",
-  },
   navButton: {
     width: 24,
     height: 24,
@@ -1475,7 +1692,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   navActionIcon: { width: 24, height: 24, tintColor: "#FFFFFF" },
-  backIcon: { width: 24, height: 24, tintColor: "#fff" },
   identity: {
     flexDirection: "row",
     alignItems: "center",
@@ -1550,19 +1766,47 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: "500",
   },
-  clubLine: { flexDirection: "row", alignItems: "center", gap: 12 },
-  clubInfo: { flexDirection: "row", alignItems: "center", gap: 2 },
-  clubLabel: {
+  idClubRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  // 大神标签：与陪玩卡片标签保持一致的尺寸与排版
+  companionTag: {
+    borderRadius: 2,
+    paddingHorizontal: 2,
+    height: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  companionTagText: {
+    color: "#FFF",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: "500",
+    includeFontPadding: false,
+    textAlignVertical: "center",
+  },
+  idRow: {
     color: "rgba(255,255,255,0.6)",
     fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
-  clubValue: {
-    color: "#FFFFFF",
+  clubLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    flexShrink: 1,
+  },
+  clubIcon: { width: 16, height: 16 },
+  clubName: {
+    color: "rgba(255,255,255,0.6)",
     fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
+    flexShrink: 1,
   },
   scrollIntro: {
     marginTop: -1,
@@ -1638,11 +1882,6 @@ const styles = StyleSheet.create({
     minWidth: 36,
     position: "relative",
   },
-  tabAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-  },
   tabText: {
     color: "#999",
     fontFamily: DOUYIN_SANS,
@@ -1658,13 +1897,16 @@ const styles = StyleSheet.create({
   tabIndicator: {
     position: "absolute",
     bottom: -6,
-    left: 3,
-    right: 3,
-    height: 6,
-    borderRadius: 2,
-    backgroundColor: "#FFC2C6",
+    left: "50%",
+    marginLeft: -6,
+    width: 12,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: "#FE1F4C",
   },
-  gameTags: { flexDirection: "row", gap: 10, marginTop: 12, paddingRight: 16 },
+  // paddingBottom 1：部分 Android 屏幕密度下 32dp 取整后最后 1px 物理行落在
+  // 横向 ScrollView 裁剪区外，选中态的圆角边框底部会被裁掉，留 1px 余量兼容
+  gameTags: { flexDirection: "row", gap: 10, marginTop: 12, paddingRight: 16, paddingBottom: 1 },
   gameTag: {
     height: 32,
     paddingHorizontal: 6,
@@ -1708,6 +1950,8 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   gallery: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 14 },
+  // 默认空态 minHeight 240，这里收紧到插画+文案的紧凑高度
+  galleryEmpty: { minHeight: 150 },
   galleryItem: {
     width: 62,
     height: 62,

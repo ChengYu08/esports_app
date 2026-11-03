@@ -1,4 +1,3 @@
-import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import {
   toUploadItems,
   useCaseDetail,
@@ -29,20 +28,24 @@ import {
   type CourtSource,
   type TicketTarget,
 } from "@/features/court/court.api";
+import { showToast, toastDurations } from "@/shared/ui/app-toast";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { useAuthStore } from "@esports/auth";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
-  ScrollView,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { showToast, toastDurations } from "@/shared/ui/app-toast";
+import {
+  KeyboardAwareScrollView,
+  KeyboardEvents,
+  KeyboardStickyView,
+  type KeyboardAwareScrollViewRef,
+} from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Mode = "court" | "ticket" | "evidence" | "appeal";
@@ -71,6 +74,8 @@ export default function CourtComplaintScreen() {
   const [ticketReason, setTicketReason] = useState<string>("RULE_VIOLATION");
   const [claim, setClaim] = useState("");
   const [content, setContent] = useState("");
+  const [footerHeight, setFooterHeight] = useState(0);
+  const formScrollRef = useRef<KeyboardAwareScrollViewRef>(null);
   const [sourceSessionId] = useState(() => makeIdempotencyKey("court-source"));
   const [targetSessionId] = useState(() => makeIdempotencyKey("ticket-target"));
   const [submitTicket] = useState(createTicketSubmitter);
@@ -87,6 +92,19 @@ export default function CourtComplaintScreen() {
   );
   const [submitting, setSubmitting] = useState(false);
 
+  const revealFocusedInput = useCallback(() => {
+    formScrollRef.current?.assureFocusedInputVisible();
+  }, []);
+
+  useEffect(() => {
+    // 键盘完全展开后重新测量，兼容首次聚焦及输入法高度变化。
+    const subscription = KeyboardEvents.addListener(
+      "keyboardDidShow",
+      revealFocusedInput,
+    );
+    return () => subscription.remove();
+  }, [revealFocusedInput]);
+
   const evidence = useEvidenceImages(accessToken, checkAccount);
   const {
     images,
@@ -96,7 +114,19 @@ export default function CourtComplaintScreen() {
     removeImage,
     uploadAll,
   } = evidence;
-  const caseDetail = useCaseDetail(params.caseId, (item) => {
+  // 重新提交 / 申诉 / 补充举证各自校验不同的操作码；发起投诉（无 caseId）不加载。
+  const requiredAction =
+    mode === "evidence"
+      ? ("SUPPLEMENT_EVIDENCE" as const)
+      : mode === "appeal"
+        ? ("APPEAL" as const)
+        : ("RESUBMIT" as const);
+  const caseDetail = useCaseDetail(params.caseId, requiredAction, (item) => {
+    // 与 Web 端一致：只有重新提交回填原表单；补充举证 / 申诉是全新的空白表单，
+    // 原投诉内容已在页面顶部的案件信息区展示，不带入输入框。
+    if (mode !== "court") {
+      return;
+    }
     if (item.content) setContent(item.content);
     if (item.claim) setClaim(item.claim);
     if (item.caseType) setCaseType(item.caseType as CourtCaseType);
@@ -362,30 +392,30 @@ export default function CourtComplaintScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={styles.screen}
-    >
-      <View
-        style={[
-          styles.header,
-          { paddingTop: insets.top, height: insets.top + 44 },
-        ]}
-      >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="返回"
-          disabled={submitting}
-          onPress={() => router.back()}
-          style={styles.back}
-        >
-          <ChevronLeft24Regular color="#0D0D0F" width={24} height={24} style={styles.backIcon} />
-        </Pressable>
-        <Text style={styles.headerTitle}>{title}</Text>
-        <View style={styles.back} />
-      </View>
-      <ScrollView
+    // 滚动区域保持稳定，由自动滚动避让输入框，底部操作栏单独跟随键盘移动。
+    <View style={styles.screen}>
+      <ScreenHeader
+        title={title}
+        onBack={() => {
+          // 提交中保持返回键可见但不响应，与原 disabled={submitting} 行为一致
+          if (!submitting) {
+            router.back();
+          }
+        }}
+        backIconColor="#0D0D0F"
+        titleStyle={styles.headerTitle}
+        style={{
+          paddingTop: insets.top,
+          height: insets.top + 44,
+          paddingHorizontal: 16,
+        }}
+      />
+      <KeyboardAwareScrollView
+        ref={formScrollRef}
+        // 提交栏随键盘上移，输入光标还需避开提交栏并保留少量间距。
+        bottomOffset={footerHeight + 12}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
@@ -431,6 +461,7 @@ export default function CourtComplaintScreen() {
                 }}
                 onOpenSources={openSources}
                 onChangeClaim={setClaim}
+                onFocusClaim={revealFocusedInput}
               />
             ) : (
               <TicketFormSection
@@ -489,6 +520,7 @@ export default function CourtComplaintScreen() {
           required
         >
           <TextInput
+            onFocus={revealFocusedInput}
             value={content}
             onChangeText={setContent}
             multiline
@@ -524,8 +556,9 @@ export default function CourtComplaintScreen() {
               驳回原因：{caseDetail.rejectionReason}
             </Text>
           )}
-      </ScrollView>
-      <View
+      </KeyboardAwareScrollView>
+      <KeyboardStickyView
+        onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
         style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}
       >
         {(mode === "court" || mode === "ticket") && (
@@ -584,7 +617,7 @@ export default function CourtComplaintScreen() {
             )}
           </Pressable>
         </View>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardStickyView>
+    </View>
   );
 }

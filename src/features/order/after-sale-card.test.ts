@@ -19,9 +19,9 @@ describe("after-sale card", () => {
       { label: "陪玩师", value: "陪玩师小王（ID：456）" },
       { label: "订单号", value: "PZ20261008001" },
       { label: "游戏", value: "王者荣耀" },
-      { label: "服务", value: "排位上分 68星钻/小时" },
+      { label: "服务", value: "排位上分 68钻石/小时" },
       { label: "数量", value: "2小时" },
-      { label: "总价", value: "136星钻" },
+      { label: "总价", value: "136钻石" },
       { label: "时间", value: "2026-10-08 10:30:00" },
       { label: "备注", value: "尽快安排" },
     ]);

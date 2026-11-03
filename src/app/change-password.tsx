@@ -1,4 +1,5 @@
 import { env } from "@/core/config/env";
+import { signOut } from "@/features/auth/sign-out";
 import { createAuthSsoAdapter, ForgotPasswordScreen, useAuthStore } from "@esports/auth";
 import { SsoClient } from "@esports/sso-sdk";
 import { router, Stack } from "expo-router";
@@ -60,8 +61,10 @@ export default function ChangePasswordRoute() {
           }
           try {
             await adapter.forgetPassword(payload);
+            // 改密后旧凭证不再可信：按退出登录流程清理会话，再强制回到登录页重新登录。
             showToast("密码修改成功，请使用新密码登录");
-            router.back();
+            await signOut();
+            router.replace("/login");
           } catch (error) {
             showToast(
               `密码修改失败，${getErrorMessage(error, "密码修改失败")}`,

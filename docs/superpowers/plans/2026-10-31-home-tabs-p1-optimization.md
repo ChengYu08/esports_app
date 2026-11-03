@@ -113,7 +113,12 @@ const renderCard = useCallback(
     <GodCard
       item={item}
       gameIconUrl={gameIconByName.get(item.gameName)}
-      playingUrl={voicePlayer.playingUrl}
+      // 仅把播放中卡片的 voiceUrl 传入，其余卡片恒为 null：语音启停时只有新旧两张卡片重渲染（review 修正：直接透传 playingUrl 会让全部可见卡片 memo 失效）。
+      playingUrl={
+        voicePlayer.playingUrl === item.voiceUrl && item.voiceUrl
+          ? voicePlayer.playingUrl
+          : null
+      }
       onToggleVoice={voicePlayer.toggle}
       onItemPress={handleItemPress}
     />
@@ -284,7 +289,7 @@ Run: `npm run android`（JAVA_HOME 指向 jdk-17，不加 `--device`）
 验证清单：
 1. 大神列表快滑：掉帧明显改善；列表快速滑动无长时间空白区（windowSize 收窄的代价检查）
 2. 大神列表：打开"性别/状态/价格"任一下拉筛选 → 弹层动画流畅，卡片不闪烁（memo 生效的间接证据）；选择筛选 → 列表正常刷新
-3. 大神列表：点击任一语音播放 → 仅对应卡片的播放状态变化，其余卡片不重渲染（肉眼无闪烁）；再次点击停止
+3. 大神列表：点击任一语音播放 → 仅对应卡片的播放状态变化，其余卡片不重渲染（肉眼无闪烁）；再次点击停止；**播放中切走顶部频道 → 语音立即停止（keep-alive 常驻后需显式 stop，HomeScreen 传 active prop 控制）**
 4. 大神列表：点击卡片 → 正常跳转 `/profile`，参数（clubId/userId/gameId 按"全部"与具体游戏两种情况）与改动前一致
 5. 首页俱乐部列表快滑掉帧改善、加载更多正常；卡片角标渐变显示与改动前一致
 6. 小法庭列表快滑掉帧改善；回到顶部按钮、加载更多正常

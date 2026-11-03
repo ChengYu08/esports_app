@@ -14,12 +14,15 @@ import {
 export function OrderDetailInfoBlocks({
   order,
   scope,
+  clubName,
   orderNumber,
   onCopy,
   onChat,
 }: {
   order: OrderItemModel;
   scope: "accept" | "place";
+  /** 陪玩师所属俱乐部名（详情接口只回 id，由外部解析后传入） */
+  clubName?: string;
   orderNumber: string;
   onCopy: () => void;
   onChat: () => void;
@@ -50,9 +53,9 @@ export function OrderDetailInfoBlocks({
             >
               {order.sellerName}
             </Text>
-            {scope !== "accept" && (
-              <Text style={styles.muted}>盼之电竞自营俱乐部</Text>
-            )}
+            {clubName ? (
+              <Text style={styles.muted}>{clubName}</Text>
+            ) : null}
           </View>
           <Pressable
             accessibilityRole="button"
@@ -93,7 +96,7 @@ export function OrderDetailInfoBlocks({
           <OrderDetailInfoRow
             acceptStyle={scope === "accept"}
             label="单价"
-            value={`${order.unitPrice}星钻/${order.billingUnitName ?? "小时"}`}
+            value={`${order.unitPrice}钻石/${order.billingUnitName ?? "小时"}`}
           />
           <OrderDetailInfoRow
             acceptStyle={scope === "accept"}
@@ -103,7 +106,7 @@ export function OrderDetailInfoBlocks({
           <OrderDetailInfoRow
             acceptStyle={scope === "accept"}
             label={freeSummary ? `原${amountLabel}` : amountLabel}
-            value={`${order.totalPrice}星钻`}
+            value={`${order.totalPrice}钻石`}
           />
           {(order.discountAmount ?? 0) > 0 ? (
             <OrderDetailInfoRow
@@ -119,7 +122,7 @@ export function OrderDetailInfoBlocks({
                 acceptStyle={scope === "accept"}
                 label={`${amountLabel}(免单后)`}
                 amount
-                value={`${formatStar(computeOrderPayableStars(order))}星钻`}
+                value={`${formatStar(computeOrderPayableStars(order))}钻石`}
               />
             </>
           ) : null}
@@ -146,32 +149,34 @@ export function OrderDetailInfoBlocks({
         {scope === "accept" ? (
           <OrderDetailInfoRow
             acceptStyle
+            // 派单时间：单子排到陪玩侧的时间；普通单即支付完成进入接单池的时间
             label="派单时间"
-            value={formatOrderTime(order.dispatchTime ?? order.acceptedTime)}
+            value={formatOrderTime(order.dispatchTime ?? order.paidTime)}
           />
         ) : (
-          <>
-            <OrderDetailInfoRow
-              label="支付时间"
-              value={formatOrderTime(order.paidTime)}
-            />
-            <OrderDetailInfoRow
-              label="接单时间"
-              value={formatOrderTime(order.acceptedTime)}
-            />
-            <OrderDetailInfoRow
-              label="服务时间"
-              value={formatServiceTime(
-                order.serviceStartTime,
-                order.serviceEndTime,
-              )}
-            />
-            <OrderDetailInfoRow
-              label="完成时间"
-              value={formatOrderTime(order.completedTime)}
-            />
-          </>
+          <OrderDetailInfoRow
+            label="支付时间"
+            value={formatOrderTime(order.paidTime)}
+          />
         )}
+        <OrderDetailInfoRow
+          acceptStyle={scope === "accept"}
+          label="接单时间"
+          value={formatOrderTime(order.acceptedTime)}
+        />
+        <OrderDetailInfoRow
+          acceptStyle={scope === "accept"}
+          label="服务时间"
+          value={formatServiceTime(
+            order.serviceStartTime,
+            order.serviceEndTime,
+          )}
+        />
+        <OrderDetailInfoRow
+          acceptStyle={scope === "accept"}
+          label="完成时间"
+          value={formatOrderTime(order.completedTime)}
+        />
       </View>
     </>
   );
@@ -181,46 +186,49 @@ const styles = StyleSheet.create({
   infoBlock: {
     gap: 0,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 14,
+    paddingVertical: 6,
+    borderTopWidth: 8,
     borderTopColor: "#F7F7F7",
+    backgroundColor: "#FFF",
   },
   acceptInfoBlock: { borderTopWidth: 8, paddingVertical: 0, backgroundColor: "#FFF" },
   acceptDetailsBlock: { borderTopWidth: 8, paddingVertical: 6, backgroundColor: "#FFF" },
   acceptRows: { paddingVertical: 6 },
-  sellerRow: { flexDirection: "row", alignItems: "center", minHeight: 58 },
+  sellerRow: { flexDirection: "row", alignItems: "center", minHeight: 56, paddingVertical: 12 },
   acceptSellerRow: { minHeight: 56, paddingVertical: 12 },
-  avatar: { width: 40, height: 40, borderRadius: 20, marginRight: 10 },
+  avatar: { width: 32, height: 32, borderRadius: 16, marginRight: 8 },
   acceptAvatar: { width: 32, height: 32, borderRadius: 16, marginRight: 8 },
   sellerCopy: { flex: 1, minWidth: 0, gap: 4 },
   sellerName: {
     color: "#111",
     fontFamily: SYSTEM_FONT,
-    fontSize: 17,
-    fontWeight: "600",
+    fontSize: 14,
+    fontWeight: "500",
+    lineHeight: 22,
   },
   acceptSellerName: { color: "#0A0A0A", fontSize: 14, fontWeight: "500", lineHeight: 22 },
-  muted: { color: "#999", fontFamily: SYSTEM_FONT, fontSize: 13 },
+  muted: { color: "#999", fontFamily: SYSTEM_FONT, fontSize: 11, lineHeight: 14 },
   chatButton: {
     backgroundColor: "#FF2850",
     borderRadius: 20,
-    paddingHorizontal: 18,
-    height: 40,
+    paddingHorizontal: 12,
+    height: 26,
     alignItems: "center",
     justifyContent: "center",
   },
   chatText: {
     color: "#FFF",
     fontFamily: SYSTEM_FONT,
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "500",
   },
   acceptChatButton: { height: 26, borderRadius: 13, paddingHorizontal: 12, backgroundColor: "#FE1F4C" },
   acceptChatText: { fontSize: 12, fontWeight: "500", lineHeight: 18 },
   divider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: "#EEE",
-    marginVertical: 8,
+    marginVertical: 0,
   },
   acceptDivider: { backgroundColor: "#EBEBEB", marginVertical: 0 },
 });

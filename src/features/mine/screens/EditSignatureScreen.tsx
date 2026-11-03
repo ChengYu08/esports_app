@@ -1,5 +1,4 @@
 import { useAuthStore } from "@esports/auth";
-import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import {
@@ -18,8 +17,9 @@ import { toAuthUser } from "@/features/auth/client-auth-flow";
 import { saveAuthSession } from "@/features/auth/session-persistence";
 import { validateSignature } from "@/features/mine/utils/signature-rules";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
-const SIGNATURE_MAX_LENGTH = 100;
+const SIGNATURE_MAX_LENGTH = 60;
 // 设计稿 361-40424：计数达到上限时数字变红
 const LIMIT_COLOR = "#FF4754";
 
@@ -72,33 +72,26 @@ export default function EditSignatureScreen() {
 
   return (
     <View style={styles.screen}>
-      <View
-        style={[
-          styles.header,
-          { height: 44 + insets.top, paddingTop: insets.top },
-        ]}
-      >
-        <Pressable
-          accessibilityLabel="返回"
-          hitSlop={12}
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <ChevronLeft24Regular color="#0A0A0A" width={24} height={24} />
-        </Pressable>
-        <Text style={styles.headerTitle}>编辑个性签名</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="保存"
-          disabled={saving}
-          onPress={() => void save()}
-          style={styles.saveButton}
-        >
-          <Text style={[styles.saveText, saving && styles.saveTextSaving]}>
-            {saving ? "保存中" : "保存"}
-          </Text>
-        </Pressable>
-      </View>
+      <ScreenHeader
+        title="编辑个性签名"
+        onBack={() => router.back()}
+        backgroundColor="#F7F7F7"
+        titleStyle={styles.headerTitle}
+        right={
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="保存"
+            disabled={saving}
+            onPress={() => void save()}
+            style={styles.saveButton}
+          >
+            <Text style={[styles.saveText, saving && styles.saveTextSaving]}>
+              {saving ? "保存中" : "保存"}
+            </Text>
+          </Pressable>
+        }
+        style={{ paddingTop: insets.top, height: insets.top + 44 }}
+      />
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.inputSection}>
@@ -128,7 +121,7 @@ export default function EditSignatureScreen() {
             </View>
           </View>
           <Text style={styles.hintText}>
-            {"最多100字，7天内可修改3次简介"}
+            {"最多60字，7天内可修改3次简介"}
           </Text>
         </View>
       </ScrollView>
@@ -140,18 +133,6 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: "#F7F7F7",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#F7F7F7",
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
   },
   headerTitle: {
     color: "#333333",

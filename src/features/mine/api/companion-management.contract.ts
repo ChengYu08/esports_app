@@ -37,6 +37,26 @@ export type ManagedServiceLevel = {
   gameModeName?: string;
   companionServiceList?: ManagedService[];
 };
+
+/** 服务开关变化不影响展示顺序，价格相同时按服务 ID 固定排序。 */
+export function sortManagedServices(
+  services: readonly ManagedService[],
+): ManagedService[] {
+  return [...services].sort((a, b) => {
+    const priceA =
+      a.price == null || !Number.isFinite(Number(a.price))
+        ? -Infinity
+        : Number(a.price);
+    const priceB =
+      b.price == null || !Number.isFinite(Number(b.price))
+        ? -Infinity
+        : Number(b.price);
+    if (priceA !== priceB) {
+      return priceA - priceB;
+    }
+    return a.companionServiceId - b.companionServiceId;
+  });
+}
 export type CompanionWallet = {
   withdrawablePan?: number | string;
   pendingPan?: number | string;
@@ -52,8 +72,8 @@ export type WalletEntry = {
   transactionType?: string;
   transactionTypeDesc?: string;
   amount?: number | string;
-  /** 该笔流水后的剩余竹子余额；接口暂未返回时按 0 展示。 */
-  remainAmount?: number | string | null;
+  /** 该笔流水后的剩余竹子余额 */
+  balanceAfter?: number | string | null;
   relatedOrderNo?: string;
   remark?: string;
   createTime?: string;

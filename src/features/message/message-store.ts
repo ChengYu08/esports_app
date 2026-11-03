@@ -90,9 +90,13 @@ export type MessageStoreState = {
   activePeerId: string | null;
   /** 聊天界面是否在前台可见；activePeerId 在页面被覆盖/退后台时仍保留，已读判断必须叠加此项 */
   chatForeground: boolean;
+  /** 诊断用：本次登录会话内确认为离线补偿重放的消息条数（隐藏弹窗展示，文案不含 SDK 厂商名） */
+  compensatedCount: number;
   lastError: string | null;
   refreshOnlineStatuses: (token: string) => Promise<void>;
   refreshConversations: (token: string) => Promise<void>;
+  /** 兜底：进入消息页发现列表为空时，延迟重读一次快照（每次登录会话最多一次） */
+  retryIfEmpty: (token: string) => Promise<void>;
   initialize: (token: string) => Promise<void>;
   setChatForeground: (visible: boolean) => void;
   openConversation: (conversation: Pick<MessageConversation, 'id' | 'title' | 'avatar' | 'clubId' | 'isCustomerService'>) => Promise<void>;
@@ -183,6 +187,8 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
   let lifecycleRevision = 0;
   // 本次登录会话的就绪时间：离线补偿的历史消息（含已读）晚于它到达，但 sentAt 在它之前
   let sessionReadyAt = 0;
+  // 空列表延迟重读的一次性闸门：避免每次聚焦消息页都重读（用户可能本来就 0 会话）
+  let emptyListRetryUsed = false;
   // 允许少量设备间时钟误差，避免"刚好就绪时刻"的新消息被误判为补偿消息
   const BANNER_CLOCK_SKEW_MS = 5_000;
 
@@ -222,6 +228,8 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         isMine: message.isMine,
         isActive,
         sentAt: message.sentAt,
+        receivedOffline: message.receivedOffline === true,
+        sessionReadyAt,
       });
       if (
         !isSystemConversationId(normalizedPeerId)
@@ -231,6 +239,13 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         return;
       }
       const normalizedConversation = { ...conversation, id: normalizedPeerId, title: normalizedConversationTitle };
+      // 重装/换设备后的离线补偿会把窗口内的历史消息逐条重放（含已读的）。
+      // 这些消息的未读状态以融云会话快照为准（服务端已保存已读态），
+      // 这里不能再逐条 +1，否则已读消息会重新变成未读红点。
+      // 就绪后迟到的 offline 消息（sentAt 晚于本次登录就绪时间）仍按新消息计数。
+      const isReplayedHistory =
+        message.receivedOffline === true
+        && (sessionReadyAt === 0 || message.sentAt <= sessionReadyAt - BANNER_CLOCK_SKEW_MS);
       if (
         !isActive
         && !message.isMine
@@ -258,7 +273,11 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           avatar: existing?.avatar || normalizedConversation.avatar,
           preview: preview || normalizedConversation.preview,
           isOnline: message.isMine ? existing?.isOnline : true,
-          unreadCount: isActive ? 0 : message.isMine ? (existing?.unreadCount || 0) : (existing?.unreadCount || 0) + 1,
+          unreadCount: isActive
+            ? 0
+            : message.isMine || isReplayedHistory
+              ? (existing?.unreadCount || 0)
+              : (existing?.unreadCount || 0) + 1,
           updatedAt: message.sentAt,
         };
         const conversations = isActive
@@ -281,6 +300,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
             ? { ...state.messagesByPeerId, [normalizedPeerId]: mergeMessages(state.messagesByPeerId[normalizedPeerId] || [], message) }
             : state.messagesByPeerId,
           conversations,
+          compensatedCount: isReplayedHistory ? state.compensatedCount + 1 : state.compensatedCount,
         };
       });
       if (isActive) void adapter.markRead(normalizedPeerId).catch((error) => set({ lastError: error instanceof Error ? error.message : '清除未读失败' }));
@@ -317,6 +337,14 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       }
       if (expectedLifecycleRevision !== lifecycleRevision) return;
       const blockedUserIds = new Set(get().blacklistedUserIds);
+      const unreadSnapshot = conversations
+        .filter((conversation) => conversation.unreadCount > 0)
+        .map((conversation) => ({ peerId: conversation.id, title: conversation.title, unread: conversation.unreadCount }));
+      if (unreadSnapshot.length > 0) {
+        logger.info('RongCloud conversation snapshot unread', {
+          unread: JSON.stringify(unreadSnapshot),
+        });
+      }
       const blockedConversationIds = conversations
         .filter((conversation) =>
           !isSystemConversationId(conversation.id)
@@ -416,6 +444,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       openPeerIds: [],
       activePeerId: null,
       chatForeground: false,
+      compensatedCount: 0,
       lastError: null,
 
       refreshOnlineStatuses: async (token) => {
@@ -463,6 +492,28 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           return;
         }
         await get().initialize(token);
+      },
+
+      retryIfEmpty: async (token) => {
+        if (!token) return;
+        if (emptyListRetryUsed) return;
+        if (get().connectionState !== 'ready') return;
+        if (get().conversations.length > 0) return;
+        // reset 的异步断开窗口内 connectionState 仍是 ready，但会话已失效——拒绝旧 token 的重试
+        if (onlineStatusToken !== token) return;
+        emptyListRetryUsed = true;
+        logger.info('Retrying empty conversation snapshot', {
+          stage: 'empty-list-retry',
+          connectionState: get().connectionState,
+        });
+        try {
+          await syncConversations(lifecycleRevision);
+        } catch (error) {
+          logger.warn('Empty conversation snapshot retry failed', {
+            stage: 'empty-list-retry',
+            errorName: error instanceof Error ? error.name : typeof error,
+          });
+        }
       },
 
       initialize: async (token) => {
@@ -532,12 +583,6 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           });
         }
         set({ connectionState: 'connecting', lastError: null });
-        initializeInProgress = true;
-        conversationSyncPending = false;
-        logger.info('RongCloud initialize starting', {
-          stage: 'message-store-initialize',
-          attempt: reconnectAttempts,
-        });
         try {
           const ready = await adapter.initialize(token);
           if (initializationRevision !== lifecycleRevision) {
@@ -573,6 +618,12 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           initializeInProgress = false;
           sessionReadyAt = Date.now();
           set({ connectionState: 'ready', lastError: null });
+          // 离线同步完成事件若恰好在上面最后一次同步执行期间到达，会被
+          // subscribeConversationSync 回调标记 pending 但无人消费——这里兜底再读一次快照。
+          if (conversationSyncPending) {
+            conversationSyncPending = false;
+            void syncConversations(initializationRevision).catch(() => undefined);
+          }
         } catch (error) {
           if (initializationRevision !== lifecycleRevision) {
             initializeInProgress = false;
@@ -735,7 +786,11 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
 
       markRead: async (peerId) => {
         set((state) => ({ conversations: state.conversations.map((item) => item.id === peerId ? { ...item, unreadCount: 0 } : item) }));
-        if (get().connectionState !== 'ready') return;
+        if (get().connectionState !== 'ready') {
+          // 静默吞掉已读上报会导致服务端永远不知道已读，重装后未读会复活——必须留痕
+          logger.warn('markRead skipped while IM not ready', { peerId, connectionState: get().connectionState });
+          return;
+        }
         try { await adapter.markRead(peerId); } catch (error) { set({ lastError: error instanceof Error ? error.message : '清除未读失败' }); }
       },
 
@@ -789,6 +844,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         conversationSyncPending = false;
         reconnectAttempts = 0;
         sessionReadyAt = 0;
+        emptyListRetryUsed = false;
         clearCsInviteClaimStates();
         if (reconnectTimer) clearTimeout(reconnectTimer);
         reconnectTimer = undefined;
@@ -803,7 +859,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         stopConversationSyncSubscription = undefined;
         stopReadSyncSubscription = undefined;
         await adapter.disconnect();
-        set({ connectionState: 'idle', conversationError: null, conversations: [], blacklistedUserIds: [], messagesByPeerId: {}, historyByPeerId: {}, openPeerIds: [], activePeerId: null, chatForeground: false, lastError: null });
+        set({ connectionState: 'idle', conversationError: null, conversations: [], blacklistedUserIds: [], messagesByPeerId: {}, historyByPeerId: {}, openPeerIds: [], activePeerId: null, chatForeground: false, compensatedCount: 0, lastError: null });
       },
     };
   });

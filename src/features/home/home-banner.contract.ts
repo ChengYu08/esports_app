@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 
-import type { Banner, BannerJumpConfig, HomeBannerSlotCode } from "./api/home.types";
+import type { Banner, BannerJumpConfig, HomeBannerSlot, HomeBannerSlotCode } from "./api/home.types";
 
 export const HOME_BANNER_SLOT_CODES: HomeBannerSlotCode[] = [
   "APP_HOME_FLOOR1",
@@ -13,6 +13,16 @@ export type BannerJump =
   | { type: "route"; path: string; params: Record<string, string> }
   | { type: "url"; url: string }
   | { type: "none" };
+
+/** 一、二层同层返回多张素材时轮播展示（不看后台 displayMode）；第三层固定平铺。 */
+export function isBannerSlotCarousel(
+  slot: Pick<HomeBannerSlot, "code" | "items" | "displayMode">,
+): boolean {
+  if (slot.code === "APP_HOME_FLOOR3") {
+    return slot.displayMode === "CAROUSEL";
+  }
+  return slot.items.length > 1;
+}
 
 type BannerAction =
   | { type: "image" | "link"; url: string }

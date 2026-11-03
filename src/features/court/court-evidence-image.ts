@@ -2,10 +2,20 @@ import { File } from "expo-file-system";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import { detectImageFormat } from "@/shared/media-picker/image-compat";
 
+export const MAX_EVIDENCE_IMAGE_BYTES = 10 * 1024 * 1024;
+export class EvidenceImageTooLargeError extends Error {
+  constructor() {
+    super("证据图片不能超过10MB，请重新选择");
+  }
+}
+
 function readImageFormat(uri: string) {
   const file = new File(uri);
   if (!file.exists || file.size < 12) {
     throw new Error("读取图片失败，请重新选择图片");
+  }
+  if (file.size > MAX_EVIDENCE_IMAGE_BYTES) {
+    throw new EvidenceImageTooLargeError();
   }
   return detectImageFormat(uri);
 }

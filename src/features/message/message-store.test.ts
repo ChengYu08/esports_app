@@ -142,6 +142,134 @@ describe('message store', () => {
     await store.getState().reset();
   });
 
+  it('re-reads the snapshot once when the ready list is empty (retryIfEmpty)', async () => {
+    // 场景：初始化读快照为空（补偿消息尚未落库），retryIfEmpty 延迟重读后拿到会话
+    const adapter = makeAdapter({
+      getConversations: vi.fn().mockResolvedValueOnce([]).mockResolvedValue([conversation]),
+    });
+    const store = createMessageStore(adapter);
+    await store.getState().initialize('token');
+    expect(store.getState().conversations).toEqual([]);
+    await store.getState().retryIfEmpty('token');
+    expect(store.getState().conversations).toEqual([expect.objectContaining({ id: '42' })]);
+  });
+
+  it('does not re-read when the list already has conversations', async () => {
+    const adapter = makeAdapter({
+      getConversations: vi.fn().mockResolvedValue([conversation]),
+    });
+    const store = createMessageStore(adapter);
+    await store.getState().initialize('token');
+    const callsBefore = (adapter.getConversations as ReturnType<typeof vi.fn>).mock.calls.length;
+    await store.getState().retryIfEmpty('token');
+    expect((adapter.getConversations as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsBefore);
+  });
+
+  it('does not re-read twice even if the retry also finds an empty list', async () => {
+    const adapter = makeAdapter({
+      getConversations: vi.fn().mockResolvedValue([]),
+    });
+    const store = createMessageStore(adapter);
+    await store.getState().initialize('token');
+    await store.getState().retryIfEmpty('token');
+    const callsAfterFirst = (adapter.getConversations as ReturnType<typeof vi.fn>).mock.calls.length;
+    await store.getState().retryIfEmpty('token');
+    expect((adapter.getConversations as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsAfterFirst);
+  });
+
+  it('does not re-read when the connection is not ready', async () => {
+    const adapter = makeAdapter({
+      available: () => false,
+      getConversations: vi.fn().mockResolvedValue([conversation]),
+    });
+    const store = createMessageStore(adapter);
+    await store.getState().initialize('token');
+    expect(store.getState().connectionState).toBe('unavailable');
+    await store.getState().retryIfEmpty('token');
+    // unavailable 分支的 initialize 提前返回，getConversations 从未被调用过
+    expect(adapter.getConversations).not.toHaveBeenCalled();
+  });
+
+  it('keeps incoming live messages when the delayed retry finishes afterwards', async () => {
+    // 冲突场景：retryIfEmpty 重读期间用户收到实时消息——重读结果不得把实时消息会话冲掉
+    let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
+    let completeSnapshot!: (value: MessageConversation[]) => void;
+    const adapter = makeAdapter({
+      getConversations: vi.fn()
+        .mockResolvedValueOnce([])
+        .mockImplementationOnce(() => new Promise<MessageConversation[]>((resolve) => { completeSnapshot = resolve; })),
+      subscribeMessages: (listener) => { receiveMessage = listener; return () => undefined; },
+    });
+    const store = createMessageStore(adapter);
+    await store.getState().initialize('token');
+    const retry = store.getState().retryIfEmpty('token');
+    receiveMessage?.('42', { ...sentMessage, isMine: false }, { ...conversation, preview: 'hello' });
+    completeSnapshot([]);
+    await retry;
+    const list = store.getState().conversations;
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ id: '42', preview: 'hello' });
+    await store.getState().reset();
+  });
+
+  it('claims the one-shot retry gate before awaiting (concurrent calls)', async () => {
+    let completeSnapshot!: (value: MessageConversation[]) => void;
+    const adapter = makeAdapter({
+      getConversations: vi.fn()
+        .mockResolvedValueOnce([])
+        .mockImplementationOnce(() => new Promise<MessageConversation[]>((resolve) => { completeSnapshot = resolve; })),
+    });
+    const store = createMessageStore(adapter);
+    await store.getState().initialize('token');
+    const first = store.getState().retryIfEmpty('token');
+    const second = store.getState().retryIfEmpty('token');
+    completeSnapshot([]);
+    await Promise.all([first, second]);
+    // 初始化 1 次 + 重试 1 次；并发的第二次不得再读
+    expect(adapter.getConversations).toHaveBeenCalledTimes(2);
+    await store.getState().reset();
+  });
+
+  it('rejects a retry from the old session during asynchronous reset', async () => {
+    let finishDisconnect!: () => void;
+    const adapter = makeAdapter({
+      getConversations: vi.fn().mockResolvedValue([]),
+      disconnect: vi.fn(() => new Promise<void>((resolve) => { finishDisconnect = resolve; })),
+    });
+    const store = createMessageStore(adapter);
+    await store.getState().initialize('token');
+    const resetting = store.getState().reset();
+    await store.getState().retryIfEmpty('token');
+    expect(adapter.getConversations).toHaveBeenCalledTimes(1);
+    finishDisconnect();
+    await resetting;
+  });
+
+  it('rechecks again if offline sync completes during the final initialization sync', async () => {
+    let synchronized: (() => void) | undefined;
+    let completeFirst!: (value: MessageConversation[]) => void;
+    let completeSecond!: (value: MessageConversation[]) => void;
+    const adapter = makeAdapter({
+      getConversations: vi.fn()
+        .mockImplementationOnce(() => new Promise<MessageConversation[]>((resolve) => { completeFirst = resolve; }))
+        .mockImplementationOnce(() => new Promise<MessageConversation[]>((resolve) => { completeSecond = resolve; }))
+        .mockResolvedValue([conversation]),
+      subscribeConversationSync: (listener) => { synchronized = listener; return () => undefined; },
+    });
+    const store = createMessageStore(adapter);
+    const initializing = store.getState().initialize('token');
+    await vi.waitFor(() => expect(completeFirst).toBeDefined());
+    synchronized?.();
+    completeFirst([]);
+    await vi.waitFor(() => expect(completeSecond).toBeDefined());
+    // 第二次（pending）同步执行中再次完成——原窗口会丢重读
+    synchronized?.();
+    completeSecond([]);
+    await initializing;
+    expect(store.getState().conversations).toEqual([expect.objectContaining(conversation)]);
+    await store.getState().reset();
+  });
+
   it('does not create a local message while IM is unavailable', async () => {
     const store = createMessageStore(makeAdapter({ available: () => false }));
     await store.getState().initialize('token');
@@ -247,6 +375,59 @@ describe('message store', () => {
     await store.getState().reset();
   });
 
+  it('does not re-count replayed read messages as unread after reinstall', async () => {
+    let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
+    const historySentAt = Date.now() - 60_000;
+    // 重装后融云会话快照只把真正未读的那条算进来（服务端保存了已读态），
+    // 本地不能因为补偿重放了几条历史消息就把它重新累加成未读。
+    const store = createMessageStore(makeAdapter({
+      getConversations: vi.fn()
+        .mockResolvedValueOnce([conversation])
+        .mockResolvedValue([{ ...conversation, unreadCount: 1, updatedAt: historySentAt + 2_000 }]),
+      subscribeMessages: vi.fn((listener) => { receiveMessage = listener; return () => undefined; }),
+    }));
+    await store.getState().initialize('token');
+    receiveMessage?.('42', { ...sentMessage, id: 'history-1', isMine: false, sentAt: historySentAt, receivedOffline: true }, { ...conversation, preview: 'old', updatedAt: historySentAt });
+    receiveMessage?.('42', { ...sentMessage, id: 'history-2', isMine: false, sentAt: historySentAt + 1_000, receivedOffline: true }, { ...conversation, preview: 'old-2', updatedAt: historySentAt + 1_000 });
+    expect(store.getState().conversations[0].unreadCount).toBe(0);
+    await store.getState().refreshConversations('token');
+    expect(store.getState().conversations[0].unreadCount).toBe(1);
+    await store.getState().reset();
+  });
+
+  it('counts an offline message that arrives after the session is ready', async () => {
+    let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
+    const store = createMessageStore(makeAdapter({
+      getConversations: vi.fn(async () => [conversation]),
+      subscribeMessages: vi.fn((listener) => { receiveMessage = listener; return () => undefined; }),
+    }));
+    await store.getState().initialize('token');
+    receiveMessage?.('42', { ...sentMessage, id: 'late-1', isMine: false, sentAt: Date.now(), receivedOffline: true }, { ...conversation, preview: 'late', updatedAt: Date.now() });
+    expect(store.getState().conversations[0].unreadCount).toBe(1);
+    await store.getState().reset();
+  });
+
+  it('counts compensated replayed messages for the hidden diagnostic counter', async () => {
+    let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
+    const historySentAt = Date.now() - 60_000;
+    const store = createMessageStore(makeAdapter({
+      getConversations: vi.fn(async () => [conversation]),
+      subscribeMessages: vi.fn((listener) => { receiveMessage = listener; return () => undefined; }),
+    }));
+    await store.getState().initialize('token');
+    expect(store.getState().compensatedCount).toBe(0);
+    // 补偿重放的历史消息：计入诊断计数
+    receiveMessage?.('42', { ...sentMessage, id: 'replay-1', isMine: false, sentAt: historySentAt, receivedOffline: true }, conversation);
+    receiveMessage?.('42', { ...sentMessage, id: 'replay-2', isMine: false, sentAt: historySentAt + 1_000, receivedOffline: true }, conversation);
+    expect(store.getState().compensatedCount).toBe(2);
+    // 实时新消息与就绪后迟到的 offline 消息：不属于补偿，不计数
+    receiveMessage?.('42', { ...sentMessage, id: 'live-1', isMine: false, sentAt: Date.now() }, conversation);
+    expect(store.getState().compensatedCount).toBe(2);
+    // 登出重置后归零
+    await store.getState().reset();
+    expect(store.getState().compensatedCount).toBe(0);
+  });
+
   it('clears unread when another device reports the conversation as read', async () => {
     let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
     let reportRead: ((peerId: string, timestamp: number) => void) | undefined;
@@ -271,11 +452,11 @@ describe('message store', () => {
     const store = createMessageStore(adapter);
     useInAppNotification.getState().dismiss();
     await store.getState().initialize('token');
-    // 模拟重装后离线补偿：sentAt 早于本次登录就绪时间
-    receiveMessage?.('42', { ...sentMessage, isMine: false, sentAt: 10 }, conversation);
+    // 模拟重装后离线补偿：sentAt 早于本次登录就绪时间，且带补偿标记
+    receiveMessage?.('42', { ...sentMessage, isMine: false, sentAt: 10, receivedOffline: true }, conversation);
     expect(useInAppNotification.getState().notification).toBeNull();
-    // 不弹横幅但仍计入未读，列表红点正常
-    expect(store.getState().conversations[0]).toMatchObject({ id: '42', unreadCount: 1 });
+    // 补偿的历史消息不再计入未读，红点由融云会话快照提供
+    expect(store.getState().conversations[0]).toMatchObject({ id: '42', unreadCount: 0 });
     await store.getState().reset();
   });
 

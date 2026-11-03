@@ -52,7 +52,8 @@ it("下单侧展示陪玩和俱乐部，接单侧展示老板，并保留完整�
   expect(accept).toMatchObject({
     sellerName: "老板昵称",
     sellerAvatar: fields.buyerHeadImage,
-    clubName: undefined,
+    // 接单侧同样展示陪玩师所属俱乐部
+    clubName: "陪玩俱乐部",
   });
   for (const order of [place, accept]) {
     expect(order).toMatchObject({

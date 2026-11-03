@@ -9,5 +9,5 @@ const profileApi = createProfileContract(request);
 
 export const fetchProfileDetail = (params: ProfileRouteParams, signal?: AbortSignal) => profileApi.fetchProfileDetail(params, signal);
 export const fetchProfileGameDetail = (params: ProfileGameRouteParams, signal?: AbortSignal) => profileApi.fetchProfileGameDetail(params, signal);
-export const fetchProfileReviews = (params: { gameId: string; companionUserId: string; page?: number; pageSize?: number; signal?: AbortSignal }) =>
+export const fetchProfileReviews = (params: { companionUserId: string; page?: number; pageSize?: number; signal?: AbortSignal }) =>
   profileApi.fetchProfileReviews(params);

@@ -16,11 +16,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { QuickMatchGrabItem } from "@/features/match/api/match.types";
 import { MatchLinearGradient } from "@/features/match/components/MatchLinearGradient";
 import { MatchingCountdownText } from "@/features/match/components/MatchingCountdownText";
+import { useProfileDetail } from "@/features/mine/hooks/use-profile-data";
+import { calculateAge } from "@/features/mine/profile-utils";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const PUBLISH_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
 const FOOTER_CONTENT_BOTTOM = 22;
 const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
+/** Figma 444:57020 / 444:57016 性别图标 12×12 */
+const maleIcon = require("../../../../assets/svgs/gender-male.svg");
+const femaleIcon = require("../../../../assets/svgs/gender-female.svg");
 
 /** UI 默认入场缓动（强 ease-out） */
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
@@ -46,14 +51,23 @@ type MatchingGrabListViewProps = {
   onConfirm: () => void;
 };
 
-function GenderAge({ sex }: { sex: 0 | 1 | 2 }) {
-  if (sex !== 1 && sex !== 2) return null;
+function GenderAge({ sex, age }: { sex: number; age: string }) {
+  if (sex !== 1 && sex !== 2) {
+    return null;
+  }
   const isFemale = sex === 2;
   return (
     <View style={styles.genderRow}>
-      <Text style={[styles.genderMark, isFemale ? styles.female : styles.male]}>
-        {isFemale ? "♀" : "♂"}
-      </Text>
+      <Image
+        source={isFemale ? femaleIcon : maleIcon}
+        style={styles.genderIcon}
+        contentFit="contain"
+      />
+      {age ? (
+        <Text style={[styles.age, isFemale ? styles.female : styles.male]}>
+          {age}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -81,6 +95,14 @@ function AnimatedGrabCard({
   selected: boolean;
   onSelect: (grabId: string) => void;
 }) {
+  // 抢单备注描述的是订单状态，签名和年龄应使用陪玩的公开个人资料。
+  const { data: profile } = useProfileDetail(
+    item.companionUserId
+      ? { userId: item.companionUserId, clubId: item.clubId }
+      : null,
+  );
+  const age = profile?.birth ? calculateAge(profile.birth) : "";
+  const signature = profile?.signature.trim() || "暂无个性签名";
   const reducedMotion = useReducedMotion();
   const pressScale = useSharedValue(1);
   const glow = useSharedValue(0);
@@ -139,13 +161,11 @@ function AnimatedGrabCard({
             <Text style={styles.name} numberOfLines={1}>
               {item.nickname}
             </Text>
-            <GenderAge sex={item.sex} />
+            <GenderAge sex={profile?.sex ?? item.sex} age={age} />
           </View>
-          {item.remark ? (
-            <Text style={styles.signature} numberOfLines={1}>
-              {item.remark}
-            </Text>
-          ) : null}
+          <Text style={styles.signature} numberOfLines={1}>
+            {signature}
+          </Text>
         </View>
         {isNew ? (
           <Animated.View
@@ -172,6 +192,7 @@ export function MatchingGrabListView({
   const insets = useSafeAreaInsets();
   const selectedCount = selectedGrabIds.length;
   const confirmLabel = formatConfirmLabel(selectedCount, submitting);
+  const confirmDisabled = submitting || selectedCount === 0;
 
   return (
     <View style={styles.root}>
@@ -211,18 +232,22 @@ export function MatchingGrabListView({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={confirmLabel}
-          disabled={submitting}
+          accessibilityState={{ disabled: confirmDisabled }}
+          disabled={confirmDisabled}
           onPress={onConfirm}
           style={({ pressed }) => [
             styles.confirmWrap,
-            pressed && styles.pressed,
+            pressed && !confirmDisabled && styles.pressed,
           ]}
         >
           <MatchLinearGradient
             colors={PUBLISH_GRADIENT}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.confirmButton}
+            style={[
+              styles.confirmButton,
+              confirmDisabled && styles.confirmDisabled,
+            ]}
           >
             <Text style={styles.confirmText}>{confirmLabel}</Text>
           </MatchLinearGradient>
@@ -300,6 +325,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   name: {
+    flexShrink: 1,
     maxWidth: 152,
     fontFamily: DOUYIN_SANS,
     fontSize: 14,
@@ -310,8 +336,15 @@ const styles = StyleSheet.create({
   genderRow: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 2,
+    flexShrink: 0,
   },
-  genderMark: {
+  genderIcon: {
+    width: 12,
+    height: 12,
+  },
+  age: {
+    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: "500",
@@ -346,6 +379,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
+  },
+  confirmDisabled: {
+    opacity: 0.5,
   },
   confirmText: {
     fontFamily: DOUYIN_SANS,

@@ -61,6 +61,8 @@ export type Club = {
   clubTag?: string;
   clubGames?: { iconUrl?: string }[];
   games?: ClubGameIcon[];
+  /** 启用的游戏 ID，包含没有配置图标的游戏，用于统计在线陪玩。 */
+  gameIds?: number[];
 };
 
 export type ClubPage = {
@@ -126,6 +128,7 @@ export type CompanionFilters = {
   gameStatus?: 0 | 1;
   gameModeId?: number;
   gameLevelId?: number;
+  tagId?: number;
 };
 
 export type CompanionPage = {

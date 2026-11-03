@@ -8,9 +8,9 @@ import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { showToast } from "@/shared/ui/app-toast";
 
 import { exitVoiceRoom } from "./exit-voice-room";
+import { useVoiceRoomSessionStore } from "./voice-room-session";
 import { resolveVoiceRoomId, voiceRoomApi } from "./voice-room.api";
 import type { VoiceRoomDetail } from "./voice-room.types";
-import { useVoiceRoomSessionStore } from "./voice-room-session";
 
 export type EnterRoomFromInviteResult =
   | { status: "cancelled" }
@@ -110,6 +110,20 @@ export async function enterRoomFromInvite(
     if (!roomId) {
       showToast("房间信息不完整");
       return { status: "failed", message: "房间信息不完整" };
+    }
+
+    try {
+      const detail = await voiceRoomApi.getDetail(roomId, accessToken);
+      // roomStatus：1 开启，0 关闭（对齐 PC）
+      if (!detail || !resolveVoiceRoomId(detail) || detail.roomStatus !== 1) {
+        showToast("语聊房已关闭");
+        return { status: "failed", message: "语聊房已关闭" };
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "语聊房已关闭";
+      showToast(message);
+      return { status: "failed", message };
     }
 
     let joined: VoiceRoomDetail | null;

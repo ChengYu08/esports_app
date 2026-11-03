@@ -1,16 +1,19 @@
 import { Dismiss16Regular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import {
-  batchPayQuickMatch,
-  fetchQuickMatchPayable,
-} from "@/features/match/api/match.api";
+import type {
+  QuickMatchCreatedOrder,
+  QuickMatchPaymentPreview,
+} from "@/features/match/api/match.types";
 import { MatchLinearGradient } from "@/features/match/components/MatchLinearGradient";
-import { fetchStarBalance } from "@/features/mine/api/companion-order.api";
+import {
+  confirmQuickMatchPay,
+  type ConfirmPayState,
+} from "@/features/match/quick-match-confirm-pay";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
@@ -22,106 +25,81 @@ type MatchPaySheetProps = {
   visible: boolean;
   requestNo: string | null;
   token: string | null;
-  fallbackTotal: number;
-  /** 活动模式：展示原价/减免/合计，余额不足走「充值并支付」 */
-  isActivity?: boolean;
-  /** 活动优惠金额（建单返回） */
-  discountAmount?: number;
-  /** 活动实付金额（建单返回；支付校验优先用此值） */
-  realPayAmount?: number;
-  onClose: () => void;
-  onPaid: () => void;
+  /** 建单前支付明细预览（点"确定选择"时获取） */
+  preview: QuickMatchPaymentPreview | null;
+  /** 预览时的选择快照，建单按快照执行 */
+  selectionSnapshot: string[];
+  /** 当前选择是否仍与快照一致（防御校验） */
+  selectionMatchesSnapshot: () => boolean;
+  /** 关闭弹窗；ordersCreated 表示已建单未支付 */
+  onClose: (phase: "previewing" | "ordersCreated") => void;
+  /** 建单成功：父级置 orderPending 防止超时/结束信令清会话 */
+  onOrdersCreated: () => void;
+  onPaid: (orders: QuickMatchCreatedOrder[]) => void;
 };
 
 export function MatchPaySheet({
   visible,
   requestNo,
   token,
-  fallbackTotal,
-  isActivity = false,
-  discountAmount,
-  realPayAmount,
+  preview,
+  selectionSnapshot,
+  selectionMatchesSnapshot,
   onClose,
+  onOrdersCreated,
   onPaid,
 }: MatchPaySheetProps) {
   const insets = useSafeAreaInsets();
-  const [balance, setBalance] = useState<number | null>(null);
-  const [totalPrice, setTotalPrice] = useState(fallbackTotal);
+  const [state, setState] = useState<ConfirmPayState>(() => ({
+    ordersCreated: false,
+    expectedTotal:
+      preview?.paymentMethods[0]?.payableAmount ?? preview?.totalPrice ?? 0,
+    orders: [],
+  }));
   const [paying, setPaying] = useState(false);
   const [prompt, setPrompt] = useState<{ title?: string; message: string } | null>(null);
 
-  /** 活动用 realPayAmount（缺省退回建单合计）；非活动用合计 */
-  const payableAmount =
-    isActivity && realPayAmount != null ? realPayAmount : totalPrice;
-  const insufficient = balance !== null && balance < payableAmount;
+  // 余额直接取预览返回的支付方式余额（对齐 PC），不再单独请求 starBalance
+  const method = preview?.paymentMethods[0];
+  const balance = method?.balance ?? null;
   const payDisabled = paying || balance === null;
 
-  // 打开/入参变化时重置展示状态（render 阶段派生重置，避免 effect 内同步 setState）
-  const resetKey = `${visible}-${requestNo ?? ""}-${fallbackTotal}-${isActivity}-${discountAmount ?? ""}-${realPayAmount ?? ""}`;
-  const [lastResetKey, setLastResetKey] = useState(resetKey);
-  if (lastResetKey !== resetKey) {
-    setLastResetKey(resetKey);
-    setBalance(null);
-    setTotalPrice(fallbackTotal);
-  }
-
-  useEffect(() => {
-    if (!visible || !token || !requestNo) return;
-    void fetchStarBalance(token)
-      .then(setBalance)
-      .catch((error: Error) => setPrompt({ message: error.message }));
-    if (isActivity) {
-      // 活动金额以建单返回为准，不再调 pay/preview 或 payable
-      return;
-    }
-    void fetchQuickMatchPayable(requestNo, token)
-      .then((payable) => setTotalPrice(payable.totalPrice))
-      .catch(() => {
-        // 保留建单返回的 fallbackTotal
-      });
-  }, [fallbackTotal, isActivity, requestNo, token, visible]);
-
-  async function pay() {
-    if (!token || !requestNo) {
-      setPrompt({ message: "请先登录" });
-      return;
-    }
-    if (insufficient) {
-      if (isActivity) {
-        onClose();
-        router.push("/star-recharge");
-        return;
-      }
-      setPrompt({
-        title: "余额不足",
-        message: "当前星钻余额不足，请充值后再支付",
-      });
-      return;
-    }
+  async function confirmPay() {
+    if (paying || !preview || !token || !requestNo) return;
     setPaying(true);
     try {
-      await batchPayQuickMatch(requestNo, token);
-      onPaid();
-    } catch (error) {
-      setPrompt({
-        message: error instanceof Error ? error.message : "支付失败",
+      const next = await confirmQuickMatchPay(state, {
+        requestNo,
+        token,
+        grabIds: selectionSnapshot,
+        balance: balance ?? 0,
+        selectionMatchesSnapshot,
+        onSelectionChanged: () => onClose("previewing"),
+        onOrdersCreated,
+        onBalanceInsufficient: () => {
+          setPrompt({
+            title: "余额不足",
+            message: "当前钻石余额不足，请充值后再支付",
+          });
+        },
+        onPaid: (orders) => onPaid(orders),
       });
+      setState(next);
     } finally {
       setPaying(false);
     }
   }
 
-  const confirmLabel = paying
-    ? "支付中..."
-    : isActivity && insufficient
-      ? "充值并支付"
-      : "确认支付";
+  const discountAmount = method?.discountAmount ?? 0;
+  const showDiscounted = discountAmount > 0;
+  const originalTotal = preview?.totalPrice ?? 0;
+  const totalValue = state.expectedTotal;
 
   return (
     <>
       <BottomSheet
         visible={visible}
-        onClose={onClose}
+        onClose={() => onClose(state.ordersCreated ? "ordersCreated" : "previewing")}
         dismissOnBackdropPress={!paying}
         contentStyle={[
           styles.sheet,
@@ -130,15 +108,17 @@ export function MatchPaySheet({
       >
         <View style={styles.header}>
           <View style={styles.headerText}>
-            <Text style={styles.title}>星钻支付</Text>
-            <Text style={styles.hint}>请在5分钟内支付，否则订单自动取消</Text>
+            <Text style={styles.title}>钻石支付</Text>
+            {state.ordersCreated ? (
+              <Text style={styles.hint}>请在5分钟内支付，否则订单自动取消</Text>
+            ) : null}
           </View>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="关闭"
             disabled={paying}
             hitSlop={8}
-            onPress={onClose}
+            onPress={() => onClose(state.ordersCreated ? "ordersCreated" : "previewing")}
             style={styles.closeButton}
           >
             <View style={styles.closeIcon}>
@@ -148,62 +128,56 @@ export function MatchPaySheet({
         </View>
 
         <View style={styles.rows}>
-          {isActivity ? (
+          {showDiscounted ? (
             <>
               <View style={styles.row}>
                 <Text style={styles.rowLabel}>订单原价</Text>
                 <View style={styles.rowValue}>
-                  <Text style={styles.totalValue}>{totalPrice}</Text>
+                  <Text style={styles.totalValue}>{originalTotal}</Text>
                   <Image source={diamondIcon} style={styles.diamondIcon} />
                 </View>
               </View>
               <View style={styles.row}>
-                <Text style={styles.rowLabel}>减免金额</Text>
+                <Text style={styles.rowLabel}>优惠减免</Text>
                 <View style={styles.rowValue}>
-                  <Text style={styles.totalValue}>{discountAmount ?? 0}</Text>
+                  <Text style={styles.totalValue}>{discountAmount}</Text>
                   <Image source={diamondIcon} style={styles.diamondIcon} />
                 </View>
               </View>
               <View style={styles.row}>
-                <Text style={styles.rowLabel}>订单合计</Text>
+                <Text style={styles.rowLabel}>实付金额</Text>
                 <View style={styles.rowValue}>
-                  <Text style={styles.totalValue}>{payableAmount}</Text>
+                  <Text style={styles.totalValue}>{totalValue}</Text>
                   <Image source={diamondIcon} style={styles.diamondIcon} />
                 </View>
               </View>
-              <View style={styles.divider} />
             </>
           ) : (
             <View style={styles.row}>
               <Text style={styles.rowLabel}>订单合计</Text>
               <View style={styles.rowValue}>
-                <Text style={styles.totalValue}>{totalPrice}</Text>
+                <Text style={styles.totalValue}>{totalValue}</Text>
                 <Image source={diamondIcon} style={styles.diamondIcon} />
               </View>
             </View>
           )}
           <View style={styles.row}>
-            <Text style={styles.rowLabel}>我的星钻</Text>
-            <View style={styles.balanceRow}>
-              {isActivity && insufficient ? (
-                <Text style={styles.insufficientHint}>星钻不足</Text>
-              ) : null}
-              <View style={styles.rowValue}>
-                <Text style={styles.balanceValue}>
-                  {balance === null ? "..." : balance}
-                </Text>
-                <Image source={diamondIcon} style={styles.diamondIcon} />
-              </View>
+            <Text style={styles.rowLabel}>我的钻石</Text>
+            <View style={styles.rowValue}>
+              <Text style={styles.balanceValue}>
+                {balance === null ? "..." : balance}
+              </Text>
+              <Image source={diamondIcon} style={styles.diamondIcon} />
             </View>
           </View>
         </View>
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={confirmLabel}
+          accessibilityLabel="确认支付"
           accessibilityState={{ disabled: payDisabled }}
           disabled={payDisabled}
-          onPress={() => void pay()}
+          onPress={confirmPay}
           style={({ pressed }) => [
             styles.confirmWrap,
             pressed && !payDisabled && styles.pressed,
@@ -216,7 +190,9 @@ export function MatchPaySheet({
             end={{ x: 1, y: 1 }}
             style={styles.confirm}
           >
-            <Text style={styles.confirmText}>{confirmLabel}</Text>
+            <Text style={styles.confirmText}>
+              {paying ? "支付中..." : "确认支付"}
+            </Text>
           </MatchLinearGradient>
         </Pressable>
       </BottomSheet>
@@ -308,18 +284,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 4,
   },
-  balanceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  insufficientHint: {
-    fontFamily: DOUYIN_SANS,
-    fontSize: 14,
-    lineHeight: 22,
-    color: "#999999",
-    textAlign: "right",
-  },
   totalValue: {
     fontFamily: DOUYIN_SANS,
     fontSize: 14,
@@ -335,12 +299,6 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#FE1F4C",
     textAlign: "right",
-  },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    width: "100%",
-    backgroundColor: "#EEEEEE",
-    marginVertical: 4,
   },
   diamondIcon: {
     width: 16,

@@ -1,6 +1,7 @@
 import { StyleSheet, View } from "react-native";
 
 import type { HomeBannerSlot, HomeBannerSlotCode } from "@/features/home/api/home.types";
+import { isBannerSlotCarousel } from "@/features/home/home-banner.contract";
 import { HomeBannerCard } from "./HomeBannerCard";
 import { HomeBannerCarousel } from "./HomeBannerCarousel";
 
@@ -22,7 +23,7 @@ export function HomeBannerSections({ slots }: { slots: HomeBannerSlot[] }) {
         slot.code === "APP_HOME_FLOOR1" && styles.firstFloor,
         slot.code === "APP_HOME_FLOOR3" && styles.thirdFloor,
       ]}>
-        {slot.displayMode === "CAROUSEL" ? (
+        {isBannerSlotCarousel(slot) ? (
           <HomeBannerCarousel slot={slot} {...layout} />
         ) : (
           <View style={styles.tiles}>

@@ -100,6 +100,7 @@ function mapDispatchRequest(request: DispatchRequest, userGender: number, histor
     gameIcon: request.gameIconUrl ? { uri: request.gameIconUrl } : undefined,
     serviceName: serviceParts.join("-") || "陪玩服务",
     gameName: request.gameName || "未知游戏",
+    createTime: request.createTime,
     billingUnitName: request.billingUnitName || "小时",
     unitPrice: String(unitPrice),
     quantity,

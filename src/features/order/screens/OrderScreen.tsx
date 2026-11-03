@@ -6,7 +6,7 @@ import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { useAuthStore } from "@esports/auth";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   Pressable,
@@ -22,9 +22,12 @@ import {
   fetchStarBalance,
   payCompanionOrder,
 } from "@/features/mine/api/companion-order.api";
+import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
+import { useHomeGames } from "@/features/home/hooks/use-home-data";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
 import { buildAfterSalePayload } from "../after-sale-card";
 import { OrderAfterSaleSheet } from "../components/OrderAfterSaleSheet";
+import { OrderMultiCompanionSheet } from "../components/OrderMultiCompanionSheet";
 import { OrderCard } from "../components/OrderCard";
 import { OrderCompleteConfirmSheet } from "../components/OrderCompleteConfirmSheet";
 import { OrderFreeConfirmFlow } from "../components/OrderFreeConfirmFlow";
@@ -38,6 +41,7 @@ import {
   computeOrderPayableStars,
 } from "../free-amount";
 import { useOrderPage } from "../hooks/use-order-page";
+import { useOrderClubNames } from "../hooks/use-order-club-names";
 import {
   invalidateOrderQueries,
   refreshOrderAfterAction,
@@ -47,14 +51,22 @@ import {
   cancelOrder as cancelOrderRequest,
   completeOrder as completeOrderRequest,
   fetchAfterSaleMembers,
+  fetchMultiCompanionCandidates,
   fetchOrderReview,
   freeOrderService,
   rejectOrder,
+  selectMultiCompanions,
   startOrderService,
   submitOrderReview,
   type AfterSaleMember,
+  type MultiCompanionCandidate,
   type OrderReview,
 } from "../order.api";
+import {
+  multiCompanionNeedSelect,
+  needsMultiCompanionSelect,
+} from "../multi-companion";
+import { getPaymentDeadline } from "../payment-countdown";
 import type {
   OrderActionKey,
   OrderFilter,
@@ -62,9 +74,21 @@ import type {
 } from "../order.types";
 
 export default function OrderScreen() {
+  const games = useHomeGames();
+  const gameIconsByName = useMemo(() => {
+    const icons = new Map<string, string | null>();
+    for (const game of games.data ?? []) {
+      if (!game.name || !game.iconUrl) {
+        continue;
+      }
+      icons.set(game.name, icons.has(game.name) ? null : game.iconUrl);
+    }
+    return icons;
+  }, [games.data]);
   const insets = useSafeAreaInsets();
   const { scope: requestedScope } = useLocalSearchParams<{ scope?: string }>();
   const isCompanion = useAuthStore((state) => state.isCompanion);
+  const { openCustomerService } = useCustomerServiceEntry();
   const [selectedScope, setSelectedScope] = useState<
     "dispatch" | "accept" | "place"
   >(() => (isCompanion ? "dispatch" : "place"));
@@ -126,13 +150,26 @@ export default function OrderScreen() {
   const [payTarget, setPayTarget] = useState<OrderItemModel | null>(null);
   const [freeTarget, setFreeTarget] = useState<OrderItemModel | null>(null);
   const [freeSubmitting, setFreeSubmitting] = useState(false);
+  const [multiSelectTarget, setMultiSelectTarget] = useState<OrderItemModel | null>(null);
+  const [multiSelectCandidates, setMultiSelectCandidates] = useState<MultiCompanionCandidate[]>([]);
+  const [multiSelectLoading, setMultiSelectLoading] = useState(false);
+  const [multiSelectSubmitting, setMultiSelectSubmitting] = useState(false);
   const [prompt, setPrompt] = useState<{
     title: string;
     message: string;
     confirmText?: string;
   } | null>(null);
-  const cancelingPaymentRef = useRef(false);
-  const items = orders.data?.pages.flatMap((page) => page.items) ?? [];
+  // 扁平化结果用 useMemo 固定引用，避免父组件重渲染时生成新数组触发整列表重渲染
+  const items = useMemo(
+    () => orders.data?.pages.flatMap((page) => page.items) ?? [],
+    [orders.data],
+  );
+  // 列表接口不回俱乐部名，按 companionClubId 批量解析（react-query 缓存，同俱乐部只查一次）。
+  const clubNameById = useOrderClubNames(
+    items
+      .filter((item) => !item.clubName && item.clubId != null)
+      .map((item) => Number(item.clubId)),
+  );
   const emptyMessage =
     scope === "dispatch"
       ? visibleFilter === "history"
@@ -142,11 +179,36 @@ export default function OrderScreen() {
         ? "暂无订单"
         : `暂无${visibleFilter === "inProgress" ? "进行中" : visibleFilter === "completed" ? "已完成" : "已取消"}订单`;
 
-  const handleOrderAction = async (
-    item: OrderItemModel,
-    action: OrderActionKey,
-  ) => {
+  const handlePaymentExpired = useCallback(() => {
+    // 同时到期的订单复用进行中的列表请求，状态以服务端结果为准。
+    // 服务端延迟消息关单比客户端倒计时归零晚几秒，一次重拉可能抢在关单前，错峰补拉两轮。
+    const refetch = () =>
+      queryClient
+        .refetchQueries(
+          {
+            queryKey: ["orders", scope, visibleFilter, currentUserId],
+            exact: true,
+            type: "active",
+          },
+          { cancelRefetch: false },
+        )
+        .catch(() => undefined);
+    refetch();
+    setTimeout(refetch, 4000);
+    setTimeout(refetch, 12000);
+  }, [scope, visibleFilter, currentUserId]);
+
+  // 用 useCallback 固定回调引用，保证 OrderCard 的 memo 不被每次渲染的新闭包击穿
+  const handleOrderAction = useCallback(
+    async (item: OrderItemModel, action: OrderActionKey) => {
     if (action === "pay") {
+      const deadline = getPaymentDeadline(item);
+      if (deadline !== null && Date.now() >= deadline) {
+        // 已过支付截止时间：服务端自动关单有秒级延迟，刷新列表取已取消状态
+        showToast("订单支付已超时");
+        handlePaymentExpired();
+        return;
+      }
       setPayTarget(item);
       return;
     }
@@ -168,6 +230,20 @@ export default function OrderScreen() {
         pendingOrderRef.current = null;
         setPendingOrderId(null);
       }
+    }
+    // 一单多陪且参与陪玩未选满：先弹选人弹窗，确认后再开始服务
+    if (action === "start" && needsMultiCompanionSelect(item) && token) {
+      setMultiSelectTarget(item);
+      setMultiSelectCandidates([]);
+      setMultiSelectLoading(true);
+      void fetchMultiCompanionCandidates(item.id, token)
+        .then(setMultiSelectCandidates)
+        .catch(() => {
+          setMultiSelectCandidates([]);
+          showToast("获取可选陪玩失败，请稍后重试");
+        })
+        .finally(() => setMultiSelectLoading(false));
+      return;
     }
     if (
       (action === "accept" || action === "reject" || action === "start") &&
@@ -233,8 +309,42 @@ export default function OrderScreen() {
         params: {
           clubId: String(item.clubId || ""),
           userId: String(item.receiverUserId || ""),
+          reorderGame: item.gameName,
+          reorderMode: item.gameModeName ?? "",
+          reorderLevel: item.gameLevelName ?? "",
+          reorderService: item.orderServiceName ?? "",
+          reorderQuantity: String(item.quantity),
         },
       });
+    },
+    [token, currentUser, handlePaymentExpired],
+  );
+
+  /** 一单多陪选人确认：提交参与陪玩后立即开始服务，就地刷新该单卡片 */
+  const confirmMultiCompanions = async (userIds: number[]) => {
+    const target = multiSelectTarget;
+    if (!target || !token || multiSelectSubmitting) {
+      return;
+    }
+    setMultiSelectSubmitting(true);
+    try {
+      await selectMultiCompanions(target.id, userIds, token);
+      await startOrderService(target.id, token);
+      setMultiSelectTarget(null);
+      if (currentUser?.id) {
+        await refreshOrderAfterAction(target.id, token, currentUser.id);
+      } else {
+        await invalidateOrderQueries(target.id);
+      }
+      showToast("操作成功");
+    } catch (error) {
+      setPrompt({
+        title: "订单操作失败",
+        message: error instanceof Error ? error.message : "请稍后重试",
+      });
+    } finally {
+      setMultiSelectSubmitting(false);
+    }
   };
 
   const confirmCancel = async () => {
@@ -326,6 +436,54 @@ export default function OrderScreen() {
     }
   };
 
+  // 点击卡片跳转：签名接收 item，保持稳定引用以配合 OrderCard 的 memo
+  const handleOrderPress = useCallback(
+    (order: OrderItemModel) => {
+      if (order.requestNo)
+        router.push(
+          `/order/dispatch/${encodeURIComponent(order.requestNo)}`,
+        );
+      else router.push(`/order/${order.id}?scope=${scope}`);
+    },
+    [scope],
+  );
+
+  // renderItem 稳定引用 + 空态收敛到 useMemo，避免无关重渲染波及列表
+  const renderOrderItem = useCallback(
+    ({ item }: { item: OrderItemModel }) => (
+      <OrderCard
+        item={item}
+        scope={scope}
+        gameIcon={gameIconsByName.get(item.gameName) ? { uri: gameIconsByName.get(item.gameName)! } : undefined}
+        clubName={
+          item.clubName ??
+          (item.clubId != null ? clubNameById[item.clubId] : undefined)
+        }
+        actionPending={pendingOrderId === item.id}
+        onAction={handleOrderAction}
+        onPress={handleOrderPress}
+        onPaymentExpired={handlePaymentExpired}
+      />
+    ),
+    [clubNameById, pendingOrderId, handleOrderAction, handleOrderPress, handlePaymentExpired, scope, gameIconsByName],
+  );
+
+  // refetch 在 react-query 中是稳定引用，解构后作为依赖可让 memo 长效命中
+  const refetchOrders = orders.refetch;
+  const listEmpty = useMemo(() => {
+    if (orders.isLoading) {
+      return <LoadingState />;
+    }
+    if (orders.isError) {
+      return <ErrorState onRetry={() => void refetchOrders()} />;
+    }
+    return (
+      <View style={styles.empty}>
+        <EmptyState message={emptyMessage} />
+      </View>
+    );
+  }, [orders.isLoading, orders.isError, refetchOrders, emptyMessage]);
+
   return (
     <View style={styles.screen}>
       <StatusBar style="dark" />
@@ -350,17 +508,7 @@ export default function OrderScreen() {
         data={items}
         ItemSeparatorComponent={OrderSeparator}
         keyExtractor={(item) => item.id}
-        ListEmptyComponent={
-          orders.isLoading ? (
-            <LoadingState />
-          ) : orders.isError ? (
-            <ErrorState onRetry={() => void orders.refetch()} />
-          ) : (
-            <View style={styles.empty}>
-              <EmptyState message={emptyMessage} />
-            </View>
-          )
-        }
+        ListEmptyComponent={listEmpty}
         ListFooterComponent={
           orders.isFetchingNextPage ? (
             <Text style={styles.listFooter}>加载中...</Text>
@@ -371,20 +519,7 @@ export default function OrderScreen() {
             void orders.fetchNextPage();
         }}
         onEndReachedThreshold={0.35}
-        renderItem={({ item }) => (
-          <OrderCard
-            item={item}
-            actionPending={pendingOrderId === item.id}
-            onAction={handleOrderAction}
-            onPress={(order) => {
-              if (order.requestNo)
-                router.push(
-                  `/order/dispatch/${encodeURIComponent(order.requestNo)}`,
-                );
-              else router.push(`/order/${order.id}?scope=${scope}`);
-            }}
-          />
-        )}
+        renderItem={renderOrderItem}
         refreshControl={
           <RefreshControl
             refreshing={orders.isRefetching}
@@ -408,6 +543,7 @@ export default function OrderScreen() {
         loading={afterSaleLoading}
         members={afterSaleMembers}
         onClose={() => setAfterSaleTarget(null)}
+        onCustomerService={openCustomerService}
         onContact={(member) => {
           const order = afterSaleTarget;
           setAfterSaleTarget(null);
@@ -424,23 +560,36 @@ export default function OrderScreen() {
           });
         }}
       />
+      <OrderMultiCompanionSheet
+        visible={Boolean(multiSelectTarget)}
+        needSelect={multiSelectTarget ? multiCompanionNeedSelect(multiSelectTarget) : 1}
+        candidates={multiSelectCandidates}
+        loading={multiSelectLoading}
+        submitting={multiSelectSubmitting}
+        onClose={() => setMultiSelectTarget(null)}
+        onConfirm={confirmMultiCompanions}
+      />
       <OrderReviewSheet
         visible={Boolean(reviewTarget)}
         readonly={Boolean(reviewTarget?.reviewExists)}
         detail={reviewDetail}
         onClose={() => setReviewTarget(null)}
-        onSubmit={async (rating, content) => {
+        onSubmit={async (input) => {
           if (!reviewTarget || !token) return;
           await submitOrderReview(
             reviewTarget.orderNo || reviewTarget.id,
-            rating,
-            content,
+            input,
             token,
           );
           setReviewTarget((current) =>
             current ? { ...current, reviewExists: true } : current,
           );
-          setReviewDetail({ rating, content });
+          setReviewDetail({
+            rating: input.rating,
+            content: input.content,
+            imageUrls: input.imageUrls,
+            anonymous: input.anonymous,
+          });
           if (currentUser?.id) {
             // 评价后列表卡片需换成「已评价」，同样以详情为准就地刷新。
             await refreshOrderAfterAction(
@@ -520,27 +669,11 @@ export default function OrderScreen() {
         onPaymentFailed={(message) => setPrompt({ title: "支付失败", message })}
         onClose={() => {
           const target = payTarget;
+          // 关闭支付弹窗只结束本次支付，取消订单由订单卡片的独立操作处理。
           setPayTarget(null);
-          if (!target || !token || cancelingPaymentRef.current) return;
-          cancelingPaymentRef.current = true;
-          void cancelOrderRequest(target.id, token)
-            .then(async () => {
-              if (currentUser?.id) {
-                // 关闭支付即取消：取消后以详情为准就地刷新该单卡片。
-                await refreshOrderAfterAction(target.id, token, currentUser.id);
-              } else {
-                await invalidateOrderQueries(target.id);
-              }
-            })
-            .catch((error) =>
-              setPrompt({
-                title: "取消订单失败",
-                message: error instanceof Error ? error.message : "请稍后重试",
-              }),
-            )
-            .finally(() => {
-              cancelingPaymentRef.current = false;
-            });
+          if (target?.requestNo && token) {
+            showToast("请在订单创建后5分钟内完成支付");
+          }
         }}
         onPaid={() => {
           const paid = payTarget;
@@ -590,7 +723,7 @@ function StarPaymentPrompt({
 }: {
   item: OrderItemModel | null;
   token: string | null;
-  onClose: () => void | Promise<void>;
+  onClose: () => void;
   onPaid: () => void;
   onPaymentFailed: (message: string) => void;
 }) {
@@ -611,7 +744,7 @@ function StarPaymentPrompt({
     if (!item || !token) return;
     const total = Number(item.totalPrice) || 0;
     if ((balance ?? 0) < total) {
-      setMessage("当前星钻余额不足，请充值后再支付");
+      setMessage("当前钻石余额不足，请充值后再支付");
       return;
     }
     setPaying(true);
@@ -624,7 +757,7 @@ function StarPaymentPrompt({
       onPaymentFailed(errorMessage);
       if (!settledRef.current) {
         settledRef.current = true;
-        await onClose();
+        onClose();
       }
     } finally {
       setPaying(false);
@@ -636,30 +769,30 @@ function StarPaymentPrompt({
       <BottomSheet
         scrollable
         visible={Boolean(item)}
-        onClose={() => void onClose()}
+        onClose={onClose}
         contentStyle={[
           styles.paymentSheet,
           { paddingBottom: 24 + insets.bottom },
         ]}
       >
-        <Text style={styles.paymentTitle}>星钻支付</Text>
+        <Text style={styles.paymentTitle}>钻石支付</Text>
         <Text style={styles.paymentAmount}>
-          支付 {item?.totalPrice ?? 0} 星钻
+          支付 {item?.totalPrice ?? 0} 钻石
         </Text>
         <Text style={styles.paymentBalance}>
-          当前余额：{balance === null ? "加载中..." : `${balance} 星钻`}
+          当前余额：{balance === null ? "加载中..." : `${balance} 钻石`}
         </Text>
         <View style={styles.paymentActions}>
           <Pressable
             style={styles.paymentCancel}
-            onPress={() => void onClose()}
+            onPress={onClose}
           >
             <Text>取消</Text>
           </Pressable>
           <Pressable
             style={styles.paymentConfirm}
             disabled={paying || balance === null}
-            onPress={() => void pay()}
+            onPress={pay}
           >
             <Text style={styles.paymentConfirmText}>
               {paying ? "支付中..." : "确认支付"}

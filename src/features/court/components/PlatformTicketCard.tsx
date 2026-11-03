@@ -1,6 +1,8 @@
 import { formatTime, type PlatformTicket } from "@/features/court/court.api";
 import { COURT_COLORS, COURT_FONT_FAMILY } from "@/features/court/court.theme";
+import { platformTicketReasonLabel, platformTicketStatusLabel } from "@/features/court/platform-ticket-display";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 type Props = {
@@ -9,26 +11,14 @@ type Props = {
   onOpen: () => void;
 };
 
-const TYPE_LABELS: Record<string, string> = {
-  ORDER_DISPUTE: "订单存在纠纷",
-  RULE_VIOLATION: "用户投诉",
-  CHAT_DISPUTE: "用户投诉",
-  OTHER: "用户投诉",
-  PLATFORM_SUGGESTION: "平台建议",
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  SUBMITTED: "已提交",
-  REJECTED: "已驳回",
-  PROCESSING: "处理中",
-  TO_USER_REPLY: "待补充",
-  RESOLVED: "已解决",
-  CLOSED: "已关闭",
-};
-
-export function PlatformTicketCard({ item, mine, onOpen }: Props) {
+// 列表行组件：工单 tab 切换等父组件状态变化时未变的卡片跳过重渲
+export const PlatformTicketCard = memo(function PlatformTicketCard({
+  item,
+  mine,
+  onOpen,
+}: Props) {
   const orderDispute = item.reasonType === "ORDER_DISPUTE";
-  const typeLabel = TYPE_LABELS[item.reasonType ?? ""] ?? "其他";
+  const typeLabel = platformTicketReasonLabel(item.reasonType);
   const typeColor = orderDispute ? "#F5821D" : COURT_COLORS.defendant;
   const images = item.evidenceThumbnails ?? [];
   const remainingImages = Math.max(0, images.length - 5);
@@ -89,14 +79,14 @@ export function PlatformTicketCard({ item, mine, onOpen }: Props) {
       {mine && (
         <View style={styles.footer}>
           <Text style={styles.status}>
-            {STATUS_LABELS[item.status ?? ""] ?? "处理中"}
+            {platformTicketStatusLabel(item.status)}
           </Text>
           <Text style={styles.detail}>查看详情 ›</Text>
         </View>
       )}
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {

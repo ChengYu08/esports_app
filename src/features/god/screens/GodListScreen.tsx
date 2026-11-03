@@ -194,9 +194,19 @@ const GodCard = memo(function GodCard({
   );
 });
 
-export default function GodListScreen() {
+export default function GodListScreen({ active = true }: { active?: boolean }) {
   const insets = useSafeAreaInsets();
   const voicePlayer = useVoicePlayer();
+
+  // keep-alive 常驻后卸载清理不再触发，切走频道时显式停止语音，保持与卸载版行为一致。
+  const stopVoice = voicePlayer.stop;
+  useEffect(() => {
+    if (active) {
+      return;
+    }
+    stopVoice();
+  }, [active, stopVoice]);
+
   const [gameKey, setGameKey] = useState(ALL_GAME_KEY);
   const [filters, setFilters] = useState<GodFilters>(GOD_EMPTY_FILTERS);
   const [openFilter, setOpenFilter] = useState<FilterKey | null>(null);
@@ -265,7 +275,12 @@ export default function GodListScreen() {
       <GodCard
         item={item}
         gameIconUrl={gameIconByName.get(item.gameName)}
-        playingUrl={voicePlayer.playingUrl}
+        // 仅把播放中卡片的 voiceUrl 传入，其余卡片恒为 null：语音启停时只有新旧两张卡片重渲染。
+        playingUrl={
+          voicePlayer.playingUrl === item.voiceUrl && item.voiceUrl
+            ? voicePlayer.playingUrl
+            : null
+        }
         onToggleVoice={voicePlayer.toggle}
         onItemPress={handleItemPress}
       />

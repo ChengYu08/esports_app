@@ -18,6 +18,8 @@ const selectCompanionIcon = require("../../../../assets/voice-room/toolbar-selec
 
 type VoiceRoomToolbarProps = {
   bottomInset: number;
+  /** 键盘弹出时去掉底部预留 margin，避免输入框被顶得过高 */
+  keyboardOpen?: boolean;
   input: string;
   muted: boolean;
   rtcReady: boolean;
@@ -44,6 +46,7 @@ type VoiceRoomToolbarProps = {
 
 export function VoiceRoomToolbar({
   bottomInset,
+  keyboardOpen = false,
   input,
   muted,
   rtcReady,
@@ -73,7 +76,10 @@ export function VoiceRoomToolbar({
       style={[
         styles.container,
         compact && styles.containerCompact,
-        { paddingBottom: Math.max(bottomInset, 12) },
+        keyboardOpen && styles.containerKeyboardOpen,
+        {
+          paddingBottom: keyboardOpen ? 20 : Math.max(bottomInset, 12),
+        },
       ]}
     >
       <View style={[styles.composer, compact && styles.composerCompact]}>
@@ -82,6 +88,9 @@ export function VoiceRoomToolbar({
           value={input}
           onChangeText={onChangeText}
           onSubmitEditing={onSend}
+          multiline
+          maxLength={1000}
+          submitBehavior="submit"
           returnKeyType="send"
           placeholder="聊聊"
           placeholderTextColor="#979799"
@@ -259,11 +268,14 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     marginBottom: 40,
   },
+  containerKeyboardOpen: {
+    marginBottom: 0,
+  },
   containerCompact: { gap: 8, paddingHorizontal: 12 },
   composer: {
     flex: 1,
     minWidth: 0,
-    height: 36,
+    minHeight: 36,
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
@@ -275,8 +287,11 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     minWidth: 0,
-    height: 36,
-    padding: 0,
+    minHeight: 36,
+    maxHeight: 180,
+    paddingVertical: 9,
+    paddingHorizontal: 0,
+    textAlignVertical: "center",
     color: "#FFFFFF",
     fontSize: 12,
   },

@@ -12,7 +12,6 @@ import {
   isCoolingActive,
   type CoolingRecord,
 } from "@/features/auth/cancellation-cooling";
-import { useOnboardingStore } from "@/features/auth/onboarding-store";
 import { getPasswordLoginErrorMessage } from "@/features/auth/password-login-error";
 import { openExternalLink } from "@/shared/navigation/open-external-link";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
@@ -40,25 +39,12 @@ import {
 } from "react-native";
 import { showToast } from "@/shared/ui/app-toast";
 
-// 新登录用户（register=true）或需要完善资料的老用户，跳转到资料完善页
-const resolvePostLoginRoute = (
-  userId: string,
-  isNewUser: boolean,
-  shouldShowOnboarding: (userId: string) => boolean,
-) => {
-  if (isNewUser || shouldShowOnboarding(userId)) return "/onboarding";
-  return "/";
-};
-
 export default function LoginRoute() {
   const params = useLocalSearchParams<{ mode?: string; phone?: string }>();
   const initialMode = params.mode === "password" ? "password" : "sms";
   const initialPhone = typeof params.phone === "string" ? params.phone : "";
   const setSession = useAuthStore((state) => state.setSession);
   const setCompanionStatus = useAuthStore((state) => state.setCompanionStatus);
-  const shouldShowOnboarding = useOnboardingStore(
-    (state) => state.shouldShowProfileOnboarding,
-  );
   const [passwordLoginError, setPasswordLoginError] = useState<string | null>(
     null,
   );
@@ -157,20 +143,14 @@ export default function LoginRoute() {
     setQuickLoginLoading(true);
     try {
       const token = await adapter.authorizeQuickLogin(quickLoginProvider);
-      const { login, profile } = await completeClientLogin(
+      await completeClientLogin(
         token,
         "ONE_CLICK_LOGIN",
         setSession,
         setCompanionStatus,
         token.phone,
       );
-      router.replace(
-        resolvePostLoginRoute(
-          String(profile.id),
-          login.register,
-          shouldShowOnboarding,
-        ),
-      );
+      router.replace("/");
     } catch (error) {
       // 用户在授权页主动退出，授权页盖在登录页之上，关掉后自然露出下面的界面。
       // switch：点了「验证码或密码登录」，露出下面的密码/验证码表单，静默即可；
@@ -197,7 +177,7 @@ export default function LoginRoute() {
       quickLoginInFlightRef.current = false;
       setQuickLoginLoading(false);
     }
-  }, [adapter, quickLoginProvider, setSession, setCompanionStatus, shouldShowOnboarding]);
+  }, [adapter, quickLoginProvider, setSession, setCompanionStatus]);
 
   // 进入登录页先探测一键登录可用性：可用 → 自动拉起授权页；不可用 → 显示密码/验证码界面
   useEffect(() => {
@@ -284,14 +264,14 @@ export default function LoginRoute() {
           }
           try {
             const token = await adapter.passwordLogin(payload);
-            const { login, profile } = await completeClientLogin(
+            await completeClientLogin(
               token,
               "PASSWORD",
               setSession,
               setCompanionStatus,
               payload.username,
             );
-            router.replace(resolvePostLoginRoute(String(profile.id), login.register, shouldShowOnboarding));
+            router.replace("/");
           } catch (error) {
             setPasswordLoginError(getPasswordLoginErrorMessage(error));
           }
@@ -321,14 +301,14 @@ export default function LoginRoute() {
           }
           try {
             const token = await adapter.login(payload);
-            const { login, profile } = await completeClientLogin(
+            await completeClientLogin(
               token,
               "SMS_CODE",
               setSession,
               setCompanionStatus,
               payload.phone,
             );
-            router.replace(resolvePostLoginRoute(String(profile.id), login.register, shouldShowOnboarding));
+            router.replace("/");
           } catch (error) {
             showToast(
               `登录失败，${error instanceof Error ? error.message : "请检查手机号和验证码"}`,

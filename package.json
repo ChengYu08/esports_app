@@ -59,6 +59,7 @@
     "react-native": "0.86.3",
     "react-native-agora": "4.6.4",
     "react-native-gesture-handler": "~2.32.0",
+    "react-native-keyboard-controller": "1.21.9",
     "react-native-qrcode-svg": "^6.3.46",
     "react-native-reanimated": "4.5.1",
     "react-native-render-html": "^6.3.3",
@@ -69,6 +70,7 @@
     "react-native-update": "^10.62.1",
     "react-native-view-shot": "5.1.0",
     "react-native-web": "~0.21.0",
+    "react-native-webview": "13.16.1",
     "react-native-worklets": "0.10.1",
     "rn-emoji-keyboard": "^1.7.0",
     "zod": "^4.6.5",
@@ -76,8 +78,10 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "@types/react-test-renderer": "^19.3.0",
     "eslint": "^9.39.4",
     "eslint-config-expo": "~57.0.2",
+    "react-test-renderer": "19.2.3",
     "typescript": "~6.0.3",
     "vitest": "^5.0.3"
   },

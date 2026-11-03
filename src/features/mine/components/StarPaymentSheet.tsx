@@ -57,7 +57,7 @@ export function StarPaymentSheet({
     if ((balance ?? 0) < order.total)
       return setPrompt({
         title: "余额不足",
-        message: "当前星钻余额不足，请充值后再支付",
+        message: "当前钻石余额不足，请充值后再支付",
       });
     setPaying(true);
     try {
@@ -89,13 +89,13 @@ export function StarPaymentSheet({
       >
         <View style={styles.paymentModalHeader}>
           <View style={styles.paymentModalHeading}>
-            <Text style={styles.paymentModalTitle}>星钻支付</Text>
+            <Text style={styles.paymentModalTitle}>钻石支付</Text>
             <Text style={styles.paymentModalHint}>
               请在5分钟内支付，否则订单自动取消
             </Text>
           </View>
           <Pressable
-            accessibilityLabel="关闭星钻支付"
+            accessibilityLabel="关闭钻石支付"
             disabled={paying}
             hitSlop={8}
             onPress={() => void onClose()}

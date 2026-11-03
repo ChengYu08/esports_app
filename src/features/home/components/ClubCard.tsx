@@ -1,14 +1,15 @@
+import { fetchClubGameCompanionCounts } from "@/features/home/api/home.api";
 import type { Club } from "@/features/home/api/home.types";
 import { computeGameIconLayout } from "@/features/mine/utils/game-icons-layout";
 import { colors } from "@/shared/theme/tokens";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-
 
 const icons = {
   user: require("../../../../assets/home/h_user.svg"),
@@ -27,9 +28,12 @@ const tagGradient = (
 
 export const ClubCard = memo(function ClubCard({
   club,
+  onlineCount = club.onlineCount,
   onSelect,
 }: {
   club: Club;
+  /** 在线陪玩人数，null 表示尚未获取；未传时使用俱乐部自身的统计。 */
+  onlineCount?: number | null;
   onSelect?: (club: Club) => void;
 }) {
   const colors = ["#24354b", "#4a2637", "#2e4650", "#493e2e"];
@@ -39,9 +43,23 @@ export const ClubCard = memo(function ClubCard({
     router.push({ pathname: "/club/[id]", params: { id: club.id } });
   };
 
-  // 游戏图标行布局：≤4 平铺，>4 重叠且总宽不超过 4 个平铺宽度，最多 8 个
-  const gamesLayout = computeGameIconLayout(club.games?.length ?? 0);
-  const games = (club.games ?? []).slice(0, gamesLayout.shown);
+  const gameIds = Array.from(new Set(club.gameIds ?? [])).sort((a, b) => a - b);
+  const gameCounts = useQuery({
+    queryKey: ["club-game-companion-counts", club.id, gameIds],
+    queryFn: ({ signal }) =>
+      fetchClubGameCompanionCounts(club.id, gameIds, signal),
+    enabled: gameIds.length > 0,
+    staleTime: 5 * 60_000,
+  });
+  const counts = gameCounts.data;
+  const gameIcons = new Map((club.games ?? []).map((game) => [game.id, game]));
+  const games = counts
+    ? [...gameIds]
+        .sort((a, b) => counts[b] - counts[a] || a - b)
+        .slice(0, 3)
+        .flatMap((id) => (gameIcons.has(id) ? [gameIcons.get(id)!] : []))
+    : [];
+  const gamesLayout = computeGameIconLayout(games.length);
 
   return (
     <Pressable
@@ -76,7 +94,7 @@ export const ClubCard = memo(function ClubCard({
           </Text>
           <View style={styles.online}>
             <View style={styles.onlineDot} />
-            <Text style={styles.onlineText}>{club.onlineCount}人</Text>
+            <Text style={styles.onlineText}>{onlineCount ?? "--"}人</Text>
           </View>
         </View>
         <Text numberOfLines={1} style={styles.desc}>
@@ -91,17 +109,14 @@ export const ClubCard = memo(function ClubCard({
             <Image source={icons.id} style={styles.metaIcon} />
             <Text style={styles.metaText}>{club.clubCode}</Text>
           </View>
-          {/* 游戏图标：靠右，>4 个重叠展示（右侧图标在上层） */}
+
           {games.length > 0 ? (
             <View style={[styles.gameIcons, { width: gamesLayout.totalWidth }]}>
               {games.map((game, index) => (
                 <Image
                   key={`${game.iconUrl}-${index}`}
                   source={{ uri: game.iconUrl }}
-                  style={[
-                    styles.gameIcon,
-                    { left: index * gamesLayout.step },
-                  ]}
+                  style={[styles.gameIcon, { left: index * gamesLayout.step }]}
                   contentFit="cover"
                 />
               ))}

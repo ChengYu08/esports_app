@@ -29,9 +29,11 @@ export default function TabsLayout() {
   return (
     <>
       <Tabs
+        // Expo Router 57 在 detachInactiveScreens + fade 下快速切换可能卡住 activityState，导致内容白屏。
+        detachInactiveScreens={false}
         initialRouteName="index"
         tabBar={(props) => <AppTabBar {...props} />}
-        screenOptions={{ headerShown: false, animation: "fade" }}
+        screenOptions={{ headerShown: false, animation: "none" }}
       >
         <Tabs.Screen name="index" />
         <Tabs.Screen

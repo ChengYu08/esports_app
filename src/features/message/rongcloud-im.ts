@@ -15,6 +15,7 @@ import { getRongConversationTargetId, getSystemConversationTitle, isSystemConver
 import { loadConversationSnapshot } from './conversation-loader';
 import { parseRongCommand, type RongCommand } from './rongcloud-command';
 import { KNOWN_RONG_COMMAND_NAMES } from './rongcloud-commands';
+import { fetchRongHistoryMessages } from './rong-history';
 
 export type RongConversation = MessageConversation;
 export type RongTextMessage = ManagedMessage;
@@ -326,12 +327,27 @@ async function fetchImTokenWithRetry(accessToken: string, attemptEpoch: number) 
   return null;
 }
 
-async function emitReceived(message: RCIMIWMessage) {
+async function emitReceived(message: RCIMIWMessage, offline: boolean) {
   const enums = getSdkEnums();
   const peerId = normalizeSystemConversationId(message.senderUserId || message.targetId || '');
-  if (!enums || message.conversationType !== enums.conversationType || !peerId) return;
+  if (!enums || message.conversationType !== enums.conversationType || !peerId) {
+    // 重装回补场景下这里被丢弃的会话永远不会出现在列表里，必须留痕排查
+    logger.warn('RongCloud message dropped before reaching conversation list', {
+      stage: 'emit-received',
+      conversationType: message.conversationType,
+      expectedType: enums?.conversationType,
+      peerId,
+      senderUserId: message.senderUserId,
+      targetId: message.targetId,
+      sentTime: message.sentTime,
+    });
+    return;
+  }
   const mapped = toManagedMessage(message);
   if (!mapped) return;
+  if (offline) {
+    mapped.receivedOffline = true;
+  }
   const conversation = await hydrateConversation(mapConversation({
     targetId: getRongConversationTargetId(peerId),
     conversationType: message.conversationType,
@@ -347,7 +363,7 @@ function installListeners() {
   engine.setOnOfflineMessageSyncCompletedListener(() => {
     conversationSyncListeners.forEach((listener) => listener());
   });
-  engine.setOnMessageReceivedListener((message) => {
+  engine.setOnMessageReceivedListener((message, _left, offline) => {
     const sdk = loadSdk();
     if (sdk && message.messageType === sdk.RCIMIWMessageType.COMMAND) {
       const command = parseRongCommand(message, {
@@ -370,7 +386,7 @@ function installListeners() {
       chatRoomMessageListeners.forEach((listener) => listener(roomId, message));
       return;
     }
-    void emitReceived(message);
+    void emitReceived(message, offline);
   });
   engine.setOnChatRoomMemberChangedListener((roomId, actions) => {
     chatRoomMemberListeners.forEach((listener) => listener(roomId, actions));
@@ -620,7 +636,36 @@ export async function getRongConversations(): Promise<RongConversation[]> {
   const epoch = connectionEpoch;
   const conversations = await loadConversationSnapshot(engine, sdk.RCIMIWConversationType.PRIVATE);
   if (epoch !== connectionEpoch) return [];
-  return Promise.all(conversations.map(mapConversation).filter((item) => item.id).map(hydrateConversation));
+  const entries = conversations
+    .map((raw) => {
+      const item = mapConversation(raw);
+      // 目录同步恢复的会话壳不带 lastMessage，预览是"新消息"兜底，需从云端补最后一条生成真实预览
+      const isShell = !raw.lastMessage || item.preview === '新消息';
+      return { item, isShell };
+    })
+    .filter((entry) => entry.item.id);
+  logger.info('RongCloud conversations mapped', {
+    count: entries.length,
+    shells: entries.filter((entry) => entry.isShell).map((entry) => entry.item.id).join(','),
+  });
+  return Promise.all(entries.map(({ item, isShell }) =>
+    (isShell ? hydrateShellPreview(item) : Promise.resolve(item)).then(hydrateConversation),
+  ));
+}
+
+// REMOTE 拉取不落本地库（探针实测），会话壳每次列表刷新都需补拉最新一条；失败则保持原预览不阻塞列表
+async function hydrateShellPreview(conversation: RongConversation): Promise<RongConversation> {
+  // 复用聊天页同一条拉取链路（远端优先 + count 20）：探针/聊天页均验证可用，
+  // 单独按 count=1 请求在真机实测返回 0 条
+  const page = await getRongMessages(conversation.id);
+  const latest = page.messages[page.messages.length - 1];
+  logger.info('RongCloud shell conversation preview hydrate', {
+    peerId: conversation.id,
+    pulled: page.messages.length,
+    preview: latest ? messagePreview(latest) : undefined,
+  });
+  if (!latest) return conversation;
+  return { ...conversation, preview: messagePreview(latest), time: latest.time, updatedAt: latest.sentAt };
 }
 
 export function subscribeRongConversationSync(listener: () => void) {
@@ -654,28 +699,23 @@ export async function getRongMessages(targetId: string, beforeSentTime?: number)
   const sdk = loadSdk();
   if (!engine || !connected || !sdk || !targetId) return { messages: [], nextCursor: null, hasMore: false };
   const count = 20;
-  return new Promise((resolve) => {
-    let settled = false;
-    const finish = (page: MessageHistoryPage) => { if (!settled) { settled = true; resolve(page); } };
-    void engine?.getMessages(
-      sdk.RCIMIWConversationType.PRIVATE,
-      getRongConversationTargetId(targetId),
-      '',
-      beforeSentTime || 0,
-      sdk.RCIMIWTimeOrder.BEFORE,
-      sdk.RCIMIWMessageOperationPolicy.LOCAL_REMOTE,
-      count,
-      {
-        onSuccess: (messages) => {
-          const mapped = (messages || []).map((message) => toManagedMessage(message)).filter((message): message is ManagedMessage => Boolean(message));
-          const chronological = mapped.sort((left, right) => left.sentAt - right.sentAt);
-          const oldest = chronological[0]?.sentAt || null;
-          finish({ messages: chronological, nextCursor: chronological.length === count ? oldest : null, hasMore: chronological.length === count });
-        },
-        onError: () => finish({ messages: [], nextCursor: null, hasMore: false }),
-      },
-    ).then((code) => { if (code !== 0) finish({ messages: [], nextCursor: null, hasMore: false }); }).catch(() => finish({ messages: [], nextCursor: null, hasMore: false }));
+  // 远端优先：换机/重装后本地库为空，LOCAL_REMOTE 实测不会去云端拉（返回 0 条），
+  // 必须显式用 REMOTE 兜底，否则云端有消息但聊天页空白
+  const messages = await fetchRongHistoryMessages(engine, {
+    conversationType: sdk.RCIMIWConversationType.PRIVATE,
+    targetId: getRongConversationTargetId(targetId),
+    sentTime: beforeSentTime || 0,
+    order: sdk.RCIMIWTimeOrder.BEFORE,
+    count,
+    remotePolicy: sdk.RCIMIWMessageOperationPolicy.REMOTE,
+    localPolicy: sdk.RCIMIWMessageOperationPolicy.LOCAL_REMOTE,
   });
+  const mapped = messages
+    .map((message) => toManagedMessage(message))
+    .filter((message): message is ManagedMessage => Boolean(message));
+  const chronological = mapped.sort((left, right) => left.sentAt - right.sentAt);
+  const oldest = chronological[0]?.sentAt || null;
+  return { messages: chronological, nextCursor: chronological.length === count ? oldest : null, hasMore: chronological.length === count };
 }
 
 function requireConnected() {
@@ -738,10 +778,16 @@ export async function sendRongAfterSaleCard(targetId: string, payload: AfterSale
 
 export async function markRongConversationRead(targetId: string) {
   const sdk = loadSdk();
-  if (!engine || !connected || !sdk || !targetId) return false;
+  if (!engine || !connected || !sdk || !targetId) {
+    logger.warn('RongCloud mark read skipped (engine not connected)', { targetId });
+    return false;
+  }
   const rongTargetId = getRongConversationTargetId(targetId);
   const code = await engine.clearUnreadCount(sdk.RCIMIWConversationType.PRIVATE, rongTargetId, '', Date.now());
-  if (code !== 0) throw new Error(`清除未读失败（${code}）`);
+  if (code !== 0) {
+    logger.warn('RongCloud clear unread count failed', { code, targetId });
+    throw new Error(`清除未读失败（${code}）`);
+  }
   // 上报服务端"已读至当前时间"，其他设备收到同步后清各自的未读数
   const syncCode = await engine.syncConversationReadStatus(sdk.RCIMIWConversationType.PRIVATE, rongTargetId, '', Date.now(), {
     onConversationReadStatusSynced: (result) => {
@@ -752,7 +798,9 @@ export async function markRongConversationRead(targetId: string) {
   });
   if (syncCode !== 0) {
     logger.warn('RongCloud conversation read status sync failed', { code: syncCode, targetId });
+    return false;
   }
+  logger.info('RongCloud mark read reported to server', { targetId });
   return true;
 }
 

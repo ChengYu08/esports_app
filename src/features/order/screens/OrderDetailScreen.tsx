@@ -8,18 +8,20 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { OrderAfterSaleSheet } from "@/features/order/components/OrderAfterSaleSheet";
 import { OrderCompleteConfirmSheet } from "@/features/order/components/OrderCompleteConfirmSheet";
+import { OrderMultiCompanionSheet } from "@/features/order/components/OrderMultiCompanionSheet";
 import { OrderDetailBottomBar } from "@/features/order/components/OrderDetailBottomBar";
 import { OrderDetailInfoBlocks } from "@/features/order/components/OrderDetailInfoBlocks";
 import { OrderDetailStatusBar } from "@/features/order/components/OrderDetailStatusBar";
 import { OrderFreeConfirmFlow } from "@/features/order/components/OrderFreeConfirmFlow";
-import { OrderProgressSteps } from "@/features/order/components/OrderProgressSteps";
 import { OrderReviewSheet } from "@/features/order/components/OrderReviewSheet";
 import { formatOrderFreeSummary } from "@/features/order/free-amount";
 import { useOrderDetailActions } from "@/features/order/hooks/use-order-detail-actions";
+import { multiCompanionNeedSelect } from "@/features/order/multi-companion";
 import { getOrderDetailAction } from "@/features/order/order-detail-actions";
 import { formatOrderTime } from "@/features/order/order-detail-format";
-import { orderDetailQueryKey } from "@/features/order/order-query";
-import { fetchOrderDetail, mapOrder } from "@/features/order/order.api";
+import { orderClubQueryKey, orderDetailQueryKey } from "@/features/order/order-query";
+import { fetchOrderClub, fetchOrderDetail, mapOrder } from "@/features/order/order.api";
+import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 
@@ -36,6 +38,7 @@ export function OrderDetailScreen({
   const insets = useSafeAreaInsets();
   const token = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.user);
+  const { openCustomerService } = useCustomerServiceEntry();
   const detail = useQuery({
     queryKey: orderDetailQueryKey(id, scope),
     queryFn: async ({ signal }) =>
@@ -60,6 +63,15 @@ export function OrderDetailScreen({
     order: detail.data,
     scope,
     refetch: detail.refetch,
+  });
+  // 详情接口只回 companionClubId，俱乐部名另查公开详情（有缓存）。
+  const clubId = detail.data?.clubId;
+  const clubQuery = useQuery({
+    queryKey: orderClubQueryKey(clubId ?? 0),
+    queryFn: ({ signal }) => fetchOrderClub(clubId as number, signal),
+    enabled: clubId != null,
+    staleTime: 10 * 60_000,
+    retry: 1,
   });
   const [clock, setClock] = useState(() => Date.now());
   const dispatchDeadline = detail.data?.dispatchDeadline;
@@ -92,6 +104,7 @@ export function OrderDetailScreen({
     );
   }
   const order = detail.data;
+  const clubName = order.clubName ?? clubQuery.data?.name;
   const isCompleted =
     order.status === "completed" || order.status === "partiallyRefunded";
   const detailAction = getOrderDetailAction(order.actions);
@@ -199,12 +212,10 @@ export function OrderDetailScreen({
           showDispatchCountdown={showDispatchCountdown}
           dispatchCountdown={dispatchCountdown}
         />
-        {scope === "place" && !isCancelled ? (
-          <OrderProgressSteps status={order.status} scope={scope} />
-        ) : null}
         <OrderDetailInfoBlocks
           order={order}
           scope={scope}
+          clubName={clubName}
           orderNumber={orderNumber}
           onCopy={actions.copyOrderNumber}
           onChat={actions.handleChat}
@@ -231,6 +242,16 @@ export function OrderDetailScreen({
         members={actions.afterSaleMembers}
         onClose={() => actions.setAfterSaleVisible(false)}
         onContact={actions.contactAfterSaleMember}
+        onCustomerService={openCustomerService}
+      />
+      <OrderMultiCompanionSheet
+        visible={actions.multiSelectVisible}
+        needSelect={multiCompanionNeedSelect(order)}
+        candidates={actions.multiSelectCandidates}
+        loading={actions.multiSelectLoading}
+        submitting={actions.actionPending}
+        onClose={() => actions.setMultiSelectVisible(false)}
+        onConfirm={actions.confirmMultiCompanions}
       />
       <OrderReviewSheet
         visible={actions.reviewVisible}

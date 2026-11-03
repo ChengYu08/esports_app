@@ -12,6 +12,7 @@ import type {
   QuickMatchCreatedOrders,
   QuickMatchGrabItem,
   QuickMatchPayable,
+  QuickMatchPaymentPreview,
   QuickMatchPublishResult,
   QuickMatchRequestDetail,
 } from "./match.types";
@@ -104,6 +105,27 @@ type ApiPayable = {
   orderCount?: number;
   totalPrice?: number | string;
 };
+
+type ApiPaymentMethodItem = {
+  code?: string;
+  name?: string;
+  balance?: number | string;
+  discountAmount?: number | string;
+  payableAmount?: number | string;
+};
+
+type ApiPaymentPreview = {
+  totalPrice?: number | string;
+  paymentMethods?: ApiPaymentMethodItem[];
+};
+
+/** 服务端余额不足错误：按 code 精确判定，供支付流程引导充值 */
+export class StarNotEnoughError extends Error {
+  constructor(message?: string) {
+    super(message || "钻石余额不足");
+    this.name = "StarNotEnoughError";
+  }
+}
 
 type ApiCreatedOrder = {
   orderId?: number | string;
@@ -472,12 +494,36 @@ export async function fetchQuickMatchPayable(
   };
 }
 
+export async function fetchQuickMatchPaymentPreview(
+  requestNo: string,
+  grabIds: string[],
+  token: string,
+): Promise<QuickMatchPaymentPreview> {
+  const response = await apiClient<ApiEnvelope<ApiPaymentPreview>>("/client/v1/pay/preview", {
+    method: "POST",
+    token,
+    body: { action: { requestNo, grabIds } },
+  });
+  const data = requireSuccess(response, "支付明细预览获取失败");
+  const paymentMethods = (data.paymentMethods ?? []).map((item) => ({
+    code: item.code ?? "DIAMOND",
+    name: item.name ?? "钻石",
+    balance: toNumber(item.balance),
+    discountAmount: toNumber(item.discountAmount),
+    payableAmount: toNumber(item.payableAmount),
+  }));
+  return { totalPrice: toNumber(data.totalPrice), paymentMethods };
+}
+
 export async function batchPayQuickMatch(requestNo: string, token: string): Promise<void> {
   const response = await apiClient<ApiEnvelope<unknown>>("/client/v1/quickMatch/batchPay", {
     method: "POST",
     token,
     body: { action: { requestNo } },
   });
+  if (response.code === "STAR_NOT_ENOUGH") {
+    throw new StarNotEnoughError(response.info);
+  }
   requireVoidSuccess(response, "支付失败");
 }
 

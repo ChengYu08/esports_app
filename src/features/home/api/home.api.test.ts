@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { apiClient } from "@/core/network/api-client";
-import { fetchBanners, fetchClubPage, fetchCompanionPage, fetchGameCategories, fetchGames } from "./home.api";
+import { fetchBanners, fetchClubGameCompanionCounts, fetchClubGameModes, fetchClubOnlineCount, fetchClubPage, fetchCompanionPage, fetchGameCategories, fetchGames } from "./home.api";
 
 vi.mock("@/core/network/api-client", () => ({ apiClient: vi.fn() }));
 
@@ -10,6 +10,16 @@ vi.mock("@/core/network/api-client", () => ({ apiClient: vi.fn() }));
 vi.mock("react-native", () => ({ Platform: { OS: "ios" } }));
 
 afterEach(() => vi.clearAllMocks());
+
+it("俱乐部模式筛选只包含当前俱乐部及未指定俱乐部的模式", async () => {
+  vi.mocked(apiClient).mockResolvedValue({ code: "SUCCESS", data: [
+    { id: 1, clubId: 10, modeName: "排位", status: 1 },
+    { id: 2, clubId: 20, modeName: "其他俱乐部", status: 1 },
+    { id: 3, modeName: "通用", status: 1 },
+    { id: 4, clubId: 10, modeName: "已停用", status: 0 },
+  ] });
+  expect((await fetchClubGameModes("8", "10")).map((mode) => mode.id)).toEqual([1, 3]);
+});
 
 describe("首页活动轮播下发", () => {
   it("批量查询 App 三层资源位，按楼层和素材顺序展示，不混入 PC 素材", async () => {
@@ -245,5 +255,93 @@ describe("俱乐部陪玩列表字段映射", () => {
 
     expect(page.items[0]).toMatchObject({ tagName: "魔王pro", tagBackgroundColor: "#8F4033" });
     expect(page.items[1]).toMatchObject({ tagName: "明星", tagBackgroundColor: "" });
+  });
+});
+
+describe("首页在线陪玩人数", () => {
+  it("按俱乐部和游戏获取去重后的陪玩总数", async () => {
+    vi.mocked(apiClient)
+      .mockResolvedValueOnce({ code: "SUCCESS", data: { total: 7 } })
+      .mockResolvedValueOnce({ code: "SUCCESS", data: { total: 2 } });
+    expect(await fetchClubGameCompanionCounts("1000004", [14, 15, 14])).toEqual({ 14: 7, 15: 2 });
+    expect(apiClient).toHaveBeenCalledTimes(2);
+    expect(apiClient).toHaveBeenCalledWith("/client/v1/companion/public/page", {
+      method: "POST",
+      body: { page: 1, pageSize: 1, action: { clubId: 1000004, gameId: 14 } },
+      signal: undefined,
+    });
+  });
+  it("统计范围保留没有图标的启用游戏，排除停用游戏并去重", async () => {
+    vi.mocked(apiClient).mockResolvedValue({ code: "SUCCESS", data: { records: [
+      { id: 1000004, clubGames: [
+        { gameId: 14, status: 1, iconUrl: "game.png" },
+        { gameId: 15, status: 1 },
+        { gameId: 14, status: 1 },
+        { gameId: 16, status: 0 },
+      ] },
+    ] } });
+
+    const page = await fetchClubPage({}, 1);
+
+    expect(page.items[0].gameIds).toEqual([14, 15]);
+    expect(page.items[0].games?.map((game) => game.id)).not.toContain(15);
+  });
+
+  it("俱乐部有两名在线成员但只有一名在线陪玩时返回 1，查询携带必填游戏 ID", async () => {
+    const controller = new AbortController();
+    vi.mocked(apiClient).mockResolvedValue({ code: "SUCCESS", data: {
+      total: 1, totalPages: 1,
+      records: [{ profileId: 10, userId: 50100145, onlineStatus: 1, gameStatus: 0 }],
+    } });
+
+    expect(await fetchClubOnlineCount("1000004", [14], controller.signal)).toBe(1);
+    expect(apiClient).toHaveBeenCalledWith("/client/v1/companion/public/page", {
+      method: "POST",
+      body: { page: 1, pageSize: 50, action: { clubId: 1000004, gameId: 14, onlineOnly: true } },
+      signal: controller.signal,
+    });
+  });
+
+  it("遍历分页并跨游戏按用户去重，空闲中和游戏中都计入，离线状态不计入", async () => {
+    vi.mocked(apiClient)
+      .mockResolvedValueOnce({ code: "SUCCESS", data: { totalPages: 2, records: [
+        { profileId: 1, userId: 101, onlineStatus: 1, gameStatus: 0 },
+      ] } })
+      .mockResolvedValueOnce({ code: "SUCCESS", data: { totalPages: 2, records: [
+        { profileId: 2, userId: 102, onlineStatus: 1, gameStatus: 1 },
+      ] } })
+      .mockResolvedValueOnce({ code: "SUCCESS", data: { totalPages: 1, records: [
+        { profileId: 11, userId: 101, onlineStatus: 1, gameStatus: 1 },
+        { profileId: 3, userId: 103, onlineStatus: 1, gameStatus: 0 },
+        { profileId: 4, userId: 104, onlineStatus: 0, gameStatus: 1 },
+      ] } });
+
+    expect(await fetchClubOnlineCount("1000004", [14, 15, 14])).toBe(3);
+    expect(vi.mocked(apiClient).mock.calls.map(([, options]) => options?.body)).toEqual([
+      { page: 1, pageSize: 50, action: { clubId: 1000004, gameId: 14, onlineOnly: true } },
+      { page: 2, pageSize: 50, action: { clubId: 1000004, gameId: 14, onlineOnly: true } },
+      { page: 1, pageSize: 50, action: { clubId: 1000004, gameId: 15, onlineOnly: true } },
+    ]);
+  });
+
+  it("没有启用游戏时人数为零，不发送缺少游戏 ID 的请求", async () => {
+    expect(await fetchClubOnlineCount("1000004", [])).toBe(0);
+    expect(apiClient).not.toHaveBeenCalled();
+  });
+
+  it("没有在线陪玩时返回真实的零人数", async () => {
+    vi.mocked(apiClient).mockResolvedValue({ code: "SUCCESS", data: { totalPages: 0, records: [] } });
+
+    expect(await fetchClubOnlineCount("1000004", [14])).toBe(0);
+  });
+
+  it("某个游戏查询失败时整体报错，不把部分人数当成俱乐部总人数", async () => {
+    vi.mocked(apiClient)
+      .mockResolvedValueOnce({ code: "SUCCESS", data: { totalPages: 1, records: [
+        { profileId: 1, userId: 101, onlineStatus: 1 },
+      ] } })
+      .mockResolvedValueOnce({ code: "FAILED", info: "游戏数据加载失败" });
+
+    await expect(fetchClubOnlineCount("1000004", [14, 15])).rejects.toThrow("游戏数据加载失败");
   });
 });

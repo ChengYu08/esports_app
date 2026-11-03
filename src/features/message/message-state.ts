@@ -6,6 +6,8 @@ export type ManagedMessage = ChatMessage & {
   status: MessageDeliveryStatus;
   clientId?: string;
   sentAt: number;
+  /** 融云离线补偿（offline=true）补回来的消息，已读状态以服务端会话快照为准 */
+  receivedOffline?: boolean;
   retryPayload?:
     | { kind: "text"; text: string }
     | { kind: "image"; path: string };

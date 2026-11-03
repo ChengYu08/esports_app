@@ -29,6 +29,39 @@ const partialFreeOrder = {
   refundAmount: 470,
 };
 
+it.each([1, 10])("派单取消支付后，单价为 %i 的待支付订单展示订单总价而非零实付", (price) => {
+  const order = mapOrder({
+    id: 42,
+    orderStatus: "PENDING_PAY",
+    price,
+    quantity: 1,
+    totalPrice: price,
+    realPayAmount: 0,
+  });
+  expect(order.status).toBe("pendingPayment");
+  expect(order.unitPrice).toBe(String(price));
+  expect(order.totalPrice).toBe(String(price));
+  expect(computeOrderPayableStars(order)).toBe(price);
+  expect(order.actions.map(({ key }) => key)).toEqual(["cancel", "pay"]);
+});
+
+it("订单总价保留接口的小数和数量口径，不使用实付金额覆盖", () => {
+  const order = mapOrder({
+    orderStatus: "PENDING_PAY",
+    price: "9.99",
+    quantity: 2,
+    totalPrice: "19.98",
+    realPayAmount: "0.00",
+  });
+  expect(order.totalPrice).toBe("19.98");
+  expect(computeOrderPayableStars(order)).toBe(19.98);
+});
+
+it("已支付订单同样按订单总价展示合计，真实零总价也不会被实付金额替换", () => {
+  expect(mapOrder({ orderStatus: "PAID", totalPrice: 100, realPayAmount: 80 }).totalPrice).toBe("100");
+  expect(mapOrder({ orderStatus: "PAID", totalPrice: 0, realPayAmount: 80 }).totalPrice).toBe("0");
+});
+
 it("部分免单同时保留原价与免单后的应收金额", () => {
   const order = mapOrder({ id: 42, orderStatus: "IN_SERVICE", realPayAmount: 800, isFreeOrder: true, refundAmount: 200 }, 0, "accept");
   expect(order.totalPrice).toBe("800");
@@ -54,7 +87,7 @@ it("免单一小时后展示免单时长、剩余金额与部分免单状态，�
     expect(order.status).toBe("partiallyRefunded");
     expect(order.statusLabel).toBe("部分免单");
     expect(order.quantity).toBe(2);
-    expect(formatOrderFreeSummary(order)).toBe("1小时（470星钻）");
+    expect(formatOrderFreeSummary(order)).toBe("1小时（470钻石）");
     expect(computeOrderPayableStars(order)).toBe(470);
     expect(order.actions.some(({ key }) => ["pay", "free", "start", "complete"].includes(key))).toBe(false);
     expect(filterOrders([order], "completed")).toEqual([order]);
@@ -67,7 +100,7 @@ it("免单一小时后展示免单时长、剩余金额与部分免单状态，�
 it("一小时订单全额免单显示已免单及零应收，并归入已取消列表", () => {
   const order = mapOrder({ ...partialFreeOrder, orderStatus: "REFUNDED", quantity: 1, realPayAmount: 470 }, 0, "accept");
   expect(order.statusLabel).toBe("已免单");
-  expect(formatOrderFreeSummary(order)).toBe("1小时（470星钻）");
+  expect(formatOrderFreeSummary(order)).toBe("1小时（470钻石）");
   expect(computeOrderPayableStars(order)).toBe(0);
   expect(filterOrders([order], "cancelled")).toEqual([order]);
   expect(order.actions).toEqual([]);
@@ -128,12 +161,11 @@ it("普通订单不输出活动字段，金额展示保持不变", () => {
   expect(order.totalPrice).toBe("500");
 });
 
-it("金额视角：普通订单陪玩侧仍取实付金额，活动订单陪玩侧取订单总价", () => {
+it("金额视角：普通订单按总价展示，活动订单陪玩侧取订单总价", () => {
   const raw = { id: 42, orderStatus: "PAID", totalPrice: 900, realPayAmount: 800 };
-  expect(mapOrder(raw, 0, "place").totalPrice).toBe("800");
-  // 普通订单陪玩侧维持实付金额优先，后端意外输出 total≠实付时展示不变
-  expect(mapOrder(raw, 0, "accept").totalPrice).toBe("800");
-  // 普通订单只有总价时两个视角都回落到总价，行为不变
+  // 普通订单合计优先订单总价（待支付实付为 0 不能覆盖应付）
+  expect(mapOrder(raw, 0, "place").totalPrice).toBe("900");
+  expect(mapOrder(raw, 0, "accept").totalPrice).toBe("900");
   expect(mapOrder({ id: 42, orderStatus: "PAID", totalPrice: 500 }, 0, "accept").totalPrice).toBe("500");
   // 活动订单（productId 存在）陪玩侧统一订单总价口径
   expect(mapOrder({ ...raw, productId: 11 }, 0, "accept").totalPrice).toBe("900");
@@ -144,16 +176,13 @@ it("金额视角：普通订单陪玩侧仍取实付金额，活动订单陪玩�
 });
 
 it("免单提交口径：活动订单按原价退款基数折算，普通订单维持时长×单价计算值", () => {
-  // 活动订单全额免单：freeAmount 即 refundBaseAmount
   const activity = { quantity: 2, refundBaseAmount: 900 };
   expect(computeFreeSubmitAmount(activity, 470, 2)).toBe(900);
-  // 活动订单部分免单：按免单时长占比折算原价基数
   expect(computeFreeSubmitAmount(activity, 470, 1)).toBe(450);
-  // 普通订单无 refundBaseAmount：维持现有计算值，行为不变
   expect(computeFreeSubmitAmount({ quantity: 2 }, 470, 1)).toBe(470);
 });
 
-it("最终确认免单向真实业务接口提交星钻金额，失败时向上抛出", async () => {
+it("最终确认免单向真实业务接口提交钻石金额，失败时向上抛出", async () => {
   vi.mocked(apiClient).mockResolvedValueOnce({ code: "SUCCESS" });
   await freeOrderService("42", 470, "order-token");
   expect(apiClient).toHaveBeenCalledWith("/client/v1/order/free", {

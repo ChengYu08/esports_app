@@ -8,12 +8,15 @@ import { courtVoteUnavailableReason, submitCourtVote } from "@/features/court/co
 import { CourtVoteButton } from "@/features/court/components/CourtVoteButton";
 import {
   courtApi,
+  courtServiceTypeText,
   formatCount,
   mapCaseStage,
   type CourtCase,
 } from "@/features/court/court.api";
 import { COURT_FONT_FAMILY } from "@/features/court/court.theme";
+import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { useAuthStore } from "@esports/auth";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import * as Clipboard from "expo-clipboard";
@@ -43,6 +46,7 @@ export default function CourtDetailScreen() {
   const busy = pendingAction !== null;
   const [reviewerPromptVisible, setReviewerPromptVisible] = useState(false);
   const voteInFlight = useRef(false);
+  const favoriteInFlight = useRef(false);
   const isMine = mine === "1";
   const loadRequestRef = useRef(0);
 
@@ -142,26 +146,32 @@ export default function CourtDetailScreen() {
       router.push("/login");
       return;
     }
-    if (!item || busy) {
+    if (!item || busy || favoriteInFlight.current) {
       return;
     }
+    favoriteInFlight.current = true;
     setPendingAction("favorite");
     try {
       const result = await courtApi.favorite(item.caseId, !item.favorited);
+      if (accessToken !== useAuthStore.getState().accessToken) {
+        return;
+      }
       setItem((current) => {
         if (!current || String(current.caseId) !== String(item.caseId)) {
           return current;
         }
+        const favoriteDelta = Number(result.favorited) - Number(Boolean(current.favorited));
         return {
           ...current,
           favorited: result.favorited,
-          favoriteCount: result.favoriteCount ?? current.favoriteCount,
+          favoriteCount: result.favoriteCount ?? Math.max(0, (current.favoriteCount ?? 0) + favoriteDelta),
         };
       });
       showToast(result.favorited ? "收藏成功" : "已取消收藏");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "收藏失败");
     } finally {
+      favoriteInFlight.current = false;
       setPendingAction(null);
     }
   }
@@ -184,17 +194,13 @@ export default function CourtDetailScreen() {
 
   return (
     <View style={styles.screen}>
-      <View style={[styles.header, { height: 44 + insets.top, paddingTop: insets.top }]}>
-        <Pressable
-          accessibilityLabel="返回"
-          onPress={() => router.back()}
-          style={styles.back}
-        >
-          <Text style={styles.backText}>‹</Text>
-        </Pressable>
-        <Text style={styles.headerTitle}>评审详情</Text>
-        <View style={styles.back} />
-      </View>
+      <ScreenHeader
+        title="评审详情"
+        onBack={() => router.back()}
+        backIconColor="#0D0D0F"
+        titleStyle={styles.headerTitle}
+        style={{ paddingTop: insets.top, height: insets.top + 44, paddingHorizontal: 12 }}
+      />
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -217,7 +223,7 @@ export default function CourtDetailScreen() {
                     value={String(item.caseNo || item.caseId)}
                     onCopy={copyCaseId}
                   />
-                  <Metadata label="服务类型" value={item.serviceName || item.gameName || "服务订单"} />
+                  <Metadata label="服务类型" value={courtServiceTypeText(item)} />
                 </View>
                 <View style={styles.metadataRow}>
                   <Metadata label="接单人员" value={item.companionNickname || item.defendant?.nickname || "-"} />
@@ -256,11 +262,25 @@ export default function CourtDetailScreen() {
             {!!item.reviewImageUrls?.length && (
               <View style={[styles.imageRow, styles.complaintImages]}>
                 {item.reviewImageUrls.slice(0, 6).map((uri, index) => (
-                  <CachedImage
+                  <Pressable
                     key={`${uri}-${index}`}
-                    source={{ uri }}
-                    style={styles.imageThumb}
-                  />
+                    accessibilityRole="button"
+                    accessibilityLabel={`查看差评图片 ${index + 1}`}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/image-preview",
+                        params: createImagePreviewParams(
+                          item.reviewImageUrls ?? [],
+                          index,
+                        ),
+                      })
+                    }
+                  >
+                    <CachedImage
+                      source={{ uri }}
+                      style={styles.imageThumb}
+                    />
+                  </Pressable>
                 ))}
               </View>
             )}
@@ -293,10 +313,18 @@ export default function CourtDetailScreen() {
               <CachedImage source={require("../../../../assets/court/eye.svg")} style={styles.statIcon} />
               <Text style={styles.statText}>{formatCount(item.viewCount)}</Text>
             </View>
-            <View style={styles.stat}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={item.favorited ? "取消收藏" : "收藏案件"}
+              accessibilityState={{ disabled: busy, busy: pendingAction === "favorite" }}
+              disabled={busy}
+              hitSlop={8}
+              onPress={favorite}
+              style={styles.stat}
+            >
               <CachedImage source={item.favorited ? require("../../../../assets/court/star-filled.svg") : require("../../../../assets/court/star.svg")} style={styles.statIcon} />
               <Text style={styles.statText}>{formatCount(item.favoriteCount)}</Text>
-            </View>
+            </Pressable>
           </View>
         </View>
 
@@ -377,6 +405,8 @@ export default function CourtDetailScreen() {
         )}
         {!isMine && (
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={item.favorited ? "取消收藏" : "收藏案件"}
             onPress={favorite}
             accessibilityState={{ disabled: busy, busy: pendingAction === "favorite" }}
             disabled={busy}
@@ -457,20 +487,6 @@ function caseTypeLabel(code?: string) {
 }
 const styles = StyleSheet.create({
   screen: { backgroundColor: "#F5F6F7", flex: 1 },
-  header: {
-    alignItems: "center",
-    backgroundColor: "#fff",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-  },
-  back: {
-    alignItems: "center",
-    height: 36,
-    justifyContent: "center",
-    width: 36,
-  },
-  backText: { color: "#0D0D0F", fontSize: 32, lineHeight: 34 },
   headerTitle: {
     color: "#0D0D0F",
     fontFamily: COURT_FONT_FAMILY,

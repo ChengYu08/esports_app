@@ -1,7 +1,7 @@
 import { useAuthStore } from "@esports/auth";
-import { ChevronLeft24Regular, Person24Regular } from "@fluentui/react-native-icons";
+import { Person24Regular } from "@fluentui/react-native-icons";
 import { useLocalSearchParams, router } from "expo-router";
-import { useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -25,12 +25,115 @@ import { requireLogin } from "@/shared/navigation/require-login";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { EmptyState, ErrorState } from "@/shared/ui/AsyncStates";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 const fallbackAvatar = require("../../../../assets/coms/avatar_default.webp");
 
 function isUnavailableUser(user: UserFollowUser) {
   return user.nickname === "账号被封禁" || user.nickname === "账号已注销";
 }
+
+const relationKeyExtractor = (item: UserFollowUser) => item.userId;
+
+// 列表行独立 memo 组件：回关 pending/完成等状态变化时未受影响的行跳过重渲
+const RelationRow = memo(function RelationRow({
+  item,
+  type,
+  isSelf,
+  followedBack,
+  followPending,
+  onOpenProfile,
+  onOpenChat,
+  onFollowBack,
+}: {
+  item: UserFollowUser;
+  type: UserFollowType;
+  isSelf: boolean;
+  followedBack: boolean;
+  followPending: boolean;
+  onOpenProfile: (user: UserFollowUser) => void;
+  onOpenChat: (user: UserFollowUser) => void;
+  onFollowBack: (user: UserFollowUser) => Promise<void>;
+}) {
+  const unavailable = isUnavailableUser(item);
+  return (
+    <View style={styles.row}>
+      <Pressable
+        disabled={unavailable}
+        accessibilityRole="button"
+        accessibilityLabel={`查看${item.nickname}的主页`}
+        onPress={unavailable ? undefined : () => onOpenProfile(item)}
+        style={({ pressed }) => [
+          styles.userInfo,
+          pressed && !unavailable && styles.pressed,
+        ]}
+      >
+        <View style={styles.avatarFrame}>
+          {unavailable ? (
+            <View style={styles.unavailableAvatar}>
+              <Person24Regular color="#D9D9D9" height={24} width={24} />
+            </View>
+          ) : (
+            <CachedImage
+              source={item.avatar ? { uri: item.avatar } : fallbackAvatar}
+              contentFit="cover"
+              style={styles.avatar}
+            />
+          )}
+        </View>
+        <View style={styles.userCopy}>
+          <Text numberOfLines={1} style={styles.nickname}>
+            {item.nickname}
+          </Text>
+          {item.signature ? (
+            <Text numberOfLines={1} style={styles.signature}>
+              {item.signature}
+            </Text>
+          ) : null}
+        </View>
+      </Pressable>
+
+      {!unavailable && !isSelf ? (
+        <View style={styles.actions}>
+          {type === "fans" ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={followedBack ? "已回关" : "回关"}
+              accessibilityState={{
+                disabled: followedBack || followPending,
+                busy: followPending,
+              }}
+              disabled={followedBack || followPending}
+              onPress={() => void onFollowBack(item)}
+              style={[
+                styles.actionButton,
+                followedBack && styles.actionButtonDone,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.actionText,
+                  followedBack && styles.actionTextDone,
+                ]}
+              >
+                {followedBack ? "已回关" : "回关"}
+              </Text>
+            </Pressable>
+          ) : (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="聊一聊"
+              onPress={() => onOpenChat(item)}
+              style={styles.actionButton}
+            >
+              <Text style={styles.actionText}>聊一聊</Text>
+            </Pressable>
+          )}
+        </View>
+      ) : null}
+    </View>
+  );
+});
 
 export default function ProfileRelationScreen() {
   const insets = useSafeAreaInsets();
@@ -50,53 +153,68 @@ export default function ProfileRelationScreen() {
   const [followedBackIds, setFollowedBackIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const items = query.data?.pages.flatMap((page) => page.items) ?? [];
+  const items = useMemo(
+    () => query.data?.pages.flatMap((page) => page.items) ?? [],
+    [query.data],
+  );
+  const refetchRelations = query.refetch;
+  const fetchNextRelations = query.fetchNextPage;
 
-  const openUserProfile = (user: UserFollowUser) => {
-    router.push({
-      pathname: "/profile",
-      params: {
-        userId: user.userId,
-        ...((user.clubId || clubId)
-          ? { clubId: user.clubId || clubId }
-          : {}),
-      },
-    });
-  };
-
-  const openChat = (user: UserFollowUser) => {
-    if (!requireLogin()) return;
-    router.push({
-      pathname: "/chat/[id]",
-      params: {
-        id: user.userId,
-        title: user.nickname,
-        avatar: user.avatar || "",
-        clubId: user.clubId || clubId || "",
-      },
-    });
-  };
-
-  const followBack = async (user: UserFollowUser) => {
-    if (!requireLogin()) return;
-    const session = useAuthStore.getState();
-    if (!session.accessToken || !session.user) return;
-
-    try {
-      const result = await followMutation.mutateAsync({
-        followUserId: user.userId,
-        currentlyFollowed: false,
-        token: session.accessToken,
-        viewerUserId: session.user.id,
+  const openUserProfile = useCallback(
+    (user: UserFollowUser) => {
+      router.push({
+        pathname: "/profile",
+        params: {
+          userId: user.userId,
+          ...((user.clubId || clubId)
+            ? { clubId: user.clubId || clubId }
+            : {}),
+        },
       });
-      if (result.followed) {
-        setFollowedBackIds((current) => new Set(current).add(user.userId));
-        showToast("已回关");
+    },
+    [clubId],
+  );
+
+  const openChat = useCallback(
+    (user: UserFollowUser) => {
+      if (!requireLogin()) return;
+      router.push({
+        pathname: "/chat/[id]",
+        params: {
+          id: user.userId,
+          title: user.nickname,
+          avatar: user.avatar || "",
+          clubId: user.clubId || clubId || "",
+        },
+      });
+    },
+    [clubId],
+  );
+
+  const followMutationAsync = followMutation.mutateAsync;
+  const followBack = useCallback(
+    async (user: UserFollowUser) => {
+      if (!requireLogin()) return;
+      const session = useAuthStore.getState();
+      if (!session.accessToken || !session.user) return;
+
+      try {
+        const result = await followMutationAsync({
+          followUserId: user.userId,
+          currentlyFollowed: false,
+          token: session.accessToken,
+          viewerUserId: session.user.id,
+        });
+        if (result.followed) {
+          setFollowedBackIds((current) => new Set(current).add(user.userId));
+          showToast("已回关");
+        }
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : "回关失败");
       }
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "回关失败");
-    }
-  };
+    },
+    [followMutationAsync],
+  );
 
   const switchType = (nextType: UserFollowType) => {
     if (nextType === type || !userId) return;
@@ -112,22 +230,10 @@ export default function ProfileRelationScreen() {
 
   return (
     <View style={styles.screen}>
-      <View
-        style={[
-          styles.header,
-          { height: 44 + insets.top, paddingTop: insets.top },
-        ]}
-      >
-        <View style={styles.nav}>
-          <Pressable
-            accessibilityLabel="返回"
-            accessibilityRole="button"
-            hitSlop={12}
-            onPress={() => router.back()}
-            style={styles.backButton}
-          >
-            <ChevronLeft24Regular color="#0A0A0A" width={24} height={24} style={styles.backIcon} />
-          </Pressable>
+      <ScreenHeader
+        title=""
+        onBack={() => router.back()}
+        right={
           <View style={styles.tabBar}>
             <Pressable
               accessibilityRole="tab"
@@ -159,20 +265,19 @@ export default function ProfileRelationScreen() {
               {type === "fans" ? <View style={styles.tabIndicator} /> : null}
             </Pressable>
           </View>
-          <View style={styles.headerSpace} />
-        </View>
-      </View>
+        }
+        style={{ paddingTop: insets.top, height: insets.top + 44 }}
+      />
 
       <FlatList
         data={items}
-        keyExtractor={(item) => item.userId}
+        keyExtractor={relationKeyExtractor}
         contentContainerStyle={[
           styles.listContent,
           items.length === 0 && styles.emptyContent,
         ]}
         renderItem={({ item }) => {
           const isSelf = Boolean(viewerUserId && item.userId === viewerUserId);
-          const unavailable = isUnavailableUser(item);
           const followedBack =
             item.followedBack || followedBackIds.has(item.userId);
           const followPending =
@@ -180,90 +285,25 @@ export default function ProfileRelationScreen() {
             followMutation.variables?.followUserId === item.userId;
 
           return (
-            <View style={styles.row}>
-              <Pressable
-                disabled={unavailable}
-                accessibilityRole="button"
-                accessibilityLabel={`查看${item.nickname}的主页`}
-                onPress={unavailable ? undefined : () => openUserProfile(item)}
-                style={({ pressed }) => [
-                  styles.userInfo,
-                  pressed && !unavailable && styles.pressed,
-                ]}
-              >
-                <View style={styles.avatarFrame}>
-                  {unavailable ? (
-                    <View style={styles.unavailableAvatar}>
-                      <Person24Regular color="#D9D9D9" height={24} width={24} />
-                    </View>
-                  ) : (
-                    <CachedImage
-                      source={item.avatar ? { uri: item.avatar } : fallbackAvatar}
-                      contentFit="cover"
-                      style={styles.avatar}
-                    />
-                  )}
-                </View>
-                <View style={styles.userCopy}>
-                  <Text numberOfLines={1} style={styles.nickname}>
-                    {item.nickname}
-                  </Text>
-                  {item.signature ? (
-                    <Text numberOfLines={1} style={styles.signature}>
-                      {item.signature}
-                    </Text>
-                  ) : null}
-                </View>
-              </Pressable>
-
-              {!unavailable && !isSelf ? (
-                <View style={styles.actions}>
-                  {type === "fans" ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={followedBack ? "已回关" : "回关"}
-                      accessibilityState={{
-                        disabled: followedBack || followPending,
-                        busy: followPending,
-                      }}
-                      disabled={followedBack || followPending}
-                      onPress={() => void followBack(item)}
-                      style={[
-                        styles.actionButton,
-                        followedBack && styles.actionButtonDone,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.actionText,
-                          followedBack && styles.actionTextDone,
-                        ]}
-                      >
-                        {followedBack ? "已回关" : "回关"}
-                      </Text>
-                    </Pressable>
-                  ) : (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="聊一聊"
-                      onPress={() => openChat(item)}
-                      style={styles.actionButton}
-                    >
-                      <Text style={styles.actionText}>聊一聊</Text>
-                    </Pressable>
-                  )}
-                </View>
-              ) : null}
-            </View>
+            <RelationRow
+              item={item}
+              type={type}
+              isSelf={isSelf}
+              followedBack={followedBack}
+              followPending={followPending}
+              onOpenProfile={openUserProfile}
+              onOpenChat={openChat}
+              onFollowBack={followBack}
+            />
           );
         }}
         onEndReached={() => {
           if (query.hasNextPage && !query.isFetchingNextPage) {
-            void query.fetchNextPage();
+            void fetchNextRelations();
           }
         }}
         onEndReachedThreshold={0.35}
-        onRefresh={() => void query.refetch()}
+        onRefresh={() => void refetchRelations()}
         refreshing={query.isRefetching && !query.isFetchingNextPage}
         ListEmptyComponent={
           query.isLoading ? (
@@ -271,7 +311,7 @@ export default function ProfileRelationScreen() {
           ) : query.isError ? (
             <ErrorState
               message="列表加载失败"
-              onRetry={() => void query.refetch()}
+              onRetry={() => void refetchRelations()}
             />
           ) : (
             <EmptyState
@@ -285,7 +325,7 @@ export default function ProfileRelationScreen() {
             <ActivityIndicator style={styles.footer} color="#E62336" />
           ) : query.isFetchNextPageError ? (
             <Pressable
-              onPress={() => void query.fetchNextPage()}
+              onPress={() => void fetchNextRelations()}
               style={styles.footer}
             >
               <Text style={styles.retryText}>加载失败，点击重试</Text>
@@ -302,26 +342,16 @@ export default function ProfileRelationScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#FFFFFF" },
-  header: { backgroundColor: "#FFFFFF" },
-  nav: {
-    height: 44,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  backButton: {
-    width: 48,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  backIcon: { width: 24, height: 24 },
+  // 标签组放 right 插槽：alignSelf 拉满剩余宽度，paddingRight 抵消左侧 48 的返回键宽度，
+  // 使「关注/粉丝」在屏幕水平居中（与原 nav + headerSpace 48 的布局一致）
   tabBar: {
-    flex: 1,
+    alignSelf: "stretch",
     height: 44,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 36,
+    paddingRight: 48,
   },
   tab: {
     height: 44,
@@ -348,7 +378,6 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: "#E62336",
   },
-  headerSpace: { width: 48, height: 44 },
   listContent: { paddingHorizontal: 16 },
   emptyContent: { flexGrow: 1 },
   row: {

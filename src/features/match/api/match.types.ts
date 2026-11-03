@@ -134,6 +134,20 @@ export type QuickMatchPayable = {
   totalPrice: number;
 };
 
+export type QuickMatchPaymentMethodItem = {
+  code: string;
+  name: string;
+  balance: number;
+  discountAmount: number;
+  payableAmount: number;
+};
+
+/** 建单前支付明细预览（/client/v1/pay/preview），仅 DIAMOND 单项 */
+export type QuickMatchPaymentPreview = {
+  totalPrice: number;
+  paymentMethods: QuickMatchPaymentMethodItem[];
+};
+
 export type QuickMatchCreatedOrder = {
   orderId: string;
   serviceUserId?: string;
@@ -204,6 +218,14 @@ export function applyGrabSelection(
     return { ids: prev, overLimit: true };
   }
   return { ids: [...prev, grabId], overLimit: false };
+}
+
+/** 从选中列表中剔除已消失的候选人；支付确认冻结期间保持原选择不变 */
+export function pruneSelectedIds(
+  selected: string[],
+  candidates: QuickMatchGrabItem[],
+): string[] {
+  return selected.filter((id) => candidates.some((item) => item.id === id));
 }
 
 export function isQuickMatchActive(request: QuickMatchRequestDetail | null): boolean {

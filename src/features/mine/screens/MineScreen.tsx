@@ -1,11 +1,9 @@
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
-  Apps24Regular,
   ChevronRight16Regular,
   ChevronRight20Regular,
   Dismiss24Regular,
-  Headset24Regular,
 } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
@@ -23,6 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { fetchStarBalance } from "@/features/mine/api/companion-order.api";
+import { resolveMineMenuKeys, type MineMenuKey } from "@/features/mine/mine-menu";
 import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
 import { useUserFollowCount } from "@/features/mine/hooks/use-user-follow";
 import {
@@ -42,6 +41,9 @@ const companionEntryQrCode = require("../../../../assets/coms/qrcode-pws.webp");
 const clubEntryQrCode = require("../../../../assets/coms/qrcode-jlb.webp");
 const menuRoomIcon = require("../../../../assets/mine/figma/mine-menu-room.svg");
 const menuCompanionIcon = require("../../../../assets/mine/figma/mine-menu-companion.svg");
+const menuSettingsIcon = require("../../../../assets/mine/figma/mine-menu-settings.svg");
+const menuServiceIcon = require("../../../../assets/mine/figma/mine-menu-service.svg");
+const menuOrderIcon = require("../../../../assets/svgs/tab-order.svg");
 
 type MenuItem = {
   key: string;
@@ -64,6 +66,7 @@ export default function MineScreen() {
   );
   const [qrCodeVisible, setQrCodeVisible] = useState(false);
   const [clubQrCodeVisible, setClubQrCodeVisible] = useState(false);
+  const [clubAdminModalVisible, setClubAdminModalVisible] = useState(false);
   const [openingVoiceRoom, setOpeningVoiceRoom] = useState(false);
   const { entering: enteringCustomerService, openCustomerService } =
     useCustomerServiceEntry();
@@ -94,6 +97,7 @@ export default function MineScreen() {
               realName: profile.realName ?? state.user.realName,
               clubInfo: profile.clubInfo ?? state.user.clubInfo,
               positions: profile.positions ?? state.user.positions,
+              sidebarMenus: profile.sidebarMenus ?? state.user.sidebarMenus,
             };
             const unchanged =
               JSON.stringify(state.user) === JSON.stringify(nextUser);
@@ -180,61 +184,80 @@ export default function MineScreen() {
   const genderIcon =
     user?.gender === 1 ? maleIcon : user?.gender === 2 ? femaleIcon : null;
 
-  const menuItems = [
+  // 已加入俱乐部（login/info 返回 clubInfo）的用户不再展示入驻入口。
+  const hasClub = Boolean(user?.clubInfo?.id);
+
+  // 功能入口按服务端 sidebarMenus 下发顺序动态组装（与 PC 端口径一致），
+  // 服务端未下发时按本地身份兜底推导；我的房间/基础设置/在线客服为固定项。
+  const menuIcon = (source: number) => (
+    <Image source={source} contentFit="contain" style={styles.menuIcon} />
+  );
+  const dynamicMenuItem = (key: MineMenuKey): MenuItem => {
+    switch (key) {
+      case "CLUB_JOIN":
+        return {
+          key,
+          title: "俱乐部入驻",
+          icon: menuIcon(menuClubIcon),
+          onPress: () => setClubQrCodeVisible(true),
+        };
+      case "BECOME_PLAYMATE":
+        return {
+          key,
+          title: "成为陪玩",
+          icon: menuIcon(menuCompanionIcon),
+          onPress: () => setQrCodeVisible(true),
+        };
+      case "PLAYMATE_MANAGE":
+        return {
+          key,
+          title: "陪玩中心",
+          icon: menuIcon(menuCompanionIcon),
+          onPress: () => router.push("/companion-dashboard"),
+        };
+      case "CLUB_ADMIN":
+        return {
+          key,
+          title: "俱乐部后台",
+          // 设计稿中俱乐部后台与在线客服共用同一图标
+          icon: menuIcon(menuServiceIcon),
+          onPress: () => setClubAdminModalVisible(true),
+        };
+      case "MY_ORDERS":
+        return {
+          key,
+          title: "我的订单",
+          icon: menuIcon(menuOrderIcon),
+          onPress: () => router.push("/order"),
+        };
+    }
+  };
+
+  const menuItems: MenuItem[] = [
     {
       key: "room",
       title: openingVoiceRoom ? "正在进入房间" : "我的房间",
-      icon: (
-        <Image
-          source={menuRoomIcon}
-          contentFit="contain"
-          style={styles.menuIcon}
-        />
-      ),
+      icon: menuIcon(menuRoomIcon),
       onPress: () => void openMyRoom(),
     },
-    {
-      key: "companion",
-      title: isCompanion ? "陪玩管理" : "成为陪玩师",
-      icon: (
-        <Image
-          source={menuCompanionIcon}
-          contentFit="contain"
-          style={styles.menuIcon}
-        />
-      ),
-      onPress: () =>
-        isCompanion
-          ? router.push("/companion-dashboard")
-          : setQrCodeVisible(true),
-    },
-    {
-      key: "club-apply",
-      title: "俱乐部入驻",
-      icon: (
-        <Image
-          source={menuClubIcon}
-          contentFit="contain"
-          style={styles.menuIcon}
-        />
-      ),
-      onPress: () => setClubQrCodeVisible(true),
-    },
+    ...resolveMineMenuKeys(user?.sidebarMenus, { hasClub, isCompanion }).map(
+      dynamicMenuItem,
+    ),
     {
       key: "settings",
       title: "基础设置",
-      icon: <Apps24Regular color="#0A0A0A" width={16} height={16} />,
+      icon: menuIcon(menuSettingsIcon),
       onPress: () => router.push("/basic-settings"),
     },
     {
       key: "customer-service",
       title: "在线客服",
-      icon: <Headset24Regular color="#0A0A0A" width={16} height={16} />,
+      icon: menuIcon(menuServiceIcon),
       onPress: openCustomerService,
       disabled: enteringCustomerService,
       busy: enteringCustomerService,
     },
-  ] satisfies readonly MenuItem[];
+  ];
 
   return (
     <View style={styles.screen}>
@@ -316,12 +339,12 @@ export default function MineScreen() {
           <View style={styles.stats}>
             <Pressable
               accessibilityRole="link"
-              accessibilityLabel="星钻余额，点击充值"
+              accessibilityLabel="钻石余额，点击充值"
               onPress={openStarRecharge}
               style={styles.stat}
             >
               <Text style={styles.statValue}>{user?.starBalance ?? "--"}</Text>
-              <Text style={styles.statLabel}>星钻</Text>
+              <Text style={styles.statLabel}>钻石</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -360,6 +383,10 @@ export default function MineScreen() {
       <ClubQrModal
         visible={clubQrCodeVisible}
         onClose={() => setClubQrCodeVisible(false)}
+      />
+      <ClubAdminNoticeModal
+        visible={clubAdminModalVisible}
+        onClose={() => setClubAdminModalVisible(false)}
       />
     </View>
   );
@@ -453,6 +480,57 @@ function CompanionQrModal({
           <Text style={styles.qrModalHint}>
             扫码联系工作人员，申请成为陪玩师
           </Text>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function ClubAdminNoticeModal({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <Modal
+      animationType="fade"
+      transparent
+      visible={visible}
+      onRequestClose={onClose}
+    >
+      <View style={styles.qrModalBackdrop}>
+        <Pressable
+          accessibilityLabel="关闭俱乐部后台提示弹窗"
+          onPress={onClose}
+          style={StyleSheet.absoluteFill}
+        />
+        <View accessibilityViewIsModal style={styles.qrModalCard}>
+          <View style={styles.qrModalHeader}>
+            <Text style={styles.qrModalTitle}>俱乐部后台</Text>
+            <Pressable
+              accessibilityLabel="关闭"
+              hitSlop={10}
+              onPress={onClose}
+              style={styles.qrModalClose}
+            >
+              <Dismiss24Regular color="#999999" height={20} width={20} />
+            </Pressable>
+          </View>
+          <Text style={styles.clubAdminNoticeText}>
+            俱乐部后台请在 PC 端操作
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onClose}
+            style={({ pressed }) => [
+              styles.clubAdminConfirmButton,
+              pressed && styles.buttonPressed,
+            ]}
+          >
+            <Text style={styles.clubAdminConfirmText}>我知道了</Text>
+          </Pressable>
         </View>
       </View>
     </Modal>
@@ -663,4 +741,29 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     textAlign: "center",
   },
+  clubAdminNoticeText: {
+    marginTop: 20,
+    color: "#666",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 14,
+    lineHeight: 22,
+    textAlign: "center",
+  },
+  clubAdminConfirmButton: {
+    marginTop: 24,
+    width: "100%",
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+    backgroundColor: "#FF1F4C",
+  },
+  clubAdminConfirmText: {
+    color: "#FFF",
+    fontFamily: DOUYIN_SANS,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "600",
+  },
+  buttonPressed: { opacity: 0.82 },
 });
