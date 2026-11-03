@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { queryClient } from "@/core/query/query-client";
 import { signOut } from "@/features/auth/sign-out";
+import { useAuthStore } from "@esports/auth";
 import { readLastTeenEnabled } from "@/features/mine/teen-mode-store";
 import { useSmsNotifyStatus } from "@/features/mine/hooks/use-sms-notify";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
@@ -47,6 +48,7 @@ function formatBytes(bytes: number | null) {
 
 export default function BasicSettingsScreen() {
   const insets = useSafeAreaInsets();
+  const userId = useAuthStore((state) => state.user?.id ?? null);
   const [clearing, setClearing] = useState(false);
   const [cacheModalVisible, setCacheModalVisible] = useState(false);
   const [cacheSize, setCacheSize] = useState<number | null>(() =>
@@ -61,10 +63,10 @@ export default function BasicSettingsScreen() {
   useFocusEffect(
     useCallback(() => {
       // 展示最近一次服务端状态镜像；以 /youth/status 拉取结果为准
-      readLastTeenEnabled().then((enabled) =>
+      readLastTeenEnabled(userId).then((enabled) =>
         setTeenModeEnabled(enabled ?? false),
       );
-    }, []),
+    }, [userId]),
   );
 
   const clearCache = () => setCacheModalVisible(true);

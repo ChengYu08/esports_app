@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { mapRongMessage } from "./chat-message";
+import { latestMessagePreview, mapRongMessage } from "./chat-message";
 import { toManagedMessage } from "./rongcloud-im";
 
 vi.mock("@/core/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn() } }));
@@ -154,5 +154,34 @@ describe("mapRongMessage", () => {
       direction: 0,
       sentTime: 1000,
     }, { imageType: 4, directionSend: 0, conversationType: 1, timeBefore: 0, localRemote: 2 })).toMatchObject({ id: "m-1", text: "hello", isMine: true, status: "sent", sentAt: 1000 });
+  });
+});
+
+describe("latestMessagePreview", () => {
+  it("取 sentTime 最新的一条生成预览和时间", () => {
+    const messages = [
+      { messageUId: "old", text: "旧消息", sentTime: new Date("2026-10-08T09:00:00").getTime(), direction: 1 },
+      { messageUId: "new", text: "最新消息", sentTime: new Date("2026-10-08T10:30:00").getTime(), direction: 1 },
+      { messageUId: "mid", text: "中间消息", sentTime: new Date("2026-10-08T10:00:00").getTime(), direction: 1 },
+    ];
+    expect(latestMessagePreview(messages, { image: 4, send: 0 })).toEqual({ preview: "最新消息", time: "10:30" });
+  });
+
+  it("图片消息预览为 [图片]", () => {
+    const messages = [
+      { messageUId: "img", messageType: 4, mediaUrl: "https://cdn.example.com/a.jpg", sentTime: new Date("2026-10-08T10:30:00").getTime(), direction: 0 },
+    ];
+    expect(latestMessagePreview(messages, { image: 4, send: 0 })).toEqual({ preview: "[图片]", time: "10:30" });
+  });
+
+  it("空数组返回 null", () => {
+    expect(latestMessagePreview([], { image: 4, send: 0 })).toBeNull();
+  });
+
+  it("最新一条不可映射（如命令消息）返回 null", () => {
+    const messages = [
+      { messageUId: "cmd", messageType: 0, sentTime: new Date("2026-10-08T10:30:00").getTime(), direction: 1 },
+    ];
+    expect(latestMessagePreview(messages, { image: 4, send: 0 })).toBeNull();
   });
 });

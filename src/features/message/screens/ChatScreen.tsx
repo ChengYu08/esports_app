@@ -48,7 +48,6 @@ import { messageStore, useMessageStore } from "../message-store";
 import { getConversationDisplayTitle } from "../message-title";
 import {
   getSystemConversationTitle,
-  isDispatchAssistantConversationId,
   isOrderAssistantConversationId,
   isSelfConversationId,
   isSystemConversationId,
@@ -235,8 +234,9 @@ export default function ChatScreen() {
     return () => subscription.remove();
   }, []);
   const isOrderAssistant = isOrderAssistantConversationId(conversationId);
-  const isDispatchAssistant = isDispatchAssistantConversationId(conversationId);
   const isPinned = Boolean(conversation?.isPinned);
+  // 系统会话没有输入框，加大列表底部留白，避免最后一条消息贴屏幕底不利查看
+  const isSystemConversation = isSystemConversationId(conversationId);
   const scrollToLatest = useCallback(() => {
     isNearBottom.current = true;
     if (scrollFrame.current !== null) cancelAnimationFrame(scrollFrame.current);
@@ -517,7 +517,10 @@ export default function ChatScreen() {
         key={conversationId}
         ref={listRef}
         inverted
-        contentContainerStyle={styles.messageList}
+        contentContainerStyle={[
+          styles.messageList,
+          isSystemConversation && styles.messageListSystem,
+        ]}
         data={chatRows}
         keyExtractor={(item) => item.key}
         ListEmptyComponent={
@@ -593,7 +596,7 @@ export default function ChatScreen() {
         <Text style={styles.errorBanner}>{lastError}</Text>
       ) : null}
 
-      {!isOrderAssistant && !isDispatchAssistant ? (
+      {!isSystemConversation ? (
         <ChatComposer
           bottomInset={insets.bottom}
           onSendText={handleSendText}
@@ -1090,9 +1093,13 @@ const styles = StyleSheet.create({
   offlineText: { color: "#999999" },
   messageList: {
     flexGrow: 1,
+    // 倒序列表中布局的 flex-end 映射为视觉顶部：内容不满一屏时从顶部开始展示
+    justifyContent: "flex-end",
     paddingTop: 8,
     paddingBottom: 12,
   },
+  // 倒序列表中 paddingTop 落在屏幕底部（最新消息一侧）；系统会话无输入框，用大留白替代
+  messageListSystem: { paddingTop: 48 },
   orderAssistantEmpty: { flex: 1 },
   timeSeparator: {
     minHeight: 32,
