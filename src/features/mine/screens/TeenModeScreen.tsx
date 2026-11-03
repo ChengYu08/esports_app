@@ -54,6 +54,7 @@ export default function TeenModeScreen({
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
   const token = useAuthStore((state) => state.accessToken);
+  const userId = useAuthStore((state) => state.user?.id ?? null);
   const [status, setStatus] = useState<TeenModeStatus | null>(null);
   const [phase, setPhase] = useState<Phase>("overview");
   const [code, setCode] = useState("");
@@ -65,7 +66,7 @@ export default function TeenModeScreen({
 
   const applyStatus = (next: TeenModeStatus) => {
     setStatus(next);
-    void saveLastTeenEnabled(next.enabled);
+    void saveLastTeenEnabled(next.enabled, userId);
     onStatusChanged?.(next);
   };
 
@@ -118,9 +119,9 @@ export default function TeenModeScreen({
           }
           // 未设过密码：open 同时完成「设置密码 + 开启」
           applyStatus(await teenModeApi.open(token, code, code));
-          // 开启成功不停留说明页：限制只在 22:00-次日 6:00 生效，直接返回上一页并提示
+          // 开启成功不停留说明页：限制只在 17:00-次日 6:00 生效，直接返回上一页并提示
           router.back();
-          showToast("青少年模式已开启，每日 22:00-6:00 期间限制核心功能");
+          showToast("青少年模式已开启，每日 17:00-6:00 期间限制核心功能");
           return;
         }
         if (
@@ -137,7 +138,7 @@ export default function TeenModeScreen({
           applyStatus(await teenModeApi.open(token, code));
           // 与首设密码路径一致：开启成功直接返回上一页并提示，不停留说明页
           router.back();
-          showToast("青少年模式已开启，每日 22:00-6:00 期间限制核心功能");
+          showToast("青少年模式已开启，每日 17:00-6:00 期间限制核心功能");
           return;
         }
         if (phase === "disable") {

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   actionNotice,
+  getActionNoticeHandlers,
   resetActionNoticeStore,
   useActionNoticeStore,
 } from "@/shared/ui/action-notice/action-notice-store";
@@ -51,6 +52,8 @@ const {
 } = await import("./action-command-handlers");
 const { refreshDispatchForRemoteChange } = await import("@/features/order/order-query");
 const { logger } = await import("@/core/logging/logger");
+const { router } = await import("expo-router");
+const { acceptOrder } = await import("@/features/order/order.api");
 
 const NOW = new Date("2026-10-20T12:00:00").getTime();
 const PLATFORM = "50000000";
@@ -286,6 +289,7 @@ describe("handleQuickMatchNotice", () => {
 
 describe("handleOrderNotifyPopup", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     resetActionCommandDedupKeys();
     resetActionNoticeStore();
   });
@@ -297,6 +301,16 @@ describe("handleOrderNotifyPopup", () => {
     buyerNickname: "老板B",
     buyerHeadImage: "https://example.com/a.png",
   };
+
+  it("接单成功后以接单方视角打开详情", async () => {
+    handleOrderNotifyPopup(command("ORDER_NOTIFY", payload), NOW);
+    await getActionNoticeHandlers("pay:PZ1")?.onAction();
+    expect(acceptOrder).toHaveBeenCalledWith("123", "token");
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: "/order/[id]",
+      params: { id: "123", scope: "accept" },
+    });
+  });
 
   it("首次命令入队且文案完整", () => {
     handleOrderNotifyPopup(command("ORDER_NOTIFY", payload), NOW);

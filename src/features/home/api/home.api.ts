@@ -90,6 +90,12 @@ type ApiClubDetail = {
   clubGames?: { id: number; clubId: number; gameId: number; gameName?: string; iconUrl?: string; backgroundUrl?: string; gameCategory?: number; status?: number }[];
 };
 type ApiMode = { id: number; clubId?: number; gameId?: number; modeName?: string; status?: number };
+export type CompanionTag = { id: number; name: string };
+
+export async function fetchCompanionTags(clubId: string, signal?: AbortSignal): Promise<CompanionTag[]> {
+  const response = await apiClient<ApiEnvelope<CompanionTag[]>>(`/client/v1/companion/public/tag/options?clubId=${encodeURIComponent(clubId)}`, { signal });
+  return requireSuccess(response, "陪玩标签加载失败");
+}
 type ApiCompanion = {
   profileId: number;
   userId?: number;
@@ -123,7 +129,7 @@ type ApiCompanion = {
   clubGameServiceName?: string;
   companionServiceId?: number;
 };
-type ApiCompanionPage = { page?: number; totalPages?: number; records?: ApiCompanion[] };
+type ApiCompanionPage = { page?: number; totalPages?: number; total?: number; records?: ApiCompanion[] };
 type ApiPriceConfig = { linkName?: string; groupId?: string; tabs?: { menuTitle?: string; imageUrl?: string; sortNo?: number }[] };
 type ApiResponse<T> = ApiEnvelope<T>;
 
@@ -146,9 +152,9 @@ export async function fetchClubDetail(id: string, signal?: AbortSignal): Promise
   };
 }
 
-export async function fetchClubGameModes(gameId: string, signal?: AbortSignal): Promise<ClubGameMode[]> {
+export async function fetchClubGameModes(gameId: string, clubId: string, signal?: AbortSignal): Promise<ClubGameMode[]> {
   const response = await apiClient<ApiResponse<ApiMode[]>>(`/client/v1/club/public/getGameModeList?id=${encodeURIComponent(gameId)}`, { signal });
-  return requireSuccess(response, "游戏模式加载失败").filter((item) => item.status !== 0).map((item) => ({ id: item.id, gameId: item.gameId ?? Number(gameId), modeName: item.modeName || `模式${item.id}` }));
+  return requireSuccess(response, "游戏模式加载失败").filter((item) => item.status !== 0 && (item.clubId == null || String(item.clubId) === clubId)).map((item) => ({ id: item.id, gameId: item.gameId ?? Number(gameId), modeName: item.modeName || `模式${item.id}` }));
 }
 
 export async function fetchPriceList(groupId: string, signal?: AbortSignal): Promise<PriceListTab[]> {
@@ -255,6 +261,24 @@ export async function fetchClubPage(filters: ClubFilters, page: number, pageSize
     hasMore: (data?.page ?? page) < (data?.totalPages ?? page),
     nextPage: page + 1,
   };
+}
+
+/** 按游戏统计可展示的陪玩人数，接口总数已按用户去重。 */
+export async function fetchClubGameCompanionCounts(clubId: string, gameIds: readonly number[], signal?: AbortSignal): Promise<Record<number, number>> {
+  const counts: Record<number, number> = {};
+  for (const gameId of new Set(gameIds)) {
+    const response = await apiClient<ApiEnvelope<ApiCompanionPage>>("/client/v1/companion/public/page", {
+      method: "POST",
+      body: { page: 1, pageSize: 1, action: { clubId: Number(clubId), gameId } },
+      signal,
+    });
+    const data = requireSuccess(response, "游戏陪玩人数加载失败");
+    if (typeof data.total !== "number" || !Number.isFinite(data.total)) {
+      throw new Error("游戏陪玩人数缺失");
+    }
+    counts[gameId] = data.total;
+  }
+  return counts;
 }
 
 /** 按详情页相同的服务条件查询在线陪玩，跨游戏按用户去重，不统计普通在线成员。 */

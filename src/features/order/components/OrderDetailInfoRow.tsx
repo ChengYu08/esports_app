@@ -66,7 +66,7 @@ const styles = StyleSheet.create({
     minHeight: 34,
   },
   acceptRow: { gap: 12, paddingVertical: 6 },
-  label: { color: "#999", fontFamily: SYSTEM_FONT, fontSize: 16 },
+  label: { color: "#808080", fontFamily: SYSTEM_FONT, fontSize: 14, lineHeight: 22 },
   acceptLabel: { width: 112, flexShrink: 1, color: "#808080", fontSize: 14, lineHeight: 22 },
   infoValue: {
     flexDirection: "row",
@@ -77,7 +77,9 @@ const styles = StyleSheet.create({
   value: {
     color: "#161616",
     fontFamily: SYSTEM_FONT,
-    fontSize: 12,
+    fontSize: 14,
+    lineHeight: 22,
+    flexShrink: 1,
     textAlign: "right",
   },
   acceptInfoValue: { flex: 1, minWidth: 0, maxWidth: undefined, gap: 4, justifyContent: "flex-end" },

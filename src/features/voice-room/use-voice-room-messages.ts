@@ -46,6 +46,10 @@ export function useVoiceRoomMessages(
     messageListRef.current?.scrollToEnd({ animated: true });
   }, []);
 
+  const followLatestMessage = useCallback(() => {
+    nearBottomRef.current = true;
+  }, []);
+
   return {
     messages,
     setMessages,
@@ -54,5 +58,6 @@ export function useVoiceRoomMessages(
     messageKeyExtractor,
     handleMessageScroll,
     handleMessageContentSizeChange,
+    followLatestMessage,
   };
 }

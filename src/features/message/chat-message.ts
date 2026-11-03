@@ -97,6 +97,22 @@ export function messagePreview(message: ChatMessage): string {
   }
 }
 
+/**
+ * 从原始消息数组中取 sentTime 最新的一条，映射成列表预览 + 时间。
+ * 会话壳（目录同步恢复、无 lastMessage）用它从云端补拉的最后一条消息生成真实预览，
+ * 避免列表误显"新消息"。最新一条不可映射时返回 null。
+ */
+export function latestMessagePreview(
+  messages: RongSdkMessage[],
+  enums: { image: number; send: number },
+): { preview: string; time: string } | null {
+  const newest = [...messages].sort((left, right) => (right.sentTime || 0) - (left.sentTime || 0))[0];
+  if (!newest) return null;
+  const mapped = mapRongMessage(newest, enums);
+  if (!mapped) return null;
+  return { preview: messagePreview(mapped), time: mapped.time };
+}
+
 export type RongSdkMessage = {
   messageType?: number;
   messageUId?: string;

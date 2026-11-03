@@ -62,6 +62,8 @@ type CompanionOrderSheetProps = {
   onClose: () => void;
   onRealNameVerificationRequired: () => void;
   onOrderCreated: (order: { orderId: number; total: number }) => void;
+  initialServiceName?: string;
+  initialQuantity?: number;
 };
 
 export function CompanionOrderSheet({
@@ -73,13 +75,15 @@ export function CompanionOrderSheet({
   onClose,
   onRealNameVerificationRequired,
   onOrderCreated,
+  initialServiceName,
+  initialQuantity,
 }: CompanionOrderSheetProps) {
   const insets = useSafeAreaInsets();
   const [services, setServices] = useState<CompanionServiceOption[]>([]);
   const [selectedServiceId, setSelectedServiceId] = useState(
     card.companionServiceId,
   );
-  const [quantity, setQuantity] = useState(ORDER_QTY_MIN);
+  const [quantity, setQuantity] = useState(() => clampOrderQuantity(initialQuantity ?? ORDER_QTY_MIN));
   const [remark, setRemark] = useState("");
   const [loading, setLoading] = useState(Boolean(token));
   const [submitting, setSubmitting] = useState(false);
@@ -134,6 +138,14 @@ export function CompanionOrderSheet({
         if (!active) return;
         setServices(items);
         setSelectedServiceId((current) => {
+          if (initialServiceName) {
+            const matches = items.filter((item) => item.name === initialServiceName);
+            if (matches.length !== 1) {
+              setPrompt({ message: "原订单服务已变更，请重新选择服务" });
+              return 0;
+            }
+            return matches[0].companionServiceId;
+          }
           if (items.some((item) => item.companionServiceId === current)) {
             return current;
           }
@@ -149,7 +161,7 @@ export function CompanionOrderSheet({
     return () => {
       active = false;
     };
-  }, [context.clubId, context.gameLevelId, context.serviceUserId, token]);
+  }, [context.clubId, context.gameLevelId, context.serviceUserId, initialServiceName, token]);
 
   const selectedService = services.find(
     (item) => item.companionServiceId === selectedServiceId,

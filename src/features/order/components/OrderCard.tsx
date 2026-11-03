@@ -2,6 +2,7 @@ import { Copy16Regular } from "@fluentui/react-native-icons";
 import * as Clipboard from "expo-clipboard";
 import { LinearGradient } from "expo-linear-gradient";
 import { memo, useEffect, useState, type ReactNode } from "react";
+import type { ImageSource } from "expo-image";
 import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
 import Toast from "react-native-root-toast";
 
@@ -19,6 +20,7 @@ import type {
   OrderActionKey,
   OrderItemModel,
   OrderStatus,
+  OrderScope,
 } from "../order.types";
 
 const PRIMARY_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
@@ -42,18 +44,20 @@ type OrderCardProps = {
   onPress?: (item: OrderItemModel) => void;
   actionPending?: boolean;
   onPaymentExpired?: () => void;
+  scope: OrderScope;
+  gameIcon?: ImageSource;
 };
 
 export const OrderCard = memo(function OrderCard({
   item,
-  clubName,
   onAction,
   onPress,
   actionPending = false,
   onPaymentExpired,
+  scope,
+  gameIcon,
 }: OrderCardProps) {
   const paymentDeadline = getPaymentDeadline(item);
-  const resolvedClubName = item.clubName ?? clubName;
   const freeSummary = formatOrderFreeSummary(item);
   const copyOrderNo = async () => {
     const orderNo = item.orderNo ?? item.id;
@@ -69,7 +73,7 @@ export const OrderCard = memo(function OrderCard({
       <Pressable
         accessibilityRole={onPress ? "button" : undefined}
         onPress={() => onPress?.(item)}
-        style={({ pressed }) => pressed && styles.cardPressed}
+        style={({ pressed }) => [styles.cardContent, pressed && styles.cardPressed]}
       >
         <View style={styles.sellerRow}>
           <View style={styles.seller}>
@@ -94,11 +98,6 @@ export const OrderCard = memo(function OrderCard({
                   </Text>
                 ) : null}
               </View>
-              {resolvedClubName ? (
-                <Text numberOfLines={1} style={styles.clubName}>
-                  {resolvedClubName}
-                </Text>
-              ) : null}
             </View>
           </View>
           <Text
@@ -118,18 +117,19 @@ export const OrderCard = memo(function OrderCard({
         </View>
 
         <View style={styles.orderBody}>
-          <Text numberOfLines={1} style={styles.serviceName}>
-            {item.serviceName}
-          </Text>
           <View style={styles.detailPanel}>
+            <Text numberOfLines={1} style={styles.serviceName}>
+              {item.serviceName}
+            </Text>
             <OrderDetailRow label="游戏">
               <View style={styles.gameValue}>
                 <CachedImage
                   source={
                     item.gameIcon ??
+                    gameIcon ??
                     require("../../../../assets/voice-room/game.svg")
                   }
-                  contentFit="contain"
+                  contentFit="cover"
                   style={styles.gameIcon}
                 />
                 <Text numberOfLines={1} style={styles.detailValue}>
@@ -137,17 +137,17 @@ export const OrderCard = memo(function OrderCard({
                 </Text>
               </View>
             </OrderDetailRow>
-            <OrderDetailRow label="时间">
+            {scope === "dispatch" ? <OrderDetailRow label="时间">
               <Text style={styles.detailValue}>
                 {formatOrderTime(item.createTime)}
               </Text>
-            </OrderDetailRow>
+            </OrderDetailRow> : null}
             <OrderDetailRow label="单价">
               <Text style={styles.detailValue}>
                 {item.unitPrice}钻石/{item.billingUnitName ?? "小时"}
               </Text>
             </OrderDetailRow>
-            <OrderDetailRow label="订单号">
+            {scope === "dispatch" ? <OrderDetailRow label="订单号">
               <View style={styles.orderNoValue}>
                 <Text numberOfLines={1} style={styles.detailValue}>
                   {item.orderNo ?? item.id}
@@ -162,7 +162,7 @@ export const OrderCard = memo(function OrderCard({
                   <Copy16Regular color="#999999" width={14} height={14} />
                 </Pressable>
               </View>
-            </OrderDetailRow>
+            </OrderDetailRow> : null}
             <OrderDetailRow label="备注">
               <Text numberOfLines={2} style={styles.detailValue}>
                 {item.remark || "-"}
@@ -178,9 +178,9 @@ export const OrderCard = memo(function OrderCard({
           </View>
           <View style={styles.totalRow}>
             <View style={styles.quantitySummary}>
-              <Text style={styles.totalLabel}>{item.unitPrice}钻石</Text>
-              <Text style={styles.totalLabel}>x</Text>
-              <Text style={styles.quantity}>
+              <Text style={styles.quantity}>{item.unitPrice}钻石</Text>
+              <Text style={styles.quantity}>x</Text>
+              <Text style={styles.totalLabel}>
                 {item.quantity}
                 {item.billingUnitName ?? "小时"}
               </Text>
@@ -362,6 +362,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     gap: 8,
   },
+  cardContent: { gap: 8 },
   sellerRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -422,6 +423,7 @@ const styles = StyleSheet.create({
     color: "#0A0A0A",
     fontSize: 14,
     lineHeight: 22,
+    fontWeight: "500",
   },
   detailPanel: {
     backgroundColor: "#F7F7F7",
@@ -446,7 +448,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   gameValue: { flexDirection: "row", alignItems: "center", gap: 6 },
-  gameIcon: { width: 14, height: 14 },
+  gameIcon: { width: 14, height: 14, borderRadius: 4, backgroundColor: "lightgray", overflow: "hidden" },
   orderNoValue: { flexDirection: "row", alignItems: "center", gap: 4 },
   copyButton: {
     width: 20,
@@ -479,7 +481,7 @@ const styles = StyleSheet.create({
   totalRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
     alignItems: "center",
     gap: 4,
   },
