@@ -79,6 +79,12 @@ export type QuickMatchGrabItem = {
   clubId?: string;
 };
 
+/** 活动卡逐行文案（仅活动需求输出） */
+export type QuickMatchCardItem = {
+  label: string;
+  value: { text: string };
+};
+
 export type QuickMatchRequestDetail = {
   requestNo: string;
   clubId?: string;
@@ -105,6 +111,22 @@ export type QuickMatchRequestDetail = {
   buyerUserId?: string;
   buyerNickname?: string;
   dispatcherUserId?: string;
+  /** 发布来源：QUICK_MATCH 普通派单 / ACTIVITY 活动派单（旧数据可能缺省） */
+  publishSource?: string;
+  /** 关联活动 ID（Long 转字符串，仅活动需求输出） */
+  activityId?: string;
+  /** 活动编码；非空即视为活动模式 */
+  activityCode?: string;
+  /** 活动类型（如 SECKILL） */
+  activityType?: string;
+  /** 活动卡逐行文案 */
+  cardItems?: QuickMatchCardItem[];
+  /** 活动优惠金额快照 */
+  discountAmount?: number;
+  /** 活动实付金额快照 */
+  realPayAmount?: number;
+  /** 本次最多可选抢单人数（活动=1；普通需求不输出，维持多选） */
+  maxSelectableCount?: number;
 };
 
 export type QuickMatchPayable = {
@@ -133,6 +155,10 @@ export type QuickMatchCreatedOrder = {
 
 export type QuickMatchCreatedOrders = {
   totalPrice: number;
+  /** 活动优惠金额（仅活动订单返回） */
+  discountAmount?: number;
+  /** 活动实付金额（仅活动订单返回） */
+  realPayAmount?: number;
   orders: QuickMatchCreatedOrder[];
 };
 
@@ -150,6 +176,50 @@ export function isMultiCompanionRequest(
   return detail != null && detail.companionPreference == null;
 }
 
+/** 抢单选人上限（与 PC / 后端 @Size(max = 3) 一致） */
+export const QUICK_MATCH_MAX_SELECT = 3;
+
+/** 活动模式判定：只认 activityCode 非空；为空即普通模式，行为保持不变 */
+export function isActivityQuickMatch(
+  detail: QuickMatchRequestDetail | null | undefined,
+): boolean {
+  return Boolean(detail && detail.activityCode && detail.activityCode.trim() !== "");
+}
+
+/** 选人上限：活动模式用 maxSelectableCount（缺省兜底单选 1），普通模式维持 3 人多选 */
+export function resolveMaxSelectableCount(
+  detail: QuickMatchRequestDetail | null | undefined,
+): number {
+  if (!isActivityQuickMatch(detail)) return QUICK_MATCH_MAX_SELECT;
+  const count = Number(detail?.maxSelectableCount);
+  if (Number.isFinite(count) && count >= 1) return Math.trunc(count);
+  return 1;
+}
+
+/**
+ * 选人切换纯逻辑（便于单测/跨容器复用）：
+ * - 点已选中的 → 取消选中；
+ * - 未达上限 → 追加；
+ * - 达上限且上限为 1（活动单选）→ 点其他人直接切换；
+ * - 达上限且上限 > 1 → 保持不变并提示超限。
+ */
+export function applyGrabSelection(
+  prev: string[],
+  grabId: string,
+  maxSelectable: number,
+): { ids: string[]; overLimit: boolean } {
+  if (prev.includes(grabId)) {
+    return { ids: prev.filter((id) => id !== grabId), overLimit: false };
+  }
+  if (prev.length >= maxSelectable) {
+    if (maxSelectable <= 1) {
+      return { ids: [grabId], overLimit: false };
+    }
+    return { ids: prev, overLimit: true };
+  }
+  return { ids: [...prev, grabId], overLimit: false };
+}
+
 /** 从选中列表中剔除已消失的候选人；支付确认冻结期间保持原选择不变 */
 export function pruneSelectedIds(
   selected: string[],
@@ -162,4 +232,22 @@ export function isQuickMatchActive(request: QuickMatchRequestDetail | null): boo
   if (!request || request.status !== "MATCHING") return false;
   if (!request.expireTime) return true;
   return parseServerDateTime(request.expireTime) > Date.now();
+}
+
+/**
+ * 语聊房「派单匹配中」判定（任务 4）：当前用户有进行中的活动需求。
+ * 条件：需求进行中（MATCHING 且未过期）+ 活动派单（publishSource === "ACTIVITY" 或 activityCode 非空）+ 本人发起。
+ * buyerUserId 有值时二次校验；缺省视为本人（/quickMatch/active/detail 仅返回调用者自己的需求）。
+ */
+export function isOwnActiveActivityRequest(
+  active: QuickMatchRequestDetail | null | undefined,
+  userId: string | number | null | undefined,
+): boolean {
+  if (userId == null || String(userId) === "") return false;
+  if (!active || !isQuickMatchActive(active)) return false;
+  // 活动判定与详情页 isActivityQuickMatch 同源：publishSource 为 ACTIVITY，或 activityCode 非空（旧数据可能缺省 publishSource）
+  if (active.publishSource !== "ACTIVITY" && !isActivityQuickMatch(active)) return false;
+  const buyerUserId = active.buyerUserId;
+  if (buyerUserId == null || buyerUserId === "") return true;
+  return buyerUserId === String(userId);
 }

@@ -1,6 +1,7 @@
 import { buildAfterSalePayload } from "@/features/order/after-sale-card";
 import {
   computeFreeStarAmount,
+  computeFreeSubmitAmount,
   computeOrderPayableStars,
 } from "@/features/order/free-amount";
 import { imageSourceUri } from "@/features/order/order-detail-format";
@@ -194,9 +195,11 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
     ) {
       return;
     }
+    // 免单金额口径：活动订单按原价退款基数折算，普通订单维持时长×单价计算值
+    const freeAmount = computeFreeSubmitAmount(order, starAmount, freeHours);
     setActionPending(true);
     try {
-      await freeOrderService(order.id, starAmount, token);
+      await freeOrderService(order.id, freeAmount, token);
       setActionPrompt(null);
       await syncAfterMutation();
       showToast("免单成功");

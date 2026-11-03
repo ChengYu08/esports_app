@@ -37,6 +37,7 @@ import { OrderScopeTabs } from "../components/OrderScopeTabs";
 import { OrderTabs } from "../components/OrderTabs";
 import {
   computeFreeStarAmount,
+  computeFreeSubmitAmount,
   computeOrderPayableStars,
 } from "../free-amount";
 import { useOrderPage } from "../hooks/use-order-page";
@@ -412,9 +413,11 @@ export default function OrderScreen() {
     ) {
       return;
     }
+    // 免单金额口径：活动订单按原价退款基数折算，普通订单维持时长×单价计算值
+    const freeAmount = computeFreeSubmitAmount(target, starAmount, freeHours);
     setFreeSubmitting(true);
     try {
-      await freeOrderService(target.id, starAmount, token);
+      await freeOrderService(target.id, freeAmount, token);
       setFreeTarget(null);
       if (currentUser?.id) {
         // 全额免单与部分免单的状态不同，以详情为准就地刷新缓存中的该单。
