@@ -32,6 +32,7 @@ export function toAuthUser(profile: ClientUserInfo, fallbackPhone?: string): Aut
     idCardNo: profile.idCardNo,
     clubInfo: profile.clubInfo,
     positions: profile.positions,
+    sidebarMenus: profile.sidebarMenus,
     starBalance: profile.starBalance,
   };
 }

@@ -2,11 +2,13 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { router } from "expo-router";
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { formatUnreadCount, sumVisibleUnreadCount } from "@/features/message/message-unread";
 import { useMessageStore } from "@/features/message/message-store";
+import { AppPrompt } from "@/shared/ui/AppPrompt";
 import {
   getProtectedNavigationAction,
   getTabPressAction,
@@ -23,6 +25,14 @@ const TAB_ITEM_HEIGHT = 46;
 const MATCH_WIDTH = 68;
 const MATCH_HEIGHT = 58;
 const BAR_TOP_OFFSET = 12;
+// 隐藏诊断入口：3 秒内连点消息 tab 5 次，弹窗展示本次启动的回补消息条数
+const DIAGNOSTIC_TAP_THRESHOLD = 5;
+const DIAGNOSTIC_TAP_WINDOW_MS = 3_000;
+
+// react-hooks/purity 禁止在组件里直接调用 Date.now，时间获取封装在模块级
+function nowMs() {
+  return Date.now();
+}
 
 const items = [
   {
@@ -64,8 +74,24 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
   );
   const unreadLabel = formatUnreadCount(unreadCount);
   const activeRoute = state.routes[state.index]?.name;
+  const compensatedCount = useMessageStore((messageState) => messageState.compensatedCount);
+  const [diagnosticVisible, setDiagnosticVisible] = useState(false);
+  const [diagnosticTaps, setDiagnosticTaps] = useState({ count: 0, windowStartAt: 0 });
 
   const handleTabPress = (tab: AppTab) => {
+    if (tab === "message") {
+      const tapAt = nowMs();
+      const withinWindow = tapAt - diagnosticTaps.windowStartAt <= DIAGNOSTIC_TAP_WINDOW_MS;
+      const count = withinWindow ? diagnosticTaps.count + 1 : 1;
+      if (count >= DIAGNOSTIC_TAP_THRESHOLD) {
+        setDiagnosticTaps({ count: 0, windowStartAt: 0 });
+        setDiagnosticVisible(true);
+      } else {
+        setDiagnosticTaps({ count, windowStartAt: withinWindow ? diagnosticTaps.windowStartAt : tapAt });
+      }
+    } else {
+      setDiagnosticTaps({ count: 0, windowStartAt: 0 });
+    }
     const action = getTabPressAction(tab, isAuthenticated);
     if (action.type === "login") {
       router.replace("/login");
@@ -144,6 +170,12 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
         {renderTabItem(items[2])}
         {renderTabItem(items[3])}
       </View>
+      <AppPrompt
+        visible={diagnosticVisible}
+        title="消息统计"
+        message={`本次启动回补消息：${compensatedCount} 条`}
+        onConfirm={() => setDiagnosticVisible(false)}
+      />
     </View>
   );
 }

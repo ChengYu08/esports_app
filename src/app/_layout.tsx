@@ -21,8 +21,6 @@ import { useNetworkRecovery } from "@/core/query/use-network-recovery";
 import { AppUpgradeHost } from "@/features/app-upgrade/AppUpgradeHost";
 import { toAuthUser } from "@/features/auth/client-auth-flow";
 import { clientAuthApi } from "@/features/auth/client-auth.api";
-import { useOnboardingStore } from "@/features/auth/onboarding-store";
-import { isProfileIncomplete } from "@/features/auth/profile-onboarding";
 import {
   clearAuthSession,
   readAuthSession,
@@ -92,11 +90,6 @@ export default function RootLayout() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const initializeMessages = useMessageStore((state) => state.initialize);
   const resetMessages = useMessageStore((state) => state.reset);
-  const onboardingHydrated = useOnboardingStore((state) => state.hydrated);
-  const shouldShowOnboarding = useOnboardingStore(
-    (state) => state.shouldShowProfileOnboarding,
-  );
-  const onboardingChecked = useRef(false);
 
   useEffect(() => {
     // 全局「未进行实名认证」拦截：接口 info 精确命中时引导跳实名认证页
@@ -183,9 +176,6 @@ export default function RootLayout() {
   useEffect(() => {
     let active = true;
     void (async () => {
-      // 先恢复 onboarding 状态
-      await useOnboardingStore.getState().hydrate();
-
       const hasPrivacyConsent = await withStartupTimeout(
         readPrivacyConsent(),
         false,
@@ -236,28 +226,6 @@ export default function RootLayout() {
     };
   }, [clearSession, setSession]);
 
-  // 已登录用户启动 app 时，检查是否需要显示资料完善页：
-  // 本地无完成/跳过记录时按服务端资料推断，避免重装后老用户重复弹窗
-  useEffect(() => {
-    if (
-      !onboardingHydrated ||
-      !sessionReady ||
-      !accessToken ||
-      onboardingChecked.current
-    )
-      return;
-
-    const user = useAuthStore.getState().user;
-    if (
-      user?.id &&
-      shouldShowOnboarding(user.id) &&
-      isProfileIncomplete(user)
-    ) {
-      onboardingChecked.current = true;
-      router.replace("/onboarding");
-    }
-  }, [onboardingHydrated, sessionReady, accessToken, shouldShowOnboarding]);
-
   useEffect(
     () => () => {
       void messageStore.getState().reset();
@@ -293,10 +261,6 @@ export default function RootLayout() {
                     <Stack.Screen
                       name="(tabs)"
                       options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                      name="onboarding"
-                      options={{ headerShown: false, gestureEnabled: false }}
                     />
                     <Stack.Screen
                       name="image-preview"

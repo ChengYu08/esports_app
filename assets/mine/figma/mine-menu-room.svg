@@ -1,6 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
-  <g stroke="#1A1A1A" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M13 5h7v14h-7M13 3 4 5v14l9 2V3Z"/>
-    <path d="M10 10v4"/>
-  </g>
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<mask id="stroke0_563_89416" fill="white">
+<path d="M1 2L10 1V15L1 14V2Z"/>
+</mask>
+<path d="M1 2L10 1V15L1 14V2Z" stroke-width="2" stroke="#0D0D0F" mask="url(#stroke0_563_89416)"/>
+<path d="M9.5 3H14.5V13H9.5V3Z" stroke="#0D0D0F"/>
+<path d="M7.5 6.5V9.5" stroke-linecap="round" stroke="#0D0D0F"/>
 </svg>
