@@ -23,10 +23,10 @@ export function useProfileGameDetail(params: ProfileGameRouteParams | null) {
   });
 }
 
-export function useProfileReviews(params: { gameId: string; companionUserId: string } | null) {
+export function useProfileReviews(params: { companionUserId: string } | null) {
   return useQuery({
-    queryKey: ["profile-reviews", params?.gameId, params?.companionUserId],
-    queryFn: ({ signal }) => fetchProfileReviews(params as { gameId: string; companionUserId: string; signal?: AbortSignal }),
+    queryKey: ["profile-reviews", params?.companionUserId],
+    queryFn: ({ signal }) => fetchProfileReviews(params as { companionUserId: string; signal?: AbortSignal }),
     enabled: Boolean(params),
   });
 }
