@@ -134,7 +134,7 @@ test("loads reviews for the selected companion game", async () => {
     };
   });
 
-  const result = await api.fetchProfileReviews({ gameId: "11", companionUserId: "50100028" });
+  const result = await api.fetchProfileReviews({ companionUserId: "50100028" });
 
   assert.equal(result.items.length, 1);
   assert.equal(result.items[0].buyerNickname, "直接猛攻- -");
@@ -144,7 +144,7 @@ test("loads reviews for the selected companion game", async () => {
     path: "/client/v1/afterSale/public/review/page",
     options: {
       method: "POST",
-      body: { page: 1, pageSize: 20, action: { gameId: 11, companionUserId: 50100028 } },
+      body: { page: 1, pageSize: 20, action: { companionUserId: 50100028 } },
     },
   }]);
 });

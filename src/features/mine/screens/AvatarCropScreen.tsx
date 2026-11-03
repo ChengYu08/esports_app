@@ -78,8 +78,18 @@ export default function AvatarCropScreen() {
   const baseWidth = imageWidth * baseScale;
   const baseHeight = imageHeight * baseScale;
 
-  const zoom = useSharedValue(1);
-  const savedZoom = useSharedValue(1);
+  const circleSize = containerSize * CIRCLE_RATIO;
+  // 最小缩放：短边恰好盖住圆形选区（保证圆内始终是图片、边缘可拖入圆内裁剪）；
+  // 极端长宽比下封顶 MAX_ZOOM，裁剪侧再用 size 兜底 clamp 进图界
+  const minZoom = Math.min(
+    MAX_ZOOM,
+    circleSize / Math.min(baseWidth, baseHeight),
+  );
+  // 初始 cover 视口（zoom=1）；横图 cover 后纵向不足圆直径，从最小缩放起步
+  const initialZoom = Math.max(1, minZoom);
+
+  const zoom = useSharedValue(initialZoom);
+  const savedZoom = useSharedValue(initialZoom);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const savedTranslateX = useSharedValue(0);
@@ -98,7 +108,7 @@ export default function AvatarCropScreen() {
     .onUpdate((event) => {
       const next = Math.min(
         MAX_ZOOM,
-        Math.max(1, savedZoom.value * event.scale),
+        Math.max(minZoom, savedZoom.value * event.scale),
       );
       zoom.value = next;
       // 以视口中心为锚点缩放，平移量随缩放等比收缩后按轴 clamp
@@ -109,6 +119,7 @@ export default function AvatarCropScreen() {
         displayedWidth: baseWidth * next,
         displayedHeight: baseHeight * next,
         containerSize,
+        circleRatio: CIRCLE_RATIO,
       });
       translateX.value = clamped.offsetX;
       translateY.value = clamped.offsetY;
@@ -127,6 +138,7 @@ export default function AvatarCropScreen() {
         displayedWidth: baseWidth * zoom.value,
         displayedHeight: baseHeight * zoom.value,
         containerSize,
+        circleRatio: CIRCLE_RATIO,
       });
       translateX.value = clamped.offsetX;
       translateY.value = clamped.offsetY;

@@ -6,8 +6,9 @@ vi.mock('@/core/logging/logger', () => ({ logger: { warn: vi.fn() } }));
 import { loadConversationSnapshot } from './conversation-loader';
 
 const conversation = { targetId: '42', conversationType: 1, unreadCount: 2 };
+const staleConversation = { targetId: '7', conversationType: 1, unreadCount: 0 };
 
-function makeEngine(localConversations = [conversation]) {
+function makeEngine(localConversations = [conversation], remoteConversations?: typeof localConversations) {
   let conversations = localConversations;
   let synchronized: ((code: number) => void) | undefined;
   return {
@@ -17,12 +18,13 @@ function makeEngine(localConversations = [conversation]) {
       return 0;
     }),
     getRemoteConversationList: vi.fn<RCIMIWEngine['getRemoteConversationList']>(async (callback) => {
-      conversations = [conversation];
+      conversations = remoteConversations ?? [conversation];
       callback?.onSuccess?.();
       synchronized?.(0);
       return 0;
     }),
-    finishSync: (code = 0) => { conversations = [conversation]; synchronized?.(code); },
+    finishSync: (code = 0) => { conversations = remoteConversations ?? [conversation]; synchronized?.(code); },
+    setLocal: (list: typeof localConversations) => { conversations = list; },
   };
 }
 
@@ -76,10 +78,33 @@ describe('conversation loading', () => {
     expect(await loadConversationSnapshot(makeEngine([]), 1)).toEqual([conversation]);
   });
 
-  it('keeps existing local conversations without requiring a remote request', async () => {
-    const engine = makeEngine();
-    engine.getRemoteConversationList.mockRejectedValue(new Error('offline'));
+  it('syncs the server directory even when local conversations exist', async () => {
+    const engine = makeEngine([staleConversation], [staleConversation, conversation]);
+    expect(await loadConversationSnapshot(engine, 1)).toEqual([staleConversation, conversation]);
+    expect(engine.getRemoteConversationList).toHaveBeenCalledTimes(1);
+    expect(engine.getConversations).toHaveBeenCalledTimes(2);
+  });
+
+  it('falls back to local conversations when the directory sync fails', async () => {
+    const engine = makeEngine([staleConversation], [staleConversation, conversation]);
+    engine.getRemoteConversationList.mockResolvedValue(33002);
+    await expect(loadConversationSnapshot(engine, 1)).resolves.toEqual([staleConversation]);
+    expect(engine.getRemoteConversationList).toHaveBeenCalledTimes(1);
+  });
+
+  it('syncs the directory only once per engine when local data exists', async () => {
+    const engine = makeEngine([conversation], [conversation]);
     expect(await loadConversationSnapshot(engine, 1)).toEqual([conversation]);
+    expect(await loadConversationSnapshot(engine, 1)).toEqual([conversation]);
+    expect(engine.getRemoteConversationList).toHaveBeenCalledTimes(1);
+  });
+
+  it('syncs again after the local database is emptied (e.g. account switch)', async () => {
+    const engine = makeEngine([], [conversation]);
+    await loadConversationSnapshot(engine, 1);
+    engine.setLocal([]);
+    await loadConversationSnapshot(engine, 1);
+    expect(engine.getRemoteConversationList).toHaveBeenCalledTimes(2);
   });
 
   it('returns an empty list after both local and remote reads confirm no conversations', async () => {
