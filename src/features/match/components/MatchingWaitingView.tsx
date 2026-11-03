@@ -149,7 +149,7 @@ function RadarRipple({ delay }: { delay: number }) {
 function RadarSweep() {
   const rotation = useSharedValue(0);
   const center = RADAR_SIZE / 2;
-  /** 楔形尖端超出画布，靠雷达容器 overflow:hidden 裁剪 */
+  /** 楔形尖端超出画布，靠 radarClip overflow:hidden 裁剪 */
   const wedgeWidth = RADAR_SIZE * 2;
 
   useEffect(() => {
@@ -351,11 +351,14 @@ export function MatchingWaitingView({
         </View>
 
         <View style={styles.radar}>
-          <RadarRings />
-          <RadarSweep />
-          <RadarRipple delay={0} />
-          <RadarRipple delay={800} />
-          <RadarRipple delay={1600} />
+          {/* 圆环/扫描/波纹需要圆形裁剪；装饰头像在环缘，不可放进同一裁剪层 */}
+          <View style={styles.radarClip} pointerEvents="none">
+            <RadarRings />
+            <RadarSweep />
+            <RadarRipple delay={0} />
+            <RadarRipple delay={800} />
+            <RadarRipple delay={1600} />
+          </View>
 
           {DECOR_SLOTS.map((item, index) => (
             <DecorAvatar key={`avatar-${index}`} slot={item} index={index} />
@@ -446,6 +449,11 @@ const styles = StyleSheet.create({
     width: RADAR_SIZE,
     height: RADAR_SIZE,
     position: "relative",
+    overflow: "visible",
+  },
+  /** 仅裁剪扫描楔形与波纹，避免环缘头像被圆形 mask 切掉 */
+  radarClip: {
+    ...StyleSheet.absoluteFill,
     overflow: "hidden",
     borderRadius: RADAR_SIZE / 2,
   },
