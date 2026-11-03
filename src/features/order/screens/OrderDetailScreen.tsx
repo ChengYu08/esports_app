@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { OrderAfterSaleSheet } from "@/features/order/components/OrderAfterSaleSheet";
 import { OrderCompleteConfirmSheet } from "@/features/order/components/OrderCompleteConfirmSheet";
+import { OrderMultiCompanionSheet } from "@/features/order/components/OrderMultiCompanionSheet";
 import { OrderDetailBottomBar } from "@/features/order/components/OrderDetailBottomBar";
 import { OrderDetailInfoBlocks } from "@/features/order/components/OrderDetailInfoBlocks";
 import { OrderDetailStatusBar } from "@/features/order/components/OrderDetailStatusBar";
@@ -16,10 +17,12 @@ import { OrderProgressSteps } from "@/features/order/components/OrderProgressSte
 import { OrderReviewSheet } from "@/features/order/components/OrderReviewSheet";
 import { formatOrderFreeSummary } from "@/features/order/free-amount";
 import { useOrderDetailActions } from "@/features/order/hooks/use-order-detail-actions";
+import { multiCompanionNeedSelect } from "@/features/order/multi-companion";
 import { getOrderDetailAction } from "@/features/order/order-detail-actions";
 import { formatOrderTime } from "@/features/order/order-detail-format";
 import { orderClubQueryKey, orderDetailQueryKey } from "@/features/order/order-query";
 import { fetchOrderClub, fetchOrderDetail, mapOrder } from "@/features/order/order.api";
+import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 
@@ -36,6 +39,7 @@ export function OrderDetailScreen({
   const insets = useSafeAreaInsets();
   const token = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.user);
+  const { openCustomerService } = useCustomerServiceEntry();
   const detail = useQuery({
     queryKey: orderDetailQueryKey(id, scope),
     queryFn: async ({ signal }) =>
@@ -242,6 +246,16 @@ export function OrderDetailScreen({
         members={actions.afterSaleMembers}
         onClose={() => actions.setAfterSaleVisible(false)}
         onContact={actions.contactAfterSaleMember}
+        onCustomerService={openCustomerService}
+      />
+      <OrderMultiCompanionSheet
+        visible={actions.multiSelectVisible}
+        needSelect={multiCompanionNeedSelect(order)}
+        candidates={actions.multiSelectCandidates}
+        loading={actions.multiSelectLoading}
+        submitting={actions.actionPending}
+        onClose={() => actions.setMultiSelectVisible(false)}
+        onConfirm={actions.confirmMultiCompanions}
       />
       <OrderReviewSheet
         visible={actions.reviewVisible}

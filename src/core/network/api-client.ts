@@ -39,6 +39,39 @@ function isAuthExpiredResponse(status: number, code?: string): boolean {
   return status === 401 || AUTH_EXPIRED_CODES.has(String(code ?? '').toUpperCase());
 }
 
+// ─── 全局「未进行实名认证」拦截 ────────────────────────────────────────
+
+type RealNameRequiredHandler = () => void | Promise<void>;
+
+let realNameRequiredHandler: RealNameRequiredHandler | null = null;
+let lastRealNameTriggeredAt = 0;
+
+/** 未实名完整文案（后端 BussinessException 的 info 文本，精确匹配；避免误命中「老板未进行实名认证」等） */
+const REAL_NAME_REQUIRED_MESSAGE = '未进行实名认证';
+/** 连续多个接口同时未实名失败时的引导冷却，避免重复压入实名页 */
+const REAL_NAME_TRIGGER_COOLDOWN_MS = 3000;
+
+export function setRealNameRequiredHandler(handler: RealNameRequiredHandler | null) {
+  realNameRequiredHandler = handler;
+  return () => {
+    if (realNameRequiredHandler === handler) realNameRequiredHandler = null;
+  };
+}
+
+async function triggerRealNameRequiredIfNeed(payload: ResponseErrorPayload): Promise<void> {
+  if (!payload || payload.code === 'SUCCESS') return;
+  const info = payload.info ?? payload.message;
+  if (info !== REAL_NAME_REQUIRED_MESSAGE) return;
+  const now = Date.now();
+  if (now - lastRealNameTriggeredAt < REAL_NAME_TRIGGER_COOLDOWN_MS) return;
+  lastRealNameTriggeredAt = now;
+  try {
+    await realNameRequiredHandler?.();
+  } catch {
+    logger.warn('api.real_name_handler_error', {});
+  }
+}
+
 type ResponseErrorPayload = { info?: string; message?: string; code?: string } | null;
 
 function readErrorPayload(payload: unknown): ResponseErrorPayload {
@@ -72,6 +105,8 @@ async function processResponse<T>(
     throw requestError;
   }
 
+  // 全局「未进行实名认证」拦截：info 精确命中时引导去实名（对齐 Web 端行为），错误仍正常抛出
+  await triggerRealNameRequiredIfNeed(errorPayload);
   if (status < 200 || status >= 300) throw requestError;
   return payload as T;
 }

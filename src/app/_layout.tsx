@@ -1,3 +1,5 @@
+import { handlePendingPushClick } from "@/features/message/push-click-handler";
+import { showToast } from "@/shared/ui/app-toast";
 import { useAuthStore } from "@esports/auth";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { router, Stack, usePathname } from "expo-router";
@@ -5,15 +7,18 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PermissionsAndroid, Platform } from "react-native";
-import { handlePendingPushClick } from "@/features/message/push-click-handler";
-import { RootSiblingParent } from "react-native-root-siblings";
-import { showToast } from "@/shared/ui/app-toast";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
+import { RootSiblingParent } from "react-native-root-siblings";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { setAuthExpiredHandler } from "@/core/network/api-client";
+import {
+  setAuthExpiredHandler,
+  setRealNameRequiredHandler,
+} from "@/core/network/api-client";
 import { queryClient } from "@/core/query/query-client";
+import { useNetworkRecovery } from "@/core/query/use-network-recovery";
+import { AppUpgradeHost } from "@/features/app-upgrade/AppUpgradeHost";
 import { toAuthUser } from "@/features/auth/client-auth-flow";
 import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { useOnboardingStore } from "@/features/auth/onboarding-store";
@@ -23,25 +28,23 @@ import {
   readAuthSession,
   saveAuthSession,
 } from "@/features/auth/session-persistence";
-import { useNetworkRecovery } from "@/core/query/use-network-recovery";
+import { InAppNotificationBanner } from "@/features/message/components/InAppNotificationBanner";
 import {
   messageStore,
   useMessageStore,
 } from "@/features/message/message-store";
-import { InAppNotificationBanner } from "@/features/message/components/InAppNotificationBanner";
 import { RongCommandHost } from "@/features/message/rong-command-dispatch/RongCommandHost";
-import { OrderNotifySyncHost } from "@/features/order/order-notify-sync";
-import { VoiceRoomMiniPlayer } from "@/features/voice-room/components/VoiceRoomMiniPlayer";
-import { VoiceRoomKickListener } from "@/features/voice-room/components/VoiceRoomKickListener";
-import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
-import { leaveVoiceChatRoom } from "@/features/voice-room/voice-room-rongcloud";
-import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
-import { VoiceRoomJoinedSyncHost } from "@/features/voice-room/use-sync-joined-voice-room";
-import { PushyUpdateHost } from "@/features/ota/PushyUpdateHost";
-import { AppUpgradeHost } from "@/features/app-upgrade/AppUpgradeHost";
 import { TeenModeGate } from "@/features/mine/components/TeenModeGate";
+import { OrderNotifySyncHost } from "@/features/order/order-notify-sync";
+import { PushyUpdateHost } from "@/features/ota/PushyUpdateHost";
 import { PrivacyConsentGate } from "@/features/privacy/components/PrivacyConsentGate";
 import { readPrivacyConsent } from "@/features/privacy/privacy-consent";
+import { VoiceRoomKickListener } from "@/features/voice-room/components/VoiceRoomKickListener";
+import { VoiceRoomMiniPlayer } from "@/features/voice-room/components/VoiceRoomMiniPlayer";
+import { VoiceRoomJoinedSyncHost } from "@/features/voice-room/use-sync-joined-voice-room";
+import { leaveVoiceChatRoom } from "@/features/voice-room/voice-room-rongcloud";
+import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
+import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
 import { ActionNoticeHost } from "@/shared/ui/action-notice";
 import { AppConfirmHost } from "@/shared/ui/AppConfirmHost";
 
@@ -52,9 +55,9 @@ void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 // Android 13+ requires runtime POST_NOTIFICATIONS permission for vendor offline push.
 function requestNotificationPermissionIfNeeded() {
-  PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS).catch(
-    () => undefined,
-  );
+  PermissionsAndroid.request(
+    PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+  ).catch(() => undefined);
 }
 
 const STARTUP_TIMEOUT_MS = 8000;
@@ -96,6 +99,13 @@ export default function RootLayout() {
   const onboardingChecked = useRef(false);
 
   useEffect(() => {
+    // 全局「未进行实名认证」拦截：接口 info 精确命中时引导跳实名认证页
+    return setRealNameRequiredHandler(() => {
+      router.push("/real-name-verification");
+    });
+  }, []);
+
+  useEffect(() => {
     return setAuthExpiredHandler(async (_error, requestToken) => {
       if (useAuthStore.getState().accessToken !== requestToken) return;
       if (authExpiryTask.current) {
@@ -132,7 +142,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (accessToken && privacyAccepted) {
       // Android 13+ requires runtime notification permission for vendor offline push.
-      if (Platform.OS === 'android' && Platform.Version >= 33) {
+      if (Platform.OS === "android" && Platform.Version >= 33) {
         requestNotificationPermissionIfNeeded();
       }
       // 防御：同 token 的 initialize 只触发一次，避免 initialize 内部 set 触发
@@ -155,13 +165,18 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (accessToken) return;
-    const { activeRoom, joiningRoom, clearActiveRoom } = useVoiceRoomSessionStore.getState();
+    const { activeRoom, joiningRoom, clearActiveRoom } =
+      useVoiceRoomSessionStore.getState();
     clearActiveRoom();
     if (!activeRoom && !joiningRoom) return;
     void leaveVoiceRtc();
-    const chatroomIds = new Set([activeRoom?.rongChatroomId, joiningRoom?.rongChatroomId]);
+    const chatroomIds = new Set([
+      activeRoom?.rongChatroomId,
+      joiningRoom?.rongChatroomId,
+    ]);
     chatroomIds.forEach((chatroomId) => {
-      if (chatroomId) void leaveVoiceChatRoom(chatroomId).catch(() => undefined);
+      if (chatroomId)
+        void leaveVoiceChatRoom(chatroomId).catch(() => undefined);
     });
   }, [accessToken]);
 
@@ -229,7 +244,8 @@ export default function RootLayout() {
       !sessionReady ||
       !accessToken ||
       onboardingChecked.current
-    ) return;
+    )
+      return;
 
     const user = useAuthStore.getState().user;
     if (
@@ -259,49 +275,56 @@ export default function RootLayout() {
         <GestureHandlerRootView style={{ flex: 1 }}>
           <KeyboardProvider>
             <RootSiblingParent>
-            <StatusBar style="dark" />
-            {privacyAccepted ? (
-              <PushyUpdateHost>
-                {/* 网络监控、整包升级检查与热更新均在同意隐私后启动 */}
-                <NetworkRecovery />
-                <AppUpgradeHost />
-                <Stack
-                  screenOptions={{
-                    headerShown: false,
-                    gestureEnabled: true,
-                    animation: "fade",
-                    animationMatchesGesture: false,
-                    fullScreenGestureEnabled: false,
-                  }}
-                >
-                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                  <Stack.Screen
-                    name="onboarding"
-                    options={{ headerShown: false, gestureEnabled: false }}
-                  />
-                  <Stack.Screen
-                    name="image-preview"
-                    options={{ headerShown: false }}
-                  />
-                  <Stack.Screen name="basic-settings" />
-                  <Stack.Screen name="account-settings" />
-                  <Stack.Screen name="about" />
-                </Stack>
-                {/* 青少年模式启动门：开启且在 22:00-06:00 生效时段内整屏锁定，未开启按每日规则弹促销窗 */}
-                <TeenModeGate />
-              </PushyUpdateHost>
-            ) : (
-              <PrivacyConsentGate onAccepted={() => setPrivacyAccepted(true)} />
-            )}
-            <InAppNotificationBanner visible={!pathname.startsWith("/voice-room/")} />
-            <ActionNoticeHost />
-            <VoiceRoomMiniPlayer />
-            <VoiceRoomJoinedSyncHost enabled={privacyAccepted} />
-            <VoiceRoomKickListener />
-            <RongCommandHost />
-            <OrderNotifySyncHost />
-            <AppConfirmHost />
-          </RootSiblingParent>
+              <StatusBar style="dark" />
+              {privacyAccepted ? (
+                <PushyUpdateHost>
+                  {/* 网络监控、整包升级检查与热更新均在同意隐私后启动 */}
+                  <NetworkRecovery />
+                  <AppUpgradeHost />
+                  <Stack
+                    screenOptions={{
+                      headerShown: false,
+                      gestureEnabled: true,
+                      animation: "fade",
+                      animationMatchesGesture: false,
+                      fullScreenGestureEnabled: false,
+                    }}
+                  >
+                    <Stack.Screen
+                      name="(tabs)"
+                      options={{ headerShown: false }}
+                    />
+                    <Stack.Screen
+                      name="onboarding"
+                      options={{ headerShown: false, gestureEnabled: false }}
+                    />
+                    <Stack.Screen
+                      name="image-preview"
+                      options={{ headerShown: false }}
+                    />
+                    <Stack.Screen name="basic-settings" />
+                    <Stack.Screen name="account-settings" />
+                    <Stack.Screen name="about" />
+                  </Stack>
+                  {/* 青少年模式启动门：开启且在 22:00-06:00 生效时段内整屏锁定，未开启按每日规则弹促销窗 */}
+                  <TeenModeGate />
+                </PushyUpdateHost>
+              ) : (
+                <PrivacyConsentGate
+                  onAccepted={() => setPrivacyAccepted(true)}
+                />
+              )}
+              <InAppNotificationBanner
+                visible={!pathname.startsWith("/voice-room/")}
+              />
+              <ActionNoticeHost />
+              <VoiceRoomMiniPlayer />
+              <VoiceRoomJoinedSyncHost enabled={privacyAccepted} />
+              <VoiceRoomKickListener />
+              <RongCommandHost />
+              <OrderNotifySyncHost />
+              <AppConfirmHost />
+            </RootSiblingParent>
           </KeyboardProvider>
         </GestureHandlerRootView>
       </SafeAreaProvider>

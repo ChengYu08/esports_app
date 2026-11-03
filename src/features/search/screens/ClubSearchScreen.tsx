@@ -60,6 +60,14 @@ export default function ClubSearchScreen() {
     clubId?: string;
   }>();
   const [category, setCategory] = useState<SearchCategory>(type === "user" ? "user" : "club");
+  // 从俱乐部/个人主页弹回本页时 dismissTo 会更新参数，渲染期同步切换分类（避免 effect 里 setState）
+  const [lastType, setLastType] = useState(type);
+  if (type !== lastType) {
+    setLastType(type);
+    if (type === "user" || type === "club") {
+      setCategory(type);
+    }
+  }
   const searchType: SearchType = type === "message" ? "message" : category;
   const [input, setInput] = useState("");
   const [keyword, setKeyword] = useState("");

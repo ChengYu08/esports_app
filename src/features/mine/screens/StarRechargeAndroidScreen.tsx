@@ -12,6 +12,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { env } from "@/core/config/env";
+import { APP_LINKS } from "@/core/config/links";
 import { fetchStarBalance } from "@/features/mine/api/companion-order.api";
 import {
   createAppPayOrder,
@@ -20,13 +22,11 @@ import {
   type RechargeChannel,
   type RechargePlan,
 } from "@/features/mine/api/recharge.api";
-import { APP_LINKS } from "@/core/config/links";
-import { env } from "@/core/config/env";
 import { WechatPayQrModal } from "@/features/mine/components/WechatPayQrModal";
-import AlipayPayment from "../../../../modules/alipay-payment";
 import { openExternalLink } from "@/shared/navigation/open-external-link";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
+import AlipayPayment from "../../../../modules/alipay-payment";
 
 const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
 const headerBg = require("../../../../assets/images/star-recharge-header-bg.png");
@@ -150,9 +150,7 @@ export default function StarRechargeAndroidScreen() {
         setChannels(nextChannels);
         setSelectedPlanIndex(0);
         setSelectedChannelKey(
-          nextChannels.length > 0
-            ? channelStableKey(nextChannels[0], 0)
-            : null,
+          nextChannels.length > 0 ? channelStableKey(nextChannels[0], 0) : null,
         );
         setConfigLoading(false);
       })
@@ -203,7 +201,10 @@ export default function StarRechargeAndroidScreen() {
           starAmount: selectedStar,
         });
         if (!order.qrCode) {
-          setPrompt({ title: "支付失败", message: "未获取到支付订单信息，请稍后再试。" });
+          setPrompt({
+            title: "支付失败",
+            message: "未获取到支付订单信息，请稍后再试。",
+          });
           return;
         }
         setWechatQrCode(order.qrCode);
@@ -219,7 +220,10 @@ export default function StarRechargeAndroidScreen() {
       return;
     }
     if (!AlipayPayment) {
-      setPrompt({ title: "提示", message: "当前版本暂不支持支付宝支付，请更新 App 后重试。" });
+      setPrompt({
+        title: "提示",
+        message: "当前版本暂不支持支付宝支付，请更新 App 后重试。",
+      });
       return;
     }
     setPaying(true);
@@ -231,7 +235,10 @@ export default function StarRechargeAndroidScreen() {
         starAmount: selectedStar,
       });
       if (!order.orderStr) {
-        setPrompt({ title: "支付失败", message: "未获取到支付订单信息，请稍后再试。" });
+        setPrompt({
+          title: "支付失败",
+          message: "未获取到支付订单信息，请稍后再试。",
+        });
         return;
       }
       const result = await AlipayPayment.payAsync(
@@ -240,16 +247,22 @@ export default function StarRechargeAndroidScreen() {
         false,
       );
       if (result.code === "SUCCESS") {
-        setPrompt({ title: "支付成功", message: "星钻已到账。" });
+        setPrompt({ title: "支付成功", message: "钻石已到账。" });
         fetchStarBalance(token)
           .then((nextBalance) => setBalance(nextBalance))
           .catch(() => undefined);
       } else if (result.code === "DEALING") {
-        setPrompt({ title: "支付处理中", message: result.message ?? "支付处理中，请稍后在订单中查看结果。" });
+        setPrompt({
+          title: "支付处理中",
+          message: result.message ?? "支付处理中，请稍后在订单中查看结果。",
+        });
       } else if (result.code === "CANCELLED") {
         setPrompt({ title: "支付取消", message: "已取消本次支付。" });
       } else {
-        setPrompt({ title: "支付失败", message: result.message ?? "支付失败，请重试。" });
+        setPrompt({
+          title: "支付失败",
+          message: result.message ?? "支付失败，请重试。",
+        });
       }
     } catch (error) {
       const message =
@@ -272,7 +285,7 @@ export default function StarRechargeAndroidScreen() {
       />
 
       <ScreenHeader
-        title="星钻充值"
+        title="钻石充值"
         onBack={() => router.back()}
         backgroundColor="transparent"
         backIconColor="#0D0D0F"
@@ -284,7 +297,7 @@ export default function StarRechargeAndroidScreen() {
         <Text style={styles.balanceValue}>
           {balance === null ? "--" : formatAmount(balance)}
         </Text>
-        <Text style={styles.balanceLabel}>我的星钻余额</Text>
+        <Text style={styles.balanceLabel}>我的钻石余额</Text>
       </View>
 
       <ScrollView
@@ -298,14 +311,14 @@ export default function StarRechargeAndroidScreen() {
             <Text style={styles.sectionDescription}>
               {shortfall ? (
                 <>
-                  还需充值{" "}
+                  还需充值
                   <Text style={styles.shortfallValue}>
-                    {formatAmount(shortfall)}星钻
-                  </Text>{" "}
+                    {formatAmount(shortfall)}钻石
+                  </Text>
                   以购买本次服务
                 </>
               ) : (
-                "星钻可用于平台服务消费"
+                "钻石可用于平台服务消费"
               )}
             </Text>
           </View>
@@ -341,12 +354,14 @@ export default function StarRechargeAndroidScreen() {
                     );
                   })}
                   {row.length < 3
-                    ? Array.from({ length: 3 - row.length }).map((_, filler) => (
-                        <View
-                          key={`filler-${rowIndex}-${filler}`}
-                          style={styles.packageFiller}
-                        />
-                      ))
+                    ? Array.from({ length: 3 - row.length }).map(
+                        (_, filler) => (
+                          <View
+                            key={`filler-${rowIndex}-${filler}`}
+                            style={styles.packageFiller}
+                          />
+                        ),
+                      )
                     : null}
                 </View>
               ))}
@@ -420,9 +435,7 @@ export default function StarRechargeAndroidScreen() {
             支付即同意
             <Text
               style={styles.agreementLink}
-              onPress={() =>
-                void openExternalLink(APP_LINKS.rechargeAgreement)
-              }
+              onPress={() => openExternalLink(APP_LINKS.rechargeAgreement)}
             >
               《盼之电竞购买须知》
             </Text>
@@ -508,7 +521,7 @@ function RechargeOption({
     <Pressable
       accessibilityRole="radio"
       accessibilityState={{ selected }}
-      accessibilityLabel={`${diamonds} 星钻，${price} 元`}
+      accessibilityLabel={`${diamonds} 钻石，${price} 元`}
       onPress={onPress}
       style={[styles.packageCard, selected && styles.packageCardSelected]}
     >

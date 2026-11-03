@@ -52,8 +52,8 @@ export type WalletEntry = {
   transactionType?: string;
   transactionTypeDesc?: string;
   amount?: number | string;
-  /** 该笔流水后的剩余竹子余额；接口暂未返回时按 0 展示。 */
-  remainAmount?: number | string | null;
+  /** 该笔流水后的剩余竹子余额 */
+  balanceAfter?: number | string | null;
   relatedOrderNo?: string;
   remark?: string;
   createTime?: string;

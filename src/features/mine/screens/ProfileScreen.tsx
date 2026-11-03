@@ -106,8 +106,10 @@ export default function ProfileScreen() {
   const route = useLocalSearchParams<{
     clubId?: string | string[];
     userId?: string | string[];
+    fromSearch?: string | string[];
   }>();
   const routeParams = getProfileRouteParams(route);
+  const fromSearchPage = route.fromSearch === "1";
   const isMine = !routeParams || String(user?.id ?? "") === routeParams.userId;
   const [tab, setTab] = useState<ProfileTab>("技能");
   const [coverHeight, setCoverHeight] = useState(0);
@@ -648,14 +650,17 @@ export default function ProfileScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="搜索"
                   hitSlop={12}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/search",
-                      params: routeParams?.clubId
-                        ? { type: "user", clubId: routeParams.clubId }
-                        : { type: "user" },
-                    })
-                  }
+                  onPress={() => {
+                    const searchParams = routeParams?.clubId
+                      ? { type: "user" as const, clubId: routeParams.clubId }
+                      : { type: "user" as const };
+                    // 搜索页已在栈内时弹回它，避免 搜索/俱乐部/个人主页 反复跳转无限套娃
+                    if (fromSearchPage) {
+                      router.dismissTo({ pathname: "/search", params: searchParams });
+                      return;
+                    }
+                    router.push({ pathname: "/search", params: searchParams });
+                  }}
                   style={styles.navActionButton}
                 >
                   <Search24Regular color="#fff" width={24} height={24} />
@@ -1055,6 +1060,13 @@ function ProfileIdentity({
   profile: ProfileDetail;
   isBlacklisted: boolean;
 }) {
+  const route = useLocalSearchParams<{
+    fromClubId?: string | string[];
+    fromSearch?: string | string[];
+  }>();
+  const fromClubId =
+    typeof route.fromClubId === "string" ? route.fromClubId : undefined;
+  const fromSearch = route.fromSearch === "1";
   const status = getStatus(profile.onlineStatus, profile.gameStatus);
   const age = profile.birth ? calculateAge(profile.birth) : "";
   const avatarPreviewParams = createProfileAvatarPreviewParams(
@@ -1137,12 +1149,22 @@ function ProfileIdentity({
           {profile.clubId > 0 ? (
             <Pressable
               style={styles.clubLine}
-              onPress={() =>
+              onPress={() => {
+                // 来源就是这家俱乐部主页时直接出栈回退，俱乐部/个人主页来回点不再无限堆栈
+                if (fromClubId && fromClubId === String(profile.clubId)) {
+                  router.back();
+                  return;
+                }
                 router.push({
                   pathname: "/club/[id]",
-                  params: { id: String(profile.clubId) },
-                })
-              }
+                  // fromUserId 标记来源个人主页，俱乐部页点回该成员时直接出栈，避免套娃
+                  params: {
+                    id: String(profile.clubId),
+                    fromUserId: String(profile.userId),
+                    ...(fromSearch ? { fromSearch: "1" } : {}),
+                  },
+                });
+              }}
             >
               <Image source={clubIcon} style={styles.clubIcon} />
               <Text numberOfLines={1} style={styles.clubName}>
