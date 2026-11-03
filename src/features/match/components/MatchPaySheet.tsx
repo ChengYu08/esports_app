@@ -64,7 +64,7 @@ export function MatchPaySheet({
     if ((balance ?? 0) < totalPrice) {
       setPrompt({
         title: "余额不足",
-        message: "当前星钻余额不足，请充值后再支付",
+        message: "当前钻石余额不足，请充值后再支付",
       });
       return;
     }
@@ -94,7 +94,7 @@ export function MatchPaySheet({
       >
         <View style={styles.header}>
           <View style={styles.headerText}>
-            <Text style={styles.title}>星钻支付</Text>
+            <Text style={styles.title}>钻石支付</Text>
             <Text style={styles.hint}>请在5分钟内支付，否则订单自动取消</Text>
           </View>
           <Pressable
@@ -120,7 +120,7 @@ export function MatchPaySheet({
             </View>
           </View>
           <View style={styles.row}>
-            <Text style={styles.rowLabel}>我的星钻</Text>
+            <Text style={styles.rowLabel}>我的钻石</Text>
             <View style={styles.rowValue}>
               <Text style={styles.balanceValue}>
                 {balance === null ? "..." : balance}

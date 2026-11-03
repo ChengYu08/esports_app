@@ -21,7 +21,7 @@ const protocolBaseUrl = Platform.select({
 export const APP_LINKS = {
   userAgreement: `${protocolBaseUrl}/public/protocols?code=${protocolCode("user_server")}`,
   privacyPolicy: `${protocolBaseUrl}/public/protocols?code=${protocolCode("user_privacy")}`,
-  // 盼之电竞购买须知（星钻充值页，安卓充值页 rechargeAgreement 同 code）
+  // 盼之电竞购买须知（钻石充值页，安卓充值页 rechargeAgreement 同 code）
   purchaseNotice: `${protocolBaseUrl}/public/protocols?code=${protocolCode("user_recharge")}`,
   rechargeAgreement: `${protocolBaseUrl}/public/protocols?code=${protocolCode("user_recharge")}`,
   // 注销协议（注销流程页《注销协议》入口）

@@ -49,6 +49,8 @@ export const UserSearchCard = memo(function UserSearchCard({
       params: {
         userId,
         ...(targetClubId ? { clubId: targetClubId } : {}),
+        // fromSearch 标记来自搜索页，个人主页再点搜索时弹回该搜索页，避免无限套娃
+        fromSearch: "1",
       },
     });
   };

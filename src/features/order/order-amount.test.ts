@@ -87,7 +87,7 @@ it("免单一小时后展示免单时长、剩余金额与部分免单状态，�
     expect(order.status).toBe("partiallyRefunded");
     expect(order.statusLabel).toBe("部分免单");
     expect(order.quantity).toBe(2);
-    expect(formatOrderFreeSummary(order)).toBe("1小时（470星钻）");
+    expect(formatOrderFreeSummary(order)).toBe("1小时（470钻石）");
     expect(computeOrderPayableStars(order)).toBe(470);
     expect(order.actions.some(({ key }) => ["pay", "free", "start", "complete"].includes(key))).toBe(false);
     expect(filterOrders([order], "completed")).toEqual([order]);
@@ -100,7 +100,7 @@ it("免单一小时后展示免单时长、剩余金额与部分免单状态，�
 it("一小时订单全额免单显示已免单及零应收，并归入已取消列表", () => {
   const order = mapOrder({ ...partialFreeOrder, orderStatus: "REFUNDED", quantity: 1, realPayAmount: 470 }, 0, "accept");
   expect(order.statusLabel).toBe("已免单");
-  expect(formatOrderFreeSummary(order)).toBe("1小时（470星钻）");
+  expect(formatOrderFreeSummary(order)).toBe("1小时（470钻石）");
   expect(computeOrderPayableStars(order)).toBe(0);
   expect(filterOrders([order], "cancelled")).toEqual([order]);
   expect(order.actions).toEqual([]);
@@ -112,7 +112,7 @@ it("普通部分退款使用退款文案，不冒充免单", () => {
   expect(formatOrderFreeSummary(order)).toBeUndefined();
 });
 
-it("最终确认免单向真实业务接口提交星钻金额，失败时向上抛出", async () => {
+it("最终确认免单向真实业务接口提交钻石金额，失败时向上抛出", async () => {
   vi.mocked(apiClient).mockResolvedValueOnce({ code: "SUCCESS" });
   await freeOrderService("42", 470, "order-token");
   expect(apiClient).toHaveBeenCalledWith("/client/v1/order/free", {

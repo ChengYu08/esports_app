@@ -96,7 +96,7 @@ export function OrderDetailInfoBlocks({
           <OrderDetailInfoRow
             acceptStyle={scope === "accept"}
             label="单价"
-            value={`${order.unitPrice}星钻/${order.billingUnitName ?? "小时"}`}
+            value={`${order.unitPrice}钻石/${order.billingUnitName ?? "小时"}`}
           />
           <OrderDetailInfoRow
             acceptStyle={scope === "accept"}
@@ -106,7 +106,7 @@ export function OrderDetailInfoBlocks({
           <OrderDetailInfoRow
             acceptStyle={scope === "accept"}
             label={freeSummary ? `原${amountLabel}` : amountLabel}
-            value={`${order.totalPrice}星钻`}
+            value={`${order.totalPrice}钻石`}
           />
           {freeSummary ? (
             <>
@@ -115,7 +115,7 @@ export function OrderDetailInfoBlocks({
                 acceptStyle={scope === "accept"}
                 label={`${amountLabel}(免单后)`}
                 amount
-                value={`${formatStar(computeOrderPayableStars(order))}星钻`}
+                value={`${formatStar(computeOrderPayableStars(order))}钻石`}
               />
             </>
           ) : null}
@@ -142,32 +142,34 @@ export function OrderDetailInfoBlocks({
         {scope === "accept" ? (
           <OrderDetailInfoRow
             acceptStyle
+            // 派单时间：单子排到陪玩侧的时间；普通单即支付完成进入接单池的时间
             label="派单时间"
-            value={formatOrderTime(order.dispatchTime ?? order.acceptedTime)}
+            value={formatOrderTime(order.dispatchTime ?? order.paidTime)}
           />
         ) : (
-          <>
-            <OrderDetailInfoRow
-              label="支付时间"
-              value={formatOrderTime(order.paidTime)}
-            />
-            <OrderDetailInfoRow
-              label="接单时间"
-              value={formatOrderTime(order.acceptedTime)}
-            />
-            <OrderDetailInfoRow
-              label="服务时间"
-              value={formatServiceTime(
-                order.serviceStartTime,
-                order.serviceEndTime,
-              )}
-            />
-            <OrderDetailInfoRow
-              label="完成时间"
-              value={formatOrderTime(order.completedTime)}
-            />
-          </>
+          <OrderDetailInfoRow
+            label="支付时间"
+            value={formatOrderTime(order.paidTime)}
+          />
         )}
+        <OrderDetailInfoRow
+          acceptStyle={scope === "accept"}
+          label="接单时间"
+          value={formatOrderTime(order.acceptedTime)}
+        />
+        <OrderDetailInfoRow
+          acceptStyle={scope === "accept"}
+          label="服务时间"
+          value={formatServiceTime(
+            order.serviceStartTime,
+            order.serviceEndTime,
+          )}
+        />
+        <OrderDetailInfoRow
+          acceptStyle={scope === "accept"}
+          label="完成时间"
+          value={formatOrderTime(order.completedTime)}
+        />
       </View>
     </>
   );

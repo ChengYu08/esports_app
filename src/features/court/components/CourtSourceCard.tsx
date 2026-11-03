@@ -155,7 +155,7 @@ export function CourtSourceCard({
             <View style={styles.detailRow}>
               <Text style={styles.label}>总价</Text>
               <Text style={styles.value}>
-                {source.totalPrice == null ? "—" : `${source.totalPrice}星钻`}
+                {source.totalPrice == null ? "—" : `${source.totalPrice}钻石`}
               </Text>
             </View>
           </View>
