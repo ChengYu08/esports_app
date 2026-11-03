@@ -26,7 +26,11 @@ export const MessageListItem = memo(function MessageListItem({
       accessibilityLabel={`${item.title}${item.isOnline ? "，在线" : ""}，${item.preview}`}
       accessibilityRole="button"
       onPress={() => onPress(item)}
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+      style={({ pressed }) => [
+        styles.row,
+        item.isPinned && styles.rowPinned,
+        pressed && styles.rowPressed,
+      ]}
     >
       <View style={styles.avatarWrap}>
         <CachedImage source={item.avatar} style={styles.avatar} contentFit="cover" />
@@ -62,6 +66,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
+  // 置顶会话背景更深（设计稿 76-49626：置顶行 Gray-04 #F7F7F7，普通行白色）
+  rowPinned: { backgroundColor: "#F7F7F7" },
   rowPressed: { backgroundColor: "#FAFAFA" },
   avatarWrap: { position: "relative", width: 40, height: 40 },
   avatar: { width: 40, height: 40, borderRadius: 20 },
