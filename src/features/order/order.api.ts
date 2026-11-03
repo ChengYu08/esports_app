@@ -87,10 +87,21 @@ export function mapOrder(
   const status: OrderItemModel["status"] =
     ORDER_STATUS_BY_RAW[rawStatus ?? ""] ?? "pendingPayment";
   const id = stringValue(item, "id", "orderId", "orderNo") ?? `order-${index}`;
-  // 合计优先取订单总价；待支付订单的实付金额为零，不能用它覆盖应付总价。
-  const total =
-    stringValue(item, "totalPrice", "realPayAmount", "payAmount", "amount") ??
-    "0";
+  const orderType = stringValue(item, "orderType");
+  // ACTIVITY：玩家合计=realPayAmount，陪玩合计=price；其它订单保持原口径。
+  // 非 ACTIVITY 但带活动字段时，陪玩侧仍取订单总价（兼容旧数据）。
+  const isActivityType = orderType === "ACTIVITY";
+  const isActivityOrder = numberValue(item, "discountAmount") !== undefined
+    || numberValue(item, "refundBaseAmount") !== undefined
+    || numberValue(item, "productId") !== undefined;
+  // 普通订单合计优先取订单总价；待支付订单的实付金额为零，不能用它覆盖应付总价。
+  const total = isActivityType
+    ? (scope === "accept"
+      ? stringValue(item, "price", "unitPrice", "totalPrice") ?? "0"
+      : stringValue(item, "realPayAmount", "totalPrice", "payAmount", "amount") ?? "0")
+    : scope === "accept" && isActivityOrder
+      ? stringValue(item, "totalPrice", "realPayAmount", "payAmount", "amount") ?? "0"
+      : stringValue(item, "totalPrice", "realPayAmount", "payAmount", "amount") ?? "0";
   // 接口分别返回模式、等级和服务，不能只取服务名或用旧标题覆盖。
   const serviceParts = ["gameModeName", "gameLevelName", "serviceName"]
     .map((key) => stringValue(item, key)?.trim())
@@ -242,6 +253,12 @@ export function mapOrder(
     quantity: numberValue(item, "quantity", "count", "num") ?? 1,
     billingUnitName: stringValue(item, "billingUnitName") ?? "小时",
     totalPrice: total,
+    orderType,
+    realPayAmount: stringValue(item, "realPayAmount"),
+    productId: numberValue(item, "productId"),
+    activityId: numberValue(item, "activityId"),
+    discountAmount: numberValue(item, "discountAmount"),
+    refundBaseAmount: numberValue(item, "refundBaseAmount"),
     freeAmount: isFreeOrder ? stringValue(item, "refundAmount") : undefined,
     remark: stringValue(item, "remark", "buyerRemark"),
     ...times,

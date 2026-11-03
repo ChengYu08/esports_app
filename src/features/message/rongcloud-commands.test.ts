@@ -47,6 +47,32 @@ describe("parseQuickMatchNotice", () => {
   it("requestNo 数字转为字符串", () => {
     expect(parseQuickMatchNotice({ requestNo: 123 })?.requestNo).toBe("123");
   });
+
+  it("解析活动字段 activityCode/activityType", () => {
+    const payload = parseQuickMatchNotice({
+      requestNo: "QM1",
+      activityCode: " SECKILL001 ",
+      activityType: " ACTIVITY_BASED_DISPATCHING ",
+    });
+    expect(payload?.activityCode).toBe("SECKILL001");
+    expect(payload?.activityType).toBe("ACTIVITY_BASED_DISPATCHING");
+  });
+
+  it("不含活动字段时为 undefined", () => {
+    const payload = parseQuickMatchNotice({ requestNo: "QM1" });
+    expect(payload?.activityCode).toBeUndefined();
+    expect(payload?.activityType).toBeUndefined();
+  });
+
+  it("活动字段为空串或纯空白时归 undefined", () => {
+    const payload = parseQuickMatchNotice({
+      requestNo: "QM1",
+      activityCode: "   ",
+      activityType: "",
+    });
+    expect(payload?.activityCode).toBeUndefined();
+    expect(payload?.activityType).toBeUndefined();
+  });
 });
 
 describe("parseQuickMatchExpired", () => {

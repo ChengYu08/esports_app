@@ -1,5 +1,4 @@
 import { useAuthStore } from "@esports/auth";
-import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { Stack, router } from "expo-router";
@@ -15,7 +14,6 @@ import {
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { fetchCompanionPage } from "@/features/home/api/home.api";
 import { fetchQuickMatchPaymentPreview } from "@/features/match/api/match.api";
 import {
   isMultiCompanionRequest,
@@ -78,17 +76,6 @@ export default function MatchMatchingScreen({
   });
 
   const hasCandidates = session.candidates.length > 0;
-  const clubId = session.detail?.clubId;
-  const gameId = session.detail?.gameId;
-  const companionAvatars = useQuery({
-    queryKey: ["match-club-avatars", clubId, gameId],
-    queryFn: ({ signal }) => fetchCompanionPage({ clubId: clubId!, gameId: gameId! }, 1, 50, signal),
-    enabled: Boolean(clubId && gameId && !hasCandidates),
-    staleTime: 5 * 60_000,
-    select: (page) => Array.from(new Map(page.items
-      .filter((item) => item.headImage?.trim())
-      .map((item) => [item.userId, { userId: item.userId, headImage: item.headImage!.trim() }])).values()).slice(0, 8),
-  });
 
   // 首个陪玩出现时短暂播一段庆祝动效（一次性）
   useEffect(() => {
@@ -275,7 +262,6 @@ export default function MatchMatchingScreen({
             countdownText={session.countdownText}
             countdownSec={session.countdownSec}
             game={game}
-            avatars={companionAvatars.data}
             onCancel={openCancelPrompt}
           />
         )}
