@@ -3,6 +3,8 @@ export type TeenModeStatus = {
   enabled: boolean;
   passwordSet: boolean;
   remainingAttempts: number;
+  /** 服务端当前时间（epoch 毫秒）：用于校准本地时钟偏移，锁定时段判定以它为准 */
+  serverTime?: number;
 };
 
 /** 后端 R 包络（这组接口为数字 code 形态）。 */
