@@ -508,11 +508,6 @@ export default function MatchPublishScreen() {
               <View
                 style={[styles.footer, { paddingBottom: insets.bottom + FOOTER_CONTENT_BOTTOM }]}
               >
-                <View style={styles.etaRow}>
-                  <Text style={styles.etaMuted}>预计</Text>
-                  <Text style={styles.etaAccent}>30s</Text>
-                  <Text style={styles.etaMuted}>内匹配成功</Text>
-                </View>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="立即发布，匹配陪玩"
@@ -712,25 +707,6 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingHorizontal: 16,
     gap: 12,
-  },
-  etaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-  },
-  etaMuted: {
-    fontFamily: DOUYIN_SANS,
-    fontSize: 12,
-    lineHeight: 18,
-    color: "rgba(255,255,255,0.6)",
-  },
-  etaAccent: {
-    fontFamily: DOUYIN_SANS,
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: "500",
-    color: "#FE4267",
   },
   publishWrap: {
     width: "100%",

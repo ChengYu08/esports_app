@@ -667,11 +667,6 @@ export function ClubQuickMatchSheet({
         </ScrollView>
 
         <View style={styles.footer}>
-          <View style={styles.etaRow}>
-            <Text style={styles.etaMuted}>预计</Text>
-            <Text style={styles.etaAccent}>30s</Text>
-            <Text style={styles.etaMuted}>内匹配成功</Text>
-          </View>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="立即发布，匹配陪玩"
@@ -964,25 +959,6 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingHorizontal: 16,
     gap: 8,
-  },
-  etaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-  },
-  etaMuted: {
-    fontFamily: DOUYIN_SANS,
-    fontSize: 12,
-    lineHeight: 18,
-    color: "#7F7F80",
-  },
-  etaAccent: {
-    fontFamily: DOUYIN_SANS,
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: "500",
-    color: "#FE4267",
   },
   publishWrap: {
     width: "100%",
