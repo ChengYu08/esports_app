@@ -23,6 +23,9 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 const PUBLISH_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
 const FOOTER_CONTENT_BOTTOM = 22;
 const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
+/** Figma 444:57020 / 444:57016 性别图标 12×12 */
+const maleIcon = require("../../../../assets/svgs/gender-male.svg");
+const femaleIcon = require("../../../../assets/svgs/gender-female.svg");
 
 /** UI 默认入场缓动（强 ease-out） */
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
@@ -55,9 +58,16 @@ function GenderAge({ sex, age }: { sex: number; age: string }) {
   const isFemale = sex === 2;
   return (
     <View style={styles.genderRow}>
-      <Text style={[styles.genderMark, isFemale ? styles.female : styles.male]}>
-        {isFemale ? "♀" : "♂"}{age}
-      </Text>
+      <Image
+        source={isFemale ? femaleIcon : maleIcon}
+        style={styles.genderIcon}
+        contentFit="contain"
+      />
+      {age ? (
+        <Text style={[styles.age, isFemale ? styles.female : styles.male]}>
+          {age}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -321,8 +331,15 @@ const styles = StyleSheet.create({
   genderRow: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 2,
+    flexShrink: 0,
   },
-  genderMark: {
+  genderIcon: {
+    width: 12,
+    height: 12,
+  },
+  age: {
+    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: "500",
