@@ -3,7 +3,6 @@ import { showToast } from "@/shared/ui/app-toast";
 import { useAuthStore } from "@esports/auth";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { router, Stack, usePathname } from "expo-router";
-import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PermissionsAndroid, Platform } from "react-native";
@@ -48,8 +47,7 @@ import { AppConfirmHost } from "@/shared/ui/AppConfirmHost";
 
 import { StartupSplash } from "@/shared/ui/StartupSplash";
 
-// Keep the native screen until the full-screen artwork is ready to display.
-void SplashScreen.preventAutoHideAsync().catch(() => undefined);
+// 启动图由 AppTheme 的 windowBackground 全屏承载，无需再钉住/收起系统 splash。
 
 // Android 13+ requires runtime POST_NOTIFICATIONS permission for vendor offline push.
 function requestNotificationPermissionIfNeeded() {
