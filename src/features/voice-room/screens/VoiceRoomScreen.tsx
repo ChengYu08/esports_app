@@ -1,14 +1,6 @@
 import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
-import { clientAuthApi } from "@/features/auth/client-auth.api";
-import {
-  cancelQuickMatch,
-  fetchActiveQuickMatch,
-  fetchDispatchActiveQuickMatch,
-  fetchQuickMatchClubDetail,
-  fetchQuickMatchGames,
-} from "@/features/match/api/match.api";
+import { fetchActiveQuickMatch } from "@/features/match/api/match.api";
 import { isQuickMatchActive } from "@/features/match/api/match.types";
-import type { MatchGame } from "@/features/match/api/match.types";
 import { useQuickMatchEndSignals } from "@/features/match/quick-match-end-signals";
 import { ClubQuickMatchSheet } from "@/features/match/components/ClubQuickMatchSheet";
 import { messageStore } from "@/features/message/message-store";
@@ -27,6 +19,7 @@ import {
   Keyboard,
   Linking,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -39,7 +32,6 @@ import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAppConfirm } from "@/shared/ui/app-confirm";
-import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 
 import { VoiceRoomBackground, VOICE_ROOM_BG_BASE } from "../components/VoiceRoomBackground";
 import { VoiceRoomConversationsSheet } from "../components/VoiceRoomConversationsSheet";
@@ -50,44 +42,42 @@ import { VoiceRoomSpeakingHalo } from "../components/VoiceRoomSpeakingHalo";
 import { VoiceRoomSpeakingWaves } from "../components/VoiceRoomSpeakingWaves";
 import { VoiceRoomToolbar } from "../components/VoiceRoomToolbar";
 import { exitVoiceRoom } from "../exit-voice-room";
+import { inviteMember, normalizeMembers } from "../member-normalize";
+import { useCustomerServiceCall } from "../use-customer-service-call";
+import { useVoiceRoomMessages } from "../use-voice-room-messages";
+import { useVoiceRoomReception } from "../use-voice-room-reception";
+import { useVoiceRoomRtc } from "../use-voice-room-rtc";
+import { useVoiceRoomSessionStore } from "../voice-room-session";
 import {
-  getVoiceChatHistory,
-  joinVoiceChatRoom,
-  leaveVoiceChatRoom,
   sendVoiceChatMessage,
   subscribeVoiceChatMembers,
   subscribeVoiceChatMessages,
 } from "../voice-room-rongcloud";
-import {
-  clearVoiceRtcCallbacks,
-  getVoiceRtcMuted,
-  getVoiceRtcRemoteUserIds,
-  joinVoiceRtc,
-  leaveVoiceRtc,
-  muteVoiceRtc,
-} from "../voice-room-rtc";
-import { useVoiceRoomSessionStore, type ActiveVoiceRoom } from "../voice-room-session";
-import { voiceRoomApi } from "../voice-room.api";
+import { muteVoiceRtc } from "../voice-room-rtc";
 import type {
   VoiceRoomDetail,
   VoiceRoomMember,
-  VoiceRoomMessage,
+  VoiceRoomMemberRole,
 } from "../voice-room.types";
 
-/** 呼叫接待超时（秒），对齐 PC CS_CALL_TIMEOUT_SECONDS */
-const CS_CALL_TIMEOUT_SECONDS = 60;
+/** 麦位槽位高度（含昵称），对齐 Figma Component 7 */
+const MEMBER_SLOT_HEIGHT = 103;
+const MEMBER_ROW_GAP = 12;
+const GRID_PADDING_TOP = 24;
+const GRID_PADDING_BOTTOM = 12;
+const SEAT_MAX_ROWS = 3;
+/** 麦位区最大高度：最多 3 行，超出后区域内滚动 */
+const SEAT_AREA_MAX_HEIGHT =
+  GRID_PADDING_TOP +
+  GRID_PADDING_BOTTOM +
+  MEMBER_SLOT_HEIGHT * SEAT_MAX_ROWS +
+  MEMBER_ROW_GAP * (SEAT_MAX_ROWS - 1);
 
 const closeIcon = require("../../../../assets/voice-room/navbar-exit.svg");
 const inviteIcon = require("../../../../assets/voice-room/toolbar-invite.svg");
+const invitePlaceholderIcon = require("../../../../assets/voice-room/game.svg");
 const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
 const ringOwner = require("../../../../assets/voice-room/ring-owner.svg");
-const ringInvite = require("../../../../assets/voice-room/ring-invite.svg");
-
-const inviteMember: VoiceRoomMember = {
-  userId: "invite",
-  nickname: "邀请用户",
-  role: "guest",
-};
 
 function avatarSource(member: VoiceRoomMember) {
   const avatar = member.avatar?.trim();
@@ -95,88 +85,6 @@ function avatarSource(member: VoiceRoomMember) {
     return { uri: avatar.startsWith("//") ? `https:${avatar}` : avatar };
   return defaultAvatar;
 }
-
-function normalizeMembers(
-  detail: VoiceRoomDetail | undefined,
-  currentUser?: { id: string; nickname?: string; headImage?: string },
-) {
-  const currentUserId = currentUser ? String(currentUser.id) : undefined;
-  const creatorUserId =
-    detail?.creatorUserId == null ? "" : String(detail.creatorUserId);
-  const serviceUserId =
-    detail?.serviceUserId == null ? "" : String(detail.serviceUserId);
-  const self: VoiceRoomMember[] = currentUser
-    ? [
-        {
-          userId: currentUserId!,
-          nickname: currentUser.nickname || "我",
-          avatar: currentUser.headImage,
-          role:
-            creatorUserId === currentUserId ? ("owner" as const) : undefined,
-        },
-      ]
-    : [];
-  const people = (detail?.members || [])
-    .filter(
-      (member) =>
-        String(member.userId) !== currentUserId && member.userId !== "invite",
-    )
-    .map((member) => {
-      const userId = String(member.userId);
-      const role =
-        userId === creatorUserId
-          ? ("owner" as const)
-          : userId === serviceUserId
-            ? ("service" as const)
-            : member.role;
-      return { ...member, userId, role };
-    });
-  // 房主固定排在第一个麦位，其余成员按加入顺序排列
-  const isSelfOwner = Boolean(creatorUserId) && creatorUserId === currentUserId;
-  const owner = people.filter((member) => member.role === "owner");
-  const others = people.filter((member) => member.role !== "owner");
-  const normalizedMembers: VoiceRoomMember[] = [
-    ...owner,
-    ...(isSelfOwner ? self : self.filter((member) => member.role !== "owner")),
-    ...others,
-  ];
-  return [...normalizedMembers.slice(0, 7), inviteMember];
-}
-
-function displayMessage(message: VoiceRoomMessage) {
-  if (message.kind === "notice")
-    return <Text style={styles.noticeText}>{message.text}</Text>;
-  return (
-    <View style={styles.messageRow}>
-      <Text style={styles.messageName}>{message.nickname || "用户"}</Text>
-      {message.imageUrl ? (
-        <Pressable
-          accessibilityRole="imagebutton"
-          accessibilityLabel="查看图片"
-          onPress={() =>
-            router.push({
-              pathname: "/image-preview",
-              params: createImagePreviewParams([message.imageUrl as string], 0),
-            })
-          }
-        >
-          <Image
-            source={{ uri: message.imageUrl }}
-            style={styles.messageImage}
-            contentFit="cover"
-            transition={120}
-          />
-        </Pressable>
-      ) : (
-        <Text style={styles.messageBody}>{message.text}</Text>
-      )}
-    </View>
-  );
-}
-
-const messageKeyExtractor = (item: VoiceRoomMessage) => item.id;
-const renderMessageItem = ({ item }: { item: VoiceRoomMessage }) =>
-  displayMessage(item);
 
 // 成员槽位独立 memo 组件：消息到达/输入框打字等父组件重渲染时麦位不参与重渲，
 // 仅 speaking/micOpen 变化的槽位更新。
@@ -186,6 +94,7 @@ const MemberSlot = memo(function MemberSlot({
   ring,
   micOpen,
   speaking,
+  inviteLabel,
   onPress,
 }: {
   member: VoiceRoomMember;
@@ -193,15 +102,17 @@ const MemberSlot = memo(function MemberSlot({
   ring?: number;
   micOpen: boolean;
   speaking: boolean;
+  inviteLabel: string;
   onPress: (member: VoiceRoomMember) => void;
 }) {
   const invite = member.userId === "invite";
+  const isService = member.role === "service";
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={
         invite
-          ? "邀请用户"
+          ? inviteLabel
           : `查看${member.nickname}的资料，${micOpen ? "已开麦" : "已闭麦"}${speaking ? "，正在说话" : ""}`
       }
       style={[styles.memberSlot, { width: `${100 / columns}%` }]}
@@ -211,7 +122,14 @@ const MemberSlot = memo(function MemberSlot({
         {!invite ? <VoiceRoomSpeakingHalo active={speaking} /> : null}
         {ring ? <Image source={ring} style={styles.ring} /> : null}
         {invite ? (
-          <Image source={ringInvite} style={styles.inviteRing} />
+          <View style={styles.inviteAvatar}>
+            <Image
+              source={
+                inviteLabel === "接待邀请中" ? inviteIcon : invitePlaceholderIcon
+              }
+              style={styles.invitePlaceholderIcon}
+            />
+          </View>
         ) : (
           <Image source={avatarSource(member)} style={styles.avatar} />
         )}
@@ -219,17 +137,18 @@ const MemberSlot = memo(function MemberSlot({
         {!invite ? (
           <VoiceRoomMicBadge muted={!micOpen} speaking={speaking} />
         ) : null}
-        {invite ? <Image source={inviteIcon} style={styles.inviteBadge} /> : null}
+        {isService ? (
+          <View style={styles.serviceBadge}>
+            <Text style={styles.serviceBadgeText}>接待</Text>
+          </View>
+        ) : null}
       </View>
       <Text
         numberOfLines={1}
         style={[styles.memberName, invite && styles.inviteName]}
       >
-        {invite ? "邀请用户" : member.nickname}
+        {invite ? inviteLabel : member.nickname}
       </Text>
-      {member.role === "owner" ? (
-        <Text style={styles.roleLabel}>房主</Text>
-      ) : null}
     </Pressable>
   );
 });
@@ -266,20 +185,6 @@ export default function VoiceRoomScreen() {
   const [members, setMembers] = useState<VoiceRoomMember[]>(() =>
     normalizeMembers(undefined, currentUser || undefined),
   );
-  const [messages, setMessages] = useState<VoiceRoomMessage[]>([
-    {
-      id: "welcome",
-      kind: "notice",
-      text: "欢迎来到语聊房，和大家一起开黑吧",
-      sentAt: 1,
-    },
-    {
-      id: "tips",
-      kind: "system",
-      text: "房间内请文明交流，友善互动",
-      sentAt: 2,
-    },
-  ]);
   const [input, setInput] = useState("");
   // 键盘可见性来自 keyboard-controller 原生事件，顶起由 KeyboardAvoidingView 处理
   const keyboardOpen = useKeyboardState((state) => state.isVisible);
@@ -298,37 +203,8 @@ export default function VoiceRoomScreen() {
   const exitInFlight = useRef(false);
   const kickedRef = useRef(false);
   const focusedRef = useRef(false);
-  const [rtcReadyRoomId, setRtcReadyRoomId] = useState<string | null>(null);
-  // 独立于 members 的说话人 uid 集合，声网音量回调高频更新。
-  // 之所以不放在 members 属性里，是规避 React Compiler 对深层对象属性更新
-  // 追踪失灵导致的高频更新不重渲染问题（远端说话时 members 变了但麦位不刷新）
-  const [speakingUserIds, setSpeakingUserIds] = useState<string[]>([]);
-  // 每个说话人最后一次检测到说话的时间戳，用于迟滞判断
-  const speakingLastAtRef = useRef<Record<string, number>>({});
-  // 迟滞定时器，说话停止后延迟移除
-  const speakingTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const [micState, setMicState] = useState<{
-    roomId: string;
-    muted: boolean;
-  } | null>(null);
   const [micChanging, setMicChanging] = useState(false);
-  const [serviceCalling, setServiceCalling] = useState(false);
   const [distanceEnabled, setDistanceEnabled] = useState(false);
-  const [receptionVisible, setReceptionVisible] = useState(false);
-  const [receptionPreparing, setReceptionPreparing] = useState(false);
-  const [receptionClub, setReceptionClub] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
-  const [receptionGames, setReceptionGames] = useState<MatchGame[]>([]);
-  const [receptionBuyerId, setReceptionBuyerId] = useState<string>("");
-  const [receptionBuyerName, setReceptionBuyerName] = useState("");
-  const autoCallServiceDoneRef = useRef(false);
-  const csTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [loading, setLoading] = useState(() => Boolean(roomId && accessToken));
-  const [error, setError] = useState<string | null>(() =>
-    !roomId ? "语聊房不存在" : !accessToken ? "请先登录后进入语聊房" : null,
-  );
   /**
    * 两套独立校验态（null=校验中不展示）：
    * - audition：老板需试音自发
@@ -340,10 +216,11 @@ export default function VoiceRoomScreen() {
   const [matchActiveForQuickMatchCreated, setMatchActiveForQuickMatchCreated] =
     useState<boolean | null>(null);
 
-  const roomVersion = room?.roomVersion ?? "1";
   const chatroomId = room?.rongChatroomId;
   const roomTitle = room?.roomName || "语聊房";
   const memberColumns = members.length <= 2 ? 2 : members.length === 3 ? 3 : 4;
+  const seatRowCount = Math.ceil(members.length / memberColumns) || 1;
+  const seatNeedsScroll = seatRowCount > SEAT_MAX_ROWS;
   // 麦位点击回调：setState 均为稳定引用，供 MemberSlot memo 生效
   const handleSlotPress = useCallback((member: VoiceRoomMember) => {
     Keyboard.dismiss();
@@ -355,6 +232,26 @@ export default function VoiceRoomScreen() {
     setSelectedMember(member);
     setMemberSheetVisible(true);
   }, []);
+
+  const roleByUserId = useCallback(
+    (userId?: string): VoiceRoomMemberRole | undefined => {
+      if (!userId) return undefined;
+      return members.find((member) => member.userId === userId)?.role;
+    },
+    [members],
+  );
+
+  const {
+    messages,
+    setMessages,
+    messageListRef,
+    renderMessageItem,
+    messageKeyExtractor,
+    handleMessageScroll,
+    handleMessageContentSizeChange,
+    followLatestMessage,
+  } = useVoiceRoomMessages(roleByUserId);
+
   const isOwner =
     Boolean(currentUser?.id) &&
     String(room?.creatorUserId ?? "") === String(currentUser?.id);
@@ -363,6 +260,63 @@ export default function VoiceRoomScreen() {
     Boolean(currentUser?.id) &&
     room?.serviceUserId != null &&
     String(room.serviceUserId) === String(currentUser?.id);
+
+  const {
+    loading,
+    error,
+    rtcReady,
+    muted,
+    setMicState,
+    setRtcReadyRoomId,
+    speakingUserIds,
+    hydrateMemberProfile,
+    roomRef,
+  } = useVoiceRoomRtc({
+    roomId,
+    accessToken,
+    currentUser,
+    room,
+    invitedRoomVersion,
+    routeScene,
+    routeRequestNo,
+    routeExpireTime,
+    routeGameId,
+    routeGameName,
+    routeGameIconUrl,
+    kickedRef,
+    setRoom,
+    setMembers,
+    setMessages,
+  });
+
+  const { serviceCalling, callService, refreshServiceUserId } =
+    useCustomerServiceCall({
+      roomId,
+      accessToken,
+      room,
+      isOwner,
+      rtcReady,
+      loading,
+      shouldAutoCallService,
+      setRoom,
+    });
+
+  const {
+    receptionVisible,
+    setReceptionVisible,
+    receptionClub,
+    receptionGames,
+    receptionBuyerId,
+    receptionBuyerName,
+    onServiceDispatch,
+  } = useVoiceRoomReception({
+    accessToken,
+    room,
+    currentUser,
+    canServiceDispatch,
+  });
+
+  const inviteSlotLabel = serviceCalling ? "接待邀请中" : "邀请用户";
 
   // ---- 场景 A：试音自发 ----
   const auditionFromSession =
@@ -398,13 +352,6 @@ export default function VoiceRoomScreen() {
       Boolean(quickMatchCreatedRequestNo) &&
       matchActiveForQuickMatchCreated === true);
   const showCallService = isOwner && !hasService && !showSelectCompanion;
-  const rtcReady = Boolean(roomId && rtcReadyRoomId === roomId);
-  const muted = !roomId || micState?.roomId !== roomId || micState.muted;
-  const profileRequests = useRef(new Set<string>());
-  const roomRef = useRef(room);
-  useEffect(() => {
-    roomRef.current = room;
-  }, [room]);
 
   const minimize = useCallback(() => {
     if (router.canGoBack()) router.back();
@@ -691,524 +638,7 @@ export default function VoiceRoomScreen() {
       Keyboard.dismiss();
       if (focusedRef.current) minimize();
     });
-  }, [invitedRoomVersion, minimize, roomId]);
-  const hydrateMemberProfile = useCallback(
-    (userId: string, token: string) => {
-      if (
-        !userId ||
-        !token ||
-        userId === currentUser?.id ||
-        profileRequests.current.has(userId)
-      )
-        return;
-      profileRequests.current.add(userId);
-      void clientAuthApi
-        .getUserProfile(token, userId)
-        .then((profile) => {
-          setMembers((items) =>
-            items.map((member) =>
-              member.userId === userId
-                ? {
-                    ...member,
-                    nickname: profile.nickname || member.nickname,
-                    avatar: profile.headImage || member.avatar,
-                  }
-                : member,
-            ),
-          );
-        })
-        .catch(() => undefined)
-        .finally(() => profileRequests.current.delete(userId));
-    },
-    [currentUser?.id],
-  );
-
-  const ensureRtcMember = useCallback(
-    (userId: string) => {
-      // uid "0" 是 joinChannel 传 0 时 Agora 在音量回调里返回的本地占位 uid，不是真实用户
-      if (!userId || userId === "0" || userId === currentUser?.id) return;
-      const creatorUserId = String(roomRef.current?.creatorUserId ?? "");
-      const serviceUserId = String(roomRef.current?.serviceUserId ?? "");
-      setMembers((items) => {
-        if (items.some((member) => member.userId === userId)) return items;
-        const newMember: VoiceRoomMember = {
-          userId,
-          nickname: `用户${userId}`,
-          role:
-            userId === creatorUserId
-              ? "owner"
-              : userId === serviceUserId
-                ? "service"
-                : "guest",
-          micOpen: false,
-        };
-        return [
-          ...items.filter((member) => member.userId !== "invite"),
-          newMember,
-          inviteMember,
-        ].slice(0, 8);
-      });
-      hydrateMemberProfile(userId, accessToken || "");
-    },
-    [accessToken, currentUser?.id, hydrateMemberProfile],
-  );
-
-  useEffect(() => () => clearVoiceRtcCallbacks(), []);
-
-  useEffect(() => {
-    if (!roomId || !accessToken) {
-      return;
-    }
-    if (kickedRef.current) return;
-    let active = true;
-    let joining: ActiveVoiceRoom | null = null;
-    const isCurrentJoin = () => active && !kickedRef.current
-      && (!joining || useVoiceRoomSessionStore.getState().joiningRoom === joining);
-    const cleanupCancelledJoin = async () => {
-      if (!joining) return;
-      const state = useVoiceRoomSessionStore.getState();
-      // Never tear down a newer room that took over while an old request waited.
-      const currentRoom = state.joiningRoom && state.joiningRoom !== joining
-        ? state.joiningRoom : state.activeRoom;
-      if (currentRoom?.rongChatroomId === joining.rongChatroomId) return;
-      await Promise.allSettled([
-        ...(currentRoom ? [] : [leaveVoiceRtc()]),
-        leaveVoiceChatRoom(joining.rongChatroomId),
-      ]);
-    };
-    void (async () => {
-      try {
-        const detail = await voiceRoomApi.getDetail(roomId, accessToken);
-        if (!isCurrentJoin()) return;
-        const staleInvite = Boolean(
-          invitedRoomVersion &&
-            String(detail.roomVersion ?? "1") !== invitedRoomVersion,
-        );
-        // 邀请卡片携带的是旧实例版本：房间已重建，按当前版本进入最新实例
-        const prepared = await voiceRoomApi.prepareJoin(
-          roomId,
-          detail.roomVersion ?? "1",
-          accessToken,
-        );
-        if (!isCurrentJoin()) return;
-        const prevRoom = useVoiceRoomSessionStore.getState().activeRoom;
-        const prevAudition =
-          prevRoom?.roomId === roomId && prevRoom.scene === "audition"
-            ? prevRoom
-            : null;
-        const prevQuickMatchCreated =
-          prevRoom?.roomId === roomId && prevRoom.scene === "quickMatchCreated"
-            ? prevRoom
-            : null;
-        // 路由试音优先；否则保留 session 上的 audition / quickMatchCreated 标记，避免进房覆盖丢失
-        const preservedMatch =
-          routeScene === "audition" || prevAudition
-            ? {
-                scene: "audition" as const,
-                matchRequestNo:
-                  routeRequestNo || prevAudition?.matchRequestNo || undefined,
-                matchExpireTime:
-                  routeExpireTime || prevAudition?.matchExpireTime || undefined,
-                matchGameId: routeGameId || prevAudition?.matchGameId || undefined,
-                matchGameName:
-                  routeGameName || prevAudition?.matchGameName || undefined,
-                matchGameIconUrl:
-                  routeGameIconUrl || prevAudition?.matchGameIconUrl || undefined,
-              }
-            : prevQuickMatchCreated?.matchRequestNo
-              ? {
-                  scene: "quickMatchCreated" as const,
-                  matchRequestNo: prevQuickMatchCreated.matchRequestNo,
-                  matchExpireTime: prevQuickMatchCreated.matchExpireTime,
-                  matchGameId: prevQuickMatchCreated.matchGameId,
-                  matchGameName: prevQuickMatchCreated.matchGameName,
-                  matchGameIconUrl: prevQuickMatchCreated.matchGameIconUrl,
-                }
-              : null;
-        joining = {
-          roomId,
-          roomVersion: String(prepared.roomVersion ?? detail.roomVersion ?? "1"),
-          rongChatroomId: prepared.rongChatroomId,
-          roomName: prepared.roomName || detail.roomName || "语聊房",
-          creatorUserId: String(detail.creatorUserId ?? ""),
-          ownerName: String(detail.creatorUserId ?? "") === String(currentUser?.id ?? "")
-            ? currentUser?.nickname || "我" : "房间成员",
-          ownerAvatar: String(detail.creatorUserId ?? "") === String(currentUser?.id ?? "")
-            ? currentUser?.headImage : undefined,
-          ...(preservedMatch?.matchRequestNo
-            ? {
-                scene: preservedMatch.scene,
-                matchRequestNo: preservedMatch.matchRequestNo,
-                matchExpireTime: preservedMatch.matchExpireTime,
-                matchGameId: preservedMatch.matchGameId,
-                matchGameName: preservedMatch.matchGameName,
-                matchGameIconUrl: preservedMatch.matchGameIconUrl,
-              }
-            : {}),
-        };
-        useVoiceRoomSessionStore.getState().beginRoomJoin(joining);
-        setRoom({ ...detail, ...prepared, roomId });
-        const preparedMembers = normalizeMembers(
-          { ...detail, ...prepared },
-          currentUser || undefined,
-        );
-        setMembers(preparedMembers);
-        preparedMembers.forEach((member) =>
-          hydrateMemberProfile(member.userId, accessToken),
-        );
-        await joinVoiceChatRoom(accessToken, prepared.rongChatroomId);
-        if (!isCurrentJoin()) { await cleanupCancelledJoin(); return; }
-        void getVoiceChatHistory(prepared.rongChatroomId)
-          .then((history) => {
-            if (!active || history.length === 0) return;
-            setMessages((items) => {
-              const notices = items.filter((item) => item.kind !== "chat");
-              const chatById = new Map<string, VoiceRoomMessage>();
-              [
-                ...history,
-                ...items.filter((item) => item.kind === "chat"),
-              ].forEach((message) => {
-                chatById.set(message.id, { ...message, kind: "chat" });
-              });
-              return [
-                ...notices,
-                ...Array.from(chatById.values()).sort(
-                  (left, right) => left.sentAt - right.sentAt,
-                ),
-              ].slice(-80);
-            });
-          })
-          .catch((cause) =>
-            console.warn("[voice-room] history load failed", cause),
-          );
-        const rtc = await voiceRoomApi.getRtcToken(
-          roomId,
-          prepared.roomVersion,
-          accessToken,
-        );
-        if (!isCurrentJoin()) { await cleanupCancelledJoin(); return; }
-        if (rtc.accessStatus && rtc.accessStatus !== "READY")
-          throw new Error("语聊房当前不可加入");
-        const token = rtc.token || rtc.rtcToken;
-        const channelName =
-          rtc.channelName || rtc.rtcChannelName || prepared.rtcChannelName;
-        if (!token || !channelName)
-          throw new Error("语音频道参数不完整，请稍后重试");
-        const rtcJoined = await joinVoiceRtc({
-          appId: rtc.appId,
-          token,
-          channelName,
-          uid: Number(rtc.uid || rtc.agoraUid || currentUser?.id || 0),
-          callbacks: {
-            onUserJoined: (uid) => ensureRtcMember(uid),
-            onUserOffline: (uid) =>
-              setMembers((items) =>
-                items.map((item) =>
-                  item.userId === uid
-                    ? { ...item, micOpen: false, speaking: false }
-                    : item,
-                ),
-              ),
-            onUserMuted: (uid, value) => {
-              ensureRtcMember(uid);
-              setMembers((items) =>
-                items.map((item) =>
-                  item.userId === uid ? { ...item, micOpen: !value } : item,
-                ),
-              );
-            },
-            onRemoteAudioActive: (uid) => {
-              // 进房晚于对方开麦时收不到 mute 广播，音频流到达即说明对方已开麦
-              ensureRtcMember(uid);
-              setMembers((items) =>
-                items.map((item) =>
-                  item.userId === uid && !item.micOpen
-                    ? { ...item, micOpen: true }
-                    : item,
-                ),
-              );
-            },
-            onSpeakingChanged: (uids) => {
-              uids.forEach(ensureRtcMember);
-              const selfId = String(currentUser?.id ?? "");
-              // 声网音量回调里本地说话人的 uid 恒为 "0"（Agora AudioVolumeInfo 约定），
-              // 命中即自己在说话；远端说话人按真实 userId 匹配
-              const speakingIds = uids.map((uid) =>
-                uid === "0" ? selfId : uid,
-              );
-              const now = Date.now();
-              // 记录每个说话人最后一次检测到说话的时间
-              speakingIds.forEach((id) => {
-                speakingLastAtRef.current[id] = now;
-              });
-              // 迟滞判断：500ms 内检测到说话即视为持续发言，避免 200ms 音量震荡导致光环闪烁
-              const activeIds = Object.entries(speakingLastAtRef.current)
-                .filter(([, lastAt]) => now - lastAt < 500)
-                .map(([id]) => id);
-              // 内容不变时不更新，避免 200ms 高频回调触发无效重渲染
-              setSpeakingUserIds((prev) =>
-                prev.length === activeIds.length &&
-                prev.every((id) => activeIds.includes(id))
-                  ? prev
-                  : activeIds,
-              );
-              // 为刚停止说话的人安排延迟清理
-              Object.keys(speakingLastAtRef.current).forEach((id) => {
-                const lastAt = speakingLastAtRef.current[id];
-                if (now - lastAt < 500) return;
-                if (speakingTimersRef.current[id]) return;
-                speakingTimersRef.current[id] = setTimeout(() => {
-                  delete speakingTimersRef.current[id];
-                  delete speakingLastAtRef.current[id];
-                  setSpeakingUserIds((prev) => prev.filter((v) => v !== id));
-                }, 500);
-              });
-              // 远端说话人必然开着麦，兜底纠正进房前漏掉的 mute 状态。
-              // 无 micOpen 翻转时返回原数组，避免 5Hz 音量回调触发整屏重渲染。
-              setMembers((items) => {
-                let changed = false;
-                const next = items.map((item) => {
-                  if (
-                    item.userId !== selfId &&
-                    speakingIds.includes(item.userId) &&
-                    !item.micOpen
-                  ) {
-                    changed = true;
-                    return { ...item, micOpen: true };
-                  }
-                  return item;
-                });
-                return changed ? next : items;
-              });
-            },
-          },
-        });
-        if (!isCurrentJoin()) { await cleanupCancelledJoin(); return; }
-        if (!rtcJoined) throw new Error("当前设备的语音服务不可用");
-        if (!useVoiceRoomSessionStore.getState().completeRoomJoin(joining)) return;
-        getVoiceRtcRemoteUserIds().forEach(ensureRtcMember);
-        setRtcReadyRoomId(roomId);
-        setMicState({ roomId, muted: getVoiceRtcMuted() });
-        setError(null);
-        if (staleInvite) {
-          showToast("语聊房已重新开启，已为你进入最新房间");
-        }
-      } catch (cause) {
-        await cleanupCancelledJoin();
-        if (active && !kickedRef.current)
-          setError(cause instanceof Error ? cause.message : "进入语聊房失败");
-      } finally {
-        if (joining) useVoiceRoomSessionStore.getState().cancelRoomJoin(joining);
-        if (active) setLoading(false);
-      }
-    })();
-    return () => {
-      active = false;
-      if (joining) useVoiceRoomSessionStore.getState().cancelRoomJoin(joining);
-      // 清理迟滞定时器和说话人状态
-      Object.values(speakingTimersRef.current).forEach(clearTimeout);
-      speakingTimersRef.current = {};
-      speakingLastAtRef.current = {};
-      setSpeakingUserIds([]);
-    };
-  }, [
-    accessToken,
-    currentUser,
-    ensureRtcMember,
-    hydrateMemberProfile,
-    invitedRoomVersion,
-    roomId,
-  ]);
-
-  const clearCsTimeout = useCallback(() => {
-    if (csTimeoutRef.current) {
-      clearTimeout(csTimeoutRef.current);
-      csTimeoutRef.current = null;
-    }
-  }, []);
-
-  const startCsTimeout = useCallback(() => {
-    clearCsTimeout();
-    csTimeoutRef.current = setTimeout(() => {
-      csTimeoutRef.current = null;
-      setServiceCalling((calling) => {
-        if (calling) {
-          showToast("当前无空闲接待，请稍后再试");
-        }
-        return false;
-      });
-    }, CS_CALL_TIMEOUT_SECONDS * 1000);
-  }, [clearCsTimeout]);
-
-  const callService = useCallback(async () => {
-    if (!roomId || !accessToken || serviceCalling) return;
-    if (!room?.clubId) {
-      showToast("当前房间暂未绑定俱乐部，无法呼叫接待");
-      return;
-    }
-    if (room.serviceUserId) return;
-    setServiceCalling(true);
-    startCsTimeout();
-    try {
-      await voiceRoomApi.inviteClubService(
-        roomId,
-        roomVersion,
-        room.clubId,
-        accessToken,
-      );
-      showToast("已呼叫俱乐部接待，请稍候");
-    } catch (cause) {
-      clearCsTimeout();
-      setServiceCalling(false);
-      showToast(
-        cause instanceof Error ? cause.message : "呼叫接待失败，请稍后重试",
-      );
-    }
-  }, [
-    accessToken,
-    clearCsTimeout,
-    room?.clubId,
-    room?.serviceUserId,
-    roomId,
-    roomVersion,
-    serviceCalling,
-    startCsTimeout,
-  ]);
-
-  /** 俱乐部接待派单进房后自动呼叫接待（仅一次） */
-  useEffect(() => {
-    if (!shouldAutoCallService || autoCallServiceDoneRef.current) return;
-    if (!roomId || !accessToken || loading || !room || !rtcReady) return;
-    if (!isOwner || room.serviceUserId) {
-      autoCallServiceDoneRef.current = true;
-      return;
-    }
-    autoCallServiceDoneRef.current = true;
-    void callService();
-  }, [
-    accessToken,
-    callService,
-    isOwner,
-    loading,
-    room,
-    roomId,
-    rtcReady,
-    shouldAutoCallService,
-  ]);
-
-  useEffect(() => () => clearCsTimeout(), [clearCsTimeout]);
-
-  /** 呼叫中成员加入时反查 serviceUserId，确认接待是否已接单 */
-  const refreshServiceUserId = useCallback(
-    async (joinedUserId?: string) => {
-      if (!roomId || !accessToken) return;
-      try {
-        const detail = await voiceRoomApi.getDetail(roomId, accessToken);
-        const serviceUserId =
-          detail.serviceUserId == null ? "" : String(detail.serviceUserId);
-        setRoom((prev) =>
-          prev
-            ? {
-                ...prev,
-                serviceUserId: detail.serviceUserId ?? prev.serviceUserId,
-                clubId: detail.clubId ?? prev.clubId,
-              }
-            : prev,
-        );
-        if (
-          serviceCalling &&
-          serviceUserId &&
-          (!joinedUserId || serviceUserId === joinedUserId)
-        ) {
-          clearCsTimeout();
-          setServiceCalling(false);
-          showToast("接待已接单");
-        }
-      } catch {
-        /* 反查失败静默，等下一次成员变更或超时兜底 */
-      }
-    },
-    [accessToken, clearCsTimeout, roomId, serviceCalling],
-  );
-
-  const onServiceDispatch = useCallback(async () => {
-    if (!canServiceDispatch) {
-      showToast("只有当前房间绑定的接待客服可以派单");
-      return;
-    }
-    if (!accessToken || !room) return;
-    const clubId = room.clubId;
-    const ownerId = room.creatorUserId;
-    if (clubId == null || clubId === "" || ownerId == null || ownerId === "") {
-      showToast("房间信息不完整，无法派单");
-      return;
-    }
-    if (receptionPreparing) return;
-    setReceptionPreparing(true);
-    const selfId = String(currentUser?.id || "");
-    const valid = () =>
-      !!useAuthStore.getState().accessToken &&
-      String(useAuthStore.getState().user?.id || "") === selfId &&
-      canServiceDispatch;
-
-    try {
-      const active = await fetchDispatchActiveQuickMatch(accessToken);
-      if (!valid()) return;
-      if (active && isQuickMatchActive(active)) {
-        const confirmed = await useAppConfirm.getState().confirm({
-          title: "派单进行中",
-          message: `订单 ${active.requestNo} 仍在匹配中，可取消后重新派单。`,
-          cancelText: "知道了",
-          confirmText: "取消派单",
-        });
-        if (confirmed) {
-          try {
-            await cancelQuickMatch(active.requestNo, accessToken);
-            showToast("已取消派单");
-          } catch (error) {
-            showToast(
-              error instanceof Error
-                ? error.message
-                : "取消派单失败，请稍后重试",
-            );
-          }
-        }
-        return;
-      }
-
-      const [detail, gameList, ownerProfile] = await Promise.all([
-        fetchQuickMatchClubDetail(clubId, accessToken),
-        fetchQuickMatchGames(accessToken, undefined, clubId),
-        clientAuthApi
-          .getUserProfile(accessToken, String(ownerId))
-          .catch(() => null),
-      ]);
-      if (!valid()) return;
-      if (!detail) {
-        showToast("俱乐部信息获取失败，请稍后重试");
-        return;
-      }
-      setReceptionBuyerId(String(ownerId));
-      setReceptionBuyerName(ownerProfile?.nickname || "");
-      setReceptionClub({ id: detail.id, name: detail.name });
-      setReceptionGames(gameList);
-      setReceptionVisible(true);
-    } catch (error) {
-      if (valid()) {
-        showToast(
-          error instanceof Error ? error.message : "派单准备失败，请重试",
-        );
-      }
-    } finally {
-      setReceptionPreparing(false);
-    }
-  }, [
-    accessToken,
-    canServiceDispatch,
-    currentUser?.id,
-    receptionPreparing,
-    room,
-  ]);
+  }, [invitedRoomVersion, minimize, roomId, roomRef, setMicState, setRtcReadyRoomId]);
 
   useEffect(() => {
     if (!chatroomId) return;
@@ -1273,6 +703,7 @@ export default function VoiceRoomScreen() {
     room?.creatorUserId,
     room?.serviceUserId,
     serviceCalling,
+    setMessages,
   ]);
 
   const confirmExit = async () => {
@@ -1305,9 +736,11 @@ export default function VoiceRoomScreen() {
   const sendMessage = async () => {
     const text = input.trim();
     if (!text) return;
+    followLatestMessage();
     setInput("");
     const local = {
       id: `local-${Date.now()}`,
+      userId: currentUser?.id ? String(currentUser.id) : undefined,
       nickname: currentUser?.nickname || "我",
       text,
       sentAt: Date.now(),
@@ -1431,6 +864,35 @@ export default function VoiceRoomScreen() {
     }
   };
 
+  const seatSlots = members.map((member, index) => {
+    const invite = member.userId === "invite";
+    const ring = invite
+      ? undefined
+      : member.role === "owner"
+        ? ringOwner
+        : undefined;
+    const micOpen =
+      rtcReady &&
+      (member.userId === String(currentUser?.id)
+        ? !muted
+        : Boolean(member.micOpen));
+    // speaking 来自独立的 speakingUserIds（声网音量回调高频更新的原子 state），
+    // 能说话即代表已开麦，不再用可能滞后的 micOpen 二次短路
+    const speaking = rtcReady && speakingUserIds.includes(member.userId);
+    return (
+      <MemberSlot
+        key={`${member.userId}-${index}`}
+        member={member}
+        columns={memberColumns}
+        ring={ring}
+        micOpen={micOpen}
+        speaking={speaking}
+        inviteLabel={inviteSlotLabel}
+        onPress={handleSlotPress}
+      />
+    );
+  });
+
   return (
     <View style={styles.screen}>
       <StatusBar style="light" />
@@ -1476,36 +938,18 @@ export default function VoiceRoomScreen() {
           <Text style={styles.roomId}>房间号 {roomId || '--'}</Text>
         </View> */}
 
-        <View style={styles.grid}>
-          {members.map((member, index) => {
-            const invite = member.userId === "invite";
-            const ring = invite
-              ? ringInvite
-              : member.role === "owner"
-                ? ringOwner
-                : undefined;
-            const micOpen =
-              rtcReady &&
-              (member.userId === String(currentUser?.id)
-                ? !muted
-                : Boolean(member.micOpen));
-            // speaking 来自独立的 speakingUserIds（声网音量回调高频更新的原子 state），
-            // 能说话即代表已开麦，不再用可能滞后的 micOpen 二次短路
-            const speaking =
-              rtcReady && speakingUserIds.includes(member.userId);
-            return (
-              <MemberSlot
-                key={`${member.userId}-${index}`}
-                member={member}
-                columns={memberColumns}
-                ring={ring}
-                micOpen={micOpen}
-                speaking={speaking}
-                onPress={handleSlotPress}
-              />
-            );
-          })}
-        </View>
+        {seatNeedsScroll ? (
+          <ScrollView
+            style={styles.seatScroll}
+            contentContainerStyle={styles.grid}
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled
+          >
+            {seatSlots}
+          </ScrollView>
+        ) : (
+          <View style={styles.grid}>{seatSlots}</View>
+        )}
 
         <View style={styles.chatPanel}>
           {loading ? (
@@ -1513,11 +957,16 @@ export default function VoiceRoomScreen() {
           ) : null}
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           <FlatList
+            ref={messageListRef}
             data={messages}
             keyExtractor={messageKeyExtractor}
             renderItem={renderMessageItem}
             contentContainerStyle={styles.messageList}
             showsVerticalScrollIndicator={false}
+            onScroll={handleMessageScroll}
+            scrollEventThrottle={16}
+            onContentSizeChange={handleMessageContentSizeChange}
+            onLayout={handleMessageContentSizeChange}
           />
         </View>
 
@@ -1623,22 +1072,26 @@ const styles = StyleSheet.create({
   roomMeta: { paddingHorizontal: 20, paddingTop: 2, paddingBottom: 12 },
   roomName: { color: "#F7F8FF", fontSize: 16, fontWeight: "700" },
   roomId: { color: "#9296B3", fontSize: 11, marginTop: 5 },
+  seatScroll: {
+    flexGrow: 0,
+    flexShrink: 0,
+    maxHeight: SEAT_AREA_MAX_HEIGHT,
+  },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
     paddingHorizontal: 16,
-    // flexBasis 代替固定 height，键盘顶起时可压缩且仍能看见麦位
-    flexBasis: 381,
-    flexGrow: 0,
-    flexShrink: 1,
-    minHeight: 103,
-    alignItems: "center",
-    alignContent: "center",
-    justifyContent: "center",
-    rowGap: 12,
-    overflow: "hidden",
+    paddingTop: GRID_PADDING_TOP,
+    paddingBottom: GRID_PADDING_BOTTOM,
+    alignItems: "flex-start",
+    alignContent: "flex-start",
+    rowGap: MEMBER_ROW_GAP,
   },
-  memberSlot: { alignItems: "center", minHeight: 103, overflow: "visible" },
+  memberSlot: {
+    alignItems: "center",
+    minHeight: MEMBER_SLOT_HEIGHT,
+    overflow: "visible",
+  },
   avatarWrap: {
     width: 58,
     height: 58,
@@ -1648,23 +1101,46 @@ const styles = StyleSheet.create({
   },
   avatar: { width: 48, height: 48, borderRadius: 24 },
   ring: { position: "absolute", width: 58, height: 58 },
-  inviteRing: { position: "absolute", width: 58, height: 58 },
-  inviteBadge: { width: 22, height: 22 },
-  memberName: {
-    color: "#F0F1FF",
-    fontSize: 11,
-    maxWidth: 76,
-    marginTop: 7,
-    textAlign: "center",
+  inviteAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  inviteName: { color: "#A9B2E9" },
-  roleLabel: { color: "#D3A2FF", fontSize: 9, marginTop: 2 },
+  invitePlaceholderIcon: { width: 24, height: 24 },
+  serviceBadge: {
+    position: "absolute",
+    left: -2,
+    bottom: -2,
+    backgroundColor: "#B81636",
+    borderRadius: 52,
+    paddingHorizontal: 3,
+    paddingVertical: 1,
+  },
+  serviceBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 8,
+    fontWeight: "600",
+    lineHeight: 12,
+  },
+  memberName: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    lineHeight: 16,
+    maxWidth: 76,
+    marginTop: 16,
+    textAlign: "center",
+    textShadowColor: "rgba(0,0,0,0.15)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
+  },
+  inviteName: { color: "#979799", textShadowColor: "transparent" },
   chatPanel: {
     flex: 1,
-    marginTop: 8,
+    marginTop: 0,
     marginHorizontal: 16,
-    // 键盘顶起后剩余高度紧张，flex 收缩会把消息列表压成 0（内容被"挤没"），
-    // 保住最小高度让消息仍可见，压缩量改由麦位区（有 minHeight 兜底）承担
     minHeight: 96,
   },
   loading: { marginTop: 12 },
@@ -1676,18 +1152,8 @@ const styles = StyleSheet.create({
   },
   messageList: {
     flexGrow: 1,
-    justifyContent: "flex-end",
-    paddingTop: 12,
+    paddingTop: 0,
     paddingBottom: 10,
+    gap: 8,
   },
-  noticeText: {
-    color: "#9EA7D1",
-    fontSize: 12,
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  messageRow: { flexDirection: "row", marginBottom: 8, paddingRight: 12 },
-  messageName: { color: "#B892FF", fontSize: 12, marginRight: 6 },
-  messageBody: { color: "#E9EAF5", fontSize: 12, flex: 1, lineHeight: 18 },
-  messageImage: { width: 132, height: 132, borderRadius: 8, marginTop: 4 },
 });

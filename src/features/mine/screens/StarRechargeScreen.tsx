@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStarIap } from "@/features/iap/use-star-iap";
 import { fetchStarBalance } from "@/features/mine/api/companion-order.api";
 import { APP_LINKS } from "@/core/config/links";
-import { openExternalLink } from "@/shared/navigation/open-external-link";
+import { openInAppWebView } from "@/shared/navigation/open-web-view";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { Skeleton } from "@/shared/ui/Skeleton";
@@ -265,7 +265,7 @@ export default function StarRechargeScreen() {
             <Text
               style={styles.agreementLink}
               onPress={() =>
-                void openExternalLink(APP_LINKS.rechargeAgreement)
+                openInAppWebView(APP_LINKS.rechargeAgreement, "盼之电竞购买须知")
               }
             >
               《盼之电竞购买须知》

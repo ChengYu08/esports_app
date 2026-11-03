@@ -88,4 +88,14 @@ describe("evidence image compatibility", () => {
     fs.files.set(uri, new Uint8Array());
     expect(() => getEvidenceUploadFile(uri, "photo.jpg")).toThrow("读取图片失败");
   });
+
+  it("选图和上传均拒绝超过10MB的证据图片", async () => {
+    const bytes = new Uint8Array(10 * 1024 * 1024 + 1);
+    bytes.set(jpeg);
+    fs.files.set(uri, bytes);
+    await expect(preparePickedEvidenceImage(uri)).rejects.toThrow("不能超过10MB");
+    expect(() => getEvidenceUploadFile(uri)).toThrow("不能超过10MB");
+    fs.files.set(uri, bytes.slice(0, -1));
+    await expect(preparePickedEvidenceImage(uri)).resolves.toMatchObject({ uri });
+  });
 });

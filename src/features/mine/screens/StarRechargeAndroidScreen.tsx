@@ -23,7 +23,7 @@ import {
   type RechargePlan,
 } from "@/features/mine/api/recharge.api";
 import { WechatPayQrModal } from "@/features/mine/components/WechatPayQrModal";
-import { openExternalLink } from "@/shared/navigation/open-external-link";
+import { openInAppWebView } from "@/shared/navigation/open-web-view";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import AlipayPayment from "../../../../modules/alipay-payment";
@@ -435,7 +435,9 @@ export default function StarRechargeAndroidScreen() {
             支付即同意
             <Text
               style={styles.agreementLink}
-              onPress={() => openExternalLink(APP_LINKS.rechargeAgreement)}
+              onPress={() =>
+                openInAppWebView(APP_LINKS.rechargeAgreement, "盼之电竞购买须知")
+              }
             >
               《盼之电竞购买须知》
             </Text>

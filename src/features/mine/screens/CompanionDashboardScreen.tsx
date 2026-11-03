@@ -30,6 +30,7 @@ import { CachedImage } from "@/shared/ui/CachedImage";
 import { companionManagementApi as api } from "../api/companion-management.api";
 import {
   formatManagementNumber as format,
+  sortManagedServices,
   type ManagedImage,
   type ManagedService,
 } from "../api/companion-management.contract";
@@ -118,7 +119,7 @@ export default function CompanionDashboardScreen() {
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      <CompanionDashboardHeader title="陪玩管理" />
+      <CompanionDashboardHeader title="陪玩中心" />
       <ScrollView
         contentInsetAdjustmentBehavior="never"
         automaticallyAdjustContentInsets={false}
@@ -368,22 +369,26 @@ export default function CompanionDashboardScreen() {
                         </Text>
                         <View style={styles.divider} />
                         {level.companionServiceList?.length ? (
-                          level.companionServiceList.map((service) => (
-                            <ServiceRow
-                              key={service.companionServiceId}
-                              service={service}
-                              goodRate={
-                                service.goodRate ??
-                                detail?.skillCards?.find(
-                                  (card) =>
-                                    card.companionServiceId ===
-                                    service.companionServiceId,
-                                )?.goodRate
-                              }
-                              busy={updatingIds.has(service.companionServiceId)}
-                              onToggle={() => void toggleService(service)}
-                            />
-                          ))
+                          sortManagedServices(level.companionServiceList).map(
+                            (service) => (
+                              <ServiceRow
+                                key={service.companionServiceId}
+                                service={service}
+                                goodRate={
+                                  service.goodRate ??
+                                  detail?.skillCards?.find(
+                                    (card) =>
+                                      card.companionServiceId ===
+                                      service.companionServiceId,
+                                  )?.goodRate
+                                }
+                                busy={updatingIds.has(
+                                  service.companionServiceId,
+                                )}
+                                onToggle={() => void toggleService(service)}
+                              />
+                            ),
+                          )
                         ) : (
                           <Text style={styles.noImages}>暂无已分配服务</Text>
                         )}

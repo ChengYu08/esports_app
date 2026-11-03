@@ -234,6 +234,9 @@ export function mapOrder(
       stringValue(item, "title", "productName") ||
       "陪玩服务",
     gameName: stringValue(item, "gameName") ?? "未知游戏",
+    gameModeName: stringValue(item, "gameModeName"),
+    gameLevelName: stringValue(item, "gameLevelName"),
+    orderServiceName: stringValue(item, "serviceName"),
     gameIcon: gameIcon ? { uri: gameIcon } : undefined,
     unitPrice: stringValue(item, "unitPrice", "price") ?? total,
     quantity: numberValue(item, "quantity", "count", "num") ?? 1,

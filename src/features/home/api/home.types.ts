@@ -124,6 +124,7 @@ export type CompanionFilters = {
   gameStatus?: 0 | 1;
   gameModeId?: number;
   gameLevelId?: number;
+  tagId?: number;
 };
 
 export type CompanionPage = {

@@ -89,11 +89,11 @@ const styles = StyleSheet.create({
   bottom: {
     backgroundColor: "#FFF",
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 8,
     flexDirection: "row",
     justifyContent: "flex-end",
     gap: 8,
-    borderTopWidth: 14,
+    borderTopWidth: 0,
     borderTopColor: "#F7F7F7",
   },
   acceptBottom: { borderTopWidth: 0, paddingTop: 8, gap: 12 },
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 42,
     paddingHorizontal: 18,
-    borderRadius: 12,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: "#E7E7E7",
     alignItems: "center",
@@ -115,8 +115,8 @@ const styles = StyleSheet.create({
   outlineText: {
     color: "#111",
     fontFamily: SYSTEM_FONT,
-    fontSize: 17,
-    fontWeight: "600",
+    fontSize: 14,
+    fontWeight: "500",
   },
   primaryButton: {
     paddingHorizontal: 0,
@@ -134,8 +134,8 @@ const styles = StyleSheet.create({
   primaryText: {
     color: "#FFF",
     fontFamily: SYSTEM_FONT,
-    fontSize: 17,
-    fontWeight: "600",
+    fontSize: 14,
+    fontWeight: "500",
   },
   acceptActionText: { fontSize: 14, fontWeight: "500", lineHeight: 22 },
 });
