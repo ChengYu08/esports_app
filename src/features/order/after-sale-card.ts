@@ -28,9 +28,9 @@ export function afterSaleCardRows(payload: Partial<AfterSaleCardPayload>): After
   push("游戏", payload.gameName);
   const serviceDesc = text(payload.serviceDesc);
   const unitPrice = text(payload.unitPrice);
-  if (serviceDesc) push("服务", unitPrice ? `${serviceDesc} ${unitPrice}星钻/小时` : serviceDesc);
+  if (serviceDesc) push("服务", unitPrice ? `${serviceDesc} ${unitPrice}钻石/小时` : serviceDesc);
   push("数量", payload.quantity ? `${payload.quantity}小时` : "");
-  push("总价", payload.totalPrice ? `${payload.totalPrice}星钻` : "");
+  push("总价", payload.totalPrice ? `${payload.totalPrice}钻石` : "");
   push("时间", formatCardTime(payload.createTime));
   push("备注", payload.remark);
   return rows;

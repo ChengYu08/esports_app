@@ -140,7 +140,7 @@ export const OrderCard = memo(function OrderCard({
             </OrderDetailRow>
             <OrderDetailRow label="单价">
               <Text style={styles.detailValue}>
-                {item.unitPrice}星钻/{item.billingUnitName ?? "小时"}
+                {item.unitPrice}钻石/{item.billingUnitName ?? "小时"}
               </Text>
             </OrderDetailRow>
             <OrderDetailRow label="订单号">
@@ -174,7 +174,7 @@ export const OrderCard = memo(function OrderCard({
           </View>
           <View style={styles.totalRow}>
             <View style={styles.quantitySummary}>
-              <Text style={styles.totalLabel}>{item.unitPrice}星钻</Text>
+              <Text style={styles.totalLabel}>{item.unitPrice}钻石</Text>
               <Text style={styles.totalLabel}>x</Text>
               <Text style={styles.quantity}>
                 {item.quantity}

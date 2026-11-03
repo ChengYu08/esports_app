@@ -1,7 +1,7 @@
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { router } from "expo-router";
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { CourtSource } from "../court.api";
 import { COURT_FONT_FAMILY } from "../court.theme";
@@ -14,10 +14,10 @@ type Props = {
   selected: boolean;
   disabled?: boolean;
   keyword?: string;
-  onSelect: () => void;
+  onSelect: (source: CourtSource) => void;
 };
 
-export function CourtSourceCard({
+export const CourtSourceCard = memo(function CourtSourceCard({
   source,
   gameIconUrl,
   kind,
@@ -52,7 +52,7 @@ export function CourtSourceCard({
       }
       accessibilityState={{ selected, disabled }}
       disabled={disabled}
-      onPress={onSelect}
+      onPress={() => onSelect(source)}
       style={styles.row}
     >
       <View style={[styles.radio, selected && styles.radioSelected]}>
@@ -155,7 +155,7 @@ export function CourtSourceCard({
             <View style={styles.detailRow}>
               <Text style={styles.label}>总价</Text>
               <Text style={styles.value}>
-                {source.totalPrice == null ? "—" : `${source.totalPrice}星钻`}
+                {source.totalPrice == null ? "—" : `${source.totalPrice}钻石`}
               </Text>
             </View>
           </View>
@@ -163,7 +163,7 @@ export function CourtSourceCard({
       </View>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   row: {

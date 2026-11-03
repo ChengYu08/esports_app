@@ -90,6 +90,8 @@ export type MessageStoreState = {
   activePeerId: string | null;
   /** 聊天界面是否在前台可见；activePeerId 在页面被覆盖/退后台时仍保留，已读判断必须叠加此项 */
   chatForeground: boolean;
+  /** 诊断用：本次登录会话内确认为离线补偿重放的消息条数（隐藏弹窗展示，文案不含 SDK 厂商名） */
+  compensatedCount: number;
   lastError: string | null;
   refreshOnlineStatuses: (token: string) => Promise<void>;
   refreshConversations: (token: string) => Promise<void>;
@@ -298,6 +300,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
             ? { ...state.messagesByPeerId, [normalizedPeerId]: mergeMessages(state.messagesByPeerId[normalizedPeerId] || [], message) }
             : state.messagesByPeerId,
           conversations,
+          compensatedCount: isReplayedHistory ? state.compensatedCount + 1 : state.compensatedCount,
         };
       });
       if (isActive) void adapter.markRead(normalizedPeerId).catch((error) => set({ lastError: error instanceof Error ? error.message : '清除未读失败' }));
@@ -441,6 +444,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       openPeerIds: [],
       activePeerId: null,
       chatForeground: false,
+      compensatedCount: 0,
       lastError: null,
 
       refreshOnlineStatuses: async (token) => {
@@ -855,7 +859,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         stopConversationSyncSubscription = undefined;
         stopReadSyncSubscription = undefined;
         await adapter.disconnect();
-        set({ connectionState: 'idle', conversationError: null, conversations: [], blacklistedUserIds: [], messagesByPeerId: {}, historyByPeerId: {}, openPeerIds: [], activePeerId: null, chatForeground: false, lastError: null });
+        set({ connectionState: 'idle', conversationError: null, conversations: [], blacklistedUserIds: [], messagesByPeerId: {}, historyByPeerId: {}, openPeerIds: [], activePeerId: null, chatForeground: false, compensatedCount: 0, lastError: null });
       },
     };
   });

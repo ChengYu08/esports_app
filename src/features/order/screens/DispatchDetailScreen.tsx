@@ -113,14 +113,14 @@ export function DispatchDetailScreen({ requestNo }: { requestNo: string }) {
             <Text numberOfLines={1} style={styles.gameName}>{request.gameName || "未知游戏"}</Text>
           </View>
           <InfoRow label="服务" value={serviceName} />
-          <InfoRow label="单价" value={`${unitPrice} 星钻/${request.billingUnitName || "小时"}`} />
+          <InfoRow label="单价" value={`${unitPrice} 钻石/${request.billingUnitName || "小时"}`} />
           <InfoRow label="数量" value={`${quantity} ${request.billingUnitName || "小时"}`} />
           <InfoRow label="试音要求" value={request.needVoice ? "需要试音" : "不需要试音"} />
           <InfoRow label="备注" value={request.remark?.trim() || "无"} multiline />
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>预估总额</Text>
             <Text style={styles.totalValue}>{total}</Text>
-            <Text style={styles.totalUnit}>星钻</Text>
+            <Text style={styles.totalUnit}>钻石</Text>
           </View>
         </View>
 

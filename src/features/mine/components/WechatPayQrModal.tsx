@@ -112,7 +112,7 @@ export function WechatPayQrModal({
             </Pressable>
           </View>
           <Text style={styles.summary}>
-            ¥{moneyAmount} 充值 {starAmount} 星钻
+            ¥{moneyAmount} 充值 {starAmount} 钻石
           </Text>
           <View ref={qrCardRef} collapsable={false} style={styles.qrCard}>
             <QRCodeSvg

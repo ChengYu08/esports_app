@@ -14,6 +14,8 @@ export type AuthUser = {
   idCardNo?: string;
   clubInfo?: { id: number; clubName: string; logoUrl: string; status: number; memberStatus: number } | null;
   positions?: { code: string; description: string }[];
+  /** 服务端下发的我的页功能入口（SidebarMenuEnum code，按展示顺序） */
+  sidebarMenus?: string[];
   starBalance?: number | string;
 };
 

@@ -96,7 +96,7 @@ export function OrderDetailInfoBlocks({
           <OrderDetailInfoRow
             acceptStyle={scope === "accept"}
             label="单价"
-            value={`${order.unitPrice}星钻/${order.billingUnitName ?? "小时"}`}
+            value={`${order.unitPrice}钻石/${order.billingUnitName ?? "小时"}`}
           />
           <OrderDetailInfoRow
             acceptStyle={scope === "accept"}
@@ -106,7 +106,7 @@ export function OrderDetailInfoBlocks({
           <OrderDetailInfoRow
             acceptStyle={scope === "accept"}
             label={freeSummary ? `原${amountLabel}` : amountLabel}
-            value={`${order.totalPrice}星钻`}
+            value={`${order.totalPrice}钻石`}
           />
           {freeSummary ? (
             <>
@@ -115,7 +115,7 @@ export function OrderDetailInfoBlocks({
                 acceptStyle={scope === "accept"}
                 label={`${amountLabel}(免单后)`}
                 amount
-                value={`${formatStar(computeOrderPayableStars(order))}星钻`}
+                value={`${formatStar(computeOrderPayableStars(order))}钻石`}
               />
             </>
           ) : null}

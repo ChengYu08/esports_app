@@ -646,7 +646,7 @@ function StarPaymentPrompt({
     if (!item || !token) return;
     const total = Number(item.totalPrice) || 0;
     if ((balance ?? 0) < total) {
-      setMessage("当前星钻余额不足，请充值后再支付");
+      setMessage("当前钻石余额不足，请充值后再支付");
       return;
     }
     setPaying(true);
@@ -677,12 +677,12 @@ function StarPaymentPrompt({
           { paddingBottom: 24 + insets.bottom },
         ]}
       >
-        <Text style={styles.paymentTitle}>星钻支付</Text>
+        <Text style={styles.paymentTitle}>钻石支付</Text>
         <Text style={styles.paymentAmount}>
-          支付 {item?.totalPrice ?? 0} 星钻
+          支付 {item?.totalPrice ?? 0} 钻石
         </Text>
         <Text style={styles.paymentBalance}>
-          当前余额：{balance === null ? "加载中..." : `${balance} 星钻`}
+          当前余额：{balance === null ? "加载中..." : `${balance} 钻石`}
         </Text>
         <View style={styles.paymentActions}>
           <Pressable
