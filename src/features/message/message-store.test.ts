@@ -407,6 +407,27 @@ describe('message store', () => {
     await store.getState().reset();
   });
 
+  it('counts compensated replayed messages for the hidden diagnostic counter', async () => {
+    let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
+    const historySentAt = Date.now() - 60_000;
+    const store = createMessageStore(makeAdapter({
+      getConversations: vi.fn(async () => [conversation]),
+      subscribeMessages: vi.fn((listener) => { receiveMessage = listener; return () => undefined; }),
+    }));
+    await store.getState().initialize('token');
+    expect(store.getState().compensatedCount).toBe(0);
+    // 补偿重放的历史消息：计入诊断计数
+    receiveMessage?.('42', { ...sentMessage, id: 'replay-1', isMine: false, sentAt: historySentAt, receivedOffline: true }, conversation);
+    receiveMessage?.('42', { ...sentMessage, id: 'replay-2', isMine: false, sentAt: historySentAt + 1_000, receivedOffline: true }, conversation);
+    expect(store.getState().compensatedCount).toBe(2);
+    // 实时新消息与就绪后迟到的 offline 消息：不属于补偿，不计数
+    receiveMessage?.('42', { ...sentMessage, id: 'live-1', isMine: false, sentAt: Date.now() }, conversation);
+    expect(store.getState().compensatedCount).toBe(2);
+    // 登出重置后归零
+    await store.getState().reset();
+    expect(store.getState().compensatedCount).toBe(0);
+  });
+
   it('clears unread when another device reports the conversation as read', async () => {
     let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
     let reportRead: ((peerId: string, timestamp: number) => void) | undefined;

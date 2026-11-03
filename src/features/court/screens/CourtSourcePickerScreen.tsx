@@ -106,20 +106,23 @@ function CourtSourcePickerScreen({ step }: { step: "orders" | "reviews" }) {
     }
   }
 
-  function choose(source: CourtSource) {
-    if (busyRef.current) {
-      return;
-    }
-    if (isReview) {
-      useCourtSourceSelection
-        .getState()
-        .selectReview(sessionId, String(source.reviewId));
-    } else {
-      useCourtSourceSelection
-        .getState()
-        .selectOrder(sessionId, String(source.orderId));
-    }
-  }
+  const choose = useCallback(
+    (source: CourtSource) => {
+      if (busyRef.current) {
+        return;
+      }
+      if (isReview) {
+        useCourtSourceSelection
+          .getState()
+          .selectReview(sessionId, String(source.reviewId));
+      } else {
+        useCourtSourceSelection
+          .getState()
+          .selectOrder(sessionId, String(source.orderId));
+      }
+    },
+    [isReview, sessionId],
+  );
 
   async function confirm() {
     if (!selected || !session || !validSession || busyRef.current) {
@@ -168,6 +171,25 @@ function CourtSourcePickerScreen({ step }: { step: "orders" | "reviews" }) {
     query.isPending ||
     query.isError ||
     confirming;
+  const keyExtractor = useCallback(
+    (source: CourtSource) =>
+      isReview ? courtSourceKey(source) : String(source.orderId),
+    [isReview],
+  );
+  const renderSource = useCallback(
+    ({ item }: { item: CourtSource }) => (
+      <CourtSourceCard
+        source={item}
+        gameIconUrl={courtSourceGameIcon(item, games.data)}
+        kind={isReview ? "review" : "order"}
+        selected={item === selected}
+        disabled={confirming}
+        keyword={keyword}
+        onSelect={choose}
+      />
+    ),
+    [choose, confirming, games.data, isReview, keyword, selected],
+  );
   return (
     <View style={styles.screen}>
       <View
@@ -246,21 +268,8 @@ function CourtSourcePickerScreen({ step }: { step: "orders" | "reviews" }) {
       ) : (
         <FlatList
           data={rows}
-          extraData={{ selected, games: games.data }}
-          keyExtractor={(source) =>
-            isReview ? courtSourceKey(source) : String(source.orderId)
-          }
-          renderItem={({ item }) => (
-            <CourtSourceCard
-              source={item}
-              gameIconUrl={courtSourceGameIcon(item, games.data)}
-              kind={isReview ? "review" : "order"}
-              selected={item === selected}
-              disabled={confirming}
-              keyword={keyword}
-              onSelect={() => choose(item)}
-            />
-          )}
+          keyExtractor={keyExtractor}
+          renderItem={renderSource}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           contentContainerStyle={styles.listContent}

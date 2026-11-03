@@ -1,7 +1,5 @@
 import { StyleSheet, Text, View } from "react-native";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
-
 type FieldLabelProps = {
   label: string;
   required?: boolean;
@@ -29,14 +27,12 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   labelText: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
-    fontWeight: "600",
-    color: "#DEDEE0",
+    fontWeight: "400",
+    color: "#EBEBEB",
   },
   required: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: "500",

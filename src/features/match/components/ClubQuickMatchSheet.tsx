@@ -27,6 +27,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { publishQuickMatch } from "@/features/match/api/match.api";
 import type { MatchGame } from "@/features/match/api/match.types";
 import { openAuditionRoom } from "@/features/match/enter-audition-room";
+import { LightGameOptionChip } from "@/features/match/components/LightGameOptionChip";
+import { LightOptionChip } from "@/features/match/components/LightOptionChip";
 import { MatchLinearGradient } from "@/features/match/components/MatchLinearGradient";
 import {
   MATCH_COMPANION_PREFERENCE_OPTIONS,
@@ -117,39 +119,6 @@ function LightFieldLabel({
         {required ? <Text style={styles.required}>*</Text> : null}
       </View>
     </View>
-  );
-}
-
-function LightChip({
-  label,
-  selected,
-  onPress,
-  iconUrl,
-  style,
-}: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-  iconUrl?: string;
-  style?: object;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={[styles.chip, selected && styles.chipSelected, style]}
-    >
-      {iconUrl ? (
-        <Image source={{ uri: iconUrl }} style={styles.gameIcon} />
-      ) : null}
-      <Text
-        numberOfLines={1}
-        style={[styles.chipLabel, selected && styles.chipLabelSelected]}
-      >
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -501,13 +470,13 @@ export function ClubQuickMatchSheet({
                 </Text>
               ) : (
                 form.games.map((game) => (
-                  <LightChip
+                  <LightGameOptionChip
                     key={game.id}
                     label={game.name}
-                    iconUrl={game.iconUrl}
+                    icon={game.iconUrl ? { uri: game.iconUrl } : undefined}
+                    iconFallback
                     selected={form.gameId === game.id}
                     onPress={() => handleSelectGame(game.id)}
-                    style={styles.gameChip}
                   />
                 ))
               )}
@@ -531,7 +500,7 @@ export function ClubQuickMatchSheet({
                   <Text style={styles.hint}>该俱乐部暂无可用模式</Text>
                 ) : (
                   form.modes.map((mode) => (
-                    <LightChip
+                    <LightOptionChip
                       key={mode.id}
                       label={mode.name}
                       selected={form.modeId === mode.id}
@@ -553,7 +522,7 @@ export function ClubQuickMatchSheet({
                   <Text style={styles.hint}>暂无可用等级</Text>
                 ) : (
                   form.levels.map((level) => (
-                    <LightChip
+                    <LightOptionChip
                       key={level.id}
                       label={level.name}
                       selected={form.levelId === level.id}
@@ -575,7 +544,7 @@ export function ClubQuickMatchSheet({
                   <Text style={styles.hint}>暂无可用服务</Text>
                 ) : (
                   form.services.map((service) => (
-                    <LightChip
+                    <LightOptionChip
                       key={service.id}
                       label={service.name}
                       selected={form.serviceId === service.id}
@@ -592,7 +561,7 @@ export function ClubQuickMatchSheet({
               <LightFieldLabel label="性别" required />
               <View style={styles.options}>
                 {MATCH_GENDER_OPTIONS.map((option) => (
-                  <LightChip
+                  <LightOptionChip
                     key={option.value}
                     label={option.label}
                     selected={form.gender === option.value}
@@ -608,7 +577,7 @@ export function ClubQuickMatchSheet({
               <LightFieldLabel label="陪玩人数" required />
               <View style={styles.options}>
                 {MATCH_COMPANION_PREFERENCE_OPTIONS.map((option) => (
-                  <LightChip
+                  <LightOptionChip
                     key={option.value}
                     label={option.label}
                     selected={form.companionPreference === option.value}
@@ -629,7 +598,7 @@ export function ClubQuickMatchSheet({
               <LightFieldLabel label="试音" required />
               <View style={styles.options}>
                 {MATCH_VOICE_OPTIONS.map((option) => (
-                  <LightChip
+                  <LightOptionChip
                     key={option}
                     label={option}
                     selected={form.voice === option}
@@ -667,11 +636,6 @@ export function ClubQuickMatchSheet({
         </ScrollView>
 
         <View style={styles.footer}>
-          <View style={styles.etaRow}>
-            <Text style={styles.etaMuted}>预计</Text>
-            <Text style={styles.etaAccent}>30s</Text>
-            <Text style={styles.etaMuted}>内匹配成功</Text>
-          </View>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="立即发布，匹配陪玩"
@@ -827,44 +791,6 @@ const styles = StyleSheet.create({
     gap: 8,
     alignItems: "center",
   },
-  chip: {
-    minHeight: 40,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 4,
-    backgroundColor: "#F5F6F7",
-    borderWidth: 0.5,
-    borderColor: "transparent",
-    flexShrink: 0,
-  },
-  chipSelected: {
-    backgroundColor: "#FFF5F7",
-    borderColor: "#FE4267",
-  },
-  chipLabel: {
-    fontFamily: DOUYIN_SANS,
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: "400",
-    color: "#0D0D0F",
-    flexShrink: 0,
-  },
-  chipLabelSelected: {
-    fontWeight: "500",
-    color: "#FE1F4C",
-  },
-  gameChip: {
-    minWidth: 116,
-  },
-  gameIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 4,
-  },
   clubName: {
     flex: 1,
     fontFamily: DOUYIN_SANS,
@@ -964,25 +890,6 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingHorizontal: 16,
     gap: 8,
-  },
-  etaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-  },
-  etaMuted: {
-    fontFamily: DOUYIN_SANS,
-    fontSize: 12,
-    lineHeight: 18,
-    color: "#7F7F80",
-  },
-  etaAccent: {
-    fontFamily: DOUYIN_SANS,
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: "500",
-    color: "#FE4267",
   },
   publishWrap: {
     width: "100%",
