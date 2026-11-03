@@ -1,5 +1,6 @@
 import { useAuthStore } from "@esports/auth";
 import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
+import { Image } from "expo-image";
 import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -19,7 +20,6 @@ import {
   type MatchGame,
 } from "@/features/match/api/match.types";
 import { MatchCelebrationOverlay } from "@/features/match/components/MatchCelebrationOverlay";
-import { MatchLinearGradient } from "@/features/match/components/MatchLinearGradient";
 import { MatchPaySheet } from "@/features/match/components/MatchPaySheet";
 import { MatchingGrabListView } from "@/features/match/components/MatchingGrabListView";
 import { MatchingWaitingView } from "@/features/match/components/MatchingWaitingView";
@@ -28,7 +28,7 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { showToast } from "@/shared/ui/app-toast";
 
-const BG_GRADIENT = ["#0C0C2E", "#120D2B"] as const;
+const bgPublishDark = require("../../../../assets/images/bg_publish_dark.webp");
 
 type MatchMatchingScreenProps = {
   requestNo: string;
@@ -142,11 +142,11 @@ export default function MatchMatchingScreen({
     <View style={styles.root}>
       <StatusBar style="light" />
       <Stack.Screen options={{ headerShown: false }} />
-      <MatchLinearGradient
-        colors={BG_GRADIENT}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
+      <Image
+        source={bgPublishDark}
         style={styles.background}
+        contentFit="fill"
+        pointerEvents="none"
       />
 
       <View style={[styles.nav, { paddingTop: insets.top }]}>
