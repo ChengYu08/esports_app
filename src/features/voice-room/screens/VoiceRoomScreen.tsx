@@ -24,9 +24,12 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Keyboard,
   Linking,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -71,17 +74,33 @@ import { voiceRoomApi } from "../voice-room.api";
 import type {
   VoiceRoomDetail,
   VoiceRoomMember,
+  VoiceRoomMemberRole,
   VoiceRoomMessage,
 } from "../voice-room.types";
 
 /** 呼叫接待超时（秒），对齐 PC CS_CALL_TIMEOUT_SECONDS */
 const CS_CALL_TIMEOUT_SECONDS = 60;
 
+/** 麦位槽位高度（含昵称），对齐 Figma Component 7 */
+const MEMBER_SLOT_HEIGHT = 103;
+const MEMBER_ROW_GAP = 12;
+const GRID_PADDING_TOP = 24;
+const GRID_PADDING_BOTTOM = 12;
+const SEAT_MAX_ROWS = 3;
+/** 麦位区最大高度：最多 3 行，超出后区域内滚动 */
+const SEAT_AREA_MAX_HEIGHT =
+  GRID_PADDING_TOP +
+  GRID_PADDING_BOTTOM +
+  MEMBER_SLOT_HEIGHT * SEAT_MAX_ROWS +
+  MEMBER_ROW_GAP * (SEAT_MAX_ROWS - 1);
+
+const MESSAGE_NEAR_BOTTOM_THRESHOLD = 80;
+
 const closeIcon = require("../../../../assets/voice-room/navbar-exit.svg");
 const inviteIcon = require("../../../../assets/voice-room/toolbar-invite.svg");
+const invitePlaceholderIcon = require("../../../../assets/voice-room/game.svg");
 const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
 const ringOwner = require("../../../../assets/voice-room/ring-owner.svg");
-const ringInvite = require("../../../../assets/voice-room/ring-invite.svg");
 
 const inviteMember: VoiceRoomMember = {
   userId: "invite",
@@ -143,16 +162,55 @@ function normalizeMembers(
   return [...normalizedMembers.slice(0, 7), inviteMember];
 }
 
-function displayMessage(message: VoiceRoomMessage) {
-  if (message.kind === "notice")
+function MessageRoleTag({ role }: { role?: VoiceRoomMemberRole }) {
+  if (role === "service") {
+    return (
+      <View style={[styles.msgRoleTag, styles.msgRoleTagService]}>
+        <Text style={styles.msgRoleTagText}>接待</Text>
+      </View>
+    );
+  }
+  if (role === "player") {
+    return (
+      <View style={[styles.msgRoleTag, styles.msgRoleTagPlayer]}>
+        <Text style={styles.msgRoleTagText}>陪玩</Text>
+      </View>
+    );
+  }
+  return null;
+}
+
+function displayMessage(
+  message: VoiceRoomMessage,
+  memberRole?: VoiceRoomMemberRole,
+) {
+  if (message.kind === "notice") {
     return (
       <View style={styles.noticeBubble}>
         <Text style={styles.noticeText}>{message.text}</Text>
       </View>
     );
+  }
+  if (message.kind === "system") {
+    return (
+      <View style={styles.systemBubble}>
+        {message.nickname ? (
+          <Text style={styles.systemName}>{message.nickname}</Text>
+        ) : null}
+        <Text style={styles.systemText}>{message.text}</Text>
+      </View>
+    );
+  }
+  const name = message.nickname || "用户";
   return (
-    <View style={styles.messageRow}>
-      <Text style={styles.messageName}>{message.nickname || "用户"}</Text>
+    <View style={styles.chatBubble}>
+      <View style={styles.chatInline}>
+        <MessageRoleTag role={memberRole} />
+        <Text style={styles.chatName}>{`${name}：`}</Text>
+        {message.imageUrl ? null : (
+          <Text style={styles.chatBody}>{message.text}</Text>
+        )}
+      </View>
       {message.imageUrl ? (
         <Pressable
           accessibilityRole="imagebutton"
@@ -171,16 +229,12 @@ function displayMessage(message: VoiceRoomMessage) {
             transition={120}
           />
         </Pressable>
-      ) : (
-        <Text style={styles.messageBody}>{message.text}</Text>
-      )}
+      ) : null}
     </View>
   );
 }
 
 const messageKeyExtractor = (item: VoiceRoomMessage) => item.id;
-const renderMessageItem = ({ item }: { item: VoiceRoomMessage }) =>
-  displayMessage(item);
 
 // 成员槽位独立 memo 组件：消息到达/输入框打字等父组件重渲染时麦位不参与重渲，
 // 仅 speaking/micOpen 变化的槽位更新。
@@ -190,6 +244,7 @@ const MemberSlot = memo(function MemberSlot({
   ring,
   micOpen,
   speaking,
+  inviteLabel,
   onPress,
 }: {
   member: VoiceRoomMember;
@@ -197,15 +252,17 @@ const MemberSlot = memo(function MemberSlot({
   ring?: number;
   micOpen: boolean;
   speaking: boolean;
+  inviteLabel: string;
   onPress: (member: VoiceRoomMember) => void;
 }) {
   const invite = member.userId === "invite";
+  const isService = member.role === "service";
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={
         invite
-          ? "邀请用户"
+          ? inviteLabel
           : `查看${member.nickname}的资料，${micOpen ? "已开麦" : "已闭麦"}${speaking ? "，正在说话" : ""}`
       }
       style={[styles.memberSlot, { width: `${100 / columns}%` }]}
@@ -215,7 +272,14 @@ const MemberSlot = memo(function MemberSlot({
         {!invite ? <VoiceRoomSpeakingHalo active={speaking} /> : null}
         {ring ? <Image source={ring} style={styles.ring} /> : null}
         {invite ? (
-          <Image source={ringInvite} style={styles.inviteRing} />
+          <View style={styles.inviteAvatar}>
+            <Image
+              source={
+                inviteLabel === "接待邀请中" ? inviteIcon : invitePlaceholderIcon
+              }
+              style={styles.invitePlaceholderIcon}
+            />
+          </View>
         ) : (
           <Image source={avatarSource(member)} style={styles.avatar} />
         )}
@@ -223,17 +287,18 @@ const MemberSlot = memo(function MemberSlot({
         {!invite ? (
           <VoiceRoomMicBadge muted={!micOpen} speaking={speaking} />
         ) : null}
-        {invite ? <Image source={inviteIcon} style={styles.inviteBadge} /> : null}
+        {isService ? (
+          <View style={styles.serviceBadge}>
+            <Text style={styles.serviceBadgeText}>接待</Text>
+          </View>
+        ) : null}
       </View>
       <Text
         numberOfLines={1}
         style={[styles.memberName, invite && styles.inviteName]}
       >
-        {invite ? "邀请用户" : member.nickname}
+        {invite ? inviteLabel : member.nickname}
       </Text>
-      {member.role === "owner" ? (
-        <Text style={styles.roleLabel}>房主</Text>
-      ) : null}
     </Pressable>
   );
 });
@@ -274,10 +339,12 @@ export default function VoiceRoomScreen() {
     {
       id: "welcome",
       kind: "notice",
-      text: "系统：官方倡导绿色互动，请勿发布违法、低俗暴力、广告等内容，禁止违规私下交易，频道内容采取24小时人工巡查，如有任何违规信息，请及时举报，以防上当受骗！",
+      text: "欢迎来到盼之电竞，请文明交流，禁止发布辱骂、涉政、暴力、广告、色情低俗等内容，禁止违规私下交易，频道内容采取24小时人工巡查，如有任何违规信息，请及时举报，以防上当受骗！",
       sentAt: 1,
     },
   ]);
+  const messageListRef = useRef<FlatList<VoiceRoomMessage>>(null);
+  const nearBottomRef = useRef(true);
   const [input, setInput] = useState("");
   // 键盘可见性来自 keyboard-controller 原生事件，顶起由 KeyboardAvoidingView 处理
   const keyboardOpen = useKeyboardState((state) => state.isVisible);
@@ -342,6 +409,8 @@ export default function VoiceRoomScreen() {
   const chatroomId = room?.rongChatroomId;
   const roomTitle = room?.roomName || "语聊房";
   const memberColumns = members.length <= 2 ? 2 : members.length === 3 ? 3 : 4;
+  const seatRowCount = Math.ceil(members.length / memberColumns) || 1;
+  const seatNeedsScroll = seatRowCount > SEAT_MAX_ROWS;
   // 麦位点击回调：setState 均为稳定引用，供 MemberSlot memo 生效
   const handleSlotPress = useCallback((member: VoiceRoomMember) => {
     Keyboard.dismiss();
@@ -353,6 +422,39 @@ export default function VoiceRoomScreen() {
     setSelectedMember(member);
     setMemberSheetVisible(true);
   }, []);
+
+  const inviteSlotLabel = serviceCalling ? "接待邀请中" : "邀请用户";
+
+  const roleByUserId = useCallback(
+    (userId?: string): VoiceRoomMemberRole | undefined => {
+      if (!userId) return undefined;
+      return members.find((member) => member.userId === userId)?.role;
+    },
+    [members],
+  );
+
+  const renderMessageItem = useCallback(
+    ({ item }: { item: VoiceRoomMessage }) =>
+      displayMessage(item, roleByUserId(item.userId)),
+    [roleByUserId],
+  );
+
+  const handleMessageScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const { layoutMeasurement, contentOffset, contentSize } =
+        event.nativeEvent;
+      nearBottomRef.current =
+        contentOffset.y + layoutMeasurement.height >=
+        contentSize.height - MESSAGE_NEAR_BOTTOM_THRESHOLD;
+    },
+    [],
+  );
+
+  const handleMessageContentSizeChange = useCallback(() => {
+    if (!nearBottomRef.current) return;
+    messageListRef.current?.scrollToEnd({ animated: true });
+  }, []);
+
   const isOwner =
     Boolean(currentUser?.id) &&
     String(room?.creatorUserId ?? "") === String(currentUser?.id);
@@ -1306,6 +1408,7 @@ export default function VoiceRoomScreen() {
     setInput("");
     const local = {
       id: `local-${Date.now()}`,
+      userId: currentUser?.id ? String(currentUser.id) : undefined,
       nickname: currentUser?.nickname || "我",
       text,
       sentAt: Date.now(),
@@ -1429,6 +1532,35 @@ export default function VoiceRoomScreen() {
     }
   };
 
+  const seatSlots = members.map((member, index) => {
+    const invite = member.userId === "invite";
+    const ring = invite
+      ? undefined
+      : member.role === "owner"
+        ? ringOwner
+        : undefined;
+    const micOpen =
+      rtcReady &&
+      (member.userId === String(currentUser?.id)
+        ? !muted
+        : Boolean(member.micOpen));
+    // speaking 来自独立的 speakingUserIds（声网音量回调高频更新的原子 state），
+    // 能说话即代表已开麦，不再用可能滞后的 micOpen 二次短路
+    const speaking = rtcReady && speakingUserIds.includes(member.userId);
+    return (
+      <MemberSlot
+        key={`${member.userId}-${index}`}
+        member={member}
+        columns={memberColumns}
+        ring={ring}
+        micOpen={micOpen}
+        speaking={speaking}
+        inviteLabel={inviteSlotLabel}
+        onPress={handleSlotPress}
+      />
+    );
+  });
+
   return (
     <View style={styles.screen}>
       <StatusBar style="light" />
@@ -1474,36 +1606,18 @@ export default function VoiceRoomScreen() {
           <Text style={styles.roomId}>房间号 {roomId || '--'}</Text>
         </View> */}
 
-        <View style={styles.grid}>
-          {members.map((member, index) => {
-            const invite = member.userId === "invite";
-            const ring = invite
-              ? ringInvite
-              : member.role === "owner"
-                ? ringOwner
-                : undefined;
-            const micOpen =
-              rtcReady &&
-              (member.userId === String(currentUser?.id)
-                ? !muted
-                : Boolean(member.micOpen));
-            // speaking 来自独立的 speakingUserIds（声网音量回调高频更新的原子 state），
-            // 能说话即代表已开麦，不再用可能滞后的 micOpen 二次短路
-            const speaking =
-              rtcReady && speakingUserIds.includes(member.userId);
-            return (
-              <MemberSlot
-                key={`${member.userId}-${index}`}
-                member={member}
-                columns={memberColumns}
-                ring={ring}
-                micOpen={micOpen}
-                speaking={speaking}
-                onPress={handleSlotPress}
-              />
-            );
-          })}
-        </View>
+        {seatNeedsScroll ? (
+          <ScrollView
+            style={styles.seatScroll}
+            contentContainerStyle={styles.grid}
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled
+          >
+            {seatSlots}
+          </ScrollView>
+        ) : (
+          <View style={styles.grid}>{seatSlots}</View>
+        )}
 
         <View style={styles.chatPanel}>
           {loading ? (
@@ -1511,11 +1625,15 @@ export default function VoiceRoomScreen() {
           ) : null}
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           <FlatList
+            ref={messageListRef}
             data={messages}
             keyExtractor={messageKeyExtractor}
             renderItem={renderMessageItem}
             contentContainerStyle={styles.messageList}
             showsVerticalScrollIndicator={false}
+            onScroll={handleMessageScroll}
+            scrollEventThrottle={16}
+            onContentSizeChange={handleMessageContentSizeChange}
           />
         </View>
 
@@ -1621,22 +1739,26 @@ const styles = StyleSheet.create({
   roomMeta: { paddingHorizontal: 20, paddingTop: 2, paddingBottom: 12 },
   roomName: { color: "#F7F8FF", fontSize: 16, fontWeight: "700" },
   roomId: { color: "#9296B3", fontSize: 11, marginTop: 5 },
+  seatScroll: {
+    flexGrow: 0,
+    flexShrink: 0,
+    maxHeight: SEAT_AREA_MAX_HEIGHT,
+  },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
     paddingHorizontal: 16,
-    // flexBasis 代替固定 height，键盘顶起时可压缩且仍能看见麦位
-    flexBasis: 381,
-    flexGrow: 0,
-    flexShrink: 1,
-    minHeight: 103,
-    alignItems: "center",
-    alignContent: "center",
-    justifyContent: "center",
-    rowGap: 12,
-    overflow: "hidden",
+    paddingTop: GRID_PADDING_TOP,
+    paddingBottom: GRID_PADDING_BOTTOM,
+    alignItems: "flex-start",
+    alignContent: "flex-start",
+    rowGap: MEMBER_ROW_GAP,
   },
-  memberSlot: { alignItems: "center", minHeight: 103, overflow: "visible" },
+  memberSlot: {
+    alignItems: "center",
+    minHeight: MEMBER_SLOT_HEIGHT,
+    overflow: "visible",
+  },
   avatarWrap: {
     width: 58,
     height: 58,
@@ -1646,23 +1768,46 @@ const styles = StyleSheet.create({
   },
   avatar: { width: 48, height: 48, borderRadius: 24 },
   ring: { position: "absolute", width: 58, height: 58 },
-  inviteRing: { position: "absolute", width: 58, height: 58 },
-  inviteBadge: { width: 22, height: 22 },
-  memberName: {
-    color: "#F0F1FF",
-    fontSize: 11,
-    maxWidth: 76,
-    marginTop: 7,
-    textAlign: "center",
+  inviteAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  inviteName: { color: "#A9B2E9" },
-  roleLabel: { color: "#D3A2FF", fontSize: 9, marginTop: 2 },
+  invitePlaceholderIcon: { width: 24, height: 24 },
+  serviceBadge: {
+    position: "absolute",
+    left: -2,
+    bottom: -2,
+    backgroundColor: "#B81636",
+    borderRadius: 52,
+    paddingHorizontal: 3,
+    paddingVertical: 1,
+  },
+  serviceBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 8,
+    fontWeight: "600",
+    lineHeight: 12,
+  },
+  memberName: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    lineHeight: 16,
+    maxWidth: 76,
+    marginTop: 16,
+    textAlign: "center",
+    textShadowColor: "rgba(0,0,0,0.15)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
+  },
+  inviteName: { color: "#979799", textShadowColor: "transparent" },
   chatPanel: {
     flex: 1,
-    marginTop: 8,
+    marginTop: 0,
     marginHorizontal: 16,
-    // 键盘顶起后剩余高度紧张，flex 收缩会把消息列表压成 0（内容被"挤没"），
-    // 保住最小高度让消息仍可见，压缩量改由麦位区（有 minHeight 兜底）承担
     minHeight: 96,
   },
   loading: { marginTop: 12 },
@@ -1674,9 +1819,9 @@ const styles = StyleSheet.create({
   },
   messageList: {
     flexGrow: 1,
-    justifyContent: "flex-end",
-    paddingTop: 12,
+    paddingTop: 0,
     paddingBottom: 10,
+    gap: 8,
   },
   noticeBubble: {
     alignSelf: "stretch",
@@ -1684,7 +1829,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    marginBottom: 8,
   },
   noticeText: {
     color: "#55C9D4",
@@ -1692,8 +1836,75 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     lineHeight: 18,
   },
-  messageRow: { flexDirection: "row", marginBottom: 8, paddingRight: 12 },
-  messageName: { color: "#B892FF", fontSize: 12, marginRight: 6 },
-  messageBody: { color: "#E9EAF5", fontSize: 12, flex: 1, lineHeight: 18 },
-  messageImage: { width: 132, height: 132, borderRadius: 8, marginTop: 4 },
+  systemBubble: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  systemName: {
+    color: "#55C9D4",
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 18,
+  },
+  systemText: {
+    color: "#979799",
+    fontSize: 12,
+    fontWeight: "400",
+    lineHeight: 18,
+  },
+  chatBubble: {
+    alignSelf: "flex-start",
+    maxWidth: "100%",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  chatInline: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 4,
+  },
+  chatName: {
+    color: "#55C9D4",
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 18,
+  },
+  chatBody: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "400",
+    lineHeight: 18,
+    flexShrink: 1,
+  },
+  msgRoleTag: {
+    borderRadius: 52,
+    paddingHorizontal: 3,
+    paddingVertical: 1,
+  },
+  msgRoleTagService: { backgroundColor: "#B81636" },
+  msgRoleTagPlayer: { backgroundColor: "#1540AD" },
+  msgRoleTagText: {
+    color: "#FFFFFF",
+    fontSize: 8,
+    fontWeight: "600",
+    lineHeight: 12,
+  },
+  messageImage: {
+    width: 80,
+    height: 73,
+    borderRadius: 8,
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: "#49494A",
+  },
 });
