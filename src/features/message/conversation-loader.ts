@@ -17,6 +17,8 @@ const REMOTE_SYNC_SOFT_SUCCESS_CODES = new Set([
 ]);
 
 const pendingSyncs = new WeakMap<ConversationEngine, Promise<void>>();
+/** 已成功同步过服务端目录的引擎：同一连接内不重复触发，换账号/清库后本地为空会重新同步。 */
+const syncedEngines = new WeakSet<ConversationEngine>();
 
 function syncError(code: number) {
   return new Error(`消息同步失败（${code}）`);
@@ -89,12 +91,22 @@ export async function loadConversationSnapshot(
   conversationType: RCIMIWConversationType,
 ): Promise<RCIMIWConversation[]> {
   const conversations = await readLocalConversations(engine, conversationType);
-  if (conversations.length > 0) return conversations;
-
-  // Reinstalling or signing in on a new device leaves the SDK's local DB empty.
-  // Restore the server snapshot before declaring that the user has no messages.
-  // When active pull is disallowed (33301/33302), skip failing and re-read local;
-  // offline sync completion will refresh the list via subscribeConversationSync.
-  await synchronizeRemoteConversations(engine);
+  // 离线补偿只覆盖窗口内（默认 1 天）的会话，重装后"前几天发过消息的人"只存在于
+  // 服务端目录里——本地非空也必须同步一次目录，否则列表只剩最近联系人。
+  if (conversations.length === 0 || !syncedEngines.has(engine)) {
+    try {
+      await synchronizeRemoteConversations(engine);
+      syncedEngines.add(engine);
+    } catch (error) {
+      // 目录同步失败但本地有数据时降级为本地列表，不能让列表整体挂掉
+      if (conversations.length > 0) {
+        logger.warn('RongCloud remote conversation sync failed, falling back to local conversations', {
+          reason: error instanceof Error ? error.message : String(error),
+        });
+        return conversations;
+      }
+      throw error;
+    }
+  }
   return readLocalConversations(engine, conversationType);
 }

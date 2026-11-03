@@ -14,6 +14,7 @@ import {
 } from "@/features/match/api/match.api";
 import {
   isQuickMatchActive,
+  pruneSelectedIds,
   type QuickMatchGrabItem,
   type QuickMatchRequestDetail,
 } from "@/features/match/api/match.types";
@@ -190,6 +191,12 @@ export function useQuickMatchSession(
   /** 建单后支付中：迟到的超时/结束信令不得清会话 */
   const [orderPending, setOrderPending] = useState(false);
 
+  /** 支付确认中冻结选择：轮询剔除与手动改选均不生效 */
+  const selectionLockedRef = useRef(false);
+  const setSelectionLocked = useCallback((locked: boolean) => {
+    selectionLockedRef.current = locked;
+  }, []);
+
   const expireAtRef = useRef(0);
   const generationRef = useRef(0);
   const pollBusyRef = useRef(false);
@@ -270,6 +277,7 @@ export function useQuickMatchSession(
     setNewCandidateIds(new Set());
     setDetail(null);
     setOrderPending(false);
+    selectionLockedRef.current = false;
     prevGrabIdsRef.current = new Set();
     if (clearNewMarkTimerRef.current) {
       clearTimeout(clearNewMarkTimerRef.current);
@@ -321,7 +329,9 @@ export function useQuickMatchSession(
         return;
       }
       setCandidates(list);
-      setSelectedGrabIds((prev) => prev.filter((id) => list.some((item) => item.id === id)));
+      setSelectedGrabIds((prev) =>
+        selectionLockedRef.current ? prev : pruneSelectedIds(prev, list),
+      );
 
       // diff 出本次新出现的候选人，触发一次性金色描边
       const prevIds = prevGrabIdsRef.current;
@@ -416,6 +426,7 @@ export function useQuickMatchSession(
   }, [requestNo, token, userId]);
 
   const toggleGrab = useCallback((grabId: string) => {
+    if (selectionLockedRef.current) return;
     setSelectedGrabIds((prev) => {
       if (prev.includes(grabId)) {
         return prev.filter((id) => id !== grabId);
@@ -440,6 +451,7 @@ export function useQuickMatchSession(
     orderPending,
     setSubmitting,
     setOrderPending,
+    setSelectionLocked,
     cancelMatching,
     closeAuditionRoom,
     toggleGrab,

@@ -254,7 +254,7 @@ export function createProfileContract(requester: ProfileRequester) {
       return mapGameDetail(data);
     },
 
-    async fetchProfileReviews(params: { gameId: string; companionUserId: string; page?: number; pageSize?: number; signal?: AbortSignal }) {
+    async fetchProfileReviews(params: { companionUserId: string; page?: number; pageSize?: number; signal?: AbortSignal }) {
       const page = params.page ?? 1;
       const pageSize = params.pageSize ?? 20;
       const data = requireSuccess(
@@ -264,7 +264,7 @@ export function createProfileContract(requester: ProfileRequester) {
             page,
             pageSize,
             action: {
-              gameId: toId(params.gameId, "游戏ID"),
+              // 评价按陪玩师整体拉取，不做游戏分类过滤
               companionUserId: toId(params.companionUserId, "用户ID"),
             },
           },

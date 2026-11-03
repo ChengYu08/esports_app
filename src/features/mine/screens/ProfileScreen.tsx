@@ -194,9 +194,10 @@ export default function ProfileScreen() {
         }
       : null,
   );
+  // 评价按陪玩师整体拉取（全部游戏），不做游戏分类过滤
   const reviewQuery = useProfileReviews(
-    tab === "评价" && routeParams && activeGameId
-      ? { gameId: activeGameId, companionUserId: routeParams.userId }
+    tab === "评价" && routeParams
+      ? { companionUserId: routeParams.userId }
       : null,
   );
   const localProfile = useMemo(() => toLocalProfile(user), [user]);
@@ -413,21 +414,31 @@ export default function ProfileScreen() {
       },
     ];
 
-    if (games.length > 0) {
-      profileListItems.push({
-        key: "game-selector",
-        content: (
-          <View style={styles.scrollBody}>
-            <GameSelector
-              games={games}
-              selectedGameId={activeGameId}
-              onSelect={setSelectedGameId}
-            />
-          </View>
-        ),
-      });
+    // 游戏筛选栏仅服务技能 tab；评价 tab 拉取陪玩师全部评价，不按游戏分类
+    if (tab === "技能") {
+      if (games.length === 0) {
+        profileListItems.push({
+          key: "games-empty",
+          content: (
+            <View style={styles.scrollBody}>
+              <EmptyState message="暂无支持的游戏" />
+            </View>
+          ),
+        });
+      } else {
+        profileListItems.push({
+          key: "game-selector",
+          content: (
+            <View style={styles.scrollBody}>
+              <GameSelector
+                games={games}
+                selectedGameId={activeGameId}
+                onSelect={setSelectedGameId}
+              />
+            </View>
+          ),
+        });
 
-      if (tab === "技能") {
         if (gameDetailQuery.isLoading) {
           profileListItems.push({
             key: "skills-loading",
@@ -498,60 +509,51 @@ export default function ProfileScreen() {
             });
           }
         }
-      } else if (reviewQuery.isLoading) {
+      }
+    } else if (reviewQuery.isLoading) {
+      profileListItems.push({
+        key: "reviews-loading",
+        content: (
+          <View style={styles.scrollBody}>
+            <ProfileGameSkeleton reviews />
+          </View>
+        ),
+      });
+    } else if (reviewQuery.isError) {
+      profileListItems.push({
+        key: "reviews-error",
+        content: (
+          <View style={styles.scrollBody}>
+            <InlineState
+              text="评价加载失败"
+              actionLabel="重试"
+              onAction={() => void reviewQuery.refetch()}
+            />
+          </View>
+        ),
+      });
+    } else {
+      const reviews = reviewQuery.data?.items ?? [];
+      if (reviews.length === 0) {
         profileListItems.push({
-          key: "reviews-loading",
+          key: "reviews-empty",
           content: (
             <View style={styles.scrollBody}>
-              <ProfileGameSkeleton reviews />
-            </View>
-          ),
-        });
-      } else if (reviewQuery.isError) {
-        profileListItems.push({
-          key: "reviews-error",
-          content: (
-            <View style={styles.scrollBody}>
-              <InlineState
-                text="评价加载失败"
-                actionLabel="重试"
-                onAction={() => void reviewQuery.refetch()}
+              <EmptyState
+                message="暂无评价"
+                hint="完成订单后会显示评价内容"
               />
             </View>
           ),
         });
       } else {
-        const reviews = reviewQuery.data?.items ?? [];
-        if (reviews.length === 0) {
-          profileListItems.push({
-            key: "reviews-empty",
-            content: (
-              <View style={styles.scrollBody}>
-                <EmptyState
-                  message="暂无评价"
-                  hint="完成订单后会显示评价内容"
-                />
-              </View>
-            ),
-          });
-        } else {
-          profileListItems.push(
-            ...reviews.map((review, index) => ({
-              key: `review-${review.id}-${index}`,
-              content: <ReviewCard review={review} />,
-            })),
-          );
-        }
+        profileListItems.push(
+          ...reviews.map((review, index) => ({
+            key: `review-${review.id}-${index}`,
+            content: <ReviewCard review={review} />,
+          })),
+        );
       }
-    } else {
-      profileListItems.push({
-        key: "games-empty",
-        content: (
-          <View style={styles.scrollBody}>
-            <EmptyState message="暂无支持的游戏" />
-          </View>
-        ),
-      });
     }
 
     return profileListItems;
@@ -962,9 +964,6 @@ const ProfileTabs = memo(function ProfileTabs({
           onPress={() => onSelect(item)}
           style={styles.tabButton}
         >
-          {tab === item && (
-            <Image source={fallbackAvatar} style={styles.tabAvatar} />
-          )}
           <Text style={[styles.tabText, tab === item && styles.tabTextActive]}>
             {item}
           </Text>
@@ -1912,11 +1911,6 @@ const styles = StyleSheet.create({
     gap: 4,
     minWidth: 36,
     position: "relative",
-  },
-  tabAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
   },
   tabText: {
     color: "#999",

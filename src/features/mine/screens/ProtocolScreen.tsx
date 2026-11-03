@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { APP_LINKS } from "@/core/config/links";
-import { openExternalLink } from "@/shared/navigation/open-external-link";
+import { openInAppWebView } from "@/shared/navigation/open-web-view";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 const documents = {
@@ -58,7 +58,7 @@ export default function ProtocolScreen() {
         ))}
         <Pressable
           accessibilityRole="link"
-          onPress={() => void openExternalLink(document.url)}
+          onPress={() => openInAppWebView(document.url, document.title)}
           style={styles.linkButton}
         >
           <Text style={styles.linkText}>查看完整{document.title}</Text>
