@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { APP_LINKS } from "@/core/config/links";
 import { useAppUpgradeStore } from "@/features/app-upgrade/app-upgrade.store";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
-import { openExternalLink } from "@/shared/navigation/open-external-link";
+import { openInAppWebView } from "@/shared/navigation/open-web-view";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 const appIcon = require("../../../../assets/images/icon.png");
@@ -97,12 +97,12 @@ export default function AboutScreen() {
           <View style={styles.divider} />
           <AboutRow
             label="用户协议"
-            onPress={() => void openExternalLink(APP_LINKS.userAgreement)}
+            onPress={() => openInAppWebView(APP_LINKS.userAgreement, "用户协议")}
           />
           <View style={styles.divider} />
           <AboutRow
             label="隐私政策"
-            onPress={() => void openExternalLink(APP_LINKS.privacyPolicy)}
+            onPress={() => openInAppWebView(APP_LINKS.privacyPolicy, "隐私政策")}
           />
           <View style={styles.divider} />
         </View>

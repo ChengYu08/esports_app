@@ -22,6 +22,7 @@ import { AppUpgradeHost } from "@/features/app-upgrade/AppUpgradeHost";
 import { toAuthUser } from "@/features/auth/client-auth-flow";
 import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { useOnboardingStore } from "@/features/auth/onboarding-store";
+import { isProfileIncomplete } from "@/features/auth/profile-onboarding";
 import {
   clearAuthSession,
   readAuthSession,
@@ -235,7 +236,8 @@ export default function RootLayout() {
     };
   }, [clearSession, setSession]);
 
-  // 已登录用户启动 app 时，检查是否需要显示资料完善页
+  // 已登录用户启动 app 时，检查是否需要显示资料完善页：
+  // 本地无完成/跳过记录时按服务端资料推断，避免重装后老用户重复弹窗
   useEffect(() => {
     if (
       !onboardingHydrated ||
@@ -246,7 +248,11 @@ export default function RootLayout() {
       return;
 
     const user = useAuthStore.getState().user;
-    if (user?.id && shouldShowOnboarding(user.id)) {
+    if (
+      user?.id &&
+      shouldShowOnboarding(user.id) &&
+      isProfileIncomplete(user)
+    ) {
       onboardingChecked.current = true;
       router.replace("/onboarding");
     }
@@ -300,7 +306,7 @@ export default function RootLayout() {
                     <Stack.Screen name="account-settings" />
                     <Stack.Screen name="about" />
                   </Stack>
-                  {/* 青少年模式启动门：enabled 时整屏锁定，未开启按每日规则弹促销窗 */}
+                  {/* 青少年模式启动门：开启且在 22:00-06:00 生效时段内整屏锁定，未开启按每日规则弹促销窗 */}
                   <TeenModeGate />
                 </PushyUpdateHost>
               ) : (

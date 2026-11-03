@@ -55,6 +55,9 @@ import {
   normalizeSystemConversationId,
 } from "../system-conversations";
 
+// 聊天单次发送图片数量上限（相册多选防刷屏）
+const CHAT_IMAGE_MAX = 10;
+
 const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
 const defaultMyAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const chatMore = require("../../../../assets/message/chat-more.svg");
@@ -102,15 +105,23 @@ function buildChatListRows(messages: ManagedMessage[]): ChatListRow[] {
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
-  const { id, title, avatar, clubId, afterSale, customerService } =
-    useLocalSearchParams<{
-      id?: string;
-      title?: string;
-      avatar?: string;
-      clubId?: string;
-      afterSale?: string;
-      customerService?: string;
-    }>();
+  const {
+    id,
+    title,
+    avatar,
+    clubId,
+    afterSale,
+    customerService,
+    fromProfile,
+  } = useLocalSearchParams<{
+    id?: string;
+    title?: string;
+    avatar?: string;
+    clubId?: string;
+    afterSale?: string;
+    customerService?: string;
+    fromProfile?: string;
+  }>();
   const accessToken = useAuthStore((state) => state.accessToken);
   const userId = useAuthStore((state) => state.user?.id);
   const myAvatarUrl = useAuthStore((state) => state.user?.headImage);
@@ -303,14 +314,22 @@ export default function ChatScreen() {
       clubId ||
       conversation?.clubId ||
       (afterSalePayload?.clubId ? String(afterSalePayload.clubId) : undefined);
-    router.push({
-      pathname: "/profile",
+    const profileHref = {
+      pathname: "/profile" as const,
       params: {
         ...(targetClubId ? { clubId: String(targetClubId) } : {}),
         userId: conversationId,
       },
-    });
-  }, [afterSalePayload, clubId, conversation?.clubId, conversationId]);
+    };
+    // expo-router fork 的 StackRouter 对深层 NAVIGATE 不做弹回去重（仅栈顶同名才合并），
+    // 会造成 主页→聊天→主页 无限套娃；从主页进的聊天，主页必然在栈中，
+    // 用 dismissTo（POP_TO）弹回栈内已有主页；其他入口栈里没有主页，仍用 push
+    if (fromProfile === "1") {
+      router.dismissTo(profileHref);
+      return;
+    }
+    router.push(profileHref);
+  }, [afterSalePayload, clubId, conversation, conversationId, fromProfile]);
   const renderChatRow = useCallback(
     ({ item }: { item: ChatListRow }) =>
       item.kind === "time" ? (
@@ -746,21 +765,32 @@ const ChatComposer = memo(function ChatComposer({
   const pickImage = async () => {
     if (imageSending) return;
     setEmojiPickerOpen(false);
-    // 相册选择页内部处理权限，选图结果经会话桥接回传
+    // 相册选择页内部处理权限，选图结果经会话桥接回传；上限 10 张防止刷屏
     const pickPending = beginMediaPick();
-    router.push({ pathname: "/media-picker", params: { max: "1" } });
-    const picked = (await pickPending)?.[0];
-    if (!picked) return;
+    router.push({
+      pathname: "/media-picker",
+      params: { max: String(CHAT_IMAGE_MAX) },
+    });
+    const picked = await pickPending;
+    if (!picked?.length) return;
 
     setImageSending(true);
+    let failed = 0;
     try {
-      // 沿用旧照片选择器的行为：统一重编码为 JPEG，规避 HEIC 原图与超大原图直接发送
-      const sendUri = await convertToJpeg(picked);
-      await onSendImage(sendUri);
-    } catch {
-      showToast("图片处理失败，请重试");
+      // 逐张发送保持顺序；沿用旧照片选择器的行为：统一重编码为 JPEG，规避 HEIC 原图与超大原图直接发送
+      for (const uri of picked) {
+        try {
+          const sendUri = await convertToJpeg(uri);
+          await onSendImage(sendUri);
+        } catch {
+          failed += 1;
+        }
+      }
     } finally {
       setImageSending(false);
+    }
+    if (failed > 0) {
+      showToast(`${failed}张图片发送失败，请重试`);
     }
   };
 
@@ -823,11 +853,15 @@ const ChatComposer = memo(function ChatComposer({
         </View>
       </View>
       <EmojiPicker
-        defaultHeight={340}
+        // 库内用的是 RN SafeAreaView（Android 不生效），需手动叠加底部安全区，避免emoji底行被导航条遮挡
+        defaultHeight={340 + bottomInset}
         enableRecentlyUsed
+        // 不需要分类标题栏（默认显示英文如 Smileys & Emotion）
+        hideHeader
         onClose={() => setEmojiPickerOpen(false)}
         onEmojiSelected={selectEmoji}
         open={emojiPickerOpen}
+        styles={{ container: { paddingBottom: bottomInset } }}
         theme={{
           backdrop: "rgba(0, 0, 0, 0.18)",
           knob: "#CCCCCC",

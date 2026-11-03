@@ -14,6 +14,7 @@ import {
 } from "@/features/auth/cancellation-cooling";
 import { useOnboardingStore } from "@/features/auth/onboarding-store";
 import { getPasswordLoginErrorMessage } from "@/features/auth/password-login-error";
+import { isProfileIncomplete } from "@/features/auth/profile-onboarding";
 import { openExternalLink } from "@/shared/navigation/open-external-link";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { createAuthSsoAdapter, LoginScreen, useAuthStore } from "@esports/auth";
@@ -40,14 +41,18 @@ import {
 } from "react-native";
 import { showToast } from "@/shared/ui/app-toast";
 
-// 新登录用户（register=true）或需要完善资料的老用户，跳转到资料完善页
+// 新登录用户（register=true）或资料未完善的用户，跳转到资料完善页。
+// 本地已有完成/跳过记录的尊重本地记录；新装 app 无本地记录时按服务端资料推断，
+// 避免已完善过资料的老用户重装后重复弹窗。
 const resolvePostLoginRoute = (
   userId: string,
   isNewUser: boolean,
+  profile: { nickname?: string; gender?: number; isRealName?: number },
   shouldShowOnboarding: (userId: string) => boolean,
 ) => {
-  if (isNewUser || shouldShowOnboarding(userId)) return "/onboarding";
-  return "/";
+  if (!isNewUser && !shouldShowOnboarding(userId)) return "/";
+  if (!isProfileIncomplete(profile)) return "/";
+  return "/onboarding";
 };
 
 export default function LoginRoute() {
@@ -168,6 +173,7 @@ export default function LoginRoute() {
         resolvePostLoginRoute(
           String(profile.id),
           login.register,
+          profile,
           shouldShowOnboarding,
         ),
       );
@@ -291,7 +297,7 @@ export default function LoginRoute() {
               setCompanionStatus,
               payload.username,
             );
-            router.replace(resolvePostLoginRoute(String(profile.id), login.register, shouldShowOnboarding));
+            router.replace(resolvePostLoginRoute(String(profile.id), login.register, profile, shouldShowOnboarding));
           } catch (error) {
             setPasswordLoginError(getPasswordLoginErrorMessage(error));
           }
@@ -328,7 +334,7 @@ export default function LoginRoute() {
               setCompanionStatus,
               payload.phone,
             );
-            router.replace(resolvePostLoginRoute(String(profile.id), login.register, shouldShowOnboarding));
+            router.replace(resolvePostLoginRoute(String(profile.id), login.register, profile, shouldShowOnboarding));
           } catch (error) {
             showToast(
               `登录失败，${error instanceof Error ? error.message : "请检查手机号和验证码"}`,

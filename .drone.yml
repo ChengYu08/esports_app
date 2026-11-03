@@ -296,10 +296,12 @@ trigger:
     include:
       - push
       - custom
+  # 只在 test 分支构建并上传测试包；功能分支 push 不触发（避免产物传到
+  # .../esportsapp/<分支名>/ 目录、浪费一次全量构建）。功能分支需要装机验证时
+  # 本地跑 npm run build:apk:test，MR 合入 test 后自动出测试包。
   branch:
-    exclude:
-      - prod
-      - "*prod*"
+    include:
+      - test
 
 ---
 # =============================================================================

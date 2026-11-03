@@ -153,8 +153,9 @@ export async function fetchClubGameModes(gameId: string, signal?: AbortSignal): 
 
 export async function fetchPriceList(groupId: string, signal?: AbortSignal): Promise<PriceListTab[]> {
   const response = await apiClient<ApiResponse<ApiPriceConfig>>(`/client/v1/clubPageConfig/public/detail?groupId=${encodeURIComponent(groupId)}`, { signal });
-  const data = requireSuccess(response, "价目表加载失败");
-  return (data.tabs ?? [])
+  // 页面配置被删除/停用时接口返回 FAILED「页面不存在或未开放」，按空价目表降级（与 PC 端一致），不当成加载失败
+  if (response.code !== "SUCCESS" || !response.data) return [];
+  return (response.data.tabs ?? [])
     .filter((tab) => Boolean(tab.imageUrl))
     .sort((a, b) => (a.sortNo ?? 0) - (b.sortNo ?? 0))
     .map((tab, index) => ({ menuTitle: tab.menuTitle || `分类${index + 1}`, imageUrl: tab.imageUrl as string, sortNo: tab.sortNo ?? index }));

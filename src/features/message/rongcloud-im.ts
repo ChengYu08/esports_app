@@ -753,10 +753,16 @@ export async function sendRongAfterSaleCard(targetId: string, payload: AfterSale
 
 export async function markRongConversationRead(targetId: string) {
   const sdk = loadSdk();
-  if (!engine || !connected || !sdk || !targetId) return false;
+  if (!engine || !connected || !sdk || !targetId) {
+    logger.warn('RongCloud mark read skipped (engine not connected)', { targetId });
+    return false;
+  }
   const rongTargetId = getRongConversationTargetId(targetId);
   const code = await engine.clearUnreadCount(sdk.RCIMIWConversationType.PRIVATE, rongTargetId, '', Date.now());
-  if (code !== 0) throw new Error(`清除未读失败（${code}）`);
+  if (code !== 0) {
+    logger.warn('RongCloud clear unread count failed', { code, targetId });
+    throw new Error(`清除未读失败（${code}）`);
+  }
   // 上报服务端"已读至当前时间"，其他设备收到同步后清各自的未读数
   const syncCode = await engine.syncConversationReadStatus(sdk.RCIMIWConversationType.PRIVATE, rongTargetId, '', Date.now(), {
     onConversationReadStatusSynced: (result) => {
@@ -767,7 +773,9 @@ export async function markRongConversationRead(targetId: string) {
   });
   if (syncCode !== 0) {
     logger.warn('RongCloud conversation read status sync failed', { code: syncCode, targetId });
+    return false;
   }
+  logger.info('RongCloud mark read reported to server', { targetId });
   return true;
 }
 
