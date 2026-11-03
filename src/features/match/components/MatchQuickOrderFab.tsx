@@ -281,7 +281,13 @@ export function MatchQuickOrderFab() {
                 end={RED_GRADIENT.end}
                 style={styles.pill}
               >
-                <Text style={styles.pillText}>快速下单</Text>
+                <Text
+                  allowFontScaling={false}
+                  numberOfLines={1}
+                  style={styles.pillText}
+                >
+                  快速下单
+                </Text>
               </LinearGradient>
             </View>
           </Animated.View>
@@ -347,8 +353,8 @@ const styles = StyleSheet.create({
   },
   pillWrap: {
     position: "absolute",
-    left: 0,
-    right: 0,
+    left: -8,
+    right: -8,
     bottom: 0,
     alignItems: "center",
   },
@@ -359,6 +365,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     minHeight: 20,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -366,8 +373,9 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontFamily: DOUYIN_SANS,
     fontSize: 12,
-    lineHeight: 12,
+    lineHeight: 14,
     fontWeight: "700",
+    includeFontPadding: false,
     textShadowColor: "rgba(146, 17, 19, 0.15)",
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
