@@ -148,20 +148,21 @@ export function DispatchDetailScreen({ requestNo }: { requestNo: string }) {
 }
 
 function getStatusLabel(status: string, grabStatus?: GrabStatus, hasGrabbed = false) {
+  // 落选（FAILED）只会与 ORDERED 共存，必须先于 ORDERED 判断，否则落选者永远看到"派单成功"
+  if (grabStatus === "FAILED") return "抢单失败";
   if (status === "CANCELLED") return "老板已取消";
   if (status === "EXPIRED") return "派单已过期";
   if (status === "ORDERED") return "派单成功";
   if (grabStatus === "SUCCESS") return "抢单成功";
-  if (grabStatus === "FAILED") return "抢单失败";
-  return hasGrabbed ? "已被抢单" : "未被抢单";
+  return hasGrabbed ? "已抢单" : "未抢单";
 }
 
 function getStateDescription(status: string, grabStatus?: GrabStatus, hasGrabbed = false) {
   if (status === "CANCELLED") return "老板已取消本次需求";
   if (status === "EXPIRED") return "本次派单已超过有效时间";
-  if (status === "ORDERED") return grabStatus === "FAILED" ? "老板已选择其他陪玩师" : "老板已完成下单";
+  if (status === "ORDERED") return grabStatus === "FAILED" ? "老板已选择其他陪玩下单" : "老板已完成下单";
   if (grabStatus === "SUCCESS") return "抢单成功，等待订单开始";
-  if (grabStatus === "FAILED") return "老板已选择其他陪玩师";
+  if (grabStatus === "FAILED") return "老板已选择其他陪玩下单";
   return hasGrabbed ? "已提交抢单，等待老板选择陪玩师" : "该需求当前尚未被抢单";
 }
 

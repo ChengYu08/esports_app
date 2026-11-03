@@ -195,6 +195,8 @@ export function mapOrder(
   return {
     id,
     orderNo: stringValue(item, "orderNo", "orderNumber") ?? id,
+    // 快速匹配单的派单号：支付抽屉取消分流（有 requestNo 只结束本次支付）依赖它
+    requestNo: stringValue(item, "quickMatchRequestNo") ?? undefined,
     status,
     statusLabel,
     buyerUserId: stringValue(item, "buyerUserId"),
