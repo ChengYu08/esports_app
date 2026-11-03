@@ -64,6 +64,7 @@ import {
   multiCompanionNeedSelect,
   needsMultiCompanionSelect,
 } from "../multi-companion";
+import { getPaymentDeadline } from "../payment-countdown";
 import type {
   OrderActionKey,
   OrderFilter,
@@ -145,7 +146,6 @@ export default function OrderScreen() {
     message: string;
     confirmText?: string;
   } | null>(null);
-  const cancelingPaymentRef = useRef(false);
   // 扁平化结果用 useMemo 固定引用，避免父组件重渲染时生成新数组触发整列表重渲染
   const items = useMemo(
     () => orders.data?.pages.flatMap((page) => page.items) ?? [],
@@ -166,10 +166,36 @@ export default function OrderScreen() {
         ? "暂无订单"
         : `暂无${visibleFilter === "inProgress" ? "进行中" : visibleFilter === "completed" ? "已完成" : "已取消"}订单`;
 
+  const handlePaymentExpired = useCallback(() => {
+    // 同时到期的订单复用进行中的列表请求，状态以服务端结果为准。
+    // 服务端延迟消息关单比客户端倒计时归零晚几秒，一次重拉可能抢在关单前，错峰补拉两轮。
+    const refetch = () =>
+      queryClient
+        .refetchQueries(
+          {
+            queryKey: ["orders", scope, visibleFilter, currentUserId],
+            exact: true,
+            type: "active",
+          },
+          { cancelRefetch: false },
+        )
+        .catch(() => undefined);
+    refetch();
+    setTimeout(refetch, 4000);
+    setTimeout(refetch, 12000);
+  }, [scope, visibleFilter, currentUserId]);
+
   // 用 useCallback 固定回调引用，保证 OrderCard 的 memo 不被每次渲染的新闭包击穿
   const handleOrderAction = useCallback(
     async (item: OrderItemModel, action: OrderActionKey) => {
     if (action === "pay") {
+      const deadline = getPaymentDeadline(item);
+      if (deadline !== null && Date.now() >= deadline) {
+        // 已过支付截止时间：服务端自动关单有秒级延迟，刷新列表取已取消状态
+        showToast("订单支付已超时");
+        handlePaymentExpired();
+        return;
+      }
       setPayTarget(item);
       return;
     }
@@ -273,7 +299,7 @@ export default function OrderScreen() {
         },
       });
     },
-    [token, currentUser],
+    [token, currentUser, handlePaymentExpired],
   );
 
   /** 一单多陪选人确认：提交参与陪玩后立即开始服务，就地刷新该单卡片 */
@@ -401,14 +427,6 @@ export default function OrderScreen() {
     },
     [scope],
   );
-
-  const handlePaymentExpired = useCallback(() => {
-    // 同时到期的订单复用进行中的列表请求，状态以服务端结果为准。
-    queryClient.refetchQueries(
-      { queryKey: ["orders", scope, visibleFilter, currentUserId], exact: true, type: "active" },
-      { cancelRefetch: false },
-    ).catch(() => undefined);
-  }, [scope, visibleFilter, currentUserId]);
 
   // renderItem 稳定引用 + 空态收敛到 useMemo，避免无关重渲染波及列表
   const renderOrderItem = useCallback(
@@ -629,32 +647,11 @@ export default function OrderScreen() {
         onPaymentFailed={(message) => setPrompt({ title: "支付失败", message })}
         onClose={() => {
           const target = payTarget;
+          // 关闭支付弹窗只结束本次支付，取消订单由订单卡片的独立操作处理。
           setPayTarget(null);
-          if (!target || !token || cancelingPaymentRef.current) return;
-          // 快速匹配单取消支付只结束本次支付，订单保留待支付（对齐 Web：5分钟内未支付才自动取消）
-          if (target.requestNo) {
+          if (target?.requestNo && token) {
             showToast("请在订单创建后5分钟内完成支付");
-            return;
           }
-          cancelingPaymentRef.current = true;
-          void cancelOrderRequest(target.id, token)
-            .then(async () => {
-              if (currentUser?.id) {
-                // 普通单关闭支付即取消订单：取消后以详情为准就地刷新该单卡片。
-                await refreshOrderAfterAction(target.id, token, currentUser.id);
-              } else {
-                await invalidateOrderQueries(target.id);
-              }
-            })
-            .catch((error) =>
-              setPrompt({
-                title: "取消订单失败",
-                message: error instanceof Error ? error.message : "请稍后重试",
-              }),
-            )
-            .finally(() => {
-              cancelingPaymentRef.current = false;
-            });
         }}
         onPaid={() => {
           const paid = payTarget;
@@ -704,7 +701,7 @@ function StarPaymentPrompt({
 }: {
   item: OrderItemModel | null;
   token: string | null;
-  onClose: () => void | Promise<void>;
+  onClose: () => void;
   onPaid: () => void;
   onPaymentFailed: (message: string) => void;
 }) {
@@ -738,7 +735,7 @@ function StarPaymentPrompt({
       onPaymentFailed(errorMessage);
       if (!settledRef.current) {
         settledRef.current = true;
-        await onClose();
+        onClose();
       }
     } finally {
       setPaying(false);
@@ -750,7 +747,7 @@ function StarPaymentPrompt({
       <BottomSheet
         scrollable
         visible={Boolean(item)}
-        onClose={() => void onClose()}
+        onClose={onClose}
         contentStyle={[
           styles.paymentSheet,
           { paddingBottom: 24 + insets.bottom },
@@ -766,14 +763,14 @@ function StarPaymentPrompt({
         <View style={styles.paymentActions}>
           <Pressable
             style={styles.paymentCancel}
-            onPress={() => void onClose()}
+            onPress={onClose}
           >
             <Text>取消</Text>
           </Pressable>
           <Pressable
             style={styles.paymentConfirm}
             disabled={paying || balance === null}
-            onPress={() => void pay()}
+            onPress={pay}
           >
             <Text style={styles.paymentConfirmText}>
               {paying ? "支付中..." : "确认支付"}

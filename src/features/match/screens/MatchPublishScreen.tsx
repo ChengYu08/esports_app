@@ -46,8 +46,8 @@ import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 
 const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
+const bgPublishDark = require("../../../../assets/images/bg_publish_dark.webp");
 
-const BG_GRADIENT = ["#0C0C2E", "#120D2B"] as const;
 const PUBLISH_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
 const FOOTER_CONTENT_BOTTOM = 22;
 const REMARK_KEYBOARD_GAP = 12;
@@ -257,11 +257,11 @@ export default function MatchPublishScreen() {
     <View style={styles.root}>
       <StatusBar style="light" />
       <Stack.Screen options={{ headerShown: false }} />
-      <MatchLinearGradient
-        colors={BG_GRADIENT}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
+      <Image
+        source={bgPublishDark}
         style={styles.background}
+        contentFit="fill"
+        pointerEvents="none"
       />
       <KeyboardAvoidingView
         style={styles.content}
