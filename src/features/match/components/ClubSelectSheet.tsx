@@ -15,7 +15,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { MatchClub } from "@/features/match/api/match.types";
 import { HighlightedText } from "@/features/match/components/HighlightedText";
 import { MatchLinearGradient } from "@/features/match/components/MatchLinearGradient";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 
 const CONFIRM_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
@@ -73,7 +72,7 @@ export function ClubSelectSheet({
       backdropStyle={styles.backdrop}
       contentStyle={[styles.sheet, { maxHeight: height * 0.78 }]}
     >
-      <View style={[styles.body, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+      <View style={styles.body}>
         <View style={styles.header}>
           <Text style={styles.title}>选择俱乐部</Text>
           <Pressable
@@ -83,19 +82,17 @@ export function ClubSelectSheet({
             onPress={onClose}
             style={styles.closeButton}
           >
-            <View style={styles.closeIcon}>
-              <Dismiss16Regular color="rgba(0, 0, 0, 0.2)" width={20} height={20} />
-            </View>
+            <Dismiss16Regular color="rgba(0, 0, 0, 0.2)" width={20} height={20} />
           </Pressable>
         </View>
 
         <View style={styles.searchRow}>
           <View style={styles.searchBox}>
-            <Search24Regular color="#0A0A0A" width={20} height={20} style={styles.searchIcon} />
+            <Search24Regular color="#B3B3B3" width={20} height={20} />
             <TextInput
               value={keyword}
               onChangeText={setKeyword}
-              placeholder="搜索俱乐部名称或ID"
+              placeholder="搜索俱乐部名称"
               placeholderTextColor="#CCCCCC"
               style={styles.searchInput}
               returnKeyType="search"
@@ -169,21 +166,23 @@ export function ClubSelectSheet({
           }}
         />
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="确定"
-          onPress={handleConfirm}
-          style={({ pressed }) => [styles.confirmWrap, pressed && styles.pressed]}
-        >
-          <MatchLinearGradient
-            colors={CONFIRM_GRADIENT}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.confirm}
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="确定"
+            onPress={handleConfirm}
+            style={({ pressed }) => [styles.confirmWrap, pressed && styles.pressed]}
           >
-            <Text style={styles.confirmText}>确定</Text>
-          </MatchLinearGradient>
-        </Pressable>
+            <MatchLinearGradient
+              colors={CONFIRM_GRADIENT}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.confirm}
+            >
+              <Text style={styles.confirmText}>确定</Text>
+            </MatchLinearGradient>
+          </Pressable>
+        </View>
       </View>
     </BottomSheet>
   );
@@ -205,13 +204,13 @@ const styles = StyleSheet.create({
   },
   header: {
     height: 56,
+    minHeight: 56,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
   },
   title: {
     flex: 1,
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "500",
@@ -221,12 +220,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 12,
     top: 12,
-    width: 32,
-    height: 32,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  closeIcon: {
     width: 32,
     height: 32,
     alignItems: "center",
@@ -245,13 +238,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: "#F7F7F7",
   },
-  searchIcon: {
-    width: 20,
-    height: 20,
-  },
   searchInput: {
     flex: 1,
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     color: "#0D0D0F",
@@ -269,16 +257,16 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 4,
+    paddingBottom: 12,
     gap: 12,
   },
   row: {
     gap: 12,
   },
   card: {
-    minHeight: 91,
+    height: 91,
     alignItems: "center",
-    justifyContent: "center",
     gap: 8,
     padding: 12,
     borderRadius: 8,
@@ -294,6 +282,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 4,
+    overflow: "hidden",
   },
   coverPlaceholder: {
     alignItems: "center",
@@ -301,7 +290,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#E8E9EB",
   },
   coverInitial: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 18,
     lineHeight: 24,
     fontWeight: "600",
@@ -310,6 +298,7 @@ const styles = StyleSheet.create({
   cardName: {
     width: "100%",
     fontSize: 11,
+    lineHeight: 16,
     fontWeight: "500",
     color: "#0D0D0F",
     textAlign: "center",
@@ -319,13 +308,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   emptyText: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     color: "#999999",
   },
+  footer: {
+    paddingTop: 8,
+    paddingHorizontal: 16,
+  },
   confirmWrap: {
-    marginHorizontal: 16,
-    marginTop: 8,
+    width: "100%",
   },
   confirm: {
     height: 42,
@@ -334,7 +325,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   confirmText: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "500",
