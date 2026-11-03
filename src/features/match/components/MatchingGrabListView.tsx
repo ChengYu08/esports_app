@@ -192,6 +192,7 @@ export function MatchingGrabListView({
   const insets = useSafeAreaInsets();
   const selectedCount = selectedGrabIds.length;
   const confirmLabel = formatConfirmLabel(selectedCount, submitting);
+  const confirmDisabled = submitting || selectedCount === 0;
 
   return (
     <View style={styles.root}>
@@ -231,18 +232,22 @@ export function MatchingGrabListView({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={confirmLabel}
-          disabled={submitting}
+          accessibilityState={{ disabled: confirmDisabled }}
+          disabled={confirmDisabled}
           onPress={onConfirm}
           style={({ pressed }) => [
             styles.confirmWrap,
-            pressed && styles.pressed,
+            pressed && !confirmDisabled && styles.pressed,
           ]}
         >
           <MatchLinearGradient
             colors={PUBLISH_GRADIENT}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.confirmButton}
+            style={[
+              styles.confirmButton,
+              confirmDisabled && styles.confirmDisabled,
+            ]}
           >
             <Text style={styles.confirmText}>{confirmLabel}</Text>
           </MatchLinearGradient>
@@ -374,6 +379,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
+  },
+  confirmDisabled: {
+    opacity: 0.5,
   },
   confirmText: {
     fontFamily: DOUYIN_SANS,
