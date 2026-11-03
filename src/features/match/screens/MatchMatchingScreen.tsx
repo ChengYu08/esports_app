@@ -14,16 +14,19 @@ import {
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { selectAndCreateOrder } from "@/features/match/api/match.api";
+import { fetchQuickMatchPaymentPreview } from "@/features/match/api/match.api";
 import {
   isMultiCompanionRequest,
   type MatchGame,
+  type QuickMatchCreatedOrder,
+  type QuickMatchPaymentPreview,
 } from "@/features/match/api/match.types";
 import { MatchCelebrationOverlay } from "@/features/match/components/MatchCelebrationOverlay";
 import { MatchPaySheet } from "@/features/match/components/MatchPaySheet";
 import { MatchingGrabListView } from "@/features/match/components/MatchingGrabListView";
 import { MatchingWaitingView } from "@/features/match/components/MatchingWaitingView";
 import { useQuickMatchSession } from "@/features/match/hooks/use-quick-match-session";
+import { messageStore } from "@/features/message/message-store";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { showToast } from "@/shared/ui/app-toast";
@@ -45,8 +48,12 @@ export default function MatchMatchingScreen({
   const { width, height } = useWindowDimensions();
   const token = useAuthStore((state) => state.accessToken);
   const [payVisible, setPayVisible] = useState(false);
-  const [payTotal, setPayTotal] = useState(0);
-  const [paidOrderId, setPaidOrderId] = useState<string | null>(null);
+  /** 建单前支付明细预览（对齐 PC：先看明细，确认支付才建单） */
+  const [payPreview, setPayPreview] = useState<QuickMatchPaymentPreview | null>(null);
+  /** 预览时的选择快照，建单与订单匹配均按快照执行 */
+  const [selectionSnapshot, setSelectionSnapshot] = useState<string[]>([]);
+  /** 每次发起预览自增，作为支付弹窗的 key 强制重置内部状态 */
+  const [paySessionId, setPaySessionId] = useState(0);
   const [cancelPromptVisible, setCancelPromptVisible] = useState(false);
   /** 首位候选人出现的短暂庆祝动效 */
   const [celebrating, setCelebrating] = useState(false);
@@ -84,59 +91,84 @@ export default function MatchMatchingScreen({
   }, []);
 
   const handleSelectAndOrder = useCallback(async () => {
-    if (!token) return;
-    if (session.orderPending) {
-      setPayVisible(true);
+    if (!token) {
+      return;
+    }
+    if (session.submitting) {
       return;
     }
     if (!session.selectedGrabIds.length) {
       showToast("请先选择陪玩");
       return;
     }
-    if (session.submitting) return;
-    const firstGrabId = session.selectedGrabIds[0];
-    const firstCompanionUserId = session.candidates.find(
-      (item) => item.id === firstGrabId,
-    )?.companionUserId;
     session.setSubmitting(true);
     try {
-      const created = await selectAndCreateOrder(
+      const preview = await fetchQuickMatchPaymentPreview(
         requestNo,
-        session.selectedGrabIds,
+        [...session.selectedGrabIds],
         token,
       );
-      const matchedOrder = firstCompanionUserId
-        ? created.orders.find(
-            (order) => order.serviceUserId === firstCompanionUserId,
-          )
-        : undefined;
-      setPaidOrderId(matchedOrder?.orderId ?? null);
-      session.setOrderPending(true);
-      setPayTotal(created.totalPrice);
+      setSelectionSnapshot([...session.selectedGrabIds]);
+      setPayPreview(preview);
+      setPaySessionId((id) => id + 1);
+      session.setSelectionLocked(true);
       setPayVisible(true);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "创建订单失败");
+      showToast(error instanceof Error ? error.message : "支付明细预览获取失败");
     } finally {
       session.setSubmitting(false);
     }
   }, [requestNo, session, token]);
 
+  /** 支付弹窗关闭：未建单回匹配继续选人；已建单提示去订单中心补付 */
+  const handlePaySheetClose = useCallback(
+    (phase: "previewing" | "ordersCreated") => {
+      setPayVisible(false);
+      setPayPreview(null);
+      session.setSelectionLocked(false);
+      if (phase === "ordersCreated") {
+        showToast("订单已创建，请在5分钟内到订单中心支付");
+        leaveMatchFlow();
+      }
+    },
+    [leaveMatchFlow, session],
+  );
+
   // TODO(临时注释): 支付成功关闭试音房
   // const closeAuditionRoom = session.closeAuditionRoom;
-  const handlePaid = useCallback(() => {
-    setPayVisible(false);
-    showToast("支付成功");
-    // void (async () => {
-    //   await closeAuditionRoom();
-    //   leaveMatchFlow();
-    // })();
-    if (paidOrderId) {
-      // replace：用订单详情替换匹配页，返回键回到进入匹配前的页面
-      router.replace(`/order/${paidOrderId}?scope=place`);
-      return;
-    }
-    leaveMatchFlow();
-  }, [leaveMatchFlow, paidOrderId]);
+  const handlePaid = useCallback(
+    (orders: QuickMatchCreatedOrder[]) => {
+      setPayVisible(false);
+      setPayPreview(null);
+      session.setSelectionLocked(false);
+      showToast("支付成功");
+      const companionUserIds = orders
+        .map((order) => order.serviceUserId)
+        .filter((id): id is string => Boolean(id));
+      Promise.allSettled(
+        companionUserIds.map((uid) =>
+          messageStore
+            .getState()
+            .sendText(uid, "我已支付订单~")
+            .catch(() => {}),
+        ),
+      );
+      const firstGrabId = selectionSnapshot[0];
+      const firstCompanionUserId = firstGrabId
+        ? session.candidates.find((item) => item.id === firstGrabId)?.companionUserId
+        : undefined;
+      const matchedOrder = firstCompanionUserId
+        ? orders.find((order) => order.serviceUserId === firstCompanionUserId)
+        : undefined;
+      if (matchedOrder) {
+        // replace：用订单详情替换匹配页，返回键回到进入匹配前的页面
+        router.replace(`/order/${matchedOrder.orderId}?scope=place`);
+        return;
+      }
+      leaveMatchFlow();
+    },
+    [leaveMatchFlow, selectionSnapshot, session],
+  );
 
   return (
     <View style={styles.root}>
@@ -219,11 +251,18 @@ export default function MatchMatchingScreen({
       ) : null}
 
       <MatchPaySheet
+        key={paySessionId}
         visible={payVisible}
         requestNo={requestNo}
         token={token}
-        fallbackTotal={payTotal}
-        onClose={() => setPayVisible(false)}
+        preview={payPreview}
+        selectionSnapshot={selectionSnapshot}
+        selectionMatchesSnapshot={() =>
+          selectionSnapshot.length === session.selectedGrabIds.length &&
+          selectionSnapshot.every((id) => session.selectedGrabIds.includes(id))
+        }
+        onClose={handlePaySheetClose}
+        onOrdersCreated={() => session.setOrderPending(true)}
         onPaid={handlePaid}
       />
 
