@@ -44,6 +44,7 @@ import type {
 import {
   addToBlacklist,
   isUserBlacklisted,
+  removeFromBlacklist,
   subscribeBlacklist,
 } from "@/features/mine/blacklist";
 import { CompanionOrderSheet } from "@/features/mine/components/CompanionOrderSheet";
@@ -819,7 +820,25 @@ export default function ProfileScreen() {
               },
             })
           }
-          onBlockRequest={() => setBlacklistPromptVisible(true)}
+          onBlockRequest={() => {
+            const currentlyBlacklisted =
+              blacklistStatus.userId === String(profile.userId) &&
+              blacklistStatus.isBlacklisted;
+            if (currentlyBlacklisted) {
+              removeFromBlacklist(
+                String(profile.userId),
+                useAuthStore.getState().accessToken ?? "",
+              )
+                .then(() => {
+                  showToast("已取消拉黑");
+                })
+                .catch((error: unknown) => {
+                  showToast(error instanceof Error ? error.message : "操作失败");
+                });
+            } else {
+              setBlacklistPromptVisible(true);
+            }
+          }}
         />
       ) : null}
       <AppPrompt
