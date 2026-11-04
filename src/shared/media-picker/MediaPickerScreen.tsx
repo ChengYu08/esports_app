@@ -18,7 +18,6 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { showToast } from "@/shared/ui/app-toast";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import {
   completeMediaPick,
   isMediaPickActive,
@@ -218,14 +217,6 @@ export default function MediaPickerScreen() {
     if (completingRef.current) {
       return;
     }
-    if (cropEnabled) {
-      void openCrop(asset);
-      return;
-    }
-    if (maxCount === 1) {
-      void complete([asset]);
-      return;
-    }
     setSelectedIds((current) => {
       const next = new Set(current);
       if (next.has(asset.id)) {
@@ -241,7 +232,15 @@ export default function MediaPickerScreen() {
   };
 
   const confirmMultiSelect = () => {
+    if (completingRef.current || selectedIds.size === 0) {
+      return;
+    }
     const picked = assets.filter((asset) => selectedIds.has(asset.id));
+    // 头像流程：确认后带着唯一选中项进入裁剪页，裁剪结果由裁剪页回传
+    if (cropEnabled) {
+      void openCrop(picked[0]);
+      return;
+    }
     void complete(picked);
   };
 
@@ -284,6 +283,8 @@ export default function MediaPickerScreen() {
   }
 
   const selectedCount = selectedIds.size;
+  // 已选满上限后未选中项置灰不可选，避免继续误触
+  const limitReached = selectedCount >= maxCount;
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -308,24 +309,20 @@ export default function MediaPickerScreen() {
           </Text>
           <CaretDown16Regular color="#333333" width={16} height={16} />
         </Pressable>
-        {maxCount > 1 ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="确认选择"
-            disabled={selectedCount === 0}
-            onPress={confirmMultiSelect}
-            style={[
-              styles.confirmButton,
-              selectedCount === 0 && styles.confirmButtonDisabled,
-            ]}
-          >
-            <Text style={styles.confirmText}>
-              {selectedCount > 0 ? `完成(${selectedCount}/${maxCount})` : "完成"}
-            </Text>
-          </Pressable>
-        ) : (
-          <View style={styles.navPlaceholder} />
-        )}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="确认选择"
+          disabled={selectedCount === 0}
+          onPress={confirmMultiSelect}
+          style={[
+            styles.confirmButton,
+            selectedCount === 0 && styles.confirmButtonDisabled,
+          ]}
+        >
+          <Text style={styles.confirmText}>
+            {selectedCount > 0 ? `完成(${selectedCount}/${maxCount})` : "完成"}
+          </Text>
+        </Pressable>
       </View>
 
       {albumsOpen ? (
@@ -366,21 +363,23 @@ export default function MediaPickerScreen() {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => {
           const selected = selectedIds.has(item.id);
+          const disabled = !selected && limitReached;
           return (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="选择照片"
+              disabled={disabled}
               onPress={() => toggleSelect(item)}
               style={styles.gridItem}
             >
               <Image
                 source={{ uri: item.uri }}
-                style={styles.thumb}
+                style={[styles.thumb, disabled && styles.thumbDisabled]}
                 contentFit="cover"
                 transition={0}
                 recyclingKey={item.id}
               />
-              {maxCount > 1 && selected ? (
+              {selected ? (
                 <View style={styles.checkOverlay}>
                   <Checkmark24Regular color="#FFFFFF" width={18} height={18} />
                 </View>
@@ -435,13 +434,11 @@ const styles = StyleSheet.create({
   },
   titleText: {
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "600",
     maxWidth: 200,
   },
-  navPlaceholder: { width: 32 },
   confirmButton: {
     minWidth: 32,
     height: 28,
@@ -456,7 +453,6 @@ const styles = StyleSheet.create({
   },
   confirmText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 13,
     fontWeight: "600",
   },
@@ -482,7 +478,6 @@ const styles = StyleSheet.create({
   },
   albumName: {
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 15,
   },
   albumNameActive: {
@@ -495,6 +490,7 @@ const styles = StyleSheet.create({
     padding: 0.5,
   },
   thumb: { width: "100%", height: "100%", backgroundColor: "#F0F0F0" },
+  thumbDisabled: { opacity: 0.4 },
   checkOverlay: {
     position: "absolute",
     left: 0,
@@ -509,14 +505,12 @@ const styles = StyleSheet.create({
     marginTop: 80,
     alignSelf: "center",
     color: "#999999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
   },
   deniedText: {
     marginTop: 16,
     textAlign: "center",
     color: "#666666",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -534,7 +528,6 @@ const styles = StyleSheet.create({
   },
   retryText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "600",
   },

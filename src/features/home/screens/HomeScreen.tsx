@@ -1,6 +1,7 @@
 import { CourtHomeScreen } from "@/features/court/screens/CourtHomeScreen";
 import GodListScreen from "@/features/god/screens/GodListScreen";
 import RankingScreen from "@/features/ranking/screens/RankingScreen";
+import { RankingBackground } from "@/features/ranking/components/RankingBackground";
 import type { GameKey, HomeTab } from "@/features/home/api/home.types";
 import { ClubCard } from "@/features/home/components/ClubCard";
 import { useClubOnlineCounts } from "@/features/home/hooks/use-club-online-counts";
@@ -14,7 +15,12 @@ import {
   useHomeGames,
 } from "@/features/home/hooks/use-home-data";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import {
+  router,
+  useFocusEffect,
+  useIsFocused,
+  useLocalSearchParams,
+} from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Animated,
@@ -23,18 +29,26 @@ import {
   View,
   useAnimatedValue,
   type LayoutChangeEvent,
+  type ViewToken,
 } from "react-native";
 import { showToast, toastDurations } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+const clubViewabilityConfig = { itemVisiblePercentThreshold: 20 };
+
+function sameClubIds(current: string[], next: string[]) {
+  return current.length === next.length && current.every((id, index) => id === next[index]);
+}
+
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const focused = useIsFocused();
   const { reviewerApplied, ticketSubmitted } = useLocalSearchParams<{
     reviewerApplied?: string;
     ticketSubmitted?: string;
   }>();
   const [topTab, setTopTab] = useState<HomeTab>("home");
-  // 顶部频道懒挂载 + 常驻：首次选中才挂载，之后仅显隐切换，避免低端机反复整屏重挂载。
+  // 顶部频道首次选中才挂载，之后保留筛选状态和列表滚动位置。
   const [mountedTabs, setMountedTabs] = useState<Record<HomeTab, boolean>>({
     home: true,
     god: false,
@@ -68,8 +82,8 @@ export default function HomeScreen() {
       }),
     [headerHeight, scrollY],
   );
-  const games = useHomeGames();
-  const categories = useHomeGameCategories();
+  const games = useHomeGames(topTab === "home" && focused);
+  const categories = useHomeGameCategories(topTab === "home" && focused);
   const { refetch: refetchGames } = games;
   const { refetch: refetchCategories } = categories;
   const selectedCategory = categories.data?.some((item) => item.id === category)
@@ -89,11 +103,15 @@ export default function HomeScreen() {
     categoryGames.some((item) => String(item.id) === game)
       ? game
       : "";
-  const banners = useHomeBanners(topTab);
-  const clubs = useHomeClubs(topTab, {
-    gameId: selectedGame || undefined,
-    gameCategoryId: selectedCategory || undefined,
-  });
+  const banners = useHomeBanners(topTab, focused);
+  const clubs = useHomeClubs(
+    topTab,
+    {
+      gameId: selectedGame || undefined,
+      gameCategoryId: selectedCategory || undefined,
+    },
+    focused,
+  );
   const bannerSlots = useMemo(() => banners.data ?? [], [banners.data]);
 
   useFocusEffect(
@@ -127,11 +145,25 @@ export default function HomeScreen() {
     () => clubs.data?.pages.flatMap((page) => page.items) ?? [],
     [clubs.data],
   );
+  const [visibleClubIds, setVisibleClubIds] = useState<string[]>([]);
+  const onClubViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    const next = viewableItems.map(({ item }) => item.id as string);
+    setVisibleClubIds((current) => sameClubIds(current, next) ? current : next);
+  }, []);
+  // 精确在线人数需要逐游戏分页查询，只计算屏幕上的卡片。
+  const visibleClubs = useMemo(
+    () => clubItems.filter((club) => visibleClubIds.includes(club.id)),
+    [clubItems, visibleClubIds],
+  );
   const onlineGameIds = useMemo(
     () => selectedGame ? [Number(selectedGame)] : selectedCategory ? categoryGames.map((item) => item.id) : undefined,
     [selectedGame, selectedCategory, categoryGames],
   );
-  const onlineCounts = useClubOnlineCounts(clubItems, onlineGameIds, topTab === "home");
+  const legacyVisibleClubs = useMemo(
+    () => visibleClubs.filter((club) => club.onlineCompanionCount == null),
+    [visibleClubs],
+  );
+  const onlineCounts = useClubOnlineCounts(legacyVisibleClubs, onlineGameIds, topTab === "home");
   const selectTopTab = useCallback((tab: HomeTab) => {
     setTopTab(tab);
     setMountedTabs((current) =>
@@ -163,7 +195,7 @@ export default function HomeScreen() {
     ({ item }: { item: (typeof clubItems)[number] }) => (
       <ClubCard
         club={item}
-        onlineCount={onlineCounts.counts[item.id] ?? null}
+        onlineCount={item.onlineCompanionCount ?? onlineCounts.counts[item.id] ?? null}
       />
     ),
     [onlineCounts.counts],
@@ -226,6 +258,8 @@ export default function HomeScreen() {
         >
           <HomeBackground />
         </Animated.View>
+      ) : topTab === "ranking" ? (
+        <RankingBackground />
       ) : (
         <HomeBackground />
       )}
@@ -241,6 +275,8 @@ export default function HomeScreen() {
                 data={clubItems}
                 keyExtractor={(item) => item.id}
                 renderItem={renderClub}
+                onViewableItemsChanged={onClubViewableItemsChanged}
+                viewabilityConfig={clubViewabilityConfig}
                 ListHeaderComponent={header}
                 contentContainerStyle={{
                   flexGrow: 1,
@@ -287,7 +323,7 @@ export default function HomeScreen() {
         )}
         {mountedTabs.ranking && (
           <View style={[styles.pane, topTab !== "ranking" && styles.paneHidden]}>
-            <RankingScreen embedded />
+            <RankingScreen embedded active={topTab === "ranking"} />
           </View>
         )}
         {topTab === "court" && (

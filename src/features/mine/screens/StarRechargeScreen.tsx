@@ -2,19 +2,14 @@ import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import {
-  Dimensions,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { APP_LINKS } from "@/core/config/links";
 import { useStarIap } from "@/features/iap/use-star-iap";
 import { fetchStarBalance } from "@/features/mine/api/companion-order.api";
-import { APP_LINKS } from "@/core/config/links";
-import { openExternalLink } from "@/shared/navigation/open-external-link";
+import { openInAppWebView } from "@/shared/navigation/open-web-view";
+import { getDDinProStyle } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { Skeleton } from "@/shared/ui/Skeleton";
@@ -78,14 +73,14 @@ export default function StarRechargeScreen() {
     refreshBalance();
     setPrompt({
       title: "充值成功",
-      message: "星钻已到账，可用于平台服务消费。",
+      message: "钻石已到账，可用于平台服务消费。",
     });
   }, [refreshBalance]);
 
   const handlePending = useCallback(() => {
     setPrompt({
       title: "充值处理中",
-      message: "系统将自动补发，请稍后查询星钻余额。",
+      message: "系统将自动补发，请稍后查询钻石余额。",
     });
   }, []);
 
@@ -171,7 +166,7 @@ export default function StarRechargeScreen() {
       />
 
       <ScreenHeader
-        title="星钻充值"
+        title="钻石充值"
         onBack={() => router.back()}
         backgroundColor="transparent"
         backIconColor="#0D0D0F"
@@ -183,7 +178,7 @@ export default function StarRechargeScreen() {
         <Text style={styles.balanceValue}>
           {balance === null ? "--" : formatAmount(balance)}
         </Text>
-        <Text style={styles.balanceLabel}>我的星钻余额</Text>
+        <Text style={styles.balanceLabel}>我的钻石余额</Text>
       </View>
 
       <View style={styles.contentSection}>
@@ -194,12 +189,12 @@ export default function StarRechargeScreen() {
               <>
                 还需充值{" "}
                 <Text style={styles.shortfallValue}>
-                  {formatAmount(shortfall)}星钻
+                  {formatAmount(shortfall)}钻石
                 </Text>{" "}
                 以购买本次服务
               </>
             ) : (
-              "星钻可用于平台服务消费"
+              "钻石可用于平台服务消费"
             )}
           </Text>
         </View>
@@ -235,10 +230,7 @@ export default function StarRechargeScreen() {
       </View>
 
       <View
-        style={[
-          styles.purchaseFooter,
-          { paddingBottom: insets.bottom + 8 },
-        ]}
+        style={[styles.purchaseFooter, { paddingBottom: insets.bottom + 8 }]}
       >
         <View style={styles.agreementRow}>
           <Pressable
@@ -265,7 +257,10 @@ export default function StarRechargeScreen() {
             <Text
               style={styles.agreementLink}
               onPress={() =>
-                void openExternalLink(APP_LINKS.rechargeAgreement)
+                openInAppWebView(
+                  APP_LINKS.rechargeAgreement,
+                  "盼之电竞购买须知",
+                )
               }
             >
               《盼之电竞购买须知》
@@ -321,7 +316,7 @@ function RechargeOption({
     <Pressable
       accessibilityRole="radio"
       accessibilityState={{ selected }}
-      accessibilityLabel={`${diamonds} 星钻，${price}`}
+      accessibilityLabel={`${diamonds} 钻石，${price}`}
       onPress={onPress}
       style={[styles.packageCard, selected && styles.packageCardSelected]}
     >
@@ -397,6 +392,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: GRID_GAP,
+    ...getDDinProStyle(600),
   },
   packageCard: {
     width: CARD_WIDTH,
@@ -491,6 +487,6 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     lineHeight: 22,
-    fontWeight: "500",
+    ...getDDinProStyle(500),
   },
 });

@@ -12,6 +12,7 @@ import type {
   QuickMatchCreatedOrders,
   QuickMatchGrabItem,
   QuickMatchPayable,
+  QuickMatchPaymentPreview,
   QuickMatchPublishResult,
   QuickMatchRequestDetail,
 } from "./match.types";
@@ -89,12 +90,44 @@ type ApiRequestDetail = {
   buyerUserId?: number | string;
   buyerNickname?: string;
   dispatcherUserId?: number | string;
+  /** 以下为活动需求新增字段，普通需求不输出 */
+  publishSource?: string;
+  activityId?: number | string;
+  activityCode?: string;
+  activityType?: string;
+  cardItems?: { label?: string; value?: { text?: string } }[];
+  discountAmount?: number | string;
+  realPayAmount?: number | string;
+  maxSelectableCount?: number | string;
 };
 
 type ApiPayable = {
   orderCount?: number;
   totalPrice?: number | string;
+  discountAmount?: number | string;
+  realPayAmount?: number | string;
 };
+
+type ApiPaymentMethodItem = {
+  code?: string;
+  name?: string;
+  balance?: number | string;
+  discountAmount?: number | string;
+  payableAmount?: number | string;
+};
+
+type ApiPaymentPreview = {
+  totalPrice?: number | string;
+  paymentMethods?: ApiPaymentMethodItem[];
+};
+
+/** 服务端余额不足错误：按 code 精确判定，供支付流程引导充值 */
+export class StarNotEnoughError extends Error {
+  constructor(message?: string) {
+    super(message || "钻石余额不足");
+    this.name = "StarNotEnoughError";
+  }
+}
 
 type ApiCreatedOrder = {
   orderId?: number | string;
@@ -103,6 +136,8 @@ type ApiCreatedOrder = {
 
 type ApiCreatedOrders = {
   totalPrice?: number | string;
+  discountAmount?: number | string;
+  realPayAmount?: number | string;
   orders?: ApiCreatedOrder[];
 };
 
@@ -127,6 +162,34 @@ function toNumber(value: number | string | undefined): number {
 function toOptionalString(value: number | string | null | undefined): string | undefined {
   if (value === null || value === undefined || value === "") return undefined;
   return String(value);
+}
+
+/** trim 后为空串的字符串视为缺省（活动字段普通需求不输出） */
+function toTrimmedOptional(value: string | null | undefined): string | undefined {
+  const trimmed = (value || "").trim();
+  return trimmed === "" ? undefined : trimmed;
+}
+
+/** 活动卡逐行文案映射；label/value.text 均 trim，整行全空的丢弃 */
+function mapCardItems(
+  items: ApiRequestDetail["cardItems"],
+): QuickMatchRequestDetail["cardItems"] {
+  const mapped: NonNullable<QuickMatchRequestDetail["cardItems"]> = [];
+  for (const item of items ?? []) {
+    const label = (item?.label || "").trim();
+    const text = (item?.value?.text || "").trim();
+    if (!label && !text) {
+      continue;
+    }
+    mapped.push({ label, value: { text } });
+  }
+  return mapped;
+}
+
+/** 金额类字段：缺省（null/undefined）不输出；存在但非法兜底 0 */
+function toOptionalNumber(value: number | string | null | undefined): number | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  return toNumber(value);
 }
 
 function mapRequestDetail(item: ApiRequestDetail | null | undefined): QuickMatchRequestDetail | null {
@@ -156,6 +219,15 @@ function mapRequestDetail(item: ApiRequestDetail | null | undefined): QuickMatch
     buyerUserId: toOptionalString(item.buyerUserId),
     buyerNickname: item.buyerNickname,
     dispatcherUserId: toOptionalString(item.dispatcherUserId),
+    // 活动字段：普通需求不输出（undefined），活动需求透传
+    publishSource: toTrimmedOptional(item.publishSource),
+    activityId: toOptionalString(item.activityId),
+    activityCode: toTrimmedOptional(item.activityCode),
+    activityType: toTrimmedOptional(item.activityType),
+    cardItems: mapCardItems(item.cardItems),
+    discountAmount: toOptionalNumber(item.discountAmount),
+    realPayAmount: toOptionalNumber(item.realPayAmount),
+    maxSelectableCount: toOptionalNumber(item.maxSelectableCount),
   };
 }
 
@@ -379,12 +451,18 @@ export async function selectAndCreateOrder(
   grabIds: string[],
   token: string,
 ): Promise<QuickMatchCreatedOrders> {
+  // 活动归属由后端按 requestNo 反查，请求不携带活动 ID。
   const response = await apiClient<ApiEnvelope<ApiCreatedOrders>>(
     "/client/v1/quickMatch/selectAndCreateOrder",
     {
       method: "POST",
       token,
-      body: { action: { requestNo, grabIds } },
+      body: {
+        action: {
+          requestNo,
+          grabIds,
+        },
+      },
     },
   );
   const data = requireSuccess(response, "创建订单失败");
@@ -395,7 +473,12 @@ export async function selectAndCreateOrder(
     const serviceUserId = toOptionalString(item.serviceUserId);
     orders.push(serviceUserId ? { orderId, serviceUserId } : { orderId });
   }
-  return { totalPrice: toNumber(data.totalPrice), orders };
+  return {
+    totalPrice: toNumber(data.totalPrice),
+    discountAmount: toOptionalNumber(data.discountAmount),
+    realPayAmount: toOptionalNumber(data.realPayAmount),
+    orders,
+  };
 }
 
 export async function fetchQuickMatchPayable(
@@ -410,7 +493,30 @@ export async function fetchQuickMatchPayable(
   return {
     orderCount: Number(data.orderCount) || 0,
     totalPrice: toNumber(data.totalPrice),
+    discountAmount: toOptionalNumber(data.discountAmount),
+    realPayAmount: toOptionalNumber(data.realPayAmount),
   };
+}
+
+export async function fetchQuickMatchPaymentPreview(
+  requestNo: string,
+  grabIds: string[],
+  token: string,
+): Promise<QuickMatchPaymentPreview> {
+  const response = await apiClient<ApiEnvelope<ApiPaymentPreview>>("/client/v1/pay/preview", {
+    method: "POST",
+    token,
+    body: { action: { requestNo, grabIds } },
+  });
+  const data = requireSuccess(response, "支付明细预览获取失败");
+  const paymentMethods = (data.paymentMethods ?? []).map((item) => ({
+    code: item.code ?? "DIAMOND",
+    name: item.name ?? "钻石",
+    balance: toNumber(item.balance),
+    discountAmount: toNumber(item.discountAmount),
+    payableAmount: toNumber(item.payableAmount),
+  }));
+  return { totalPrice: toNumber(data.totalPrice), paymentMethods };
 }
 
 export async function batchPayQuickMatch(requestNo: string, token: string): Promise<void> {
@@ -419,6 +525,9 @@ export async function batchPayQuickMatch(requestNo: string, token: string): Prom
     token,
     body: { action: { requestNo } },
   });
+  if (response.code === "STAR_NOT_ENOUGH") {
+    throw new StarNotEnoughError(response.info);
+  }
   requireVoidSuccess(response, "支付失败");
 }
 

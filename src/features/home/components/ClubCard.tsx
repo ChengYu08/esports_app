@@ -1,14 +1,12 @@
 import type { Club } from "@/features/home/api/home.types";
 import { computeGameIconLayout } from "@/features/mine/utils/game-icons-layout";
 import { colors } from "@/shared/theme/tokens";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-
 
 const icons = {
   user: require("../../../../assets/home/h_user.svg"),
@@ -42,9 +40,12 @@ export const ClubCard = memo(function ClubCard({
     router.push({ pathname: "/club/[id]", params: { id: club.id } });
   };
 
-  // 游戏图标行布局：≤4 平铺，>4 重叠且总宽不超过 4 个平铺宽度，最多 8 个
-  const gamesLayout = computeGameIconLayout(club.games?.length ?? 0);
-  const games = (club.games ?? []).slice(0, gamesLayout.shown);
+  // 优先使用服务端批量返回的人数排序；旧数据缺人数时沿用接口顺序，避免逐卡查询。
+  const games = [...(club.games ?? [])]
+    .filter((game) => game.iconUrl)
+    .sort((a, b) => (b.companionCount ?? -1) - (a.companionCount ?? -1))
+    .slice(0, 3);
+  const gamesLayout = computeGameIconLayout(games.length);
 
   return (
     <Pressable
@@ -94,17 +95,14 @@ export const ClubCard = memo(function ClubCard({
             <Image source={icons.id} style={styles.metaIcon} />
             <Text style={styles.metaText}>{club.clubCode}</Text>
           </View>
-          {/* 游戏图标：靠右，>4 个重叠展示（右侧图标在上层） */}
+
           {games.length > 0 ? (
             <View style={[styles.gameIcons, { width: gamesLayout.totalWidth }]}>
               {games.map((game, index) => (
                 <Image
                   key={`${game.iconUrl}-${index}`}
                   source={{ uri: game.iconUrl }}
-                  style={[
-                    styles.gameIcon,
-                    { left: index * gamesLayout.step },
-                  ]}
+                  style={[styles.gameIcon, { left: index * gamesLayout.step }]}
                   contentFit="cover"
                 />
               ))}
@@ -135,7 +133,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   coverText: {
-    fontFamily: DOUYIN_SANS,
     color: "rgba(255,255,255,.78)",
     fontSize: 34,
     fontWeight: "800",
@@ -158,7 +155,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FF4754",
   },
   tagText: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 10,
     fontWeight: "600",
     lineHeight: 12,
@@ -174,7 +170,6 @@ const styles = StyleSheet.create({
   },
   // 设计稿 L2 Tag/bold：浅粉底 #FFE5EB 红字 #FF42A1，600/10/14，pad 4/1/4/1
   self: {
-    fontFamily: DOUYIN_SANS,
     color: "#FF42A1",
     backgroundColor: "#FFE5EB",
     paddingHorizontal: 4,
@@ -186,7 +181,6 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
   name: {
-    fontFamily: DOUYIN_SANS,
     color: "#0A0A0A",
     fontSize: 16,
     lineHeight: 24,
@@ -206,13 +200,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#2FC273",
   },
   onlineText: {
-    fontFamily: DOUYIN_SANS,
     color: "#2FC273",
     fontSize: 12,
     lineHeight: 17,
   },
   desc: {
-    fontFamily: DOUYIN_SANS,
     color: "#979799",
     fontSize: 11,
     lineHeight: 16,
@@ -238,7 +230,6 @@ const styles = StyleSheet.create({
   },
   meta: { flexDirection: "row", alignItems: "center", gap: 4 },
   metaText: {
-    fontFamily: DOUYIN_SANS,
     color: "#7F7F80",
     fontSize: 11,
     lineHeight: 16,

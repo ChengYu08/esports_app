@@ -1,18 +1,27 @@
 import { useCallback, useState } from "react";
-import { BackHandler, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, BackHandler, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { WebView } from "react-native-webview";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { colors } from "@/shared/theme/tokens";
 import { APP_LINKS } from "@/core/config/links";
 import { savePrivacyConsent } from "@/features/privacy/privacy-consent";
-import { openExternalLink } from "@/shared/navigation/open-external-link";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 type PrivacyConsentGateProps = {
   onAccepted: () => void;
 };
 
+type ProtocolDoc = {
+  url: string;
+  title: string;
+};
+
 export function PrivacyConsentGate({ onAccepted }: PrivacyConsentGateProps) {
+  const insets = useSafeAreaInsets();
   const [saving, setSaving] = useState(false);
+  // 隐私同意前根路由未挂载，无法 push /web-view：在弹窗内叠加全屏协议层查看
+  const [protocol, setProtocol] = useState<ProtocolDoc | null>(null);
 
   const handleAccept = useCallback(async () => {
     if (saving) return;
@@ -30,6 +39,18 @@ export function PrivacyConsentGate({ onAccepted }: PrivacyConsentGateProps) {
     // Android supports an explicit app exit. iOS does not expose an approved
     // programmatic exit API, so this remains a no-op there.
     BackHandler.exitApp();
+  }, []);
+
+  const openUserAgreement = useCallback(() => {
+    setProtocol({ url: APP_LINKS.userAgreement, title: "用户协议" });
+  }, []);
+
+  const openPrivacyPolicy = useCallback(() => {
+    setProtocol({ url: APP_LINKS.privacyPolicy, title: "隐私政策" });
+  }, []);
+
+  const closeProtocol = useCallback(() => {
+    setProtocol(null);
   }, []);
 
   return (
@@ -55,7 +76,7 @@ export function PrivacyConsentGate({ onAccepted }: PrivacyConsentGateProps) {
               盼之电竞重视保障您的个人隐私，我们依据最新的监管要求更新了盼之电竞APP的
               <Text
                 accessibilityRole="link"
-                onPress={() => void openExternalLink(APP_LINKS.userAgreement)}
+                onPress={openUserAgreement}
                 style={styles.link}
               >
                 《用户协议》
@@ -63,7 +84,7 @@ export function PrivacyConsentGate({ onAccepted }: PrivacyConsentGateProps) {
               和
               <Text
                 accessibilityRole="link"
-                onPress={() => void openExternalLink(APP_LINKS.privacyPolicy)}
+                onPress={openPrivacyPolicy}
                 style={styles.link}
               >
                 《隐私政策》
@@ -86,14 +107,14 @@ export function PrivacyConsentGate({ onAccepted }: PrivacyConsentGateProps) {
               5.你可以随时访问、修改和删除你的个人信息，同时我们也提供注销、隐身和投诉等方式。详情请查看
               <Text
                 accessibilityRole="link"
-                onPress={() => void openExternalLink(APP_LINKS.userAgreement)}
+                onPress={openUserAgreement}
                 style={styles.link}
               >
                 《用户协议》
               </Text>
               <Text
                 accessibilityRole="link"
-                onPress={() => void openExternalLink(APP_LINKS.privacyPolicy)}
+                onPress={openPrivacyPolicy}
                 style={styles.link}
               >
                 《隐私政策》
@@ -124,6 +145,28 @@ export function PrivacyConsentGate({ onAccepted }: PrivacyConsentGateProps) {
           </View>
         </View>
       </View>
+      {protocol ? (
+        <View style={StyleSheet.absoluteFill}>
+          <ScreenHeader
+            title={protocol.title}
+            onBack={closeProtocol}
+            backIcon={require("../../../../assets/home/club-detail/icon-back.svg")}
+            style={{ paddingTop: insets.top, height: insets.top + 44 }}
+          />
+          <View style={styles.protocolContent}>
+            <WebView
+              source={{ uri: protocol.url }}
+              style={styles.webView}
+              startInLoadingState
+              renderLoading={() => (
+                <View style={styles.protocolLoading}>
+                  <ActivityIndicator color={colors.brand} />
+                </View>
+              )}
+            />
+          </View>
+        </View>
+      ) : null}
     </Modal>
   );
 }
@@ -147,7 +190,6 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.textStrong,
-    fontFamily: DOUYIN_SANS,
     fontSize: 19,
     fontWeight: "600",
     lineHeight: 28,
@@ -155,7 +197,6 @@ const styles = StyleSheet.create({
   },
   body: {
     color: colors.textSecondary,
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 23,
   },
@@ -167,6 +208,17 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   link: { color: colors.brand },
+  protocolContent: {
+    flex: 1,
+    backgroundColor: "#FFF",
+  },
+  webView: { flex: 1, backgroundColor: "#FFF" },
+  protocolLoading: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFF",
+  },
   actions: {
     flexDirection: "row",
     gap: 10,
@@ -191,12 +243,10 @@ const styles = StyleSheet.create({
   },
   declineText: {
     color: colors.textSecondary,
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
   },
   acceptText: {
     color: colors.surface,
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "600",
   },

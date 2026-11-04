@@ -17,7 +17,6 @@ import { uploadClientObject } from "@/features/auth/oss-upload";
 import { saveAuthSession } from "@/features/auth/session-persistence";
 import { BirthDatePickerSheet } from "@/features/mine/components/BirthDatePickerSheet";
 import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
@@ -31,13 +30,15 @@ type EditRow = {
   value: string;
   /** 值为占位文案时置灰 */
   muted?: boolean;
+  /** 行不可编辑：不响应点击且隐藏右侧箭头 */
+  locked?: boolean;
 };
 
+// 与 PC 端口径一致：0/未设置均展示“保密”，只有明确设置为男/女后展示对应文案
 function genderText(gender?: number): string {
   if (gender === 1) return "男";
   if (gender === 2) return "女";
-  if (gender === 0) return "保密";
-  return "-";
+  return "保密";
 }
 
 export default function EditProfileScreen() {
@@ -55,7 +56,13 @@ export default function EditProfileScreen() {
   const rows: EditRow[] = [
     { key: "nickname", label: "昵称", value: user?.nickname || "-" },
     { key: "signature", label: "个性签名", value: user?.signature || "-" },
-    { key: "gender", label: "性别", value: genderText(user?.gender) },
+    {
+      key: "gender",
+      label: "性别",
+      value: genderText(user?.gender),
+      // 性别一旦明确为男或女（手动设置或实名认证按身份证写入）便不可再修改
+      locked: user?.gender === 1 || user?.gender === 2,
+    },
     {
       key: "birth",
       label: "生日",
@@ -98,6 +105,11 @@ export default function EditProfileScreen() {
   // 性别浮层：点选项立即保存（设计稿交互规则 1：点击选项立即生效，浮层自动收起）
   const saveGenderImmediate = async (gender: number) => {
     if (!token || !user || genderSaving) {
+      return;
+    }
+    // 弹层打开期间资料可能被实名认证等其他入口刷新，保存前再次校验锁定态
+    if (user.gender === 1 || user.gender === 2) {
+      setEditing(null);
       return;
     }
     setGenderSaving(true);
@@ -160,10 +172,17 @@ export default function EditProfileScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.avatarSection}>
-          <CachedImage
-            source={user?.headImage ? { uri: user.headImage } : fallbackAvatar}
-            style={styles.avatar}
-          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="更换头像"
+            disabled={avatarUploading || avatarEditing}
+            onPress={() => void changeAvatar()}
+          >
+            <CachedImage
+              source={user?.headImage ? { uri: user.headImage } : fallbackAvatar}
+              style={styles.avatar}
+            />
+          </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="更换头像"
@@ -191,7 +210,11 @@ export default function EditProfileScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`编辑${row.label}`}
+                disabled={row.locked}
                 onPress={() => {
+                  if (row.locked) {
+                    return;
+                  }
                   // 昵称/个性签名走独立页面（设计稿 253-36947 / 253-36956）
                   if (row.key === "nickname") {
                     router.push({
@@ -225,7 +248,9 @@ export default function EditProfileScreen() {
                   >
                     {row.value}
                   </Text>
-                  <ChevronRight16Regular color="#999999" width={16} height={16} />
+                  {row.locked ? null : (
+                    <ChevronRight16Regular color="#999999" width={16} height={16} />
+                  )}
                 </View>
               </Pressable>
               {index < rows.length - 1 ? <View style={styles.divider} /> : null}
@@ -259,6 +284,7 @@ export default function EditProfileScreen() {
             {([
               [1, "男"],
               [2, "女"],
+              [0, "保密"],
             ] as const).map(([value, label]) => {
               const selected = Number(user?.gender ?? 0) === value;
               return (
@@ -303,7 +329,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F7F7" },
   headerTitle: {
     color: "#0D0D0F",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "600",
@@ -342,7 +367,6 @@ const styles = StyleSheet.create({
   capsuleDisabled: { opacity: 0.6 },
   changeAvatarText: {
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: "600",
@@ -362,7 +386,6 @@ const styles = StyleSheet.create({
   },
   rowLabel: {
     color: "#666666",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -378,7 +401,6 @@ const styles = StyleSheet.create({
   rowValue: {
     flexShrink: 1,
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -412,7 +434,6 @@ const styles = StyleSheet.create({
   },
   genderOptionText: {
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
   },
   sheetTitleRow: {
@@ -424,7 +445,6 @@ const styles = StyleSheet.create({
   },
   sheetTitle: {
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "600",
@@ -446,7 +466,6 @@ const styles = StyleSheet.create({
   },
   genderRadioText: {
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },

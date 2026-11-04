@@ -1,5 +1,4 @@
 import { Image } from "expo-image";
-import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -26,8 +25,7 @@ export function StartupSplash({ onFinished }: Props) {
 
   useEffect(() => {
     if (imageState === "loading") return;
-    SplashScreen.hide();
-    // Start counting after the image has painted AND the native splash is gone.
+    // 原生层 windowBackground 已铺同一张图，这里等图片绘制完成后计最小展示时长。
     const timer = setTimeout(
       onFinished,
       imageState === "displayed" ? MIN_DISPLAY_MS : 0,
@@ -56,10 +54,10 @@ const styles = StyleSheet.create({
   // Android edge-to-edge insets are measured from this provider; without it the
   // first frame falls back to a window that excludes the system bars, so the
   // image renders "cover"-fitted into a smaller area and leaves letterboxes.
+  // 透明底：图片解码完成前由原生 windowBackground 的同图透出，避免图→白→图闪烁。
   provider: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
   },
-  screen: { flex: 1, backgroundColor: "#FFFFFF" },
+  screen: { flex: 1 },
   image: { flex: 1, width: "100%" },
 });

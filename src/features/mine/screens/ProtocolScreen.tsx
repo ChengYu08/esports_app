@@ -2,9 +2,8 @@ import { router, useLocalSearchParams } from "expo-router";
 import { ScrollView, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { APP_LINKS } from "@/core/config/links";
-import { openExternalLink } from "@/shared/navigation/open-external-link";
+import { openInAppWebView } from "@/shared/navigation/open-web-view";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 const documents = {
@@ -58,7 +57,7 @@ export default function ProtocolScreen() {
         ))}
         <Pressable
           accessibilityRole="link"
-          onPress={() => void openExternalLink(document.url)}
+          onPress={() => openInAppWebView(document.url, document.title)}
           style={styles.linkButton}
         >
           <Text style={styles.linkText}>查看完整{document.title}</Text>
@@ -70,11 +69,11 @@ export default function ProtocolScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#FFF" },
-  headerTitle: { color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 17, lineHeight: 24, fontWeight: "600" },
+  headerTitle: { color: "#0A0A0A", fontSize: 17, lineHeight: 24, fontWeight: "600" },
   content: { padding: 20 },
   section: { marginBottom: 24 },
-  heading: { color: "#111", fontFamily: DOUYIN_SANS, fontSize: 16, lineHeight: 24, fontWeight: "600", marginBottom: 8 },
-  body: { color: "#555", fontFamily: DOUYIN_SANS, fontSize: 14, lineHeight: 24 },
+  heading: { color: "#111", fontSize: 16, lineHeight: 24, fontWeight: "600", marginBottom: 8 },
+  body: { color: "#555", fontSize: 14, lineHeight: 24 },
   linkButton: { alignSelf: "flex-start", marginTop: 4, paddingVertical: 8 },
-  linkText: { color: "#FF1F4C", fontFamily: DOUYIN_SANS, fontSize: 14, lineHeight: 22 },
+  linkText: { color: "#FF1F4C", fontSize: 14, lineHeight: 22 },
 });

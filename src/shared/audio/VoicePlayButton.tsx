@@ -1,6 +1,7 @@
 import { Image } from "expo-image";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { getDDinProStyle } from "../theme/typography";
 import { VoiceWaveform } from "./VoiceWaveform";
 
 const playTriangleIcon = require("../../../assets/shared/play-triangle-white.svg");
@@ -62,10 +63,18 @@ export function VoicePlayButton({
             ]}
           >
             <View
-              style={[styles.pauseBar, compact && styles.compactPauseBar, light && styles.lightPauseBar]}
+              style={[
+                styles.pauseBar,
+                compact && styles.compactPauseBar,
+                light && styles.lightPauseBar,
+              ]}
             />
             <View
-              style={[styles.pauseBar, compact && styles.compactPauseBar, light && styles.lightPauseBar]}
+              style={[
+                styles.pauseBar,
+                compact && styles.compactPauseBar,
+                light && styles.lightPauseBar,
+              ]}
             />
           </View>
         ) : light ? (
@@ -76,7 +85,9 @@ export function VoicePlayButton({
           </Text>
         )}
       </View>
-      {light && !playing ? null : <VoiceWaveform playing={playing} compact={compact} />}
+      {light && !playing ? null : (
+        <VoiceWaveform playing={playing} compact={compact} />
+      )}
       <Text
         style={[
           styles.duration,
@@ -104,7 +115,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 4,
   },
-  compactButton: { height: 24, paddingVertical: 2, paddingRight: 6, paddingLeft: 3, gap: 3 },
+  compactButton: {
+    height: 24,
+    paddingVertical: 2,
+    paddingRight: 6,
+    paddingLeft: 3,
+    gap: 3,
+  },
   inlineButton: { backgroundColor: "#FF3158" },
   overlayButton: {
     position: "absolute",
@@ -143,7 +160,12 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   compactIconCircle: { width: 18, height: 18, borderRadius: 9 },
-  lightIconCircle: { width: 16, height: 16, borderRadius: 8, backgroundColor: "#FE4267" },
+  lightIconCircle: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#FE4267",
+  },
   playIcon: {
     color: "#FF3158",
     fontSize: 10,
@@ -164,8 +186,23 @@ const styles = StyleSheet.create({
   },
   compactPauseBar: { width: 2, height: 8, borderRadius: 1 },
   lightPauseBar: { width: 2, height: 7, backgroundColor: "#FFF" },
-  duration: { color: "#fff", fontSize: 12, lineHeight: 22, fontWeight: "700" },
+  duration: {
+    color: "#fff",
+    fontSize: 12,
+    lineHeight: 22,
+    ...getDDinProStyle(700),
+  },
   compactDuration: { fontSize: 10, lineHeight: 18 },
-  lightDuration: { color: "#FE4267", fontSize: 10, lineHeight: 14 },
-  pillDuration: { color: "#FE4267", fontSize: 12, lineHeight: 14 },
+  lightDuration: {
+    color: "#FE4267",
+    fontSize: 10,
+    lineHeight: 14,
+    ...getDDinProStyle(700),
+  },
+  pillDuration: {
+    color: "#FE4267",
+    fontSize: 12,
+    lineHeight: 14,
+    ...getDDinProStyle(700),
+  },
 });

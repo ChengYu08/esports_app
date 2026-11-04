@@ -9,7 +9,7 @@ import {
 } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useIsFocused, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
   memo,
@@ -65,17 +65,14 @@ import {
 } from "@/features/mine/hooks/use-user-follow";
 import {
   createImagePreviewParams,
-  type ImagePreviewParams,
 } from "@/features/mine/image-preview.params";
 import { createProfileAvatarPreviewParams } from "@/features/mine/profile-avatar-preview";
 import { createProfileChatParams } from "@/features/mine/profile-chat";
 import { calculateAge } from "@/features/mine/profile-utils";
 import { invalidateOrderQueries } from "@/features/order/order-query";
-import { cancelOrder } from "@/features/order/order.api";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { requireLogin } from "@/shared/navigation/require-login";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { showToast } from "@/shared/ui/app-toast";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { EmptyState } from "@/shared/ui/AsyncStates";
@@ -85,7 +82,6 @@ const background = require("../../../../assets/mine/figma/profile-bg.webp");
 const maleIcon = require("../../../../assets/home/club-detail/male.svg");
 const femaleIcon = require("../../../../assets/mine/figma/mine-female.svg");
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
-const settingsIcon = require("../../../../assets/mine/figma/mine-settings.svg");
 const customerIcon = require("../../../../assets/coms/customer.svg");
 const clubIcon = require("../../../../assets/mine/figma/mine-club-flag.svg");
 const arrowDownIcon = require("../../../../assets/mine/figma/profile-arrow-down.svg");
@@ -102,26 +98,40 @@ const profileRenderItem = ({ item }: { item: ProfileListItem }) => item.content;
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const focused = useIsFocused();
   const user = useAuthStore((state) => state.user);
   const route = useLocalSearchParams<{
     clubId?: string | string[];
     userId?: string | string[];
+    fromSearch?: string | string[];
+    reorderGame?: string;
+    reorderMode?: string;
+    reorderLevel?: string;
+    reorderService?: string;
+    reorderQuantity?: string;
   }>();
-  const routeParams = getProfileRouteParams(route);
+  const routeClubId = route.clubId;
+  const routeUserId = route.userId;
+  const routeParams = useMemo(
+    () => getProfileRouteParams({ clubId: routeClubId, userId: routeUserId }),
+    [routeClubId, routeUserId],
+  );
+  const fromSearchPage = route.fromSearch === "1";
   const isMine = !routeParams || String(user?.id ?? "") === routeParams.userId;
   const [tab, setTab] = useState<ProfileTab>("技能");
   const [coverHeight, setCoverHeight] = useState(0);
   const [compactActive, setCompactActive] = useState(false);
   const scrollY = useMemo(() => new Animated.Value(0), []);
-  // 紧凑头部淡入区间：安全区下方封面剩余 136→44px（92px 行程），滚动驱动走原生线程，
-  // 避免 JS 层每帧 setValue。封面未布局完成前恒为 0，防止紧凑头部闪现。
-  const fadeStart = coverHeight - insets.top - 136;
+  // 紧凑头部切换阈值：列表内标签行（两侧圆角的技能/评价栏）与固定标签行对齐时立刻切换。
+  // 用 1px 行程做原生驱动的阶跃淡入淡出，达到阈值即默认头部马上隐藏、紧凑头部马上出现，
+  // 不做渐变过渡（渐变会在两头部间产生同屏叠显）。封面未布局完成前恒为 0，防止闪现。
+  const fadeStart = coverHeight - insets.top - NAV_BAR_CONTENT_HEIGHT;
   const headerFade = useMemo(
     () =>
       coverHeight === 0
         ? new Animated.Value(0)
         : scrollY.interpolate({
-            inputRange: [fadeStart, fadeStart + 92],
+            inputRange: [fadeStart - 1, fadeStart],
             outputRange: [0, 1],
             extrapolate: "clamp",
           }),
@@ -135,7 +145,7 @@ export default function ProfileScreen() {
         listener: (event: {
           nativeEvent: { contentOffset: { y: number } };
         }) => {
-          const active = event.nativeEvent.contentOffset.y >= fadeStart + 92;
+          const active = event.nativeEvent.contentOffset.y >= fadeStart;
           setCompactActive((prev) => (prev === active ? prev : active));
         },
       }),
@@ -143,6 +153,8 @@ export default function ProfileScreen() {
   );
   const [selectedGameId, setSelectedGameId] = useState("");
   const [orderCard, setOrderCard] = useState<ProfileSkillCard | null>(null);
+  const [reorderActive, setReorderActive] = useState(false);
+  const reorderHandled = useRef(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [paymentOrder, setPaymentOrder] = useState<{
     orderId: number;
@@ -155,17 +167,14 @@ export default function ProfileScreen() {
     userId: "",
     isBlacklisted: false,
   });
-  const [paymentCancelError, setPaymentCancelError] = useState<string | null>(
-    null,
-  );
-  const paymentCancelingRef = useRef(false);
   const chatCheckPendingRef = useRef(false);
   const { entering: enteringCS, openCustomerService } =
     useCustomerServiceEntry();
-  const detailQuery = useProfileDetail(routeParams);
+  const detailQuery = useProfileDetail(routeParams, focused);
   const detail = detailQuery.data;
   const followStateQuery = useUserFollowState(
     !isMine && detail ? String(detail.userId) : undefined,
+    focused,
   );
   const followMutation = useToggleUserFollow();
   const firstGameId = getFirstProfileGameId(detail?.games ?? []);
@@ -173,7 +182,7 @@ export default function ProfileScreen() {
     (game) => String(game.gameId) === selectedGameId,
   )
     ? selectedGameId
-    : firstGameId;
+    : String(detail?.games.find((game) => game.gameName === route.reorderGame)?.gameId ?? firstGameId);
 
   const gameDetailQuery = useProfileGameDetail(
     routeParams && (detail?.clubId || routeParams.clubId) && activeGameId
@@ -183,12 +192,22 @@ export default function ProfileScreen() {
           gameId: activeGameId,
         }
       : null,
+    focused,
   );
+  // 评价按陪玩师整体拉取（全部游戏），不做游戏分类过滤
   const reviewQuery = useProfileReviews(
-    tab === "评价" && routeParams && activeGameId
-      ? { gameId: activeGameId, companionUserId: routeParams.userId }
+    tab === "评价" && routeParams
+      ? { companionUserId: routeParams.userId }
       : null,
+    focused,
   );
+  const gameDetailLoading = gameDetailQuery.isLoading;
+  const gameDetailError = gameDetailQuery.isError;
+  const refetchGameDetail = gameDetailQuery.refetch;
+  const reviewLoading = reviewQuery.isLoading;
+  const reviewError = reviewQuery.isError;
+  const reviewItems = reviewQuery.data?.items;
+  const refetchReviews = reviewQuery.refetch;
   const localProfile = useMemo(() => toLocalProfile(user), [user]);
   const profile = detail ?? localProfile;
   const measureCover = useCallback((height: number) => {
@@ -196,7 +215,9 @@ export default function ProfileScreen() {
   }, []);
 
   useEffect(() => {
-    if (isMine || profile.userId <= 0) return;
+    if (!focused || isMine || profile.userId <= 0) {
+      return;
+    }
 
     let active = true;
     const refreshBlacklistStatus = () => {
@@ -225,7 +246,7 @@ export default function ProfileScreen() {
       active = false;
       unsubscribe();
     };
-  }, [isMine, profile.userId]);
+  }, [focused, isMine, profile.userId]);
 
   const gameDetail = gameDetailQuery.data;
   const games = useMemo(() => detail?.games ?? [], [detail]);
@@ -234,14 +255,12 @@ export default function ProfileScreen() {
   const stopVoice = voicePlayer.stop;
   const toggleVoice = voicePlayer.toggle;
   const playingVoiceUrl = voicePlayer.playingUrl;
-  const coverPreviewParams = useMemo(
-    () => (coverImageUrl ? createImagePreviewParams([coverImageUrl], 0) : null),
-    [coverImageUrl],
-  );
 
   useEffect(() => {
-    if (tab !== "技能") stopVoice();
-  }, [tab, stopVoice]);
+    if (tab !== "技能" || !focused) {
+      stopVoice();
+    }
+  }, [focused, tab, stopVoice]);
   const openProfileRelation = useCallback(
     (type: "following" | "fans") => {
       if (profile.userId <= 0) return;
@@ -288,6 +307,7 @@ export default function ProfileScreen() {
         return;
       }
 
+      // push 进聊天；params 带 fromProfile 标记，聊天页返回主页时用 dismissTo 弹回，避免循环套娃
       router.push({
         pathname: "/chat/[id]",
         params: createProfileChatParams({
@@ -319,6 +339,43 @@ export default function ProfileScreen() {
     },
     [profile.userId],
   );
+  useEffect(() => {
+    if (!route.reorderGame || reorderHandled.current || !detail) {
+      return;
+    }
+    const matchingGames = detail.games.filter((game) => game.gameName === route.reorderGame);
+    if (matchingGames.length !== 1) {
+      reorderHandled.current = true;
+      showToast("原订单游戏已变更，请重新选择服务");
+      return;
+    }
+    const gameId = String(matchingGames[0].gameId);
+    if (activeGameId !== gameId) {
+      return;
+    }
+    if (gameDetailQuery.isError) {
+      reorderHandled.current = true;
+      showToast("服务加载失败，请重新选择服务");
+      return;
+    }
+    if (!gameDetail || String(gameDetail.gameId) !== gameId) {
+      return;
+    }
+    const cards = gameDetail.skillCards.filter((card) =>
+      card.modeName === route.reorderMode && card.levelName === route.reorderLevel,
+    );
+    const levelIds = new Set(cards.map((card) => card.gameLevelId));
+    if (levelIds.size !== 1 || !route.reorderService) {
+      reorderHandled.current = true;
+      showToast("原订单服务已变更，请重新选择服务");
+      return;
+    }
+    reorderHandled.current = true;
+    Promise.resolve().then(() => {
+      setReorderActive(true);
+      openOrder(cards[0]);
+    });
+  }, [activeGameId, detail, gameDetail, gameDetailQuery.isError, openOrder, route.reorderGame, route.reorderLevel, route.reorderMode, route.reorderService]);
   // 默认头部中的标签栏:紧凑头部淡入时反向淡出
   const tabsInverseFade = useMemo(
     () =>
@@ -338,7 +395,6 @@ export default function ProfileScreen() {
             topInset={insets.top}
             profile={profile}
             coverImageUrl={coverImageUrl}
-            coverPreviewParams={coverPreviewParams}
             isMine={isMine}
             isBlacklisted={
               !isMine &&
@@ -365,22 +421,32 @@ export default function ProfileScreen() {
       },
     ];
 
-    if (games.length > 0) {
-      profileListItems.push({
-        key: "game-selector",
-        content: (
-          <View style={styles.scrollBody}>
-            <GameSelector
-              games={games}
-              selectedGameId={activeGameId}
-              onSelect={setSelectedGameId}
-            />
-          </View>
-        ),
-      });
+    // 游戏筛选栏仅服务技能 tab；评价 tab 拉取陪玩师全部评价，不按游戏分类
+    if (tab === "技能") {
+      if (games.length === 0) {
+        profileListItems.push({
+          key: "games-empty",
+          content: (
+            <View style={styles.scrollBody}>
+              <EmptyState message="暂无支持的游戏" />
+            </View>
+          ),
+        });
+      } else {
+        profileListItems.push({
+          key: "game-selector",
+          content: (
+            <View style={styles.scrollBody}>
+              <GameSelector
+                games={games}
+                selectedGameId={activeGameId}
+                onSelect={setSelectedGameId}
+              />
+            </View>
+          ),
+        });
 
-      if (tab === "技能") {
-        if (gameDetailQuery.isLoading) {
+        if (gameDetailLoading) {
           profileListItems.push({
             key: "skills-loading",
             content: (
@@ -389,7 +455,7 @@ export default function ProfileScreen() {
               </View>
             ),
           });
-        } else if (gameDetailQuery.isError || !gameDetail) {
+        } else if (gameDetailError || !gameDetail) {
           profileListItems.push({
             key: "skills-error",
             content: (
@@ -397,7 +463,7 @@ export default function ProfileScreen() {
                 <InlineState
                   text="游戏技能加载失败"
                   actionLabel="重试"
-                  onAction={() => void gameDetailQuery.refetch()}
+                  onAction={() => void refetchGameDetail()}
                 />
               </View>
             ),
@@ -450,60 +516,51 @@ export default function ProfileScreen() {
             });
           }
         }
-      } else if (reviewQuery.isLoading) {
+      }
+    } else if (reviewLoading) {
+      profileListItems.push({
+        key: "reviews-loading",
+        content: (
+          <View style={styles.scrollBody}>
+            <ProfileGameSkeleton reviews />
+          </View>
+        ),
+      });
+    } else if (reviewError) {
+      profileListItems.push({
+        key: "reviews-error",
+        content: (
+          <View style={styles.scrollBody}>
+            <InlineState
+              text="评价加载失败"
+              actionLabel="重试"
+              onAction={() => void refetchReviews()}
+            />
+          </View>
+        ),
+      });
+    } else {
+      const reviews = reviewItems ?? [];
+      if (reviews.length === 0) {
         profileListItems.push({
-          key: "reviews-loading",
+          key: "reviews-empty",
           content: (
             <View style={styles.scrollBody}>
-              <ProfileGameSkeleton reviews />
-            </View>
-          ),
-        });
-      } else if (reviewQuery.isError) {
-        profileListItems.push({
-          key: "reviews-error",
-          content: (
-            <View style={styles.scrollBody}>
-              <InlineState
-                text="评价加载失败"
-                actionLabel="重试"
-                onAction={() => void reviewQuery.refetch()}
+              <EmptyState
+                message="暂无评价"
+                hint="完成订单后会显示评价内容"
               />
             </View>
           ),
         });
       } else {
-        const reviews = reviewQuery.data?.items ?? [];
-        if (reviews.length === 0) {
-          profileListItems.push({
-            key: "reviews-empty",
-            content: (
-              <View style={styles.scrollBody}>
-                <EmptyState
-                  message="暂无评价"
-                  hint="完成订单后会显示评价内容"
-                />
-              </View>
-            ),
-          });
-        } else {
-          profileListItems.push(
-            ...reviews.map((review, index) => ({
-              key: `review-${review.id}-${index}`,
-              content: <ReviewCard review={review} />,
-            })),
-          );
-        }
+        profileListItems.push(
+          ...reviews.map((review, index) => ({
+            key: `review-${review.id}-${index}`,
+            content: <ReviewCard review={review} />,
+          })),
+        );
       }
-    } else {
-      profileListItems.push({
-        key: "games-empty",
-        content: (
-          <View style={styles.scrollBody}>
-            <EmptyState message="暂无支持的游戏" />
-          </View>
-        ),
-      });
     }
 
     return profileListItems;
@@ -511,7 +568,6 @@ export default function ProfileScreen() {
     insets.top,
     profile,
     coverImageUrl,
-    coverPreviewParams,
     isMine,
     blacklistStatus,
     openProfileRelation,
@@ -521,15 +577,20 @@ export default function ProfileScreen() {
     tab,
     games,
     activeGameId,
-    gameDetailQuery,
+    gameDetailLoading,
+    gameDetailError,
+    refetchGameDetail,
     gameDetail,
-    reviewQuery,
+    reviewLoading,
+    reviewError,
+    reviewItems,
+    refetchReviews,
     toggleVoice,
     playingVoiceUrl,
     openOrder,
   ]);
 
-  if (routeParams && detailQuery.isLoading) {
+  if (routeParams && (detailQuery.isLoading || (!focused && !detail))) {
     return (
       <ProfileSkeleton
         topInset={insets.top}
@@ -626,34 +687,23 @@ export default function ProfileScreen() {
             </Text>
           </Animated.View>
           <View style={styles.navActions}>
-            {isMine ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="设置"
-                hitSlop={12}
-                onPress={() => router.push("/edit-profile")}
-                style={styles.navActionButton}
-              >
-                <Image
-                  source={settingsIcon}
-                  style={styles.navActionIcon}
-                  contentFit="contain"
-                />
-              </Pressable>
-            ) : (
+            {!isMine ? (
               <>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="搜索"
                   hitSlop={12}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/search",
-                      params: routeParams?.clubId
-                        ? { type: "user", clubId: routeParams.clubId }
-                        : { type: "user" },
-                    })
-                  }
+                  onPress={() => {
+                    const searchParams = routeParams?.clubId
+                      ? { type: "user" as const, clubId: routeParams.clubId }
+                      : { type: "user" as const };
+                    // 搜索页已在栈内时弹回它，避免 搜索/俱乐部/个人主页 反复跳转无限套娃
+                    if (fromSearchPage) {
+                      router.dismissTo({ pathname: "/search", params: searchParams });
+                      return;
+                    }
+                    router.push({ pathname: "/search", params: searchParams });
+                  }}
                   style={styles.navActionButton}
                 >
                   <Search24Regular color="#fff" width={24} height={24} />
@@ -686,7 +736,7 @@ export default function ProfileScreen() {
                   />
                 </Pressable>
               </>
-            )}
+            ) : null}
           </View>
         </View>
         <Animated.View
@@ -814,12 +864,18 @@ export default function ProfileScreen() {
             buyerUserId: Number(user?.id) || 0,
           }}
           token={useAuthStore.getState().accessToken}
-          onClose={() => setOrderCard(null)}
+          initialServiceName={reorderActive ? route.reorderService : undefined}
+          initialQuantity={reorderActive ? Number(route.reorderQuantity) : undefined}
+          onClose={() => {
+            setOrderCard(null);
+            setReorderActive(false);
+          }}
           onRealNameVerificationRequired={() =>
             router.push("/account-settings")
           }
           onOrderCreated={(order) => {
             setOrderCard(null);
+            setReorderActive(false);
             setPaymentError(null);
             setPaymentOrder(order);
             setPaymentSheetVisible(true);
@@ -832,7 +888,10 @@ export default function ProfileScreen() {
           visible={paymentSheetVisible}
           token={useAuthStore.getState().accessToken}
           onClose={() => {
-            void cancelPendingPaymentOrder();
+            const orderId = paymentOrder.orderId;
+            setPaymentSheetVisible(false);
+            setPaymentOrder(null);
+            invalidateOrderQueries(orderId);
           }}
           onPaid={() => {
             const paidOrderId = paymentOrder.orderId;
@@ -854,37 +913,9 @@ export default function ProfileScreen() {
         message={paymentError ?? ""}
         onConfirm={() => setPaymentError(null)}
       />
-      <AppPrompt
-        visible={Boolean(paymentCancelError)}
-        title="订单取消失败"
-        message={paymentCancelError ?? ""}
-        onConfirm={() => setPaymentCancelError(null)}
-      />
     </View>
   );
 
-  async function cancelPendingPaymentOrder() {
-    const pendingOrder = paymentOrder;
-    const token = useAuthStore.getState().accessToken;
-    if (paymentCancelingRef.current) return;
-    setPaymentSheetVisible(false);
-    setPaymentOrder(null);
-    if (!pendingOrder || !token) return;
-    paymentCancelingRef.current = true;
-    try {
-      await cancelOrder(String(pendingOrder.orderId), token);
-      void invalidateOrderQueries(pendingOrder.orderId);
-    } catch (error) {
-      setPaymentOrder(null);
-      // The payment sheet is already dismissed; surface a cancellation error
-      // without allowing the user to retry payment for the same order.
-      setPaymentCancelError(
-        error instanceof Error ? error.message : "订单取消失败",
-      );
-    } finally {
-      paymentCancelingRef.current = false;
-    }
-  }
 }
 
 // 头部标签栏独立组件：滚动阈值切换等无关重渲染时保持元素引用稳定
@@ -905,9 +936,6 @@ const ProfileTabs = memo(function ProfileTabs({
           onPress={() => onSelect(item)}
           style={styles.tabButton}
         >
-          {tab === item && (
-            <Image source={fallbackAvatar} style={styles.tabAvatar} />
-          )}
           <Text style={[styles.tabText, tab === item && styles.tabTextActive]}>
             {item}
           </Text>
@@ -923,7 +951,6 @@ const ProfileCover = memo(function ProfileCover({
   topInset,
   profile,
   coverImageUrl,
-  coverPreviewParams,
   isMine,
   isBlacklisted,
   onSelectRelation,
@@ -932,13 +959,13 @@ const ProfileCover = memo(function ProfileCover({
   topInset: number;
   profile: ProfileDetail;
   coverImageUrl?: string;
-  coverPreviewParams: ImagePreviewParams | null;
   isMine: boolean;
   isBlacklisted: boolean;
   onSelectRelation: (type: "following" | "fans") => void;
   onMeasure: (height: number) => void;
 }) {
   const [introExpanded, setIntroExpanded] = useState(false);
+  const [introOverflows, setIntroOverflows] = useState(false);
   return (
     <View
       style={[
@@ -950,33 +977,13 @@ const ProfileCover = memo(function ProfileCover({
       ]}
       onLayout={(event) => onMeasure(event.nativeEvent.layout.height)}
     >
-      {coverPreviewParams ? (
-        <Pressable
-          accessibilityLabel="预览主页背景图"
-          accessibilityRole="button"
-          onPress={() =>
-            router.push({
-              pathname: "/image-preview",
-              params: coverPreviewParams,
-            })
-          }
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Image
+          source={coverImageUrl ? { uri: coverImageUrl } : background}
+          contentFit="cover"
           style={StyleSheet.absoluteFill}
-        >
-          <Image
-            source={{ uri: coverImageUrl }}
-            contentFit="cover"
-            style={StyleSheet.absoluteFill}
-          />
-        </Pressable>
-      ) : (
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Image
-            source={background}
-            contentFit="cover"
-            style={StyleSheet.absoluteFill}
-          />
-        </View>
-      )}
+        />
+      </View>
       <LinearGradient
         pointerEvents="none"
         style={StyleSheet.absoluteFill}
@@ -991,8 +998,9 @@ const ProfileCover = memo(function ProfileCover({
       <ProfileIdentity profile={profile} isBlacklisted={isBlacklisted} />
       <View style={styles.headerStats}>
         <Pressable
-          accessibilityRole="button"
+          accessibilityRole={isMine ? "button" : "text"}
           accessibilityLabel={`关注列表，${profile.followCount}人`}
+          disabled={!isMine}
           onPress={() => onSelectRelation("following")}
           style={styles.headerStat}
         >
@@ -1000,8 +1008,9 @@ const ProfileCover = memo(function ProfileCover({
           <Text style={styles.headerStatLabel}>关注</Text>
         </Pressable>
         <Pressable
-          accessibilityRole="button"
+          accessibilityRole={isMine ? "button" : "text"}
           accessibilityLabel={`粉丝列表，${profile.fansCount}人`}
+          disabled={!isMine}
           onPress={() => onSelectRelation("fans")}
           style={styles.headerStat}
         >
@@ -1014,10 +1023,16 @@ const ProfileCover = memo(function ProfileCover({
           numberOfLines={introExpanded ? undefined : 2}
           ellipsizeMode="tail"
           style={styles.headerIntro}
+          onTextLayout={(event) => {
+            // 收起态下可见行数达到 2 行说明被截断，此时才展示展开/收起按钮
+            if (introExpanded) return;
+            const overflows = event.nativeEvent.lines.length >= 2;
+            setIntroOverflows((prev) => (prev === overflows ? prev : overflows));
+          }}
         >
           {profile.signature || "暂无个人简介"}
         </Text>
-        {profile.signature ? (
+        {profile.signature && (introExpanded || introOverflows) ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={introExpanded ? "收起简介" : "展开简介"}
@@ -1046,6 +1061,13 @@ function ProfileIdentity({
   profile: ProfileDetail;
   isBlacklisted: boolean;
 }) {
+  const route = useLocalSearchParams<{
+    fromClubId?: string | string[];
+    fromSearch?: string | string[];
+  }>();
+  const fromClubId =
+    typeof route.fromClubId === "string" ? route.fromClubId : undefined;
+  const fromSearch = route.fromSearch === "1";
   const status = getStatus(profile.onlineStatus, profile.gameStatus);
   const age = profile.birth ? calculateAge(profile.birth) : "";
   const avatarPreviewParams = createProfileAvatarPreviewParams(
@@ -1114,15 +1136,36 @@ function ProfileIdentity({
           ) : null}
         </View>
         <View style={styles.idClubRow}>
+          {profile.tagName ? (
+            <View
+              accessibilityLabel={`大神标签：${profile.tagName}`}
+              style={[
+                styles.companionTag,
+                { backgroundColor: profile.tagColor || "#C0C4CC" },
+              ]}
+            >
+              <Text style={styles.companionTagText}>{profile.tagName}</Text>
+            </View>
+          ) : null}
           {profile.clubId > 0 ? (
             <Pressable
               style={styles.clubLine}
-              onPress={() =>
+              onPress={() => {
+                // 来源就是这家俱乐部主页时直接出栈回退，俱乐部/个人主页来回点不再无限堆栈
+                if (fromClubId && fromClubId === String(profile.clubId)) {
+                  router.back();
+                  return;
+                }
                 router.push({
                   pathname: "/club/[id]",
-                  params: { id: String(profile.clubId) },
-                })
-              }
+                  // fromUserId 标记来源个人主页，俱乐部页点回该成员时直接出栈，避免套娃
+                  params: {
+                    id: String(profile.clubId),
+                    fromUserId: String(profile.userId),
+                    ...(fromSearch ? { fromSearch: "1" } : {}),
+                  },
+                });
+              }}
             >
               <Image source={clubIcon} style={styles.clubIcon} />
               <Text numberOfLines={1} style={styles.clubName}>
@@ -1237,6 +1280,7 @@ function ImageGallery({ images }: { images: string[] }) {
         >
           <CachedImage
             source={{ uri: image }}
+            cachePolicy="disk"
             contentFit="cover"
             style={StyleSheet.absoluteFill}
           />
@@ -1338,6 +1382,7 @@ const ReviewCard = memo(function ReviewCard({
               >
                 <CachedImage
                   source={{ uri: image }}
+                  cachePolicy="disk"
                   contentFit="cover"
                   style={StyleSheet.absoluteFill}
                 />
@@ -1422,6 +1467,8 @@ function toLocalProfile(
     orderCount: 0,
     onlineStatus: 0,
     gameStatus: 0,
+    tagName: "",
+    tagColor: "",
     games: [],
   };
 }
@@ -1471,12 +1518,11 @@ const styles = StyleSheet.create({
   errorBackIcon: { width: 24, height: 24, tintColor: "#0D0D0F" },
   stateText: {
     color: "#999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     textAlign: "center",
     padding: 24,
   },
-  retryText: { color: "#FF3158", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  retryText: { color: "#FF3158", fontSize: 14 },
   cover: {
     overflow: "hidden",
     backgroundColor: "#617181",
@@ -1668,7 +1714,6 @@ const styles = StyleSheet.create({
   },
   blacklistTagText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 10,
     lineHeight: 14,
     fontWeight: "500",
@@ -1708,9 +1753,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
+  // 大神标签：与陪玩卡片标签保持一致的尺寸与排版
+  companionTag: {
+    borderRadius: 2,
+    paddingHorizontal: 2,
+    height: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  companionTagText: {
+    color: "#FFF",
+    fontSize: 10,
+    lineHeight: 13,
+    fontWeight: "500",
+    includeFontPadding: false,
+    textAlignVertical: "center",
+  },
   idRow: {
     color: "rgba(255,255,255,0.6)",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -1723,7 +1783,6 @@ const styles = StyleSheet.create({
   clubIcon: { width: 16, height: 16 },
   clubName: {
     color: "rgba(255,255,255,0.6)",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     flexShrink: 1,
@@ -1772,7 +1831,6 @@ const styles = StyleSheet.create({
   },
   editProfileText: {
     color: "#0D0D0F",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "500",
     lineHeight: 22,
@@ -1781,16 +1839,14 @@ const styles = StyleSheet.create({
   stat: { flexDirection: "row", alignItems: "baseline", gap: 5 },
   statValue: {
     color: "#111",
-    fontFamily: DOUYIN_SANS,
     fontSize: 20,
     lineHeight: 28,
     fontWeight: "700",
   },
-  statLabel: { color: "#999", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  statLabel: { color: "#999", fontSize: 14 },
   signature: {
     marginTop: 12,
     color: "#161616",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 21,
   },
@@ -1802,14 +1858,8 @@ const styles = StyleSheet.create({
     minWidth: 36,
     position: "relative",
   },
-  tabAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-  },
   tabText: {
     color: "#999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -1829,7 +1879,9 @@ const styles = StyleSheet.create({
     borderRadius: 1.5,
     backgroundColor: "#FE1F4C",
   },
-  gameTags: { flexDirection: "row", gap: 10, marginTop: 12, paddingRight: 16 },
+  // paddingBottom 1：部分 Android 屏幕密度下 32dp 取整后最后 1px 物理行落在
+  // 横向 ScrollView 裁剪区外，选中态的圆角边框底部会被裁掉，留 1px 余量兼容
+  gameTags: { flexDirection: "row", gap: 10, marginTop: 12, paddingRight: 16, paddingBottom: 1 },
   gameTag: {
     height: 32,
     paddingHorizontal: 6,
@@ -1847,7 +1899,6 @@ const styles = StyleSheet.create({
   gameLogo: { width: 15, height: 12.8, borderRadius: 4 },
   gameText: {
     color: "#656566",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -1860,7 +1911,6 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "500",
@@ -1868,7 +1918,6 @@ const styles = StyleSheet.create({
   description: {
     marginTop: 14,
     color: "#656566",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -1913,14 +1962,12 @@ const styles = StyleSheet.create({
   successTitle: {
     marginTop: 16,
     color: "#111",
-    fontFamily: DOUYIN_SANS,
     fontSize: 20,
     fontWeight: "600",
   },
   successHint: {
     marginTop: 8,
     color: "#888",
-    fontFamily: DOUYIN_SANS,
     fontSize: 13,
     lineHeight: 20,
     textAlign: "center",
@@ -1936,7 +1983,6 @@ const styles = StyleSheet.create({
   },
   successButtonText: {
     color: "#fff",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     fontWeight: "600",
   },
@@ -1956,14 +2002,12 @@ const styles = StyleSheet.create({
   serviceCopy: { flex: 1, minWidth: 0, gap: 6 },
   serviceName: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "400",
   },
   serviceMeta: { flexDirection: "row", alignItems: "center", gap: 7 },
   price: {
     color: "#FF1F4C",
-    fontFamily: DOUYIN_SANS,
     fontSize: 18,
     lineHeight: 22,
     fontWeight: "600",
@@ -1971,7 +2015,6 @@ const styles = StyleSheet.create({
   diamond: { color: "#FF3158", fontSize: 14 },
   metaText: {
     color: "#979799",
-    fontFamily: DOUYIN_SANS,
     fontSize: 11,
     lineHeight: 16,
   },
@@ -1986,17 +2029,15 @@ const styles = StyleSheet.create({
   },
   orderText: {
     color: "#fff",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
   inlineState: { alignItems: "center", paddingVertical: 48 },
   empty: { alignItems: "center", paddingVertical: 48 },
-  emptyText: { color: "#777", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  emptyText: { color: "#777", fontSize: 14 },
   emptyHint: {
     marginTop: 8,
     color: "#aaa",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
   },
   reviewList: { marginHorizontal: 8, marginTop: 8 },
@@ -2020,13 +2061,11 @@ const styles = StyleSheet.create({
   reviewer: {
     flex: 1,
     color: "#999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
   reviewText: {
     color: "#333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -2034,7 +2073,6 @@ const styles = StyleSheet.create({
   reviewImage: { width: 57, height: 57, borderRadius: 6, overflow: "hidden" },
   reviewDate: {
     color: "#999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -2062,7 +2100,6 @@ const styles = StyleSheet.create({
   },
   followText: {
     color: "#111",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     fontWeight: "600",
   },
@@ -2076,7 +2113,6 @@ const styles = StyleSheet.create({
   },
   chatText: {
     color: "#fff",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     fontWeight: "600",
   },

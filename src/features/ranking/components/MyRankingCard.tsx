@@ -1,37 +1,110 @@
+import { getDDinProStyle, SYSTEM_FONT } from "@/shared/theme/typography";
 import { StyleSheet, Text, View } from "react-native";
-import { colors } from "@/shared/theme/tokens";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import type { MyRanking, RankingBoard } from "../api/ranking.types";
-import { formatRankingMetric, getRankingBoard } from "../ranking.config";
+import { formatRankingMetric } from "../ranking.config";
 import { RankingAvatar } from "./RankingAvatar";
 
-export function MyRankingCard({ rank, board, avatar }: { rank: MyRanking; board: RankingBoard; avatar?: string }) {
+export function MyRankingCard({
+  rank,
+  board,
+  avatar,
+  nickname,
+}: {
+  rank: MyRanking;
+  board: RankingBoard;
+  avatar?: string;
+  nickname?: string;
+}) {
   return (
-    <View style={styles.container}>
-      <View style={styles.card}>
-        <RankingAvatar uri={avatar} size={36} />
-        <View style={styles.identity}>
-          <Text style={styles.label}>我的排名</Text>
-          <Text style={styles.rank}>{rank.rankNo == null ? "未上榜" : `NO.${rank.rankNo}`}</Text>
-        </View>
-        <View style={styles.metric}>
-          <Text style={styles.metricLabel}>{getRankingBoard(board).metricLabel}</Text>
-          <Text style={styles.value} numberOfLines={1} adjustsFontSizeToFit>
-            {rank.metricValue === 0 ? "—" : formatRankingMetric(rank.metricValue, board)}
-          </Text>
-        </View>
+    <View style={styles.card}>
+      <View style={styles.rankColumn}>
+        <Text numberOfLines={1} adjustsFontSizeToFit style={styles.rank}>
+          {rank.rankNo == null
+            ? "未上榜"
+            : String(rank.rankNo).padStart(2, "0")}
+        </Text>
+        <Text style={styles.rankLabel}>我的排名</Text>
       </View>
+      <View style={styles.identity}>
+        <RankingAvatar uri={avatar} size={32} />
+        <Text numberOfLines={1} style={styles.nickname}>
+          {nickname || "我"}
+        </Text>
+      </View>
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.75}
+        style={styles.metric}
+      >
+        {rank.metricValue === 0
+          ? "—"
+          : formatRankingMetric(rank.metricValue, board)}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { backgroundColor: colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingHorizontal: 16, paddingVertical: 10 },
-  card: { minHeight: 52, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: "#FFF2F5", flexDirection: "row", alignItems: "center", gap: 10 },
-  identity: { flex: 1, minWidth: 0, gap: 4 },
-  label: { fontFamily: DOUYIN_SANS, fontSize: 12, color: colors.text },
-  rank: { fontFamily: DOUYIN_SANS, fontSize: 12, color: colors.brand, fontWeight: "600" },
-  metric: { maxWidth: "45%", alignItems: "flex-end", gap: 4 },
-  metricLabel: { fontFamily: DOUYIN_SANS, fontSize: 10, color: colors.textMuted },
-  value: { fontFamily: DOUYIN_SANS, fontSize: 16, fontWeight: "600", color: colors.text },
+  card: {
+    minHeight: 66,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "#E9E9EB",
+    backgroundColor: "#FFFFFF",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  rankColumn: {
+    width: 42,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rank: {
+    width: "100%",
+    fontSize: 14,
+    lineHeight: 22,
+    color: "#FF99AD",
+    textAlign: "center",
+    ...getDDinProStyle(600),
+  },
+  rankLabel: {
+    width: "100%",
+    fontFamily: SYSTEM_FONT,
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: "500",
+    color: "#0D0D0F",
+    textAlign: "center",
+  },
+  identity: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  nickname: {
+    flex: 1,
+    fontFamily: SYSTEM_FONT,
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#0D0D0F",
+  },
+  metric: {
+    width: 64,
+    fontSize: 16,
+    lineHeight: 20,
+    color: "#0D0D0F",
+    textAlign: "right",
+    ...getDDinProStyle(600),
+  },
 });

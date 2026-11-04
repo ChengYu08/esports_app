@@ -9,6 +9,7 @@ import {
   getRongMessages,
   initializeRongCloud,
   isRongCloudAvailable,
+  isRongCloudConnected,
   markRongConversationRead,
   subscribeRongConnectionStatus,
   subscribeRongConversationSync,
@@ -56,6 +57,8 @@ export type MessageConnectionState = 'idle' | 'connecting' | 'ready' | 'unavaila
 export type MessageAdapter = {
   available: () => boolean;
   initialize: (token: string) => Promise<boolean>;
+  /** SDK 长连接是否实际处于已连接状态（区别于 store 的 connectionState 标记） */
+  isConnected?: () => boolean;
   getConversations: () => Promise<MessageConversation[]>;
   getMessages: (peerId: string, beforeSentTime?: number) => Promise<MessageHistoryPage>;
   sendText: (peerId: string, text: string) => Promise<ManagedMessage>;
@@ -90,6 +93,8 @@ export type MessageStoreState = {
   activePeerId: string | null;
   /** 聊天界面是否在前台可见；activePeerId 在页面被覆盖/退后台时仍保留，已读判断必须叠加此项 */
   chatForeground: boolean;
+  /** 诊断用：本次登录会话内确认为离线补偿重放的消息条数（隐藏弹窗展示，文案不含 SDK 厂商名） */
+  compensatedCount: number;
   lastError: string | null;
   refreshOnlineStatuses: (token: string) => Promise<void>;
   refreshConversations: (token: string) => Promise<void>;
@@ -151,6 +156,7 @@ function createAdapter(): MessageAdapter {
   return {
     available: isRongCloudAvailable,
     initialize: initializeRongCloud,
+    isConnected: isRongCloudConnected,
     getConversations: getRongConversations,
     getMessages: getRongMessages,
     sendText: sendRongText,
@@ -226,6 +232,8 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         isMine: message.isMine,
         isActive,
         sentAt: message.sentAt,
+        receivedOffline: message.receivedOffline === true,
+        sessionReadyAt,
       });
       if (
         !isSystemConversationId(normalizedPeerId)
@@ -296,6 +304,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
             ? { ...state.messagesByPeerId, [normalizedPeerId]: mergeMessages(state.messagesByPeerId[normalizedPeerId] || [], message) }
             : state.messagesByPeerId,
           conversations,
+          compensatedCount: isReplayedHistory ? state.compensatedCount + 1 : state.compensatedCount,
         };
       });
       if (isActive) void adapter.markRead(normalizedPeerId).catch((error) => set({ lastError: error instanceof Error ? error.message : '清除未读失败' }));
@@ -332,6 +341,14 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       }
       if (expectedLifecycleRevision !== lifecycleRevision) return;
       const blockedUserIds = new Set(get().blacklistedUserIds);
+      const unreadSnapshot = conversations
+        .filter((conversation) => conversation.unreadCount > 0)
+        .map((conversation) => ({ peerId: conversation.id, title: conversation.title, unread: conversation.unreadCount }));
+      if (unreadSnapshot.length > 0) {
+        logger.info('RongCloud conversation snapshot unread', {
+          unread: JSON.stringify(unreadSnapshot),
+        });
+      }
       const blockedConversationIds = conversations
         .filter((conversation) =>
           !isSystemConversationId(conversation.id)
@@ -431,6 +448,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       openPeerIds: [],
       activePeerId: null,
       chatForeground: false,
+      compensatedCount: 0,
       lastError: null,
 
       refreshOnlineStatuses: async (token) => {
@@ -466,7 +484,8 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       refreshConversations: async (token) => {
         if (!token) return;
         onlineStatusToken = token;
-        if (get().connectionState === 'ready') {
+        // 标记 ready 且长连接实际在线才直接同步；后台挂起等假 ready 场景需走 initialize 重连
+        if (get().connectionState === 'ready' && adapter.isConnected?.() === true) {
           try {
             await syncConversations(lifecycleRevision);
           } catch (error) {
@@ -507,7 +526,10 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         // 否则在 await readBlacklist 期间,RootLayout 的 effect 可能再次触发 initialize,
         // 形成 initialize → set('connecting') → React 重渲染 → effect 重跑 → initialize 的死循环。
         if (initializeInProgress) return;
-        if (get().connectionState === 'connecting' || get().connectionState === 'ready') return;
+        // 状态标记为已连接、且 SDK 长连接实际在线时才跳过；
+        // 后台挂起/互踢等场景下 connectionState 仍是 ready 但连接已断，必须允许重连
+        if ((get().connectionState === 'connecting' || get().connectionState === 'ready')
+          && adapter.isConnected?.() === true) return;
         if (!token) return;
         if (!adapter.available()) {
           set({ connectionState: 'unavailable', lastError: unavailableMessage });
@@ -772,7 +794,11 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
 
       markRead: async (peerId) => {
         set((state) => ({ conversations: state.conversations.map((item) => item.id === peerId ? { ...item, unreadCount: 0 } : item) }));
-        if (get().connectionState !== 'ready') return;
+        if (get().connectionState !== 'ready') {
+          // 静默吞掉已读上报会导致服务端永远不知道已读，重装后未读会复活——必须留痕
+          logger.warn('markRead skipped while IM not ready', { peerId, connectionState: get().connectionState });
+          return;
+        }
         try { await adapter.markRead(peerId); } catch (error) { set({ lastError: error instanceof Error ? error.message : '清除未读失败' }); }
       },
 
@@ -841,7 +867,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         stopConversationSyncSubscription = undefined;
         stopReadSyncSubscription = undefined;
         await adapter.disconnect();
-        set({ connectionState: 'idle', conversationError: null, conversations: [], blacklistedUserIds: [], messagesByPeerId: {}, historyByPeerId: {}, openPeerIds: [], activePeerId: null, chatForeground: false, lastError: null });
+        set({ connectionState: 'idle', conversationError: null, conversations: [], blacklistedUserIds: [], messagesByPeerId: {}, historyByPeerId: {}, openPeerIds: [], activePeerId: null, chatForeground: false, compensatedCount: 0, lastError: null });
       },
     };
   });

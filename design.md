@@ -56,7 +56,7 @@ colors={['#FF1F2E', '#FF1F69']}
 
 ## 4. 字体与文字层级
 
-项目字体为 `DouyinSans`，常量为 `DOUYIN_SANS`。所有新增业务页面应优先使用该字体。
+正文使用系统默认字体，不额外指定自定义字体。
 
 | 场景 | 字号 | 字重/颜色 |
 | --- | ---: | --- |
@@ -198,7 +198,7 @@ pill = 15
 
 新增页面时应优先：
 
-- 复用 `DOUYIN_SANS`、`colors`、`spacing`、`radius`。
+- 复用 `colors`、`spacing`、`radius`。
 - 复用 `Image`、`Pressable`、`ScrollView`、`Modal` 等已有技术栈。
 - 使用 Expo Router 进行跳转。
 - 使用远程接口数据替代静态 demo 数据。
@@ -222,7 +222,7 @@ pill = 15
 实现没有 Figma 稿的新页面前，确认以下问题：
 
 - 页面是否使用了当前白底、深色文字、灰色辅助信息和品牌红粉渐变？
-- 是否使用了 `DouyinSans` 和已有 spacing/radius token？
+- 是否使用了系统默认字体和已有 spacing/radius token？
 - 顶部和底部是否正确处理安全区？
 - 主要列表项是否能在一屏内快速扫描？
 - 所有动态数据是否有加载、空态和错误态？

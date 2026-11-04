@@ -239,7 +239,7 @@ Expected: 通过；`grep -n "headerEnd\|headerSpace" <6 个文件>` 无残留。
 - Modify: `src/features/mine/screens/ProtocolScreen.tsx`（用户协议，28/28）
 - Modify: `src/features/mine/screens/ReportScreen.tsx`（举报，28/28）
 - Modify: `src/features/mine/screens/ProfileRelationScreen.tsx`（48/48）
-- Modify: `src/features/mine/screens/StarRechargeScreen.tsx`（星钻充值，右侧 `headerSide` → `right` 插槽）
+- Modify: `src/features/mine/screens/StarRechargeScreen.tsx`（钻石充值，右侧 `headerSide` → `right` 插槽）
 - Modify: `src/features/mine/screens/StarRechargeAndroidScreen.tsx`（安卓变体，同上）
 
 **Interfaces:**

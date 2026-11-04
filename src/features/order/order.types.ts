@@ -32,6 +32,12 @@ export type OrderAction = {
   variant: "primary" | "secondary";
 };
 
+export type MultiCompanionCandidateModel = {
+  userId: string;
+  nickname?: string;
+  headImage?: string;
+};
+
 export type OrderItemModel = {
   id: string;
   orderNo?: string;
@@ -50,17 +56,36 @@ export type OrderItemModel = {
   gameIcon?: ImageSource;
   serviceName: string;
   gameName: string;
+  gameModeName?: string;
+  gameLevelName?: string;
+  orderServiceName?: string;
   billingUnitName?: string;
   requestNo?: string;
   voiceTag?: string;
+  /** 活动需求轻量标识（activityCode 非空时输出「活动」，普通需求不输出） */
+  activityTag?: string;
   sourceLabel?: string;
   unitPrice: string;
   quantity: number;
   totalPrice: string;
-  /** 已免单的星钻金额，来自订单退款信息 */
+  /** 订单类型（ACTIVITY=活动单，COMPANION=普通陪玩单等） */
+  orderType?: string;
+  /** 实付金额（买家视角合计口径，活动订单为折后金额） */
+  realPayAmount?: string;
+  /** 活动商品 ID（非空表示商品订单；不得用 activityId 反查活动商品） */
+  productId?: number;
+  /** 活动周期 ID（活动订单输出，普通订单不输出） */
+  activityId?: number;
+  /** 优惠金额（活动订单输出，普通订单不输出） */
+  discountAmount?: number;
+  /** 原价口径退款基数（活动订单免单传参用，普通订单不输出） */
+  refundBaseAmount?: number;
+  /** 已免单的钻石金额，来自订单退款信息 */
   freeAmount?: string;
   remark?: string;
   createTime?: string;
+  /** 待支付订单的支付截止时间，优先使用服务端值 */
+  payDeadline?: string;
   paidTime?: string;
   acceptedTime?: string;
   dispatchTime?: string;
@@ -68,6 +93,12 @@ export type OrderItemModel = {
   serviceStartTime?: string;
   serviceEndTime?: string;
   completedTime?: string;
+  /** 是否一单多陪 */
+  multiCompanion?: boolean;
+  /** 一单多陪总人数（含主单，2~4） */
+  multiCompanionCount?: number;
+  /** 参与陪玩（不含主单）；未选满时开始服务需先弹选人 */
+  companions?: MultiCompanionCandidateModel[];
   actions: readonly OrderAction[];
 };
 

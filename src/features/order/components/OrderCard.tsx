@@ -1,8 +1,9 @@
 import { Copy16Regular } from "@fluentui/react-native-icons";
 import * as Clipboard from "expo-clipboard";
 import { LinearGradient } from "expo-linear-gradient";
-import { memo, type ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { memo, useEffect, useState, type ReactNode } from "react";
+import type { ImageSource } from "expo-image";
+import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
 import Toast from "react-native-root-toast";
 
 import {
@@ -11,6 +12,7 @@ import {
   formatStar,
 } from "@/features/order/free-amount";
 import { formatOrderTime } from "@/features/order/order-detail-format";
+import { formatPaymentCountdown, getPaymentDeadline } from "../payment-countdown";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import type {
@@ -18,6 +20,7 @@ import type {
   OrderActionKey,
   OrderItemModel,
   OrderStatus,
+  OrderScope,
 } from "../order.types";
 
 const PRIMARY_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
@@ -40,17 +43,34 @@ type OrderCardProps = {
   onAction: (item: OrderItemModel, action: OrderActionKey) => void;
   onPress?: (item: OrderItemModel) => void;
   actionPending?: boolean;
+  active?: boolean;
+  onPaymentExpired?: () => void;
+  scope: OrderScope;
+  gameIcon?: ImageSource;
 };
 
 export const OrderCard = memo(function OrderCard({
   item,
-  clubName,
   onAction,
   onPress,
   actionPending = false,
+  active = true,
+  onPaymentExpired,
+  scope,
+  gameIcon,
 }: OrderCardProps) {
-  const resolvedClubName = item.clubName ?? clubName;
+  const paymentDeadline = getPaymentDeadline(item);
   const freeSummary = formatOrderFreeSummary(item);
+  const isActivityOrder = item.orderType === "ACTIVITY";
+  const billingUnit = item.billingUnitName ?? "小时";
+  const qty = Math.max(1, item.quantity);
+  // 活动单三行按单价口径展示；优惠/实付为订单合计时按数量折算
+  const activityOriginal = item.unitPrice;
+  const activityDiscount = formatStar((item.discountAmount ?? 0) / qty);
+  const activityRealPayRaw = Number(item.realPayAmount ?? item.totalPrice);
+  const activityRealPay = formatStar(
+    (Number.isFinite(activityRealPayRaw) ? activityRealPayRaw : 0) / qty,
+  );
   const copyOrderNo = async () => {
     const orderNo = item.orderNo ?? item.id;
     try {
@@ -65,7 +85,7 @@ export const OrderCard = memo(function OrderCard({
       <Pressable
         accessibilityRole={onPress ? "button" : undefined}
         onPress={() => onPress?.(item)}
-        style={({ pressed }) => pressed && styles.cardPressed}
+        style={({ pressed }) => [styles.cardContent, pressed && styles.cardPressed]}
       >
         <View style={styles.sellerRow}>
           <View style={styles.seller}>
@@ -89,12 +109,10 @@ export const OrderCard = memo(function OrderCard({
                     {item.voiceTag}
                   </Text>
                 ) : null}
+                {item.activityTag ? (
+                  <Text style={styles.activityTag}>{item.activityTag}</Text>
+                ) : null}
               </View>
-              {resolvedClubName ? (
-                <Text numberOfLines={1} style={styles.clubName}>
-                  {resolvedClubName}
-                </Text>
-              ) : null}
             </View>
           </View>
           <Text
@@ -114,18 +132,19 @@ export const OrderCard = memo(function OrderCard({
         </View>
 
         <View style={styles.orderBody}>
-          <Text numberOfLines={1} style={styles.serviceName}>
-            {item.serviceName}
-          </Text>
           <View style={styles.detailPanel}>
+            <Text numberOfLines={1} style={styles.serviceName}>
+              {item.serviceName}
+            </Text>
             <OrderDetailRow label="游戏">
               <View style={styles.gameValue}>
                 <CachedImage
                   source={
                     item.gameIcon ??
+                    gameIcon ??
                     require("../../../../assets/voice-room/game.svg")
                   }
-                  contentFit="contain"
+                  contentFit="cover"
                   style={styles.gameIcon}
                 />
                 <Text numberOfLines={1} style={styles.detailValue}>
@@ -133,17 +152,37 @@ export const OrderCard = memo(function OrderCard({
                 </Text>
               </View>
             </OrderDetailRow>
-            <OrderDetailRow label="时间">
+            {scope === "dispatch" ? <OrderDetailRow label="时间">
               <Text style={styles.detailValue}>
                 {formatOrderTime(item.createTime)}
               </Text>
-            </OrderDetailRow>
-            <OrderDetailRow label="单价">
-              <Text style={styles.detailValue}>
-                {item.unitPrice}星钻/{item.billingUnitName ?? "小时"}
-              </Text>
-            </OrderDetailRow>
-            <OrderDetailRow label="订单号">
+            </OrderDetailRow> : null}
+            {isActivityOrder ? (
+              <>
+                <OrderDetailRow label="原价" labelWide>
+                  <Text style={styles.detailValue}>
+                    {`${activityOriginal}钻石/${billingUnit}`}
+                  </Text>
+                </OrderDetailRow>
+                <OrderDetailRow label="优惠减免" labelWide>
+                  <Text style={styles.detailValue}>
+                    {`${activityDiscount}钻石/${billingUnit}`}
+                  </Text>
+                </OrderDetailRow>
+                <OrderDetailRow label="实付" labelWide>
+                  <Text style={styles.detailValue}>
+                    {`${activityRealPay}钻石/${billingUnit}`}
+                  </Text>
+                </OrderDetailRow>
+              </>
+            ) : (
+              <OrderDetailRow label="单价">
+                <Text style={styles.detailValue}>
+                  {item.unitPrice}钻石/{billingUnit}
+                </Text>
+              </OrderDetailRow>
+            )}
+            {scope === "dispatch" ? <OrderDetailRow label="订单号">
               <View style={styles.orderNoValue}>
                 <Text numberOfLines={1} style={styles.detailValue}>
                   {item.orderNo ?? item.id}
@@ -158,7 +197,7 @@ export const OrderCard = memo(function OrderCard({
                   <Copy16Regular color="#999999" width={14} height={14} />
                 </Pressable>
               </View>
-            </OrderDetailRow>
+            </OrderDetailRow> : null}
             <OrderDetailRow label="备注">
               <Text numberOfLines={2} style={styles.detailValue}>
                 {item.remark || "-"}
@@ -174,9 +213,9 @@ export const OrderCard = memo(function OrderCard({
           </View>
           <View style={styles.totalRow}>
             <View style={styles.quantitySummary}>
-              <Text style={styles.totalLabel}>{item.unitPrice}星钻</Text>
-              <Text style={styles.totalLabel}>x</Text>
-              <Text style={styles.quantity}>
+              <Text style={styles.quantity}>{item.unitPrice}钻石</Text>
+              <Text style={styles.quantity}>x</Text>
+              <Text style={styles.totalLabel}>
                 {item.quantity}
                 {item.billingUnitName ?? "小时"}
               </Text>
@@ -205,7 +244,17 @@ export const OrderCard = memo(function OrderCard({
 
       {item.actions.length > 0 && (
         <View style={styles.actions}>
-          {item.actions.map((action) => (
+          {item.actions.map((action) => action.key === "pay" && paymentDeadline !== null ? (
+            <PaymentActionButton
+              key={`${action.key}:${paymentDeadline}`}
+              action={action}
+              deadline={paymentDeadline}
+              active={active}
+              disabled={actionPending}
+              onPress={() => onAction(item, action.key)}
+              onExpired={onPaymentExpired}
+            />
+          ) : (
             <ActionButton
               action={action}
               key={action.key}
@@ -222,15 +271,81 @@ export const OrderCard = memo(function OrderCard({
 function OrderDetailRow({
   label,
   children,
+  labelWide = false,
 }: {
   label: string;
   children: ReactNode;
+  labelWide?: boolean;
 }) {
   return (
     <View style={styles.detailRow}>
-      <Text style={styles.detailLabel}>{label}</Text>
+      <Text style={[styles.detailLabel, labelWide && styles.detailLabelWide]}>
+        {label}
+      </Text>
       <View style={styles.detailContent}>{children}</View>
     </View>
+  );
+}
+
+// 每秒仅更新支付按钮，避免触发整个订单列表和卡片重渲染。
+function PaymentActionButton({
+  action,
+  deadline,
+  active,
+  disabled,
+  onPress,
+  onExpired,
+}: {
+  action: OrderAction;
+  deadline: number;
+  active: boolean;
+  disabled: boolean;
+  onPress: () => void;
+  onExpired?: () => void;
+}) {
+  const [now, setNow] = useState(Date.now);
+  const [expired, setExpired] = useState(false);
+
+  useEffect(() => {
+    if (!active) {
+      return;
+    }
+    let stopped = false;
+    const update = () => {
+      if (stopped) {
+        return;
+      }
+      const current = Date.now();
+      setNow(current);
+      if (current >= deadline) {
+        stopped = true;
+        setExpired(true);
+        clearInterval(timer);
+        onExpired?.();
+      }
+    };
+    const timer = setInterval(() => {
+      if (AppState.currentState === "active") {
+        update();
+      }
+    }, 1000);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        update();
+      }
+    });
+    return () => {
+      clearInterval(timer);
+      subscription.remove();
+    };
+  }, [active, deadline, onExpired]);
+
+  return (
+    <ActionButton
+      action={{ ...action, label: `${action.label} ${formatPaymentCountdown(deadline, now)}` }}
+      disabled={disabled || expired}
+      onPress={onPress}
+    />
   );
 }
 
@@ -292,6 +407,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     gap: 8,
   },
+  cardContent: { gap: 8 },
   sellerRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -346,12 +462,23 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   voiceTagRequired: { color: "#581CE5", backgroundColor: "#F1EBFF" },
+  activityTag: {
+    overflow: "hidden",
+    borderRadius: 3,
+    backgroundColor: "#FFE9EC",
+    paddingHorizontal: 4,
+    color: "#F02A45",
+    fontFamily: SYSTEM_FONT,
+    fontSize: 11,
+    lineHeight: 18,
+  },
   orderBody: { gap: 8 },
   serviceName: {
     fontFamily: SYSTEM_FONT,
     color: "#0A0A0A",
     fontSize: 14,
     lineHeight: 22,
+    fontWeight: "500",
   },
   detailPanel: {
     backgroundColor: "#F7F7F7",
@@ -368,6 +495,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
   },
+  detailLabelWide: {
+    width: "auto",
+    minWidth: 48,
+  },
   detailContent: { flex: 1 },
   detailValue: {
     color: "#0A0A0A",
@@ -376,7 +507,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   gameValue: { flexDirection: "row", alignItems: "center", gap: 6 },
-  gameIcon: { width: 14, height: 14 },
+  gameIcon: { width: 14, height: 14, borderRadius: 4, backgroundColor: "lightgray", overflow: "hidden" },
   orderNoValue: { flexDirection: "row", alignItems: "center", gap: 4 },
   copyButton: {
     width: 20,
@@ -409,7 +540,7 @@ const styles = StyleSheet.create({
   totalRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
     alignItems: "center",
     gap: 4,
   },

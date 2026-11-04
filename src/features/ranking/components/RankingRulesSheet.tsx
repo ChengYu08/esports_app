@@ -2,7 +2,6 @@ import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } fr
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { colors } from "@/shared/theme/tokens";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import type { RankingBoard, RankingPeriod } from "../api/ranking.types";
 import { getRankingRulesTitle } from "../ranking.config";
 import { RANKING_RULES } from "../ranking.rules";
@@ -45,17 +44,17 @@ const styles = StyleSheet.create({
   sheet: { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20 },
   handle: { width: 32, height: 4, borderRadius: 2, backgroundColor: "#E5E5E9", marginTop: 10, alignSelf: "center" },
   header: { flexDirection: "row", alignItems: "center", gap: 8, paddingTop: 6, paddingBottom: 6 },
-  title: { flex: 1, fontFamily: DOUYIN_SANS, fontSize: 17, fontWeight: "600", color: colors.text },
+  title: { flex: 1, fontSize: 17, fontWeight: "600", color: colors.text },
   close: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   closeLabel: { fontSize: 28, color: colors.textMuted },
   scroll: { flexShrink: 1 },
   content: { paddingTop: 8, paddingBottom: 20, gap: 20 },
   section: { gap: 10 },
-  sectionTitle: { fontFamily: DOUYIN_SANS, fontSize: 14, fontWeight: "600", color: colors.text },
+  sectionTitle: { fontSize: 14, fontWeight: "600", color: colors.text },
   rule: { flexDirection: "row", gap: 8 },
   number: { fontSize: 12, lineHeight: 22, color: colors.textMuted, width: 18 },
-  ruleText: { flex: 1, fontFamily: DOUYIN_SANS, fontSize: 12, lineHeight: 22, color: colors.textSecondary },
+  ruleText: { flex: 1, fontSize: 12, lineHeight: 22, color: colors.textSecondary },
   confirm: { minHeight: 46, alignItems: "center", justifyContent: "center", borderRadius: 12, backgroundColor: colors.brand, marginTop: 8 },
-  confirmLabel: { fontFamily: DOUYIN_SANS, fontSize: 14, fontWeight: "500", color: "#FFF" },
+  confirmLabel: { fontSize: 14, fontWeight: "500", color: "#FFF" },
   pressed: { opacity: 0.75 },
 });

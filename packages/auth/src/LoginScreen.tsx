@@ -24,7 +24,6 @@ import {
   sanitizePhone,
 } from "./password-validation";
 import { PasswordVisibilityIcon } from "./PasswordVisibilityIcon";
-import { DOUYIN_SANS } from "./typography";
 
 const topArt = require("../assets/top-login.svg");
 const phoneIcon = require("../assets/phone.svg");
@@ -527,13 +526,12 @@ const styles = StyleSheet.create({
     textAlignVertical: "center",
   },
   divider: { width: 1, height: 16, backgroundColor: "#ddd" },
-  send: { color: "#e01b28", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  send: { color: "#e01b28", fontSize: 14 },
   sendDisabled: { color: "#bbb" },
   passwordActions: { flexDirection: "row", alignItems: "center", gap: 10 },
   eyeButton: { width: 24, height: 24, justifyContent: "center" },
   forgotPassword: {
     color: "#999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
   },
   actions: { marginTop: 56, alignItems: "center" },
@@ -552,14 +550,12 @@ const styles = StyleSheet.create({
   submitContent: { flexDirection: "row", alignItems: "center", gap: 8 },
   submitText: {
     color: "#fff",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "600",
   },
   browse: {
     marginTop: 16,
     color: "#999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
   },
   footer: {
@@ -587,7 +583,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   methodIcon: { width: 22, height: 22 },
-  methodLabel: { color: "#808080", fontFamily: DOUYIN_SANS, fontSize: 12 },
+  methodLabel: { color: "#808080", fontSize: 12 },
   agreement: {
     marginTop: 40,
     marginHorizontal: 32,
@@ -611,7 +607,6 @@ const styles = StyleSheet.create({
   agreementText: {
     flex: 1,
     color: "#999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 20,
   },
@@ -637,7 +632,6 @@ const styles = StyleSheet.create({
   modalCopy: { flexGrow: 0, flexShrink: 1 },
   modalTitle: {
     color: "#222",
-    fontFamily: DOUYIN_SANS,
     fontSize: 18,
     fontWeight: "600",
     textAlign: "center",
@@ -645,7 +639,6 @@ const styles = StyleSheet.create({
   modalText: {
     marginTop: 16,
     color: "#666",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -663,7 +656,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  disagreeText: { color: "#999", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  disagreeText: { color: "#999", fontSize: 14 },
   agreeButton: {
     flex: 2,
     minHeight: 44,
@@ -675,7 +668,6 @@ const styles = StyleSheet.create({
   },
   agreeText: {
     color: "#fff",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "600",
   },

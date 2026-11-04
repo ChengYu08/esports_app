@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfileDetail } from '@/features/mine/hooks/use-profile-data';
 import { useToggleUserFollow, useUserFollowState } from '@/features/mine/hooks/use-user-follow';
 import { useAppConfirm } from '@/shared/ui/app-confirm';
+import { showToast } from '@/shared/ui/app-toast';
 import { BottomSheet } from '@/shared/ui/BottomSheet';
 import { canKickVoiceRoomMember, getMemberAge } from '../member-profile';
 import { voiceRoomApi } from '../voice-room.api';
@@ -25,11 +26,13 @@ type Props = {
   member: VoiceRoomMember | null;
   room: VoiceRoomDetail | null;
   roomId?: string;
+  /** 非空时「主页」入口拦截（活动需求进行中限制唯一下单链路），点击仅提示不跳转 */
+  orderEntryBlockedText?: string;
   onClose: () => void;
   onMemberKicked: (userId: string) => void;
 };
 
-export function VoiceRoomMemberSheet({ visible, member, room, roomId, onClose, onMemberKicked }: Props) {
+export function VoiceRoomMemberSheet({ visible, member, room, roomId, orderEntryBlockedText, onClose, onMemberKicked }: Props) {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const token = useAuthStore((state) => state.accessToken);
@@ -160,6 +163,11 @@ export function VoiceRoomMemberSheet({ visible, member, room, roomId, onClose, o
               accessibilityLabel="查看用户主页"
               disabled={busy}
               onPress={() => {
+                // 活动需求进行中：主页内的技能卡下单入口被屏蔽，仅提示走「派单匹配中」
+                if (orderEntryBlockedText) {
+                  showToast(orderEntryBlockedText);
+                  return;
+                }
                 onClose();
                 router.push({ pathname: '/profile', params: { userId: member.userId } });
               }}

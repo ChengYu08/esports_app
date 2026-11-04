@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   actionNotice,
+  getActionNoticeHandlers,
   resetActionNoticeStore,
   useActionNoticeStore,
 } from "@/shared/ui/action-notice/action-notice-store";
@@ -51,6 +52,8 @@ const {
 } = await import("./action-command-handlers");
 const { refreshDispatchForRemoteChange } = await import("@/features/order/order-query");
 const { logger } = await import("@/core/logging/logger");
+const { router } = await import("expo-router");
+const { acceptOrder } = await import("@/features/order/order.api");
 
 const NOW = new Date("2026-10-20T12:00:00").getTime();
 const PLATFORM = "50000000";
@@ -282,10 +285,68 @@ describe("handleQuickMatchNotice", () => {
     );
     expect(useActionNoticeStore.getState().items).toHaveLength(0);
   });
+
+  it("activityCode 非空时文案带秒杀活动语境", () => {
+    handleQuickMatchNotice(
+      command("QUICK_MATCH_NOTICE", {
+        requestNo: "QM1",
+        buyerNickname: "老板A",
+        gameName: "王者荣耀",
+        activityCode: "SECKILL001",
+        activityType: "ACTIVITY_BASED_DISPATCHING",
+        expireTime: "2026-10-20 12:30:00",
+      }),
+      NOW,
+    );
+    const items = useActionNoticeStore.getState().items;
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      id: "qm:QM1",
+      text: "秒杀匹配中：「老板A」发布了王者荣耀需求",
+    });
+  });
+
+  it("activityCode 为空串时走普通文案", () => {
+    handleQuickMatchNotice(
+      command("QUICK_MATCH_NOTICE", {
+        requestNo: "QM1",
+        buyerNickname: "老板A",
+        gameName: "王者荣耀",
+        activityCode: "   ",
+        expireTime: "2026-10-20 12:30:00",
+      }),
+      NOW,
+    );
+    expect(useActionNoticeStore.getState().items[0]?.text).toBe(
+      "「老板A」发布了王者荣耀需求",
+    );
+  });
+
+  it("活动通知点击仍走既有抢单链路", async () => {
+    const { grabQuickMatchAndEnterAudition } = await import(
+      "@/features/match/grab-quick-match-flow"
+    );
+    vi.mocked(grabQuickMatchAndEnterAudition).mockResolvedValue({
+      status: "success",
+    } as never);
+    handleQuickMatchNotice(
+      command("QUICK_MATCH_NOTICE", {
+        requestNo: "QM1",
+        activityCode: "SECKILL001",
+        expireTime: "2026-10-20 12:30:00",
+      }),
+      NOW,
+    );
+    const onAction = getActionNoticeHandlers("qm:QM1")?.onAction;
+    expect(onAction).toBeDefined();
+    await onAction?.();
+    expect(grabQuickMatchAndEnterAudition).toHaveBeenCalledWith("QM1");
+  });
 });
 
 describe("handleOrderNotifyPopup", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     resetActionCommandDedupKeys();
     resetActionNoticeStore();
   });
@@ -297,6 +358,16 @@ describe("handleOrderNotifyPopup", () => {
     buyerNickname: "老板B",
     buyerHeadImage: "https://example.com/a.png",
   };
+
+  it("接单成功后以接单方视角打开详情", async () => {
+    handleOrderNotifyPopup(command("ORDER_NOTIFY", payload), NOW);
+    await getActionNoticeHandlers("pay:PZ1")?.onAction();
+    expect(acceptOrder).toHaveBeenCalledWith("123", "token");
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: "/order/[id]",
+      params: { id: "123", scope: "accept" },
+    });
+  });
 
   it("首次命令入队且文案完整", () => {
     handleOrderNotifyPopup(command("ORDER_NOTIFY", payload), NOW);

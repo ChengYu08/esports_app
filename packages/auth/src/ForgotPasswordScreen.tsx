@@ -19,7 +19,6 @@ import {
 } from "./password-validation";
 import type { ForgotPasswordPayload } from "./sso-adapter";
 import { PasswordVisibilityIcon } from "./PasswordVisibilityIcon";
-import { DOUYIN_SANS } from "./typography";
 
 export type ForgotPasswordScreenProps = {
   initialPhone?: string;
@@ -300,7 +299,6 @@ const styles = StyleSheet.create({
   },
   title: {
     color: "#222",
-    fontFamily: DOUYIN_SANS,
     fontSize: 18,
     fontWeight: "600",
   },
@@ -332,17 +330,15 @@ const styles = StyleSheet.create({
     textAlignVertical: "center",
   },
   divider: { width: 1, height: 16, backgroundColor: "#ddd" },
-  sendCode: { color: "#e01b28", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  sendCode: { color: "#e01b28", fontSize: 14 },
   muted: { color: "#999" },
   passwordHint: {
     color: "#999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
   validationMessage: {
     color: "#e01b28",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -357,7 +353,6 @@ const styles = StyleSheet.create({
   submitDisabled: { opacity: 0.55 },
   submitText: {
     color: "#fff",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "600",
   },

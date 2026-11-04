@@ -1,7 +1,6 @@
 import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import type { MessageListItemModel } from "../message.types";
 import { formatUnreadCount } from "../message-unread";
@@ -26,7 +25,11 @@ export const MessageListItem = memo(function MessageListItem({
       accessibilityLabel={`${item.title}${item.isOnline ? "，在线" : ""}，${item.preview}`}
       accessibilityRole="button"
       onPress={() => onPress(item)}
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+      style={({ pressed }) => [
+        styles.row,
+        item.isPinned && styles.rowPinned,
+        pressed && styles.rowPressed,
+      ]}
     >
       <View style={styles.avatarWrap}>
         <CachedImage source={item.avatar} style={styles.avatar} contentFit="cover" />
@@ -62,6 +65,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
+  // 置顶会话背景更深（设计稿 76-49626：置顶行 Gray-04 #F7F7F7，普通行白色）
+  rowPinned: { backgroundColor: "#F7F7F7" },
   rowPressed: { backgroundColor: "#FAFAFA" },
   avatarWrap: { position: "relative", width: 40, height: 40 },
   avatar: { width: 40, height: 40, borderRadius: 20 },
@@ -80,7 +85,6 @@ const styles = StyleSheet.create({
   heading: { flexDirection: "row", alignItems: "center", gap: 16 },
   title: {
     flex: 1,
-    fontFamily: DOUYIN_SANS,
     color: "#333333",
     fontSize: 14,
     lineHeight: 22,
@@ -88,13 +92,11 @@ const styles = StyleSheet.create({
   },
   time: {
     flexShrink: 0,
-    fontFamily: DOUYIN_SANS,
     color: "#CCCCCC",
     fontSize: 12,
     lineHeight: 18,
   },
   preview: {
-    fontFamily: DOUYIN_SANS,
     color: "#999999",
     fontSize: 14,
     lineHeight: 22,
@@ -123,7 +125,6 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 11,
     lineHeight: 16,
   },

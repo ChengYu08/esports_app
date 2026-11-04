@@ -1,5 +1,6 @@
-import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
+import { showToast } from "@/shared/ui/app-toast";
 import { useAuthStore } from "@esports/auth";
+import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -16,16 +17,17 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { publishQuickMatch } from "@/features/match/api/match.api";
-import { openAuditionRoom } from "@/features/match/enter-audition-room";
 import { ClubSelectSheet } from "@/features/match/components/ClubSelectSheet";
 import { FieldLabel } from "@/features/match/components/FieldLabel";
+import { MatchClubSelectChip } from "@/features/match/components/MatchClubSelectChip";
+import { MatchGameOptionChip } from "@/features/match/components/MatchGameOptionChip";
 import { MatchLinearGradient } from "@/features/match/components/MatchLinearGradient";
 import { MatchOptionChip } from "@/features/match/components/MatchOptionChip";
 import { MatchStepper } from "@/features/match/components/MatchStepper";
+import { openAuditionRoom } from "@/features/match/enter-audition-room";
 import {
   MATCH_COMPANION_PREFERENCE_OPTIONS,
   MATCH_GENDER_OPTIONS,
@@ -40,13 +42,12 @@ import {
   voiceRoomApi,
 } from "@/features/voice-room/voice-room.api";
 import type { VoiceRoomDetail } from "@/features/voice-room/voice-room.types";
+import { getDDinProStyle } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 
-const arrowDownIcon = require("../../../../assets/svgs/icon-arrow-down.svg");
 const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
+const bgPublishDark = require("../../../../assets/images/bg_publish_dark.webp");
 
-const BG_GRADIENT = ["#0C0C2E", "#120D2B"] as const;
 const PUBLISH_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
 const FOOTER_CONTENT_BOTTOM = 22;
 const REMARK_KEYBOARD_GAP = 12;
@@ -95,11 +96,17 @@ export default function MatchPublishScreen() {
   }, []);
 
   useEffect(() => {
-    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
 
-    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
-    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+    const showSub = Keyboard.addListener(showEvent, () =>
+      setKeyboardVisible(true),
+    );
+    const hideSub = Keyboard.addListener(hideEvent, () =>
+      setKeyboardVisible(false),
+    );
     return () => {
       showSub.remove();
       hideSub.remove();
@@ -108,7 +115,10 @@ export default function MatchPublishScreen() {
 
   useEffect(() => {
     if (!keyboardVisible || !remarkFocusedRef.current) return;
-    const timer = setTimeout(ensureRemarkAboveKeyboard, Platform.OS === "android" ? 64 : 32);
+    const timer = setTimeout(
+      ensureRemarkAboveKeyboard,
+      Platform.OS === "android" ? 64 : 32,
+    );
     return () => clearTimeout(timer);
   }, [keyboardVisible, ensureRemarkAboveKeyboard]);
 
@@ -256,11 +266,11 @@ export default function MatchPublishScreen() {
     <View style={styles.root}>
       <StatusBar style="light" />
       <Stack.Screen options={{ headerShown: false }} />
-      <MatchLinearGradient
-        colors={BG_GRADIENT}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
+      <Image
+        source={bgPublishDark}
         style={styles.background}
+        contentFit="fill"
+        pointerEvents="none"
       />
       <KeyboardAvoidingView
         style={styles.content}
@@ -276,7 +286,12 @@ export default function MatchPublishScreen() {
               onPress={goBack}
               style={styles.backButton}
             >
-              <ChevronLeft24Regular color="white" width={24} height={24} style={styles.backIcon} />
+              <ChevronLeft24Regular
+                color="white"
+                width={24}
+                height={24}
+                style={styles.backIcon}
+              />
             </Pressable>
             <Text style={styles.navTitle}>一键匹配</Text>
             <View style={styles.navRight} />
@@ -311,17 +326,20 @@ export default function MatchPublishScreen() {
                     {form.gamesLoading ? (
                       <ActivityIndicator color="#FE4267" />
                     ) : form.games.length === 0 ? (
-                      <HintText text={form.token ? "暂无可选游戏" : "请先登录"} />
+                      <HintText
+                        text={form.token ? "暂无可选游戏" : "请先登录"}
+                      />
                     ) : (
                       form.games.map((game) => (
-                        <MatchOptionChip
+                        <MatchGameOptionChip
                           key={game.id}
                           label={game.name}
-                          icon={game.iconUrl ? { uri: game.iconUrl } : undefined}
+                          icon={
+                            game.iconUrl ? { uri: game.iconUrl } : undefined
+                          }
                           iconFallback
                           selected={form.gameId === game.id}
                           onPress={() => form.selectGame(game.id)}
-                          style={styles.gameChip}
                         />
                       ))
                     )}
@@ -334,7 +352,7 @@ export default function MatchPublishScreen() {
                     {form.clubsLoading && !form.club ? (
                       <ActivityIndicator color="#FE4267" />
                     ) : (
-                      <MatchOptionChip
+                      <MatchClubSelectChip
                         label={form.club?.name ?? "请选择俱乐部"}
                         selected={Boolean(form.club)}
                         onPress={() => {
@@ -344,7 +362,6 @@ export default function MatchPublishScreen() {
                           }
                           setClubSheetVisible(true);
                         }}
-                        trailing={<Image source={arrowDownIcon} style={styles.arrowIcon} />}
                       />
                     )}
                   </View>
@@ -441,7 +458,9 @@ export default function MatchPublishScreen() {
                           key={option.value}
                           label={option.label}
                           selected={form.companionPreference === option.value}
-                          onPress={() => form.setCompanionPreference(option.value)}
+                          onPress={() =>
+                            form.setCompanionPreference(option.value)
+                          }
                         />
                       ))}
                     </View>
@@ -450,7 +469,10 @@ export default function MatchPublishScreen() {
 
                 <View style={[styles.field, styles.fieldCenter]}>
                   <FieldLabel label="数量" required />
-                  <MatchStepper value={form.quantity} onChange={form.setQuantity} />
+                  <MatchStepper
+                    value={form.quantity}
+                    onChange={form.setQuantity}
+                  />
                 </View>
 
                 <View style={styles.field}>
@@ -491,13 +513,17 @@ export default function MatchPublishScreen() {
                   </View>
                 </View>
                 {form.remarkOverLimit ? (
-                  <Text style={styles.remarkError}>备注最多{MATCH_REMARK_MAX}字</Text>
+                  <Text style={styles.remarkError}>
+                    备注最多{MATCH_REMARK_MAX}字
+                  </Text>
                 ) : null}
 
                 <View style={[styles.field, styles.fieldCenter]}>
                   <FieldLabel label="预估价格" required />
                   <View style={styles.priceRow}>
-                    <Text style={styles.priceText}>{form.estimatedPriceText}</Text>
+                    <Text style={styles.priceText}>
+                      {form.estimatedPriceText}
+                    </Text>
                     <Image source={diamondIcon} style={styles.diamondIcon} />
                   </View>
                 </View>
@@ -506,19 +532,20 @@ export default function MatchPublishScreen() {
 
             {keyboardVisible ? null : (
               <View
-                style={[styles.footer, { paddingBottom: insets.bottom + FOOTER_CONTENT_BOTTOM }]}
+                style={[
+                  styles.footer,
+                  { paddingBottom: insets.bottom + FOOTER_CONTENT_BOTTOM },
+                ]}
               >
-                <View style={styles.etaRow}>
-                  <Text style={styles.etaMuted}>预计</Text>
-                  <Text style={styles.etaAccent}>30s</Text>
-                  <Text style={styles.etaMuted}>内匹配成功</Text>
-                </View>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="立即发布，匹配陪玩"
                   disabled={submitting || form.remarkOverLimit}
                   onPress={handlePublish}
-                  style={({ pressed }) => [styles.publishWrap, pressed && styles.pressed]}
+                  style={({ pressed }) => [
+                    styles.publishWrap,
+                    pressed && styles.pressed,
+                  ]}
                 >
                   <MatchLinearGradient
                     colors={PUBLISH_GRADIENT}
@@ -526,7 +553,8 @@ export default function MatchPublishScreen() {
                     end={{ x: 1, y: 1 }}
                     style={[
                       styles.publishButton,
-                      (submitting || form.remarkOverLimit) && styles.publishDisabled,
+                      (submitting || form.remarkOverLimit) &&
+                        styles.publishDisabled,
                     ]}
                   >
                     <Text style={styles.publishText}>
@@ -605,7 +633,6 @@ const styles = StyleSheet.create({
   },
   navTitle: {
     flex: 1,
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "600",
@@ -654,15 +681,7 @@ const styles = StyleSheet.create({
     gap: 8,
     alignItems: "center",
   },
-  gameChip: {
-    minWidth: 116,
-  },
-  arrowIcon: {
-    width: 16,
-    height: 16,
-  },
   hintText: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     color: "rgba(255,255,255,0.4)",
@@ -676,7 +695,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   remarkInput: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     height: 32,
@@ -687,7 +705,6 @@ const styles = StyleSheet.create({
   remarkError: {
     marginLeft: 56,
     marginTop: -16,
-    fontFamily: DOUYIN_SANS,
     fontSize: 11,
     lineHeight: 16,
     color: "#FE4267",
@@ -698,11 +715,10 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   priceText: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 18,
     lineHeight: 22,
-    fontWeight: "600",
     color: "#FFFFFF",
+    ...getDDinProStyle(600),
   },
   diamondIcon: {
     width: 16,
@@ -712,25 +728,6 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingHorizontal: 16,
     gap: 12,
-  },
-  etaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-  },
-  etaMuted: {
-    fontFamily: DOUYIN_SANS,
-    fontSize: 12,
-    lineHeight: 18,
-    color: "rgba(255,255,255,0.6)",
-  },
-  etaAccent: {
-    fontFamily: DOUYIN_SANS,
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: "500",
-    color: "#FE4267",
   },
   publishWrap: {
     width: "100%",
@@ -745,7 +742,6 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   publishText: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "500",

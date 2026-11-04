@@ -34,9 +34,9 @@ import {
   requiresRealNameVerification,
 } from "@/features/mine/order-real-name";
 import { calculateAge } from "@/features/mine/profile-utils";
-import { CachedImage } from "@/shared/ui/CachedImage";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { getDDinProStyle } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
+import { CachedImage } from "@/shared/ui/CachedImage";
 
 const fallbackAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const maleIcon = require("../../../../assets/home/club-detail/male.svg");
@@ -62,6 +62,8 @@ type CompanionOrderSheetProps = {
   onClose: () => void;
   onRealNameVerificationRequired: () => void;
   onOrderCreated: (order: { orderId: number; total: number }) => void;
+  initialServiceName?: string;
+  initialQuantity?: number;
 };
 
 export function CompanionOrderSheet({
@@ -73,13 +75,17 @@ export function CompanionOrderSheet({
   onClose,
   onRealNameVerificationRequired,
   onOrderCreated,
+  initialServiceName,
+  initialQuantity,
 }: CompanionOrderSheetProps) {
   const insets = useSafeAreaInsets();
   const [services, setServices] = useState<CompanionServiceOption[]>([]);
   const [selectedServiceId, setSelectedServiceId] = useState(
     card.companionServiceId,
   );
-  const [quantity, setQuantity] = useState(ORDER_QTY_MIN);
+  const [quantity, setQuantity] = useState(() =>
+    clampOrderQuantity(initialQuantity ?? ORDER_QTY_MIN),
+  );
   const [remark, setRemark] = useState("");
   const [loading, setLoading] = useState(Boolean(token));
   const [submitting, setSubmitting] = useState(false);
@@ -134,6 +140,16 @@ export function CompanionOrderSheet({
         if (!active) return;
         setServices(items);
         setSelectedServiceId((current) => {
+          if (initialServiceName) {
+            const matches = items.filter(
+              (item) => item.name === initialServiceName,
+            );
+            if (matches.length !== 1) {
+              setPrompt({ message: "原订单服务已变更，请重新选择服务" });
+              return 0;
+            }
+            return matches[0].companionServiceId;
+          }
           if (items.some((item) => item.companionServiceId === current)) {
             return current;
           }
@@ -149,7 +165,13 @@ export function CompanionOrderSheet({
     return () => {
       active = false;
     };
-  }, [context.clubId, context.gameLevelId, context.serviceUserId, token]);
+  }, [
+    context.clubId,
+    context.gameLevelId,
+    context.serviceUserId,
+    initialServiceName,
+    token,
+  ]);
 
   const selectedService = services.find(
     (item) => item.companionServiceId === selectedServiceId,
@@ -507,7 +529,6 @@ const styles = StyleSheet.create({
   },
   orderModalTitle: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     fontWeight: "500",
     lineHeight: 24,
@@ -561,20 +582,17 @@ const styles = StyleSheet.create({
   orderCompanionName: {
     flexShrink: 1,
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "500",
   },
   orderGenderIcon: { width: 12, height: 12 },
   orderMaleAge: {
     color: "#0095EE",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     fontWeight: "500",
   },
   orderFemaleAge: {
     color: "#FE1F4C",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     fontWeight: "500",
   },
@@ -587,7 +605,6 @@ const styles = StyleSheet.create({
   orderClubName: {
     flex: 1,
     color: "#999999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
   },
   orderFieldRow: {
@@ -607,14 +624,12 @@ const styles = StyleSheet.create({
   },
   orderFieldLabel: {
     color: "#656566",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     fontWeight: "500",
     lineHeight: 18,
   },
   orderFieldRequired: {
     color: "#FE4267",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     fontWeight: "500",
     lineHeight: 18,
@@ -625,13 +640,11 @@ const styles = StyleSheet.create({
   },
   orderFieldValue: {
     color: "#0D0D0F",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
   orderHint: {
     color: "#999999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -656,7 +669,6 @@ const styles = StyleSheet.create({
   },
   serviceChipText: {
     color: "#0D0D0F",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -684,7 +696,6 @@ const styles = StyleSheet.create({
   },
   qtyButtonText: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 20,
     fontWeight: "500",
@@ -698,7 +709,6 @@ const styles = StyleSheet.create({
     width: 40,
     textAlign: "center",
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     fontWeight: "500",
     lineHeight: 22,
@@ -710,7 +720,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: "#F5F6F7",
     color: "#0D0D0F",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -721,10 +730,9 @@ const styles = StyleSheet.create({
   },
   orderPriceValue: {
     color: "#0D0D0F",
-    fontFamily: DOUYIN_SANS,
     fontSize: 18,
-    fontWeight: "600",
     lineHeight: 22,
+    ...getDDinProStyle(600),
   },
   orderPriceDiamond: {
     width: 16,
@@ -749,7 +757,6 @@ const styles = StyleSheet.create({
   },
   orderSubmitText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "500",
     lineHeight: 22,

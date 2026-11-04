@@ -3,6 +3,7 @@ import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
+import { getDDinProStyle } from "@/shared/theme/typography";
 
 const maleIcon = require("../../../assets/home/club-detail/male.svg");
 const femaleIcon = require("../../../assets/mine/figma/mine-female.svg");
@@ -302,10 +303,10 @@ const styles = StyleSheet.create({
   },
   priceWrap: { flexDirection: "row", alignItems: "flex-end", gap: 4 },
   price: {
+    ...getDDinProStyle(600),
     color: "#FE1F4C",
     fontSize: 20,
     lineHeight: 24,
-    fontWeight: "600",
   },
   diamond: { width: 15, height: 13, marginBottom: 5 },
   salesWrap: {

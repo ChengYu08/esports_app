@@ -16,10 +16,9 @@ import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { toAuthUser } from "@/features/auth/client-auth-flow";
 import { saveAuthSession } from "@/features/auth/session-persistence";
 import { validateSignature } from "@/features/mine/utils/signature-rules";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
-const SIGNATURE_MAX_LENGTH = 100;
+const SIGNATURE_MAX_LENGTH = 60;
 // 设计稿 361-40424：计数达到上限时数字变红
 const LIMIT_COLOR = "#FF4754";
 
@@ -121,7 +120,7 @@ export default function EditSignatureScreen() {
             </View>
           </View>
           <Text style={styles.hintText}>
-            {"最多100字，7天内可修改3次简介"}
+            {"最多60字，7天内可修改3次简介"}
           </Text>
         </View>
       </ScrollView>
@@ -136,7 +135,6 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "600",
@@ -149,7 +147,6 @@ const styles = StyleSheet.create({
   },
   saveText: {
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -168,9 +165,10 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   input: {
+    // 撑满计数器以上剩余空间，让计数器贴住卡片底部
+    flex: 1,
     minHeight: 48,
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     padding: 0,
@@ -188,7 +186,6 @@ const styles = StyleSheet.create({
   },
   counterText: {
     color: "#CCCCCC",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -196,7 +193,6 @@ const styles = StyleSheet.create({
   counterLimit: { color: LIMIT_COLOR },
   hintText: {
     color: "#808080",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     paddingHorizontal: 8,

@@ -20,12 +20,17 @@ import {
 } from "@/features/mine/teen-mode";
 import {
   teenModeApi,
+  fetchTeenModeConfig,
 } from "@/features/mine/api/teen-mode.api";
 import type { TeenModeStatus } from "@/features/mine/api/teen-mode.contract";
-import { saveLastTeenEnabled } from "@/features/mine/teen-mode-store";
+import {
+  publishTeenModeStatus,
+  saveLastTeenEnabled,
+} from "@/features/mine/teen-mode-store";
+import { createTeenRequestGuard } from "@/features/mine/teen-request-guard";
+import { teenLockWindowLabel } from "@/features/mine/utils/teen-lock-window";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { colors } from "@/shared/theme/tokens";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const closedIllustration = require("../../../../assets/mine/figma/teen-mode-closed.svg");
@@ -42,56 +47,109 @@ type Phase =
 
 type PasswordPhase = Exclude<Phase, "overview">;
 
-export default function TeenModeScreen({
-  onStatusChanged,
-  locked = false,
-}: {
+type TeenModeScreenProps = {
   /** 每次服务端状态变化后回调（启动门禁据此解除锁定覆盖层）。 */
   onStatusChanged?: (status: TeenModeStatus) => void;
   /** 作为启动门禁锁定页使用：隐藏返回键，用户必须输密码关闭才能离开。 */
   locked?: boolean;
+};
+
+export default function TeenModeScreen(props: TeenModeScreenProps) {
+  const token = useAuthStore((state) => state.accessToken);
+  const userId = useAuthStore((state) => state.user?.id ?? null);
+  const accountKey = token ? `${token}:${userId ?? ""}` : "";
+  return (
+    <TeenModeScreenSession
+      key={accountKey}
+      {...props}
+      token={token}
+      userId={userId}
+    />
+  );
+}
+
+function TeenModeScreenSession({
+  onStatusChanged,
+  locked = false,
+  token,
+  userId,
+}: TeenModeScreenProps & {
+  token: string | null;
+  userId: string | null;
 }) {
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
-  const token = useAuthStore((state) => state.accessToken);
   const [status, setStatus] = useState<TeenModeStatus | null>(null);
-  const [phase, setPhase] = useState<Phase>("overview");
+  const [phase, setPhase] = useState<Phase>(locked ? "disable" : "overview");
   const [code, setCode] = useState("");
   const [firstPassword, setFirstPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [lockRangeLabel, setLockRangeLabel] = useState(teenLockWindowLabel());
+  const requestGuardRef = useRef(createTeenRequestGuard());
 
   const enabled = status?.enabled === true;
   const passwordSet = status?.passwordSet === true;
 
-  const applyStatus = (next: TeenModeStatus) => {
+  const applyStatus = (
+    next: TeenModeStatus,
+    expectedSession: number,
+    targetUserId: string | null,
+  ) => {
+    if (!requestGuardRef.current.isSessionCurrent(expectedSession)) {
+      return false;
+    }
     setStatus(next);
-    void saveLastTeenEnabled(next.enabled);
+    void saveLastTeenEnabled(next.enabled, targetUserId);
     onStatusChanged?.(next);
+    return true;
   };
 
-  // 挂载即拉取服务端状态；拉取失败保持当前视图（fail-open，不阻断页面）
+  // 状态请求与 open/close 共用会话及操作版本，旧响应不能覆盖新账号或新操作状态
   useEffect(() => {
+    const guard = requestGuardRef.current;
+    const session = guard.beginSession();
+    const targetUserId = userId;
     if (!token) {
       return;
     }
-    let cancelled = false;
+    const snapshot = guard.snapshot();
+    // 锁定时段文案跟随服务端配置（/youth/config）；失败回退默认 9:00-23:00（与服务端默认一致）
+    void (async () => {
+      try {
+        const config = await fetchTeenModeConfig(token);
+        const startHour = Number(config?.lockStartHour);
+        const endHour = Number(config?.lockEndHour);
+        if (!guard.isSessionCurrent(session)) {
+          return;
+        }
+        if (
+          Number.isInteger(startHour) && startHour >= 0 && startHour <= 23
+          && Number.isInteger(endHour) && endHour >= 0 && endHour <= 23
+        ) {
+          setLockRangeLabel(teenLockWindowLabel(startHour, endHour));
+        }
+      } catch {
+        // 配置拉取失败保持默认窗口文案
+      }
+    })();
     void (async () => {
       try {
         const next = await teenModeApi.status(token);
-        if (cancelled) {
+        if (!guard.isCurrent(snapshot)) {
           return;
         }
-        applyStatus(next);
+        applyStatus(next, session, targetUserId);
       } catch {
         // 状态拉取失败保持当前视图，避免网络抖动导致页面不可用
       }
     })();
     return () => {
-      cancelled = true;
+      if (guard.isSessionCurrent(session)) {
+        guard.beginSession();
+      }
     };
-    // applyStatus 依赖 token/user，本 effect 仅随登录态变化重新拉取
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, userId]);
 
   const codeComplete = isPasswordComplete(code);
 
@@ -106,6 +164,21 @@ export default function TeenModeScreen({
       return;
     }
     setSubmitting(true);
+    const guard = requestGuardRef.current;
+    const requestSession = guard.snapshot().session;
+    const requestUserId = userId;
+    const requestToken = token;
+    const applyMutationStatus = (next: TeenModeStatus) => {
+      if (!guard.isSessionCurrent(requestSession)) {
+        return false;
+      }
+      guard.invalidateStatus();
+      const applied = applyStatus(next, requestSession, requestUserId);
+      if (applied && !onStatusChanged) {
+        publishTeenModeStatus(next, requestToken);
+      }
+      return applied;
+    };
     void (async () => {
       try {
         if (phase === "setConfirm") {
@@ -117,9 +190,13 @@ export default function TeenModeScreen({
             return;
           }
           // 未设过密码：open 同时完成「设置密码 + 开启」
-          applyStatus(await teenModeApi.open(token, code, code));
-          setPhase("overview");
-          showToast("青少年模式已开启");
+          const next = await teenModeApi.open(requestToken, code, code);
+          if (!applyMutationStatus(next)) {
+            return;
+          }
+          // 开启成功不停留说明页：直接返回上一页，限制时段文案跟随服务端配置
+          router.back();
+          showToast(`青少年模式已开启，每日 ${lockRangeLabel} 期间限制核心功能`);
           return;
         }
         if (
@@ -133,19 +210,29 @@ export default function TeenModeScreen({
             setPhase("openWithPassword");
             return;
           }
-          applyStatus(await teenModeApi.open(token, code));
-          setPhase("overview");
-          showToast("青少年模式已开启");
+          const next = await teenModeApi.open(requestToken, code);
+          if (!applyMutationStatus(next)) {
+            return;
+          }
+          // 与首设密码路径一致：开启成功直接返回上一页并提示，不停留说明页
+          router.back();
+          showToast(`青少年模式已开启，每日 ${lockRangeLabel} 期间限制核心功能`);
           return;
         }
         if (phase === "disable") {
           // 关闭青少年模式：单次输入，密码正确性由服务端校验
-          applyStatus(await teenModeApi.close(token, code));
+          const next = await teenModeApi.close(requestToken, code);
+          if (!applyMutationStatus(next)) {
+            return;
+          }
           setPhase("overview");
           showToast("青少年模式已关闭");
           return;
         }
       } catch (error) {
+        if (!guard.isSessionCurrent(requestSession)) {
+          return;
+        }
         // 密码错误等信息需要用户明确看到，使用长时长提示
         showToast(
           error instanceof Error ? error.message : "操作失败，请稍后重试",
@@ -153,7 +240,9 @@ export default function TeenModeScreen({
         );
         setCode("");
       } finally {
-        setSubmitting(false);
+        if (guard.isSessionCurrent(requestSession)) {
+          setSubmitting(false);
+        }
       }
     })();
   };
@@ -187,7 +276,7 @@ export default function TeenModeScreen({
               <View style={styles.bulletRow}>
                 <Image source={starIcon} style={styles.bulletIcon} />
                 <Text style={styles.bulletText}>
-                  为保障未成年人的充足休息与健康作息，开启未成年人模式后，晚10点至次日早6点期间无法访问盼之社区
+                  {`为保障未成年人的充足休息与健康作息，开启未成年人模式后，每日${lockRangeLabel}期间无法访问盼之社区`}
                 </Text>
               </View>
             </>
@@ -320,7 +409,7 @@ export default function TeenModeScreen({
             accessibilityRole="button"
             accessibilityLabel="确认"
             disabled={!codeComplete || submitting}
-            onPress={() => void confirmCode()}
+            onPress={confirmCode}
             style={[
               styles.primaryButton,
               styles.confirmInFlow,
@@ -343,7 +432,7 @@ export default function TeenModeScreen({
         backIcon={backIcon}
         style={{ paddingTop: insets.top, height: insets.top + 44 }}
       />
-      {status === null ? null : phase === "overview"
+      {status === null && !locked ? null : phase === "overview"
         ? renderOverview()
         : renderPassword()}
     </View>
@@ -447,7 +536,6 @@ const styles = StyleSheet.create({
   },
   noticeText: {
     color: "#999999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     textAlign: "center",

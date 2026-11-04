@@ -15,6 +15,7 @@ export type VoiceRoomMessage = {
   nickname?: string;
   avatar?: string;
   text: string;
+  imageUrl?: string;
   kind?: 'notice' | 'system' | 'chat';
   sentAt: number;
 };

@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
 import { parseRongCommand } from './rongcloud-command';
+
+vi.mock('@/core/logging/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn() } }));
 
 const enums = { private: 1, command: 10 };
 const message = {

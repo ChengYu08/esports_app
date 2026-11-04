@@ -1,7 +1,7 @@
 import { Copy16Regular } from "@fluentui/react-native-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { SYSTEM_FONT } from "@/shared/theme/typography";
+import { getDDinProStyle, SYSTEM_FONT } from "@/shared/theme/typography";
 
 /** 订单详情信息行：左侧标签、右侧值，支持复制按钮与陪玩端样式 */
 export function OrderDetailInfoRow({
@@ -22,7 +22,13 @@ export function OrderDetailInfoRow({
   amount?: boolean;
 }) {
   return (
-    <View style={[styles.infoRow, acceptStyle && styles.acceptRow, multiline && styles.multilineInfoRow]}>
+    <View
+      style={[
+        styles.infoRow,
+        acceptStyle && styles.acceptRow,
+        multiline && styles.multilineInfoRow,
+      ]}
+    >
       <Text style={[styles.label, acceptStyle && styles.acceptLabel]}>
         {label}
       </Text>
@@ -66,8 +72,19 @@ const styles = StyleSheet.create({
     minHeight: 34,
   },
   acceptRow: { gap: 12, paddingVertical: 6 },
-  label: { color: "#999", fontFamily: SYSTEM_FONT, fontSize: 16 },
-  acceptLabel: { width: 112, flexShrink: 1, color: "#808080", fontSize: 14, lineHeight: 22 },
+  label: {
+    color: "#808080",
+    fontFamily: SYSTEM_FONT,
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  acceptLabel: {
+    width: 112,
+    flexShrink: 1,
+    color: "#808080",
+    fontSize: 14,
+    lineHeight: 22,
+  },
   infoValue: {
     flexDirection: "row",
     alignItems: "center",
@@ -77,14 +94,27 @@ const styles = StyleSheet.create({
   value: {
     color: "#161616",
     fontFamily: SYSTEM_FONT,
-    fontSize: 12,
+    fontSize: 14,
+    lineHeight: 22,
+    flexShrink: 1,
     textAlign: "right",
   },
-  acceptInfoValue: { flex: 1, minWidth: 0, maxWidth: undefined, gap: 4, justifyContent: "flex-end" },
-  acceptValue: { flexShrink: 1, color: "#0A0A0A", fontSize: 14, lineHeight: 22 },
+  acceptInfoValue: {
+    flex: 1,
+    minWidth: 0,
+    maxWidth: undefined,
+    gap: 4,
+    justifyContent: "flex-end",
+  },
+  acceptValue: {
+    flexShrink: 1,
+    color: "#0A0A0A",
+    fontSize: 14,
+    lineHeight: 22,
+  },
   multilineInfoRow: { alignItems: "flex-start", minHeight: 44 },
   multilineValue: { textAlign: "right" },
-  amount: { color: "#FE1F4C", fontWeight: "600" },
+  amount: { color: "#FE1F4C", ...getDDinProStyle(600) },
   acceptAmount: { fontWeight: "400" },
   copy: { width: 16, height: 16 },
 });

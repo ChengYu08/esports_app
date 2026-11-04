@@ -1,7 +1,6 @@
 import { Image } from "expo-image";
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from "react-native";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { colors, radius, spacing } from "@/shared/theme/tokens";
 import { SkeletonList } from "@/shared/ui/Skeleton";
 
@@ -50,13 +49,13 @@ export function ErrorState({ message = "加载失败，请重试", onRetry, mess
 
 const styles = StyleSheet.create({
   loadingState: { width: "100%", paddingTop: spacing.lg },
-  loadingMessage: { fontFamily: DOUYIN_SANS, color: colors.textMuted, fontSize: 12, textAlign: "center", paddingTop: spacing.lg },
-  message: { fontFamily: DOUYIN_SANS, color: colors.textMuted, fontSize: 14, textAlign: "center", paddingTop: 40 },
+  loadingMessage: { color: colors.textMuted, fontSize: 12, textAlign: "center", paddingTop: spacing.lg },
+  message: { color: colors.textMuted, fontSize: 14, textAlign: "center", paddingTop: 40 },
   emptyState: { width: "100%", maxWidth: "100%", minHeight: 240, alignSelf: "center", alignItems: "center", justifyContent: "center", gap: spacing.sm },
   emptyIllustration: { width: 120, height: 120 },
-  emptyMessage: { width: "100%", fontFamily: DOUYIN_SANS, color: colors.textMuted, fontSize: 12, lineHeight: 18, textAlign: "center" },
-  emptyHint: { width: "100%", fontFamily: DOUYIN_SANS, color: colors.textMuted, fontSize: 12, lineHeight: 18, textAlign: "center" },
+  emptyMessage: { width: "100%", color: colors.textMuted, fontSize: 12, lineHeight: 18, textAlign: "center" },
+  emptyHint: { width: "100%", color: colors.textMuted, fontSize: 12, lineHeight: 18, textAlign: "center" },
   errorWrap: { alignItems: "center", paddingTop: 60 },
   retry: { marginTop: spacing.md, borderWidth: 1, borderColor: colors.brand, borderRadius: radius.pill, paddingHorizontal: spacing.lg, paddingVertical: 5 },
-  retryText: { fontFamily: DOUYIN_SANS, color: colors.brand, fontSize: 13 },
+  retryText: { color: colors.brand, fontSize: 13 },
 });

@@ -1,7 +1,29 @@
 import { storage } from "@/core/storage/storage";
+import type { TeenModeStatus } from "@/features/mine/api/teen-mode.contract";
 
 const TEEN_POPUP_CACHE_KEY = "mine:teen-popup";
 const TEEN_ENABLED_MIRROR_KEY = "mine:teen-enabled-mirror";
+
+type TeenModeStatusListener = (
+  status: TeenModeStatus,
+  token: string,
+) => void;
+
+const statusListeners = new Set<TeenModeStatusListener>();
+
+export function subscribeTeenModeStatus(listener: TeenModeStatusListener) {
+  statusListeners.add(listener);
+  return () => {
+    statusListeners.delete(listener);
+  };
+}
+
+export function publishTeenModeStatus(
+  status: TeenModeStatus,
+  token: string,
+) {
+  statusListeners.forEach((listener) => listener(status, token));
+}
 
 export type TeenPopupCache = {
   /** 勾选了"后续不再重复弹出"：永久不再弹（删除缓存后重新触发）。 */
@@ -44,8 +66,13 @@ export async function saveTeenPopupCache(patch: TeenPopupCachePatch) {
 }
 
 /** 最近一次已知的服务端开启状态镜像（基础设置行展示用；以服务端 /youth/status 为准）。 */
-export async function readLastTeenEnabled(): Promise<boolean | null> {
-  const raw = await storage.get(TEEN_ENABLED_MIRROR_KEY);
+export async function readLastTeenEnabled(
+  userId?: string | null,
+): Promise<boolean | null> {
+  if (!userId) {
+    return null;
+  }
+  const raw = await storage.get(`${TEEN_ENABLED_MIRROR_KEY}:${userId}`);
   if (raw === "true") {
     return true;
   }
@@ -55,6 +82,15 @@ export async function readLastTeenEnabled(): Promise<boolean | null> {
   return null;
 }
 
-export async function saveLastTeenEnabled(enabled: boolean) {
-  await storage.set(TEEN_ENABLED_MIRROR_KEY, enabled ? "true" : "false");
+export async function saveLastTeenEnabled(
+  enabled: boolean,
+  userId?: string | null,
+) {
+  if (!userId) {
+    return;
+  }
+  await storage.set(
+    `${TEEN_ENABLED_MIRROR_KEY}:${userId}`,
+    enabled ? "true" : "false",
+  );
 }

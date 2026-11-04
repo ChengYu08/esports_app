@@ -4,7 +4,7 @@ import { fetchOrderPage } from "../order.api";
 import { fetchDispatchPage } from "../dispatch.api";
 import type { OrderFilter, OrderScope } from "../order.types";
 
-export function useOrderPage(scope: OrderScope, filter: OrderFilter) {
+export function useOrderPage(scope: OrderScope, filter: OrderFilter, active = true) {
   const token = useAuthStore((state) => state.accessToken);
   const userId = useAuthStore((state) => state.user?.id);
   const gender = useAuthStore((state) => state.user?.gender ?? 2);
@@ -18,6 +18,6 @@ export function useOrderPage(scope: OrderScope, filter: OrderFilter) {
       return fetchOrderPage(filter, token as string, userId as string, scope, pageParam, 20, signal);
     },
     getNextPageParam: (lastPage, allPages) => lastPage.hasMore ? allPages.length + 1 : undefined,
-    enabled: Boolean(token && (scope === "dispatch" || userId)),
+    enabled: active && Boolean(token && (scope === "dispatch" || userId)),
   });
 }

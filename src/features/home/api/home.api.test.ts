@@ -1,11 +1,25 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { apiClient } from "@/core/network/api-client";
-import { fetchBanners, fetchClubOnlineCount, fetchClubPage, fetchCompanionPage, fetchGameCategories, fetchGames } from "./home.api";
+import { fetchBanners, fetchClubGameCompanionCounts, fetchClubGameModes, fetchClubOnlineCount, fetchClubPage, fetchCompanionPage, fetchGameCategories, fetchGames } from "./home.api";
 
 vi.mock("@/core/network/api-client", () => ({ apiClient: vi.fn() }));
 
+// home.api 依赖的 home-banner.contract 运行时引用 react-native，node 测试环境无法加载，这里桩掉。
+// 本套件不触达 Platform 取值，桩值仅用于阻断 react-native 进入 import 图。
+vi.mock("react-native", () => ({ Platform: { OS: "ios" } }));
+
 afterEach(() => vi.clearAllMocks());
+
+it("俱乐部模式筛选只包含当前俱乐部及未指定俱乐部的模式", async () => {
+  vi.mocked(apiClient).mockResolvedValue({ code: "SUCCESS", data: [
+    { id: 1, clubId: 10, modeName: "排位", status: 1 },
+    { id: 2, clubId: 20, modeName: "其他俱乐部", status: 1 },
+    { id: 3, modeName: "通用", status: 1 },
+    { id: 4, clubId: 10, modeName: "已停用", status: 0 },
+  ] });
+  expect((await fetchClubGameModes("8", "10")).map((mode) => mode.id)).toEqual([1, 3]);
+});
 
 describe("首页活动轮播下发", () => {
   it("批量查询 App 三层资源位，按楼层和素材顺序展示，不混入 PC 素材", async () => {
@@ -16,7 +30,9 @@ describe("首页活动轮播下发", () => {
         { slotCode: "APP_HOME_FLOOR3", slotName: "APP首页三楼", displayMode: "TILE", items: [
           { deliveryId: 8, materialId: 21, displayImageUrl: "https://cdn.example.com/b.jpg", sort: 2 },
           { deliveryId: 8, materialId: 22, displayImageUrl: " https://cdn.example.com/a.jpg ", sort: 1,
-            materialName: " 活动详情 ", contentImageUrl: " https://cdn.example.com/detail.jpg ", linkUrl: "https://example.com/activity" },
+            materialName: " 活动详情 ", contentImageUrl: " https://cdn.example.com/detail.jpg ",
+            linkUrl: "https://example.com/activity",
+            linkConfig: { PC: { jumpType: "URL", jumpUrl: "https://pc.example.com" }, IOS: { jumpType: "ROUTE", jumpUrl: "/activity", params: { activityCode: "X" } } } },
           { deliveryId: 8, materialId: 23, displayImageUrl: "  ", sort: 3 },
           { deliveryId: 8, materialId: 24, displayImageUrl: null, sort: 4 },
         ] },
@@ -39,7 +55,8 @@ describe("首页活动轮播下发", () => {
     expect(slots[2]).toMatchObject({ displayMode: "TILE", intervalMs: 5000 });
     expect(slots[2].items).toEqual([
       expect.objectContaining({ id: "8-22", imageUrl: "https://cdn.example.com/a.jpg", title: "活动详情",
-        contentImageUrl: "https://cdn.example.com/detail.jpg", linkUrl: "https://example.com/activity" }),
+        contentImageUrl: "https://cdn.example.com/detail.jpg", linkUrl: "https://example.com/activity",
+        linkConfig: { PC: { jumpType: "URL", jumpUrl: "https://pc.example.com" }, IOS: { jumpType: "ROUTE", jumpUrl: "/activity", params: { activityCode: "X" } } } }),
       expect.objectContaining({ id: "8-21", imageUrl: "https://cdn.example.com/b.jpg" }),
     ]);
     expect(apiClient).toHaveBeenCalledWith("/client/v1/ad/slot/list", {
@@ -242,6 +259,18 @@ describe("俱乐部陪玩列表字段映射", () => {
 });
 
 describe("首页在线陪玩人数", () => {
+  it("按俱乐部和游戏获取去重后的陪玩总数", async () => {
+    vi.mocked(apiClient)
+      .mockResolvedValueOnce({ code: "SUCCESS", data: { total: 7 } })
+      .mockResolvedValueOnce({ code: "SUCCESS", data: { total: 2 } });
+    expect(await fetchClubGameCompanionCounts("1000004", [14, 15, 14])).toEqual({ 14: 7, 15: 2 });
+    expect(apiClient).toHaveBeenCalledTimes(2);
+    expect(apiClient).toHaveBeenCalledWith("/client/v1/companion/public/page", {
+      method: "POST",
+      body: { page: 1, pageSize: 1, action: { clubId: 1000004, gameId: 14 } },
+      signal: undefined,
+    });
+  });
   it("统计范围保留没有图标的启用游戏，排除停用游戏并去重", async () => {
     vi.mocked(apiClient).mockResolvedValue({ code: "SUCCESS", data: { records: [
       { id: 1000004, clubGames: [
@@ -255,7 +284,19 @@ describe("首页在线陪玩人数", () => {
     const page = await fetchClubPage({}, 1);
 
     expect(page.items[0].gameIds).toEqual([14, 15]);
-    expect(page.items[0].games?.map((game) => game.id)).not.toContain(15);
+    expect(page.items[0].games?.find((game) => game.id === 15)?.iconUrl).toBeUndefined();
+  });
+
+  it("保留服务端批量返回的在线人数和游戏陪玩人数", async () => {
+    vi.mocked(apiClient).mockResolvedValue({ code: "SUCCESS", data: { records: [
+      { id: 1000004, onlineCompanionCount: 2, clubGames: [
+        { gameId: 14, status: 1, iconUrl: "game.png", companionCount: 5 },
+        { gameId: 15, status: 1, companionCount: 3 },
+      ] },
+    ] } });
+    const page = await fetchClubPage({}, 1);
+    expect(page.items[0].onlineCompanionCount).toBe(2);
+    expect(page.items[0].games?.map((game) => game.companionCount)).toEqual([5, 3]);
   });
 
   it("俱乐部有两名在线成员但只有一名在线陪玩时返回 1，查询携带必填游戏 ID", async () => {

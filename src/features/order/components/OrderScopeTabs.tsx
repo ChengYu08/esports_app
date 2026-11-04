@@ -1,6 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import type { OrderScope } from "../order.types";
 
 const SCOPES: readonly { value: OrderScope; label: string }[] = [
@@ -47,7 +46,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     position: "relative",
   },
-  label: { fontFamily: DOUYIN_SANS, color: "#999999", fontSize: 14, lineHeight: 20 },
+  label: { color: "#999999", fontSize: 14, lineHeight: 20 },
   selectedLabel: { color: "#0A0A0A", fontWeight: "600" },
   indicator: { position: "absolute", bottom: 4, width: 16, height: 3, borderRadius: 2, backgroundColor: "#E01B28" },
 });

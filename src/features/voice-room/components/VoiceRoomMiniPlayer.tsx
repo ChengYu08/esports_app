@@ -12,9 +12,30 @@ import { useVoiceRoomSessionStore } from '../voice-room-session';
 
 const fallbackAvatar = require('../../../../assets/voice-room/floating-avatar.png');
 const recordingIcon = require('../../../../assets/voice-room/floating-recording.svg');
-const PLAYER_WIDTH = 52;
-const PLAYER_HEIGHT = 54;
+const PLAYER_WIDTH = 50;
+const PLAYER_HEIGHT = 48;
 const DRAG_THRESHOLD = 6;
+/**
+ * Figma 2364:96434 / 812 画布：MiniPlayer 底边 y=608 → 距屏幕底 204。
+ * 与 FAB 距底 128 错开，切 Tab 固定不跳动。
+ */
+const FIGMA_PLAYER_BOTTOM_FROM_SCREEN = 204;
+
+/** Figma 102.85° 底层蓝渐变 */
+const BLUE_GRADIENT = {
+  colors: ['#1F31FF', '#1FBCFF'] as const,
+  locations: [0.091369, 0.93383] as const,
+  start: { x: 0.013, y: 0.389 },
+  end: { x: 0.987, y: 0.611 },
+};
+
+/** Figma 257.84° 上层深蓝紫渐变 */
+const NAVY_GRADIENT = {
+  colors: ['#0C0C2E', '#2F2759'] as const,
+  locations: [0.007869, 0.67447] as const,
+  start: { x: 0.989, y: 0.396 },
+  end: { x: 0.011, y: 0.604 },
+};
 
 export function VoiceRoomMiniPlayer() {
   const pathname = usePathname();
@@ -25,7 +46,10 @@ export function VoiceRoomMiniPlayer() {
   // Keep offsets mounted while the room screen is open so minimizing restores the position.
   const offsetY = useSharedValue(0);
   const dragStartY = useSharedValue(0);
-  const defaultY = Math.max(insets.top, height - insets.bottom - 126 - PLAYER_HEIGHT);
+  const defaultY = Math.max(
+    insets.top,
+    height - FIGMA_PLAYER_BOTTOM_FROM_SCREEN - PLAYER_HEIGHT,
+  );
   const minY = insets.top - defaultY;
   const maxY = Math.max(0, height - insets.bottom - PLAYER_HEIGHT - defaultY);
 
@@ -111,28 +135,36 @@ export function VoiceRoomMiniPlayer() {
           }}
           style={[styles.position, positionStyle]}
         >
-          <LinearGradient
-            colors={['#FF1F2E', '#FF1F69']}
-            locations={[0.12117, 1]}
-            start={{ x: 0, y: 0.4 }}
-            end={{ x: 1, y: 0.6 }}
-            style={styles.background}
-          >
-            <View pointerEvents="none" style={styles.highlight} />
-            <View style={styles.avatarWrap}>
-              <Image
-                source={avatar ? { uri: avatar.startsWith('//') ? `https:${avatar}` : avatar } : fallbackAvatar}
-                contentFit="cover"
-                style={styles.avatar}
-              />
-              <View style={styles.avatarOverlay} />
-              {microphoneMuted ? (
-                <Image source={recordingIcon} contentFit="contain" style={styles.recordingIcon} />
-              ) : (
-                <VoiceWaveform playing />
-              )}
-            </View>
-          </LinearGradient>
+          <View style={styles.shell}>
+            <LinearGradient
+              colors={[...BLUE_GRADIENT.colors]}
+              locations={[...BLUE_GRADIENT.locations]}
+              start={BLUE_GRADIENT.start}
+              end={BLUE_GRADIENT.end}
+              style={StyleSheet.absoluteFill}
+            />
+            <LinearGradient
+              colors={[...NAVY_GRADIENT.colors]}
+              locations={[...NAVY_GRADIENT.locations]}
+              start={NAVY_GRADIENT.start}
+              end={NAVY_GRADIENT.end}
+              style={styles.background}
+            >
+              <View style={styles.avatarWrap}>
+                <Image
+                  source={avatar ? { uri: avatar.startsWith('//') ? `https:${avatar}` : avatar } : fallbackAvatar}
+                  contentFit="cover"
+                  style={styles.avatar}
+                />
+                <View style={styles.avatarOverlay} />
+                {microphoneMuted ? (
+                  <Image source={recordingIcon} contentFit="contain" style={styles.recordingIcon} />
+                ) : (
+                  <VoiceWaveform playing />
+                )}
+              </View>
+            </LinearGradient>
+          </View>
         </Animated.View>
       </GestureDetector>
     </View>
@@ -141,11 +173,45 @@ export function VoiceRoomMiniPlayer() {
 
 const styles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFill, zIndex: 100 },
-  position: { position: 'absolute', top: 0, width: PLAYER_WIDTH, height: PLAYER_HEIGHT },
-  background: { flex: 1, justifyContent: 'center', paddingHorizontal: 8, borderTopLeftRadius: 100, borderBottomLeftRadius: 100, overflow: 'hidden' },
-  highlight: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(255,255,255,0.15)' },
-  avatarWrap: { width: 36, height: 36, borderRadius: 18, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  position: {
+    position: 'absolute',
+    top: 0,
+    width: PLAYER_WIDTH,
+    height: PLAYER_HEIGHT,
+    shadowColor: '#0C0C2E',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  shell: {
+    flex: 1,
+    borderTopLeftRadius: 100,
+    borderBottomLeftRadius: 100,
+    overflow: 'hidden',
+  },
+  background: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingLeft: 6,
+    paddingRight: 8,
+    paddingVertical: 6,
+  },
+  avatarWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   avatar: { ...StyleSheet.absoluteFill },
-  avatarOverlay: { ...StyleSheet.absoluteFill, borderRadius: 18, borderWidth: 0.9, borderColor: 'rgba(255,255,255,0.5)', backgroundColor: 'rgba(0,0,0,0.5)' },
+  avatarOverlay: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: 18,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
   recordingIcon: { width: 18, height: 18 },
 });

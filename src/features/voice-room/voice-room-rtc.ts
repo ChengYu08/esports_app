@@ -13,11 +13,19 @@ export type VoiceRtcCallbacks = {
   onSpeakingChanged?: (uids: string[]) => void;
 };
 
+/** joinChannel 被拒：用户仍在频道内（须等 Disconnected 后再 join） */
+const ERR_JOIN_CHANNEL_REJECTED = -17;
+const LEAVE_DISCONNECT_TIMEOUT_MS = 3000;
+
 let engine: IRtcEngine | null = null;
 let handler: IRtcEngineEventHandler | null = null;
 let activeChannelName: string | null = null;
 let activeCallbacks: VoiceRtcCallbacks | undefined;
 const remoteUserIds = new Set<string>();
+
+/** 进出房串行，避免并发 join/leave 触发 -17 */
+let rtcOpChain: Promise<unknown> = Promise.resolve();
+let disconnectWaiters: Array<() => void> = [];
 
 function loadAgora(appId = env.agoraAppId) {
   if (Platform.OS === 'web' || !appId) return null;
@@ -27,6 +35,54 @@ function loadAgora(appId = env.agoraAppId) {
   } catch {
     return null;
   }
+}
+
+function enqueueRtcOp<T>(op: () => Promise<T>): Promise<T> {
+  const run = rtcOpChain.then(op, op);
+  rtcOpChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+function notifyDisconnected() {
+  const waiters = disconnectWaiters;
+  disconnectWaiters = [];
+  waiters.forEach((resolve) => resolve());
+}
+
+function isDisconnectedState(state: number, agora: typeof import('react-native-agora')) {
+  return (
+    state === agora.ConnectionStateType.ConnectionStateDisconnected ||
+    state === agora.ConnectionStateType.ConnectionStateFailed
+  );
+}
+
+function waitUntilDisconnected(
+  agora: typeof import('react-native-agora'),
+  timeoutMs: number,
+): Promise<void> {
+  if (!engine) return Promise.resolve();
+  try {
+    if (isDisconnectedState(engine.getConnectionState(), agora)) {
+      return Promise.resolve();
+    }
+  } catch {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      disconnectWaiters = disconnectWaiters.filter((item) => item !== finish);
+      clearTimeout(timer);
+      resolve();
+    };
+    const timer = setTimeout(finish, timeoutMs);
+    disconnectWaiters.push(finish);
+  });
 }
 
 export function isVoiceRtcAvailable() {
@@ -40,6 +96,16 @@ export async function joinVoiceRtc(options: {
   uid: number;
   callbacks?: VoiceRtcCallbacks;
 }) {
+  return enqueueRtcOp(() => joinVoiceRtcLocked(options));
+}
+
+async function joinVoiceRtcLocked(options: {
+  appId?: string;
+  token: string;
+  channelName: string;
+  uid: number;
+  callbacks?: VoiceRtcCallbacks;
+}) {
   const appId = options.appId || env.agoraAppId;
   const agora = loadAgora(appId);
   if (!agora) return false;
@@ -47,7 +113,21 @@ export async function joinVoiceRtc(options: {
     activeCallbacks = options.callbacks;
     return true;
   }
-  if (engine) await leaveVoiceRtc();
+  if (engine) await leaveVoiceRtcLocked();
+  return createEngineAndJoin(agora, appId, options, true);
+}
+
+async function createEngineAndJoin(
+  agora: typeof import('react-native-agora'),
+  appId: string,
+  options: {
+    token: string;
+    channelName: string;
+    uid: number;
+    callbacks?: VoiceRtcCallbacks;
+  },
+  allowRetryOnRejected: boolean,
+) {
   if (!engine) engine = agora.createAgoraRtcEngine();
   activeCallbacks = options.callbacks;
   useVoiceRoomSessionStore.getState().setMicrophoneMuted(true);
@@ -69,15 +149,21 @@ export async function joinVoiceRtc(options: {
       remoteUserIds.delete(userId);
       activeCallbacks?.onUserOffline?.(userId);
     },
-    onUserMuteAudio: (_connection, uid, muted) => activeCallbacks?.onUserMuted?.(String(uid), muted),
+    onUserMuteAudio: (_connection, uid, muted) =>
+      activeCallbacks?.onUserMuted?.(String(uid), muted),
     onRemoteAudioStateChanged: (_connection, uid, state) => {
       // Starting/Decoding 说明对端音频流真实到达，即使漏掉 mute 广播也能据此纠正麦位状态
       if (state === 1 || state === 2) activeCallbacks?.onRemoteAudioActive?.(String(uid));
     },
     onAudioVolumeIndication: (_connection, speakers) => {
       activeCallbacks?.onSpeakingChanged?.(
-        speakers.filter((speaker) => (speaker.volume ?? 0) > 20).map((speaker) => String(speaker.uid)),
+        speakers
+          .filter((speaker) => (speaker.volume ?? 0) > 20)
+          .map((speaker) => String(speaker.uid)),
       );
+    },
+    onConnectionStateChanged: (_connection, state) => {
+      if (isDisconnectedState(state, agora)) notifyDisconnected();
     },
   };
   engine.registerEventHandler(handler);
@@ -87,6 +173,11 @@ export async function joinVoiceRtc(options: {
     publishMicrophoneTrack: false,
     clientRoleType: agora.ClientRoleType.ClientRoleBroadcaster,
   });
+  if (result === ERR_JOIN_CHANNEL_REJECTED && allowRetryOnRejected) {
+    // 仍被判定在频道内：完整离开并等到 Disconnected 后再试一次
+    await leaveVoiceRtcLocked();
+    return createEngineAndJoin(agora, appId, options, false);
+  }
   if (result !== 0) throw new Error(`声网进房失败（${result}）`);
   activeChannelName = options.channelName;
   void startVoiceRoomBackground(false);
@@ -123,19 +214,31 @@ export function muteVoiceRtc(muted: boolean) {
 }
 
 export async function leaveVoiceRtc() {
+  return enqueueRtcOp(() => leaveVoiceRtcLocked());
+}
+
+async function leaveVoiceRtcLocked() {
   if (!engine) return;
+  const current = engine;
+  const agora = loadAgora();
   try {
-    if (handler) engine.unregisterEventHandler(handler);
-    engine.leaveChannel();
-    engine.release();
-    void stopVoiceRoomBackground();
+    // 先 leave，保留 handler 以收到 Disconnected，再 release（避免未断线就 join 触发 -17）
+    current.leaveChannel();
+    if (agora) await waitUntilDisconnected(agora, LEAVE_DISCONNECT_TIMEOUT_MS);
   } finally {
+    try {
+      if (handler) current.unregisterEventHandler(handler);
+      current.release();
+    } catch {
+      // release 在异常态下可能抛错，状态仍须清空
+    }
+    notifyDisconnected();
     handler = null;
     engine = null;
     activeChannelName = null;
     activeCallbacks = undefined;
     useVoiceRoomSessionStore.getState().setMicrophoneMuted(true);
     remoteUserIds.clear();
+    void stopVoiceRoomBackground();
   }
 }
-

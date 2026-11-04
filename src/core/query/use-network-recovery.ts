@@ -5,7 +5,7 @@ import type { NetInfoState } from "@react-native-community/netinfo";
 
 /**
  * iOS 首次启动时系统联网授权弹窗会导致首批请求全部失败并被缓存。
- * 网络恢复（用户点击允许后）或 app 回到前台时，自动重刷所有失败的查询。
+ * 网络恢复（用户点击允许后）或 app 回到前台时，只重刷当前页面失败的查询。
  */
 export function useNetworkRecovery() {
   const queryClient = useQueryClient();
@@ -13,7 +13,7 @@ export function useNetworkRecovery() {
 
   const refetchFailedQueries = useCallback(() => {
     queryClient.invalidateQueries({
-      refetchType: "all",
+      refetchType: "active",
       predicate: (query) => query.state.status === "error",
     });
   }, [queryClient]);

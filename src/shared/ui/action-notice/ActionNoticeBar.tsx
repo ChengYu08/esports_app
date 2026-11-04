@@ -5,7 +5,6 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeInDown, FadeOutUp } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const ARROW_ICON = require("../../../../assets/svgs/cs-invite-arrow-right.svg");
 
@@ -141,7 +140,6 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     fontWeight: "400",
     lineHeight: 18,
@@ -155,7 +153,6 @@ const styles = StyleSheet.create({
   actionPressed: { opacity: 0.78 },
   actionText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     fontWeight: "400",
     lineHeight: 18,

@@ -16,10 +16,9 @@ import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { toAuthUser } from "@/features/auth/client-auth-flow";
 import { saveAuthSession } from "@/features/auth/session-persistence";
 import { validateNickname } from "@/features/mine/utils/nickname-rules";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
-const NICKNAME_MAX_LENGTH = 18;
+const NICKNAME_MAX_LENGTH = 20;
 
 export default function EditNicknameScreen() {
   const insets = useSafeAreaInsets();
@@ -70,7 +69,7 @@ export default function EditNicknameScreen() {
   return (
     <View style={styles.screen}>
       <ScreenHeader
-        title="编辑名字"
+        title="昵称编辑"
         onBack={() => router.back()}
         backgroundColor="#F7F7F7"
         titleStyle={styles.headerTitle}
@@ -117,7 +116,7 @@ export default function EditNicknameScreen() {
             </View>
           </View>
           <Text style={styles.hintText}>
-            {"最多18字，不能使用@<>/等无效字符，30天内可修改4次名字"}
+            {"最多20字，不能使用@<>/等无效字符，30天内可修改4次名字"}
           </Text>
         </View>
       </ScrollView>
@@ -132,7 +131,6 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "600",
@@ -145,7 +143,6 @@ const styles = StyleSheet.create({
   },
   saveText: {
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -165,7 +162,6 @@ const styles = StyleSheet.create({
   input: {
     minHeight: 48,
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     padding: 0,
@@ -183,7 +179,6 @@ const styles = StyleSheet.create({
   },
   counterText: {
     color: "#CCCCCC",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -192,7 +187,6 @@ const styles = StyleSheet.create({
   counterLimit: { color: "#FF4754" },
   hintText: {
     color: "#808080",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     paddingHorizontal: 8,

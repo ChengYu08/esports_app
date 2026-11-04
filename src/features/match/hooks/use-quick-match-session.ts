@@ -13,7 +13,10 @@ import {
   fetchQuickMatchGrabList,
 } from "@/features/match/api/match.api";
 import {
+  applyGrabSelection,
   isQuickMatchActive,
+  pruneSelectedIds,
+  resolveMaxSelectableCount,
   type QuickMatchGrabItem,
   type QuickMatchRequestDetail,
 } from "@/features/match/api/match.types";
@@ -26,8 +29,6 @@ import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-sessi
 
 const POLL_INTERVAL_MS = 4000;
 const DEFAULT_COUNTDOWN_SEC = 30 * 60;
-/** 抢单选人上限（与 PC / 后端 @Size(max = 3) 一致） */
-export const MAX_GRAB_SELECT = 3;
 
 export type MatchEndReason = "expired" | "cancelled" | "ended";
 
@@ -181,6 +182,8 @@ export function useQuickMatchSession(
   const [detail, setDetail] = useState<QuickMatchRequestDetail | null>(null);
   const [candidates, setCandidates] = useState<QuickMatchGrabItem[]>([]);
   const [selectedGrabIds, setSelectedGrabIds] = useState<string[]>([]);
+  /** 选人即时镜像：toggle 需同步读取最新选中集合（避免 StrictMode 更新器内副作用） */
+  const selectedGrabIdsRef = useRef<string[]>([]);
   const [countdownSec, setCountdownSec] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   /** 最近一次轮询中新出现的候选人 id（一次性的金色描边提示） */
@@ -189,6 +192,12 @@ export function useQuickMatchSession(
   );
   /** 建单后支付中：迟到的超时/结束信令不得清会话 */
   const [orderPending, setOrderPending] = useState(false);
+
+  /** 支付确认中冻结选择：轮询剔除与手动改选均不生效 */
+  const selectionLockedRef = useRef(false);
+  const setSelectionLocked = useCallback((locked: boolean) => {
+    selectionLockedRef.current = locked;
+  }, []);
 
   const expireAtRef = useRef(0);
   const generationRef = useRef(0);
@@ -218,6 +227,10 @@ export function useQuickMatchSession(
   useEffect(() => {
     detailRef.current = detail;
   }, [detail]);
+
+  useEffect(() => {
+    selectedGrabIdsRef.current = selectedGrabIds;
+  }, [selectedGrabIds]);
 
   const finishEnded = useCallback((reason: MatchEndReason, message?: string) => {
     if (orderPendingRef.current || endedRef.current) return;
@@ -267,9 +280,11 @@ export function useQuickMatchSession(
     setCountdownSec(sec);
     setCandidates([]);
     setSelectedGrabIds([]);
+    selectedGrabIdsRef.current = [];
     setNewCandidateIds(new Set());
     setDetail(null);
     setOrderPending(false);
+    selectionLockedRef.current = false;
     prevGrabIdsRef.current = new Set();
     if (clearNewMarkTimerRef.current) {
       clearTimeout(clearNewMarkTimerRef.current);
@@ -321,7 +336,10 @@ export function useQuickMatchSession(
         return;
       }
       setCandidates(list);
-      setSelectedGrabIds((prev) => prev.filter((id) => list.some((item) => item.id === id)));
+      // 支付确认冻结期间保持选中；否则剔除已消失候选人（ref 由 selectedGrabIds effect 同步）
+      setSelectedGrabIds((prev) =>
+        selectionLockedRef.current ? prev : pruneSelectedIds(prev, list),
+      );
 
       // diff 出本次新出现的候选人，触发一次性金色描边
       const prevIds = prevGrabIdsRef.current;
@@ -415,17 +433,16 @@ export function useQuickMatchSession(
     }
   }, [requestNo, token, userId]);
 
+  // 选人：活动模式单选（maxSelectableCount，点其他直接切换），普通模式维持 3 人多选
   const toggleGrab = useCallback((grabId: string) => {
-    setSelectedGrabIds((prev) => {
-      if (prev.includes(grabId)) {
-        return prev.filter((id) => id !== grabId);
-      }
-      if (prev.length >= MAX_GRAB_SELECT) {
-        showToast("最多选择3名陪玩");
-        return prev;
-      }
-      return [...prev, grabId];
-    });
+    if (selectionLockedRef.current) return;
+    const maxSelectable = resolveMaxSelectableCount(detailRef.current);
+    const result = applyGrabSelection(selectedGrabIdsRef.current, grabId, maxSelectable);
+    selectedGrabIdsRef.current = result.ids;
+    setSelectedGrabIds(result.ids);
+    if (result.overLimit) {
+      showToast(`最多选择${maxSelectable}名陪玩`);
+    }
   }, []);
 
   return {
@@ -440,6 +457,7 @@ export function useQuickMatchSession(
     orderPending,
     setSubmitting,
     setOrderPending,
+    setSelectionLocked,
     cancelMatching,
     closeAuditionRoom,
     toggleGrab,

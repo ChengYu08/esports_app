@@ -1,14 +1,14 @@
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { router } from "expo-router";
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { formatUnreadCount, sumVisibleUnreadCount } from "@/features/message/message-unread";
 import { useMessageStore } from "@/features/message/message-store";
+import { AppPrompt } from "@/shared/ui/AppPrompt";
 import {
-  getProtectedNavigationAction,
   getTabPressAction,
   type AppTab,
 } from "@/shared/navigation/tab-access";
@@ -20,9 +20,15 @@ type AppTabBarProps = {
 
 const TAB_CONTENT_HEIGHT = 58;
 const TAB_ITEM_HEIGHT = 46;
-const MATCH_WIDTH = 68;
-const MATCH_HEIGHT = 58;
 const BAR_TOP_OFFSET = 12;
+// 隐藏诊断入口：3 秒内连点消息 tab 5 次，弹窗展示本次启动的回补消息条数
+const DIAGNOSTIC_TAP_THRESHOLD = 5;
+const DIAGNOSTIC_TAP_WINDOW_MS = 3_000;
+
+// react-hooks/purity 禁止在组件里直接调用 Date.now，时间获取封装在模块级
+function nowMs() {
+  return Date.now();
+}
 
 const items = [
   {
@@ -51,8 +57,6 @@ const items = [
   },
 ] as const;
 
-const matchIcon = require("../../../assets/svgs/tab-match.svg");
-
 export function AppTabBar({ state, navigation }: AppTabBarProps) {
   const insets = useSafeAreaInsets();
   const isAuthenticated = useAuthStore((authState) =>
@@ -64,23 +68,30 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
   );
   const unreadLabel = formatUnreadCount(unreadCount);
   const activeRoute = state.routes[state.index]?.name;
+  const compensatedCount = useMessageStore((messageState) => messageState.compensatedCount);
+  const [diagnosticVisible, setDiagnosticVisible] = useState(false);
+  const [diagnosticTaps, setDiagnosticTaps] = useState({ count: 0, windowStartAt: 0 });
 
   const handleTabPress = (tab: AppTab) => {
+    if (tab === "message") {
+      const tapAt = nowMs();
+      const withinWindow = tapAt - diagnosticTaps.windowStartAt <= DIAGNOSTIC_TAP_WINDOW_MS;
+      const count = withinWindow ? diagnosticTaps.count + 1 : 1;
+      if (count >= DIAGNOSTIC_TAP_THRESHOLD) {
+        setDiagnosticTaps({ count: 0, windowStartAt: 0 });
+        setDiagnosticVisible(true);
+      } else {
+        setDiagnosticTaps({ count, windowStartAt: withinWindow ? diagnosticTaps.windowStartAt : tapAt });
+      }
+    } else {
+      setDiagnosticTaps({ count: 0, windowStartAt: 0 });
+    }
     const action = getTabPressAction(tab, isAuthenticated);
     if (action.type === "login") {
       router.replace("/login");
       return;
     }
     navigation.navigate(action.tab);
-  };
-
-  const handleMatchPress = () => {
-    const action = getProtectedNavigationAction("match", isAuthenticated);
-    if (action.type === "login") {
-      router.replace("/login");
-      return;
-    }
-    router.push("/match");
   };
 
   const renderTabItem = (item: (typeof items)[number]) => {
@@ -131,19 +142,14 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
         ]}
       />
       <View style={styles.iconArea}>
-        {renderTabItem(items[0])}
-        {renderTabItem(items[1])}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="快速匹配"
-          style={styles.matchButton}
-          onPress={handleMatchPress}
-        >
-          <Image source={matchIcon} style={styles.matchIcon} />
-        </Pressable>
-        {renderTabItem(items[2])}
-        {renderTabItem(items[3])}
+        {items.map((item) => renderTabItem(item))}
       </View>
+      <AppPrompt
+        visible={diagnosticVisible}
+        title="消息统计"
+        message={`本次启动回补消息：${compensatedCount} 条`}
+        onConfirm={() => setDiagnosticVisible(false)}
+      />
     </View>
   );
 }
@@ -191,16 +197,6 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   bottomIcon: { width: 24, height: 24 },
-  matchButton: {
-    width: MATCH_WIDTH,
-    height: MATCH_HEIGHT,
-    alignItems: "center",
-    justifyContent: "flex-end",
-  },
-  matchIcon: {
-    width: MATCH_WIDTH,
-    height: MATCH_HEIGHT,
-  },
   badge: {
     position: "absolute",
     top: 1,
@@ -217,13 +213,11 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 10,
     lineHeight: 13,
     fontWeight: "400",
   },
   bottomLabel: {
-    fontFamily: DOUYIN_SANS,
     color: "#979799",
     fontSize: 10,
     lineHeight: 12,

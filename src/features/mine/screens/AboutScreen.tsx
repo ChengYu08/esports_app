@@ -14,8 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { APP_LINKS } from "@/core/config/links";
 import { useAppUpgradeStore } from "@/features/app-upgrade/app-upgrade.store";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
-import { openExternalLink } from "@/shared/navigation/open-external-link";
+import { openInAppWebView } from "@/shared/navigation/open-web-view";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 const appIcon = require("../../../../assets/images/icon.png");
@@ -97,12 +96,12 @@ export default function AboutScreen() {
           <View style={styles.divider} />
           <AboutRow
             label="用户协议"
-            onPress={() => void openExternalLink(APP_LINKS.userAgreement)}
+            onPress={() => openInAppWebView(APP_LINKS.userAgreement, "用户协议")}
           />
           <View style={styles.divider} />
           <AboutRow
             label="隐私政策"
-            onPress={() => void openExternalLink(APP_LINKS.privacyPolicy)}
+            onPress={() => openInAppWebView(APP_LINKS.privacyPolicy, "隐私政策")}
           />
           <View style={styles.divider} />
         </View>
@@ -133,7 +132,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F7F7" },
   headerTitle: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "500",
@@ -144,13 +142,11 @@ const styles = StyleSheet.create({
   brandCopy: { alignItems: "center", gap: 4 },
   appName: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 22,
   },
   version: {
     color: "#666",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -170,7 +166,6 @@ const styles = StyleSheet.create({
   },
   rowValue: {
     color: "#999999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     textAlign: "right",
@@ -178,7 +173,6 @@ const styles = StyleSheet.create({
   rowLabel: {
     flex: 1,
     color: "#333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },

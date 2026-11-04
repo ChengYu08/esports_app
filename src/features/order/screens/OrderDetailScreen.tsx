@@ -1,26 +1,27 @@
 import { useAuthStore } from "@esports/auth";
 import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { useQuery } from "@tanstack/react-query";
-import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { router, useFocusEffect, useIsFocused } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { OrderAfterSaleSheet } from "@/features/order/components/OrderAfterSaleSheet";
 import { OrderCompleteConfirmSheet } from "@/features/order/components/OrderCompleteConfirmSheet";
+import { OrderMultiCompanionSheet } from "@/features/order/components/OrderMultiCompanionSheet";
 import { OrderDetailBottomBar } from "@/features/order/components/OrderDetailBottomBar";
 import { OrderDetailInfoBlocks } from "@/features/order/components/OrderDetailInfoBlocks";
 import { OrderDetailStatusBar } from "@/features/order/components/OrderDetailStatusBar";
 import { OrderFreeConfirmFlow } from "@/features/order/components/OrderFreeConfirmFlow";
-import { OrderProgressSteps } from "@/features/order/components/OrderProgressSteps";
 import { OrderReviewSheet } from "@/features/order/components/OrderReviewSheet";
 import { formatOrderFreeSummary } from "@/features/order/free-amount";
 import { useOrderDetailActions } from "@/features/order/hooks/use-order-detail-actions";
+import { multiCompanionNeedSelect } from "@/features/order/multi-companion";
 import { getOrderDetailAction } from "@/features/order/order-detail-actions";
 import { formatOrderTime } from "@/features/order/order-detail-format";
 import { orderClubQueryKey, orderDetailQueryKey } from "@/features/order/order-query";
 import { fetchOrderClub, fetchOrderDetail, mapOrder } from "@/features/order/order.api";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 
 /** 详情页只有接单方/下单方两种视角 */
@@ -34,8 +35,10 @@ export function OrderDetailScreen({
   scope: OrderDetailScope;
 }) {
   const insets = useSafeAreaInsets();
+  const focused = useIsFocused();
   const token = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.user);
+  const { openCustomerService } = useCustomerServiceEntry();
   const detail = useQuery({
     queryKey: orderDetailQueryKey(id, scope),
     queryFn: async ({ signal }) =>
@@ -45,6 +48,9 @@ export function OrderDetailScreen({
     // 不一定下发 ORDER_NOTIFY），停留期间对活跃订单轮询兜底。
     refetchOnMount: "always",
     refetchInterval: (query) => {
+      if (!focused) {
+        return false;
+      }
       const status = query.state.data?.status;
       if (
         status === "paid" ||
@@ -56,6 +62,19 @@ export function OrderDetailScreen({
       return false;
     },
   });
+  const hasFocused = useRef(false);
+  const refetchDetail = detail.refetch;
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasFocused.current) {
+        hasFocused.current = true;
+        return;
+      }
+      if (id && token) {
+        void refetchDetail({ cancelRefetch: false });
+      }
+    }, [id, refetchDetail, token]),
+  );
   const actions = useOrderDetailActions({
     order: detail.data,
     scope,
@@ -73,12 +92,12 @@ export function OrderDetailScreen({
   const [clock, setClock] = useState(() => Date.now());
   const dispatchDeadline = detail.data?.dispatchDeadline;
   useEffect(() => {
-    if (scope !== "accept" || !dispatchDeadline) {
+    if (!focused || scope !== "accept" || !dispatchDeadline) {
       return;
     }
     const timer = setInterval(() => setClock(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [dispatchDeadline, scope]);
+  }, [dispatchDeadline, focused, scope]);
   if (detail.isLoading) {
     return (
       <View style={styles.center}>
@@ -209,9 +228,6 @@ export function OrderDetailScreen({
           showDispatchCountdown={showDispatchCountdown}
           dispatchCountdown={dispatchCountdown}
         />
-        {scope === "place" && !isCancelled ? (
-          <OrderProgressSteps status={order.status} scope={scope} />
-        ) : null}
         <OrderDetailInfoBlocks
           order={order}
           scope={scope}
@@ -242,6 +258,16 @@ export function OrderDetailScreen({
         members={actions.afterSaleMembers}
         onClose={() => actions.setAfterSaleVisible(false)}
         onContact={actions.contactAfterSaleMember}
+        onCustomerService={openCustomerService}
+      />
+      <OrderMultiCompanionSheet
+        visible={actions.multiSelectVisible}
+        needSelect={multiCompanionNeedSelect(order)}
+        candidates={actions.multiSelectCandidates}
+        loading={actions.multiSelectLoading}
+        submitting={actions.actionPending}
+        onClose={() => actions.setMultiSelectVisible(false)}
+        onConfirm={actions.confirmMultiCompanions}
       />
       <OrderReviewSheet
         visible={actions.reviewVisible}
@@ -346,6 +372,6 @@ const styles = StyleSheet.create({
   headerSlot: { width: 32 },
   scroll: { flex: 1 },
   content: { paddingBottom: 8 },
-  muted: { color: "#999", fontFamily: DOUYIN_SANS, fontSize: 13 },
+  muted: { color: "#999", fontSize: 13 },
   acceptScreen: { backgroundColor: "#F7F7F7" },
 });

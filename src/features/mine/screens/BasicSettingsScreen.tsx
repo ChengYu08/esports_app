@@ -20,9 +20,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { queryClient } from "@/core/query/query-client";
 import { signOut } from "@/features/auth/sign-out";
+import { useAuthStore } from "@esports/auth";
 import { readLastTeenEnabled } from "@/features/mine/teen-mode-store";
 import { useSmsNotifyStatus } from "@/features/mine/hooks/use-sms-notify";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const arrowIcon = require("../../../../assets/mine/figma/mine-arrow-right.svg");
@@ -47,6 +47,7 @@ function formatBytes(bytes: number | null) {
 
 export default function BasicSettingsScreen() {
   const insets = useSafeAreaInsets();
+  const userId = useAuthStore((state) => state.user?.id ?? null);
   const [clearing, setClearing] = useState(false);
   const [cacheModalVisible, setCacheModalVisible] = useState(false);
   const [cacheSize, setCacheSize] = useState<number | null>(() =>
@@ -60,11 +61,18 @@ export default function BasicSettingsScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      let active = true;
+      setTeenModeEnabled(false);
       // 展示最近一次服务端状态镜像；以 /youth/status 拉取结果为准
-      readLastTeenEnabled().then((enabled) =>
-        setTeenModeEnabled(enabled ?? false),
-      );
-    }, []),
+      readLastTeenEnabled(userId).then((enabled) => {
+        if (active) {
+          setTeenModeEnabled(enabled ?? false);
+        }
+      });
+      return () => {
+        active = false;
+      };
+    }, [userId]),
   );
 
   const clearCache = () => setCacheModalVisible(true);
@@ -343,7 +351,6 @@ const styles = StyleSheet.create({
   cacheModalMessage: {
     marginTop: 8,
     color: "#666",
-    fontFamily: DOUYIN_SANS,
     fontSize: 13,
     lineHeight: 21,
     textAlign: "center",
@@ -360,13 +367,11 @@ const styles = StyleSheet.create({
   },
   cacheSizeLabel: {
     color: "#666",
-    fontFamily: DOUYIN_SANS,
     fontSize: 13,
     lineHeight: 20,
   },
   cacheSizeValue: {
     color: "#FF1F4C",
-    fontFamily: DOUYIN_SANS,
     fontSize: 15,
     lineHeight: 22,
     fontWeight: "600",
@@ -390,14 +395,12 @@ const styles = StyleSheet.create({
   },
   cacheCancelText: {
     color: "#555",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 20,
     fontWeight: "600",
   },
   cacheConfirmText: {
     color: "#FFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 20,
     fontWeight: "600",

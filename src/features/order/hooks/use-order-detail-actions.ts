@@ -1,6 +1,7 @@
 import { buildAfterSalePayload } from "@/features/order/after-sale-card";
 import {
   computeFreeStarAmount,
+  computeFreeSubmitAmount,
   computeOrderPayableStars,
 } from "@/features/order/free-amount";
 import { imageSourceUri } from "@/features/order/order-detail-format";
@@ -13,15 +14,19 @@ import {
   cancelOrder,
   completeOrder,
   fetchAfterSaleMembers,
+  fetchMultiCompanionCandidates,
   fetchOrderReview,
   freeOrderService,
   rejectOrder,
+  selectMultiCompanions,
   startOrderService,
   submitOrderReview,
   type AfterSaleMember,
+  type MultiCompanionCandidate,
   type OrderReview,
   type OrderReviewInput,
 } from "@/features/order/order.api";
+import { needsMultiCompanionSelect } from "@/features/order/multi-companion";
 import type { OrderAction, OrderItemModel } from "@/features/order/order.types";
 import { requireLogin } from "@/shared/navigation/require-login";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
@@ -50,6 +55,11 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
     [],
   );
   const [afterSaleLoading, setAfterSaleLoading] = useState(false);
+  const [multiSelectVisible, setMultiSelectVisible] = useState(false);
+  const [multiSelectCandidates, setMultiSelectCandidates] = useState<
+    MultiCompanionCandidate[]
+  >([]);
+  const [multiSelectLoading, setMultiSelectLoading] = useState(false);
   const [reviewVisible, setReviewVisible] = useState(false);
   const [reviewDetail, setReviewDetail] = useState<OrderReview | null>(null);
   const [actionPrompt, setActionPrompt] = useState<"reject" | "free" | null>(
@@ -120,10 +130,43 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
       setCompletePromptVisible(true);
       return;
     }
+    // 一单多陪且参与陪玩未选满：先弹选人弹窗，确认后再开始服务
+    if (action === "start" && needsMultiCompanionSelect(order)) {
+      setMultiSelectVisible(true);
+      setMultiSelectLoading(true);
+      void fetchMultiCompanionCandidates(order.id, token)
+        .then(setMultiSelectCandidates)
+        .catch(() => {
+          setMultiSelectCandidates([]);
+          showToast("获取可选陪玩失败，请稍后重试");
+        })
+        .finally(() => setMultiSelectLoading(false));
+      return;
+    }
     setActionPending(true);
     try {
       if (action === "accept") await acceptOrder(order.id, token);
       if (action === "start") await startOrderService(order.id, token);
+      await syncAfterMutation();
+      showToast("操作成功");
+    } catch (error) {
+      setPrompt({
+        title: "订单操作失败",
+        message: error instanceof Error ? error.message : "请稍后重试",
+      });
+    } finally {
+      setActionPending(false);
+    }
+  };
+
+  /** 一单多陪选人确认：提交参与陪玩后立即开始服务 */
+  const confirmMultiCompanions = async (userIds: number[]) => {
+    if (!order || !token || actionPending) return;
+    setActionPending(true);
+    try {
+      await selectMultiCompanions(order.id, userIds, token);
+      await startOrderService(order.id, token);
+      setMultiSelectVisible(false);
       await syncAfterMutation();
       showToast("操作成功");
     } catch (error) {
@@ -152,9 +195,11 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
     ) {
       return;
     }
+    // 免单金额口径：活动订单按原价退款基数折算，普通订单维持时长×单价计算值
+    const freeAmount = computeFreeSubmitAmount(order, starAmount, freeHours);
     setActionPending(true);
     try {
-      await freeOrderService(order.id, starAmount, token);
+      await freeOrderService(order.id, freeAmount, token);
       setActionPrompt(null);
       await syncAfterMutation();
       showToast("免单成功");
@@ -205,6 +250,11 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
         params: {
           clubId: String(order.clubId || ""),
           userId: String(order.receiverUserId || ""),
+          reorderGame: order.gameName,
+          reorderMode: order.gameModeName ?? "",
+          reorderLevel: order.gameLevelName ?? "",
+          reorderService: order.orderServiceName ?? "",
+          reorderQuantity: String(order.quantity),
         },
       });
     }
@@ -326,6 +376,11 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
     setAfterSaleVisible,
     afterSaleMembers,
     afterSaleLoading,
+    multiSelectVisible,
+    setMultiSelectVisible,
+    multiSelectCandidates,
+    multiSelectLoading,
+    confirmMultiCompanions,
     reviewVisible,
     setReviewVisible,
     reviewDetail,
