@@ -143,7 +143,7 @@ export default function MineScreen() {
   };
   const openStarRecharge = () => {
     if (!requireLogin()) return;
-    router.push("/star-recharge");
+    router.push("/my-diamonds");
   };
   const openMyRoom = async () => {
     if (!requireLogin() || !accessToken || openingVoiceRoom) return;
