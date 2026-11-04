@@ -25,6 +25,7 @@ import {
   clearAuthSession,
   saveAuthSession,
 } from "@/features/auth/session-persistence";
+import { getLogoutConfirmMessage } from "@/features/auth/sign-out";
 import { messageStore } from "@/features/message/message-store";
 import { RealNameVerificationSheet } from "@/features/mine/components/RealNameVerificationSheet";
 import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
@@ -204,7 +205,7 @@ export default function AccountSettingsScreen() {
     void (async () => {
       const confirmed = await useAppConfirm.getState().confirm({
         title: "退出登录",
-        message: "确认退出当前账号吗？您的数据将被清除！",
+        message: getLogoutConfirmMessage(user?.id),
         cancelText: "取消",
         confirmText: "退出登录",
       });

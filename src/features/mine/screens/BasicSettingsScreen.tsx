@@ -19,7 +19,10 @@ import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { queryClient } from "@/core/query/query-client";
-import { signOut } from "@/features/auth/sign-out";
+import {
+  getLogoutConfirmMessage,
+  signOut,
+} from "@/features/auth/sign-out";
 import { useAuthStore } from "@esports/auth";
 import { readLastTeenEnabled } from "@/features/mine/teen-mode-store";
 import { useSmsNotifyStatus } from "@/features/mine/hooks/use-sms-notify";
@@ -106,7 +109,7 @@ export default function BasicSettingsScreen() {
     void (async () => {
       const confirmed = await useAppConfirm.getState().confirm({
         title: "退出登录",
-        message: "确认退出当前账号吗？",
+        message: getLogoutConfirmMessage(userId),
         cancelText: "取消",
         confirmText: "退出登录",
       });
