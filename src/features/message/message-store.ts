@@ -9,6 +9,7 @@ import {
   getRongMessages,
   initializeRongCloud,
   isRongCloudAvailable,
+  isRongCloudConnected,
   markRongConversationRead,
   subscribeRongConnectionStatus,
   subscribeRongConversationSync,
@@ -56,6 +57,8 @@ export type MessageConnectionState = 'idle' | 'connecting' | 'ready' | 'unavaila
 export type MessageAdapter = {
   available: () => boolean;
   initialize: (token: string) => Promise<boolean>;
+  /** SDK 长连接是否实际处于已连接状态（区别于 store 的 connectionState 标记） */
+  isConnected?: () => boolean;
   getConversations: () => Promise<MessageConversation[]>;
   getMessages: (peerId: string, beforeSentTime?: number) => Promise<MessageHistoryPage>;
   sendText: (peerId: string, text: string) => Promise<ManagedMessage>;
@@ -153,6 +156,7 @@ function createAdapter(): MessageAdapter {
   return {
     available: isRongCloudAvailable,
     initialize: initializeRongCloud,
+    isConnected: isRongCloudConnected,
     getConversations: getRongConversations,
     getMessages: getRongMessages,
     sendText: sendRongText,
@@ -480,7 +484,8 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       refreshConversations: async (token) => {
         if (!token) return;
         onlineStatusToken = token;
-        if (get().connectionState === 'ready') {
+        // 标记 ready 且长连接实际在线才直接同步；后台挂起等假 ready 场景需走 initialize 重连
+        if (get().connectionState === 'ready' && adapter.isConnected?.() === true) {
           try {
             await syncConversations(lifecycleRevision);
           } catch (error) {
@@ -521,7 +526,10 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         // 否则在 await readBlacklist 期间,RootLayout 的 effect 可能再次触发 initialize,
         // 形成 initialize → set('connecting') → React 重渲染 → effect 重跑 → initialize 的死循环。
         if (initializeInProgress) return;
-        if (get().connectionState === 'connecting' || get().connectionState === 'ready') return;
+        // 状态标记为已连接、且 SDK 长连接实际在线时才跳过；
+        // 后台挂起/互踢等场景下 connectionState 仍是 ready 但连接已断，必须允许重连
+        if ((get().connectionState === 'connecting' || get().connectionState === 'ready')
+          && adapter.isConnected?.() === true) return;
         if (!token) return;
         if (!adapter.available()) {
           set({ connectionState: 'unavailable', lastError: unavailableMessage });

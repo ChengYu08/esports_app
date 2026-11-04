@@ -3,6 +3,7 @@
  * - CUSTOMER_SERVICE_INVITE：接待邀请 → 全局 ActionNotice 抢单条（到期自动消失）
  * - QUICK_MATCH_CREATED：接待代发创建 → 写入 quickMatchCreated 场景标记
  */
+import { logger } from "@/core/logging/logger";
 import { showToast } from "@/shared/ui/app-toast";
 
 import { markCsInviteClaimed, markCsInviteUnclaimed } from "@/features/message/cs-invite-claim-state";
@@ -36,14 +37,41 @@ export function handleCustomerServiceInvite(command: RongCommand) {
   const roomId = stringField(command.data, "roomId");
   const clubId = stringField(command.data, "clubId");
   const roomVersion = stringField(command.data, "roomVersion");
-  if (!roomId || !clubId || !roomVersion) return;
+  if (!roomId || !clubId || !roomVersion) {
+    logger.warn("cs_invite.dropped_missing_fields", {
+      roomId,
+      clubId,
+      roomVersion,
+    });
+    return;
+  }
 
   const key = `${roomId}_${roomVersion}`;
-  if (csInviteKeys.has(key)) return;
+  if (csInviteKeys.has(key)) {
+    logger.info("cs_invite.dropped_dedup", { roomId, roomVersion });
+    return;
+  }
 
   const expireAtSec = Number(command.data.expireAt);
-  if (!Number.isFinite(expireAtSec)) return;
-  if (expireAtSec * 1000 <= Date.now()) return;
+  if (!Number.isFinite(expireAtSec)) {
+    logger.warn("cs_invite.dropped_invalid_expire_at", {
+      roomId,
+      roomVersion,
+      expireAt: stringField(command.data, "expireAt"),
+    });
+    return;
+  }
+  if (expireAtSec * 1000 <= Date.now()) {
+    // 到达时已过期：多为离线/断连期间积压，或设备时钟偏差，需要留痕区分
+    logger.warn("cs_invite.dropped_expired", {
+      roomId,
+      roomVersion,
+      expireAtMs: expireAtSec * 1000,
+      receivedAtMs: Date.now(),
+      skewMs: Date.now() - expireAtSec * 1000,
+    });
+    return;
+  }
 
   const playerUserId = stringField(command.data, "playerUserId");
   const playerName =
@@ -51,6 +79,13 @@ export function handleCustomerServiceInvite(command: RongCommand) {
     || (playerUserId ? `玩家${playerUserId}` : "玩家");
   const noticeId = `cs:${key}`;
 
+  logger.info("cs_invite.received", {
+    roomId,
+    clubId,
+    roomVersion,
+    expireAtMs: expireAtSec * 1000,
+    playerUserId,
+  });
   csInviteKeys.set(key, expireAtSec);
   actionNotice.push(
     {
