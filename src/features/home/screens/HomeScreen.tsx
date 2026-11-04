@@ -15,14 +15,12 @@ import {
 } from "@/features/home/hooks/use-home-data";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
-  Animated,
+  FlatList,
   RefreshControl,
   StyleSheet,
   View,
-  useAnimatedValue,
-  type LayoutChangeEvent,
 } from "react-native";
 import { showToast, toastDurations } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -47,27 +45,6 @@ export default function HomeScreen() {
   );
   const [game, setGame] = useState<GameKey>("");
   const [category, setCategory] = useState("");
-  const scrollY = useAnimatedValue(0);
-  const [headerHeight, setHeaderHeight] = useState(1);
-  const measureHeader = useCallback((event: LayoutChangeEvent) => {
-    setHeaderHeight(Math.max(1, event.nativeEvent.layout.height));
-  }, []);
-  const handleScroll = useMemo(
-    () =>
-      Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-        useNativeDriver: true,
-      }),
-    [scrollY],
-  );
-  const backgroundOpacity = useMemo(
-    () =>
-      scrollY.interpolate({
-        inputRange: [0, headerHeight],
-        outputRange: [0, 1],
-        extrapolate: "clamp",
-      }),
-    [headerHeight, scrollY],
-  );
   const games = useHomeGames();
   const categories = useHomeGameCategories();
   const { refetch: refetchGames } = games;
@@ -171,7 +148,7 @@ export default function HomeScreen() {
   );
   const header = useMemo(
     () => (
-      <View onLayout={measureHeader} style={styles.homeHeader}>
+      <View style={styles.homeHeader}>
         <HomeHeader
           tab={topTab}
           game={selectedGame}
@@ -199,15 +176,9 @@ export default function HomeScreen() {
       retryFilters,
       bannerSlots,
       selectTopTab,
-      measureHeader,
     ],
   );
   const isHomeLoading = games.isLoading || categories.isLoading;
-
-  // 列表首次加载完成时背景回到首屏状态；频道切换后 keep-alive 保住滚动位置，背景透明度跟随真实偏移。
-  useEffect(() => {
-    scrollY.setValue(0);
-  }, [isHomeLoading, scrollY]);
 
   return (
     <View
@@ -217,19 +188,7 @@ export default function HomeScreen() {
         { paddingTop: insets.top },
       ]}
     >
-      {topTab === "home" ? (
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.topBackground,
-            { height: insets.top + 44, opacity: backgroundOpacity },
-          ]}
-        >
-          <HomeBackground />
-        </Animated.View>
-      ) : (
-        <HomeBackground />
-      )}
+      {topTab !== "home" && <HomeBackground />}
       <HomeTopBar tab={topTab} onTabChange={selectTopTab} />
       <View style={styles.paneContainer}>
         {mountedTabs.home && (
@@ -237,7 +196,7 @@ export default function HomeScreen() {
             {isHomeLoading ? (
               <HomeSkeleton bottomPadding={100 + insets.bottom} />
             ) : (
-              <Animated.FlatList
+              <FlatList
                 style={styles.clubList}
                 data={clubItems}
                 keyExtractor={(item) => item.id}
@@ -266,8 +225,6 @@ export default function HomeScreen() {
                 maxToRenderPerBatch={6}
                 updateCellsBatchingPeriod={50}
                 initialNumToRender={8}
-                onScroll={handleScroll}
-                scrollEventThrottle={16}
                 ListEmptyComponent={
                   clubs.isLoading ? (
                     <LoadingState />
@@ -311,13 +268,6 @@ const styles = StyleSheet.create({
   paneContainer: { flex: 1 },
   pane: { flex: 1 },
   paneHidden: { display: "none" },
-  topBackground: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    overflow: "hidden",
-  },
   emptyCourt: {
     minHeight: 500,
     alignItems: "center",

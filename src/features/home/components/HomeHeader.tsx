@@ -169,7 +169,7 @@ function Tab({
 }) {
   return (
     <Pressable onPress={onPress} style={styles.tab}>
-      {selected && <View style={styles.line} />}
+      {selected && <View style={[styles.line, { width: label.length === 2 ? 34 : 51 }]} />}
       <Text style={[styles.tabText, selected && styles.tabSelected, court && styles.courtTabText, court && selected && styles.courtTabSelected]}>
         {label}
       </Text>
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
     fontFamily: DOUYIN_SANS,
     color: "#999",
     fontSize: 18,
-    fontWeight: "400",
+    fontWeight: "700",
   },
   tabSelected: {
     fontFamily: DOUYIN_SANS,
@@ -199,16 +199,15 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
   },
-  courtTabText: { fontFamily: COURT_FONT_FAMILY, color: "#CACACC", fontWeight: "600", lineHeight: 26 },
+  courtTabText: { fontFamily: COURT_FONT_FAMILY, color: "#CACACC", fontWeight: "700", lineHeight: 26 },
   courtTabSelected: { color: "#0D0D0F", lineHeight: 28 },
   line: {
     position: "absolute",
     bottom: 11,
-    left: 3,
-    right: 3,
+    alignSelf: "center",
     height: 6,
     borderRadius: 2,
-    backgroundColor: "#FFC2C6",
+    backgroundColor: "#FFC2CE",
   },
   actions: { alignItems: "center", flexDirection: "row", gap: 10, height: "100%", paddingRight: 12 },
   search: { alignItems: "center", height: 44, justifyContent: "center", width: 40 },

@@ -1,7 +1,5 @@
+import { uploadCompanionMediaObject } from "@/features/mine/companion-upload";
 import { apiClient } from "@/core/network/api-client";
-import { clientAuthApi } from "@/features/auth/client-auth.api";
-import { uploadClientObject } from "@/features/auth/oss-upload";
-import { getEvidenceUploadFile } from "@/features/court/court-evidence-image";
 import { useAuthStore } from "@esports/auth";
 
 export type CourtLevel = "FIRST" | "SECOND" | "THIRD";
@@ -396,60 +394,15 @@ export const courtApi = {
   applyReviewer() {
     return post("/client/v1/court/reviewer/apply");
   },
-  /**
-   * 小法庭证据直传凭证：优先专用 STS；请求失败或凭证不完整（如 securityToken 为 null，
-   * 会令 OSS 直传 403 或原生 fetch 崩溃）时回退通用 OSS STS，对齐 Web 的 bizType=111 兜底。
-   */
-  async getEvidenceSts(objectName: string) {
-    type EvidenceSts = Parameters<typeof uploadClientObject>[0] & {
-      objectList?: string[];
-    };
-    let courtError: unknown;
-    try {
-      const data = await postRequireData<EvidenceSts>(
-        "/client/v1/court/evidence/sts",
-        {
-          action: { objectNames: [objectName] },
-        },
-      );
-      if (
-        data?.securityToken &&
-        data.accessKeyId &&
-        data.accessKeySecret &&
-        data.bucketName &&
-        data.endpoint
-      ) {
-        return data;
-      }
-    } catch (error) {
-      courtError = error;
-    }
+  async uploadEvidence(uri: string, name: string) {
     const token = useAuthStore.getState().accessToken;
     if (!token) {
-      throw courtError instanceof Error
-        ? courtError
-        : new Error("请先登录");
+      throw new Error("请先登录");
     }
-    try {
-      return await clientAuthApi.getOssSts(token, "111", [objectName]);
-    } catch (fallbackError) {
-      throw fallbackError instanceof Error
-        ? fallbackError
-        : courtError instanceof Error
-          ? courtError
-          : new Error("获取证据上传凭证失败");
-    }
-  },
-  async uploadEvidence(uri: string, name: string) {
-    const image = getEvidenceUploadFile(uri, name);
-    const sts = await this.getEvidenceSts(image.name);
-    const key = sts.objectList?.[0];
-    if (!key) throw new Error("上传凭证未返回文件路径");
-    await uploadClientObject(sts, key, {
-      uri: image.uri,
-      mimeType: image.mimeType,
-    });
-    return key;
+    const suffix = name.split(".").pop()?.toLowerCase();
+    const mimeType = suffix === "png" ? "image/png" : suffix === "webp" ? "image/webp" : "image/jpeg";
+    const result = await uploadCompanionMediaObject(token, { uri, fileName: name, mimeType }, "image");
+    return result.objectKey;
   },
   async supplementEvidence(
     caseId: string | number,
