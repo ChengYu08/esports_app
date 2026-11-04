@@ -111,6 +111,8 @@ export default function ClubDetailScreen() {
   const [game, setGame] = useState<GameKey>("");
   // 简介展开状态：默认收起两行，点击右下角按钮切换
   const [introExpanded, setIntroExpanded] = useState(false);
+  // 简介真实行数（由隐藏测量层回报）：不超过两行时不展示展开/收起按钮
+  const [introLineCount, setIntroLineCount] = useState(0);
   const [openFilter, setOpenFilter] = useState<FilterKey | null>(null);
   const [isFilterSheetVisible, setFilterSheetVisible] = useState(false);
   const [showPriceEmptyModal, setShowPriceEmptyModal] = useState(false);
@@ -418,26 +420,41 @@ export default function ClubDetailScreen() {
           </View>
         </View>
         <View style={styles.introBlock}>
+          {/* 隐藏测量层：不限制行数，取真实行数判断是否展示展开按钮 */}
+          <Text
+            numberOfLines={undefined}
+            onTextLayout={(event) => {
+              const count = event.nativeEvent.lines.length;
+              if (count !== introLineCount) {
+                setIntroLineCount(count);
+              }
+            }}
+            style={[styles.introText, styles.introTextMeasure]}
+          >
+            {club.intro}
+          </Text>
           <Text
             numberOfLines={introExpanded ? undefined : 2}
             style={styles.introText}
           >
             {club.intro}
           </Text>
-          <Pressable
-            accessibilityLabel={introExpanded ? "收起简介" : "展开简介"}
-            hitSlop={6}
-            style={styles.introToggle}
-            onPress={() => setIntroExpanded(!introExpanded)}
-          >
-            <Image
-              source={introToggleIcon}
-              style={[
-                styles.introToggleIcon,
-                introExpanded && styles.introToggleIconExpanded,
-              ]}
-            />
-          </Pressable>
+          {introLineCount > 2 ? (
+            <Pressable
+              accessibilityLabel={introExpanded ? "收起简介" : "展开简介"}
+              hitSlop={6}
+              style={styles.introToggle}
+              onPress={() => setIntroExpanded(!introExpanded)}
+            >
+              <Image
+                source={introToggleIcon}
+                style={[
+                  styles.introToggleIcon,
+                  introExpanded && styles.introToggleIconExpanded,
+                ]}
+              />
+            </Pressable>
+          ) : null}
         </View>
       </View>
       {/* 游戏页签 */}
@@ -1084,10 +1101,19 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: "400",
   },
+  // 隐藏测量层：绝对定位脱离布局流，不影响可见简介的排版；
+  // 绝对定位不受父级 paddingRight 约束，需手动补 30 与可见文本等宽，否则行数会算少
+  introTextMeasure: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 30,
+    opacity: 0,
+  },
   introToggle: {
     position: "absolute",
     right: 0,
-    bottom: 0,
+    bottom: 3,
     width: 20,
     height: 16,
     alignItems: "center",

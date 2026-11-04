@@ -7,6 +7,7 @@ import type { Club } from "@/features/home/api/home.types";
 
 const ONLINE_COUNT_BATCH_SIZE = 4;
 const ONLINE_COUNT_BATCH_GAP_MS = 120;
+const ONLINE_COUNT_STALE_TIME_MS = 30_000;
 
 type ClubOnlineCountQuery = {
   clubId: string;
@@ -64,6 +65,7 @@ export function useClubOnlineCounts(clubs: readonly Club[], gameIds?: readonly n
   const queries = useMemo(() => buildQueries(clubs, gameIds), [clubs, gameIds]);
   const signature = useMemo(() => buildSignature(queries), [queries]);
   const queriesRef = useRef(queries);
+  const runIdRef = useRef(0);
   useEffect(() => {
     queriesRef.current = queries;
   }, [queries]);
@@ -73,30 +75,35 @@ export function useClubOnlineCounts(clubs: readonly Club[], gameIds?: readonly n
     setCounts((current) => (sameCounts(current, next) ? current : next));
   }, [queryClient]);
 
-  // 分批请求：每批结束后让出事件循环，避免返回首页时集中发起的请求抢占滚动所需的 JS/渲染资源。
-  const fetchAll = useCallback(async () => {
+  // 分批请求：每批结束后让出事件循环；自动聚焦复用 30 秒新鲜缓存，手动下拉仍强制刷新。
+  const fetchAll = useCallback(async (force = false) => {
+    const runId = ++runIdRef.current;
     const activeQueries = queriesRef.current;
     if (activeQueries.length === 0) return;
     setIsRefetching(true);
     try {
       for (let index = 0; index < activeQueries.length; index += ONLINE_COUNT_BATCH_SIZE) {
+        if (runIdRef.current !== runId) return;
         const batch = activeQueries.slice(index, index + ONLINE_COUNT_BATCH_SIZE);
         await Promise.allSettled(
           batch.map((query) =>
             queryClient.fetchQuery({
               queryKey: query.queryKey,
               queryFn: ({ signal }) => fetchClubOnlineCount(query.clubId, query.countedGames, signal),
-              staleTime: 0,
+              staleTime: force ? 0 : ONLINE_COUNT_STALE_TIME_MS,
               retry: 1,
             }),
           ),
         );
+        if (runIdRef.current !== runId) return;
         if (index + ONLINE_COUNT_BATCH_SIZE < activeQueries.length) {
           await new Promise((resolve) => setTimeout(resolve, ONLINE_COUNT_BATCH_GAP_MS));
         }
       }
     } finally {
-      setIsRefetching(false);
+      if (runIdRef.current === runId) {
+        setIsRefetching(false);
+      }
     }
   }, [queryClient]);
 
@@ -109,11 +116,14 @@ export function useClubOnlineCounts(clubs: readonly Club[], gameIds?: readonly n
     });
     return () => {
       cancelled = true;
+      // 离屏即作废旧代次并中止在途请求，避免多次往返后多个全量批次叠加。
+      runIdRef.current += 1;
+      void queryClient.cancelQueries({ queryKey: ["club-online-count"] });
     };
-  }, [applyCounts, enabled, fetchAll, focused, signature]);
+  }, [applyCounts, enabled, fetchAll, focused, queryClient, signature]);
 
   const refetch = useCallback(async () => {
-    await fetchAll();
+    await fetchAll(true);
     applyCounts();
   }, [applyCounts, fetchAll]);
 

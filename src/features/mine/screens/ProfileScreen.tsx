@@ -84,7 +84,6 @@ const background = require("../../../../assets/mine/figma/profile-bg.webp");
 const maleIcon = require("../../../../assets/home/club-detail/male.svg");
 const femaleIcon = require("../../../../assets/mine/figma/mine-female.svg");
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
-const settingsIcon = require("../../../../assets/mine/figma/mine-settings.svg");
 const customerIcon = require("../../../../assets/coms/customer.svg");
 const clubIcon = require("../../../../assets/mine/figma/mine-club-flag.svg");
 const arrowDownIcon = require("../../../../assets/mine/figma/profile-arrow-down.svg");
@@ -671,21 +670,7 @@ export default function ProfileScreen() {
             </Text>
           </Animated.View>
           <View style={styles.navActions}>
-            {isMine ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="设置"
-                hitSlop={12}
-                onPress={() => router.push("/edit-profile")}
-                style={styles.navActionButton}
-              >
-                <Image
-                  source={settingsIcon}
-                  style={styles.navActionIcon}
-                  contentFit="contain"
-                />
-              </Pressable>
-            ) : (
+            {!isMine ? (
               <>
                 <Pressable
                   accessibilityRole="button"
@@ -734,7 +719,7 @@ export default function ProfileScreen() {
                   />
                 </Pressable>
               </>
-            )}
+            ) : null}
           </View>
         </View>
         <Animated.View
@@ -1018,8 +1003,9 @@ const ProfileCover = memo(function ProfileCover({
       <ProfileIdentity profile={profile} isBlacklisted={isBlacklisted} />
       <View style={styles.headerStats}>
         <Pressable
-          accessibilityRole="button"
+          accessibilityRole={isMine ? "button" : "text"}
           accessibilityLabel={`关注列表，${profile.followCount}人`}
+          disabled={!isMine}
           onPress={() => onSelectRelation("following")}
           style={styles.headerStat}
         >
@@ -1027,8 +1013,9 @@ const ProfileCover = memo(function ProfileCover({
           <Text style={styles.headerStatLabel}>关注</Text>
         </Pressable>
         <Pressable
-          accessibilityRole="button"
+          accessibilityRole={isMine ? "button" : "text"}
           accessibilityLabel={`粉丝列表，${profile.fansCount}人`}
+          disabled={!isMine}
           onPress={() => onSelectRelation("fans")}
           style={styles.headerStat}
         >

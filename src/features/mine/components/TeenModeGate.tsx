@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppState, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 import { useAuthStore } from "@esports/auth";
@@ -6,197 +6,261 @@ import { useAuthStore } from "@esports/auth";
 import { didLoginThisLaunch } from "@/features/auth/client-auth-flow";
 import TeenModeScreen from "@/features/mine/screens/TeenModeScreen";
 import { TeenModePromoDialog } from "@/features/mine/components/TeenModePromoDialog";
-import { teenModeApi } from "@/features/mine/api/teen-mode.api";
+import { teenModeApi, fetchTeenModeConfig } from "@/features/mine/api/teen-mode.api";
 import type { TeenModeStatus } from "@/features/mine/api/teen-mode.contract";
 import {
   readLastTeenEnabled,
-  readTeenClockOffset,
   saveLastTeenEnabled,
-  saveTeenClockOffset,
   readTeenPopupCache,
   saveTeenPopupCache,
+  subscribeTeenModeStatus,
 } from "@/features/mine/teen-mode-store";
+import {
+  createTeenRequestGuard,
+  type TeenRequestSnapshot,
+} from "@/features/mine/teen-request-guard";
 import {
   shouldShowTeenPopup,
   todayString,
 } from "@/features/mine/utils/teen-popup";
 import {
-  isTeenLockWindow,
+  DEFAULT_TEEN_LOCK_WINDOW,
+  createTeenServerClock,
   msUntilTeenLockBoundary,
+  readTeenServerClock,
+  shouldLockTeenMode,
+  type TeenLockWindow,
+  type TeenServerClock,
 } from "@/features/mine/utils/teen-lock-window";
 
 /**
- * 青少年模式启动门（仅登录后挂载）：
- * - 启动时拉取 /youth/status（每次启动一次），用响应里的 serverTime 校准本地时钟偏移；
- * - enabled=true 且北京时间 17:00-次日 06:00（服务端时间口径）：整屏渲染锁定页，关闭后门禁解除；
- * - enabled=true 但不处于生效时间窗：不阻断，正常使用 App；
- * - enabled=false：按每日首启规则弹"去开启/我知道了"促销弹窗（仅启动拉取时评估，回前台刷新不重弹）；
- * - 状态拉取失败且本地镜像为已开启：沿用上次的开启状态与偏移量继续判定（fail-closed，
- *   防已开启用户断网绕过）；从未拉取过则不阻断（fail-open），下次启动重试；
- * - 回到前台会重拉状态重校准时钟（防会话中途改设备时间绕过），结果只更新锁定判定。
- *
- * 时间防绕过：所有时段判定用 Date.now() + 服务端校准偏移，且固定按北京时间（UTC+8）
- * 换算，改设备时间/时区无效；服务端另有 YouthModeLockInterceptor 兜底拦截业务接口。
- * 镜像与偏移缓存均按账号维度存储，多账号同设备互不串扰。
+ * 青少年模式启动门：
+ * - 联网状态用 serverTime + 单调时钟判定锁定时段（窗口随 /youth/config 服务端配置下发，默认 9:00-23:00），
+ *   改设备时间不影响结果；
+ * - 已开启账号离线或尚未取得可信时间时直接锁定，不退回设备时间；
+ * - 缓存、状态请求和锁定页回调均校验登录会话，换号后旧结果不能落地。
  */
 export function TeenModeGate() {
   const token = useAuthStore((state) => state.accessToken);
   const userId = useAuthStore((state) => state.user?.id ?? null);
+  const accountKey = token ? `${token}:${userId ?? ""}` : "";
+  return (
+    <TeenModeGateSession
+      key={accountKey}
+      token={token}
+      userId={userId}
+    />
+  );
+}
+
+function TeenModeGateSession({
+  token,
+  userId,
+}: {
+  token: string | null;
+  userId: string | null;
+}) {
   const [status, setStatus] = useState<TeenModeStatus | null>(null);
   const [cachedEnabled, setCachedEnabled] = useState(false);
+  const [cacheReady, setCacheReady] = useState(!token);
   const [promoVisible, setPromoVisible] = useState(false);
-  const [inLockWindow, setInLockWindow] = useState(() =>
-    isTeenLockWindow(Date.now()),
-  );
-  // 本地时钟相对服务端的偏移（serverTime - Date.now()），启动时从缓存恢复
-  const clockOffsetRef = useRef(0);
-  const fetchedForTokenRef = useRef<string | null>(null);
-  // 本轮登录是否已拿到服务端实时状态：为真后缓存恢复不再覆盖（防「网络先回、存储后回」竞态）
+  const [serverNow, setServerNow] = useState<number | null>(null);
+  const [lockWindow, setLockWindow] = useState<TeenLockWindow>(DEFAULT_TEEN_LOCK_WINDOW);
+  const serverClockRef = useRef<TeenServerClock | null>(null);
+  const requestGuardRef = useRef(createTeenRequestGuard());
   const statusSyncedRef = useRef(false);
-  // 回前台重拉状态的回调（由拉取 effect 注入，避免依赖变化重建定时器链）
   const refreshOnActiveRef = useRef<(() => void) | null>(null);
-  // 同一 token 的在途请求去重（换号不阻塞）
-  const inFlightTokenRef = useRef<string | null>(null);
+  const reevaluateClockRef = useRef<(() => void) | null>(null);
+  const inFlightSnapshotRef = useRef<TeenRequestSnapshot | null>(null);
 
-  const calibratedNow = () => Date.now() + clockOffsetRef.current;
-
-  const applyServerTime = (serverTime?: number) => {
-    if (typeof serverTime !== "number" || !Number.isFinite(serverTime)) {
-      return;
+  const calibratedNow = () => {
+    const clock = serverClockRef.current;
+    if (!clock) {
+      return null;
     }
-    clockOffsetRef.current = serverTime - Date.now();
-    void saveTeenClockOffset(clockOffsetRef.current, userId);
-    setInLockWindow(isTeenLockWindow(calibratedNow()));
+    return readTeenServerClock(clock, performance.now());
   };
 
-  const applyStatus = useCallback(
-    (next: TeenModeStatus) => {
-      statusSyncedRef.current = true;
-      setStatus(next);
-      setCachedEnabled(next.enabled);
-      applyServerTime(next.serverTime);
-      void saveLastTeenEnabled(next.enabled, userId);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [userId],
-  );
+  const applyStatus = (
+    next: TeenModeStatus,
+    expectedSession: number,
+    targetUserId: string | null,
+  ) => {
+    if (!requestGuardRef.current.isSessionCurrent(expectedSession)) {
+      return false;
+    }
+    statusSyncedRef.current = true;
+    setStatus(next);
+    setCachedEnabled(next.enabled);
+    setCacheReady(true);
+    if (typeof next.serverTime === "number" && Number.isFinite(next.serverTime)) {
+      serverClockRef.current = createTeenServerClock(
+        next.serverTime,
+        performance.now(),
+      );
+    } else {
+      serverClockRef.current = null;
+    }
+    setServerNow(calibratedNow());
+    reevaluateClockRef.current?.();
+    void saveLastTeenEnabled(next.enabled, targetUserId);
+    return true;
+  };
 
-  // 启动/换号即恢复该账号缓存：时钟偏移 + 最近已知开启状态（状态拉取失败时的 fail-closed 依据）
   useEffect(() => {
-    if (!token) {
+    const guard = requestGuardRef.current;
+    const session = guard.beginSession();
+    const targetToken = token;
+    const targetUserId = userId;
+    inFlightSnapshotRef.current = null;
+    statusSyncedRef.current = false;
+    serverClockRef.current = null;
+    refreshOnActiveRef.current = null;
+
+    if (!targetToken) {
       return;
     }
-    void (async () => {
-      const [enabled, offset] = await Promise.all([
-        readLastTeenEnabled(userId),
-        readTeenClockOffset(userId),
-      ]);
-      // 竞态兜底：期间网络状态已回填则放弃陈旧缓存
-      if (statusSyncedRef.current) {
+
+    const unsubscribeStatus = subscribeTeenModeStatus((next, changedToken) => {
+      if (
+        changedToken !== targetToken
+        || !guard.isSessionCurrent(session)
+      ) {
         return;
       }
-      if (offset !== null) {
-        clockOffsetRef.current = offset;
+      guard.invalidateStatus();
+      applyStatus(next, session, targetUserId);
+    });
+
+    // 锁定窗口跟随服务端配置（/youth/config，Nacos 动态下发）；失败回退默认 9:00-23:00
+    void (async () => {
+      try {
+        const config = await fetchTeenModeConfig(targetToken);
+        const startHour = Number(config?.lockStartHour);
+        const endHour = Number(config?.lockEndHour);
+        if (!guard.isSessionCurrent(session)) {
+          return;
+        }
+        if (
+          Number.isInteger(startHour) && startHour >= 0 && startHour <= 23
+          && Number.isInteger(endHour) && endHour >= 0 && endHour <= 23
+        ) {
+          setLockWindow({ startHour, endHour });
+        }
+      } catch {
+        // 配置拉取失败保持默认窗口：与服务端默认配置一致，服务端兜底拦截仍生效
       }
-      setCachedEnabled(enabled === true);
-      setInLockWindow(isTeenLockWindow(calibratedNow()));
     })();
+
+    const runFetch = async (allowPromo: boolean) => {
+      if (inFlightSnapshotRef.current) {
+        return;
+      }
+      const snapshot = guard.snapshot();
+      inFlightSnapshotRef.current = snapshot;
+      try {
+        const next = await teenModeApi.status(targetToken);
+        if (!guard.isCurrent(snapshot)) {
+          return;
+        }
+        if (!applyStatus(next, session, targetUserId)) {
+          return;
+        }
+        if (allowPromo && !next.enabled && !didLoginThisLaunch()) {
+          const cache = await readTeenPopupCache();
+          if (guard.isCurrent(snapshot)) {
+            setPromoVisible(shouldShowTeenPopup(cache, todayString()));
+          }
+        }
+      } catch {
+        // 缓存已开启或时间不可信时由渲染层保持锁定；从未同步账号仍按原规则放行。
+      } finally {
+        if (inFlightSnapshotRef.current === snapshot) {
+          inFlightSnapshotRef.current = null;
+        }
+      }
+    };
+
+    refreshOnActiveRef.current = () => {
+      void runFetch(false);
+    };
+
+    void (async () => {
+      try {
+        const enabled = await readLastTeenEnabled(targetUserId);
+        if (!guard.isSessionCurrent(session) || statusSyncedRef.current) {
+          return;
+        }
+        // 登录用户ID未知时不能使用全局镜像，也无法证明未开启，先保守锁定。
+        setCachedEnabled(enabled === true || !targetUserId);
+        setServerNow(null);
+      } catch {
+        if (guard.isSessionCurrent(session) && !statusSyncedRef.current) {
+          // 存储不可读时无法证明未开启，保守锁定直到服务端状态返回。
+          setCachedEnabled(true);
+          setServerNow(null);
+        }
+      } finally {
+        if (guard.isSessionCurrent(session)) {
+          setCacheReady(true);
+        }
+      }
+    })();
+
+    void runFetch(true);
+    return () => {
+      unsubscribeStatus();
+      if (guard.isSessionCurrent(session)) {
+        guard.beginSession();
+      }
+      refreshOnActiveRef.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, userId]);
 
-  // 跨过 17:00 / 06:00 边界重新判定锁定状态：
-  // - 自续订定时器（与状态是否变化无关），避免系统延迟触发后判定结果不变导致定时器链断掉；
-  // - 回到前台立即重判 + 重拉状态（覆盖后台挂起跨边界、超时定时器迟到、会话中途改设备时间）。
   useEffect(() => {
     if (!token) {
       return;
     }
     let timer: ReturnType<typeof setTimeout> | undefined;
     const evaluate = () => {
+      if (timer) {
+        clearTimeout(timer);
+      }
       const now = calibratedNow();
-      setInLockWindow(isTeenLockWindow(now));
-      timer = setTimeout(evaluate, msUntilTeenLockBoundary(now));
+      setServerNow(now);
+      timer = setTimeout(
+        evaluate,
+        now === null
+          ? 60_000
+          : msUntilTeenLockBoundary(now, lockWindow.startHour, lockWindow.endHour),
+      );
     };
+    reevaluateClockRef.current = evaluate;
     evaluate();
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") {
-        // 先清旧定时器再重判，避免多次前后台切换累积孤儿定时器链
-        if (timer) {
-          clearTimeout(timer);
-        }
+        // 深睡眠可能暂停单调时钟，回前台必须作废旧响应并重新校准。
+        requestGuardRef.current.invalidateStatus();
+        inFlightSnapshotRef.current = null;
+        serverClockRef.current = null;
         evaluate();
         refreshOnActiveRef.current?.();
       }
     });
     return () => {
+      reevaluateClockRef.current = null;
       if (timer) {
         clearTimeout(timer);
       }
       subscription.remove();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
-
-  useEffect(() => {
-    // 登出：清掉上一账号的内存状态（状态/镜像/促销弹窗/同步标记），缓存镜像按账号存、无需清
-    if (!token) {
-      fetchedForTokenRef.current = null;
-      statusSyncedRef.current = false;
-      setStatus(null);
-      setCachedEnabled(false);
-      setPromoVisible(false);
-      return;
-    }
-
-    // 拉取状态；allowPromo 时附带评估促销弹窗（回前台刷新不重弹已关掉的弹窗）
-    const runFetch = async (targetToken: string, allowPromo: boolean) => {
-      if (inFlightTokenRef.current === targetToken) {
-        return;
-      }
-      inFlightTokenRef.current = targetToken;
-      try {
-        const next = await teenModeApi.status(targetToken);
-        // 过期响应（登出/换号后迟到）丢弃
-        if (fetchedForTokenRef.current !== targetToken) {
-          return;
-        }
-        applyStatus(next);
-        if (allowPromo && !next.enabled && !didLoginThisLaunch()) {
-          const cache = await readTeenPopupCache();
-          // 期间可能已换号，二次校验后再展示
-          if (fetchedForTokenRef.current === targetToken) {
-            setPromoVisible(shouldShowTeenPopup(cache, todayString()));
-          }
-        }
-      } catch {
-        // fail-closed 交由缓存镜像（cachedEnabled）兜底；从未拉取过则 fail-open 不锁定
-      } finally {
-        if (inFlightTokenRef.current === targetToken) {
-          inFlightTokenRef.current = null;
-        }
-      }
-    };
-
-    // 回前台：重拉状态重校准时钟（仅刷新锁定判定，不重评促销弹窗）
-    refreshOnActiveRef.current = () => {
-      void runFetch(token, false);
-    };
-
-    // 同一 token 的 effect 重跑（含 userId 变化触发）不重复拉取；换号则重置状态后重拉
-    if (fetchedForTokenRef.current === token) {
-      return;
-    }
-    fetchedForTokenRef.current = token;
-    statusSyncedRef.current = false;
-    setStatus(null);
-    setCachedEnabled(false);
-    setPromoVisible(false);
-    void runFetch(token, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, userId]);
+  }, [token, userId, lockWindow]);
 
   const handleStatusChanged = (next: TeenModeStatus) => {
-    applyStatus(next);
+    const session = requestGuardRef.current.snapshot().session;
+    requestGuardRef.current.invalidateStatus();
+    applyStatus(next, session, userId);
   };
 
   const dismissPromo = (dontAsk: boolean, goEnable: boolean) => {
@@ -211,10 +275,12 @@ export function TeenModeGate() {
     return null;
   }
 
-  // 服务端状态优先；拉取失败时退回本地镜像（fail-closed）
+  if (!cacheReady && !status) {
+    return <View style={[StyleSheet.absoluteFill, styles.blocking]} />;
+  }
+
   const effectiveEnabled = status?.enabled ?? cachedEnabled;
-  if (effectiveEnabled && inLockWindow) {
-    // 锁定页：覆盖全部功能，输密码关闭后经 onStatusChanged 解除
+  if (shouldLockTeenMode(effectiveEnabled, serverNow, lockWindow)) {
     return (
       <View style={StyleSheet.absoluteFill}>
         <TeenModeScreen
@@ -237,3 +303,7 @@ export function TeenModeGate() {
     />
   );
 }
+
+const styles = StyleSheet.create({
+  blocking: { backgroundColor: "#FFF" },
+});
