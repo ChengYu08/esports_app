@@ -3,7 +3,6 @@ import { AppState, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 import { useAuthStore } from "@esports/auth";
 
-import { didLoginThisLaunch } from "@/features/auth/client-auth-flow";
 import TeenModeScreen from "@/features/mine/screens/TeenModeScreen";
 import { TeenModePromoDialog } from "@/features/mine/components/TeenModePromoDialog";
 import { teenModeApi, fetchTeenModeConfig } from "@/features/mine/api/teen-mode.api";
@@ -166,7 +165,7 @@ function TeenModeGateSession({
         if (!applyStatus(next, session, targetUserId)) {
           return;
         }
-        if (allowPromo && !next.enabled && !didLoginThisLaunch()) {
+        if (allowPromo && !next.enabled) {
           const cache = await readTeenPopupCache();
           if (guard.isCurrent(snapshot)) {
             setPromoVisible(shouldShowTeenPopup(cache, todayString()));

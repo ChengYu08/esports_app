@@ -284,7 +284,19 @@ describe("首页在线陪玩人数", () => {
     const page = await fetchClubPage({}, 1);
 
     expect(page.items[0].gameIds).toEqual([14, 15]);
-    expect(page.items[0].games?.map((game) => game.id)).not.toContain(15);
+    expect(page.items[0].games?.find((game) => game.id === 15)?.iconUrl).toBeUndefined();
+  });
+
+  it("保留服务端批量返回的在线人数和游戏陪玩人数", async () => {
+    vi.mocked(apiClient).mockResolvedValue({ code: "SUCCESS", data: { records: [
+      { id: 1000004, onlineCompanionCount: 2, clubGames: [
+        { gameId: 14, status: 1, iconUrl: "game.png", companionCount: 5 },
+        { gameId: 15, status: 1, companionCount: 3 },
+      ] },
+    ] } });
+    const page = await fetchClubPage({}, 1);
+    expect(page.items[0].onlineCompanionCount).toBe(2);
+    expect(page.items[0].games?.map((game) => game.companionCount)).toEqual([5, 3]);
   });
 
   it("俱乐部有两名在线成员但只有一名在线陪玩时返回 1，查询携带必填游戏 ID", async () => {
