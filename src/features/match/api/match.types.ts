@@ -131,7 +131,12 @@ export type QuickMatchRequestDetail = {
 
 export type QuickMatchPayable = {
   orderCount: number;
+  /** 订单原价合计 */
   totalPrice: number;
+  /** 优惠合计（活动/券） */
+  discountAmount?: number;
+  /** 实付合计；比对与扣款以此为准 */
+  realPayAmount?: number;
 };
 
 export type QuickMatchPaymentMethodItem = {
