@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import { useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -23,7 +24,8 @@ export function CompanionAgreementSheet() {
   const token = useAuthStore((state) => state.accessToken);
   const userId = useAuthStore((state) => state.user?.id);
   const queryClient = useQueryClient();
-  const queryKey = ["companion-agreement-status", userId, "user_playmate"];
+  const agreementCode = Platform.OS === "ios" ? "user_playmate_ios" : "user_playmate";
+  const queryKey = ["companion-agreement-status", userId, agreementCode];
   const [visible, setVisible] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");

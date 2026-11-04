@@ -9,6 +9,18 @@ import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-sessi
 import { clientAuthApi } from "./client-auth.api";
 import { clearAuthSession } from "./session-persistence";
 
+/** 对齐 PC chatStore.getAccountLogoutConfirmText：仅房主展示解散影响说明。 */
+export function getLogoutConfirmMessage(
+  userId: string | number | null | undefined = useAuthStore.getState().user?.id,
+): string {
+  const uid = userId == null ? "" : String(userId);
+  const room = useVoiceRoomSessionStore.getState().activeRoom;
+  if (room && uid && String(room.creatorUserId) === uid) {
+    return "你当前创建的语聊房仍在进行中。退出登录将解散该房间，房内成员会被移出，正在进行的接待或试音也会结束。是否继续退出？";
+  }
+  return "确认要退出登录吗？";
+}
+
 /**
  * 退出登录（基础设置手动退出、修改密码后强制重登共用）。
  * 顺序对齐 PC 端 user.ts#logout：

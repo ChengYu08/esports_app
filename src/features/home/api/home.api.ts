@@ -85,6 +85,7 @@ type ApiClubPage = { page?: number; totalPages?: number; total?: number; records
 type ApiClubDetail = {
   id: number | string;
   clubName?: string;
+  clubTag?: string | null;
   logoUrl?: string;
   memberCount?: number;
   followCount?: number;
@@ -145,7 +146,7 @@ export async function fetchClubDetail(id: string, signal?: AbortSignal): Promise
   const response = await apiClient<ApiResponse<ApiClubDetail>>(`/client/v1/club/public/detail?id=${encodeURIComponent(id)}`, { signal });
   const data = requireSuccess(response, "俱乐部详情加载失败");
   return {
-    id: String(data.id), name: data.clubName || "未命名俱乐部", logoUrl: data.logoUrl,
+    id: String(data.id), name: data.clubName || "未命名俱乐部", clubTag: data.clubTag || undefined, logoUrl: data.logoUrl,
     intro: data.intro || "暂无俱乐部简介", memberCount: data.memberCount ?? 0, followCount: data.followCount ?? 0,
     pageConfigGroupId: data.pageConfigGroupId,
     games: (data.clubGames ?? []).filter((item) => item.status !== 0).map((item): ClubDetailGame => ({

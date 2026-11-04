@@ -42,7 +42,7 @@ const menuRoomIcon = require("../../../../assets/mine/figma/mine-menu-room.svg")
 const menuCompanionIcon = require("../../../../assets/mine/figma/mine-menu-companion.svg");
 const menuSettingsIcon = require("../../../../assets/mine/figma/mine-menu-settings.svg");
 const menuServiceIcon = require("../../../../assets/mine/figma/mine-menu-service.svg");
-const menuOrderIcon = require("../../../../assets/svgs/tab-order.svg");
+const menuOrderIcon = require("../../../../assets/mine/figma/mine-menu-order.svg");
 
 type MenuItem = {
   key: string;
@@ -143,7 +143,7 @@ export default function MineScreen() {
   };
   const openStarRecharge = () => {
     if (!requireLogin()) return;
-    router.push("/star-recharge");
+    router.push("/my-diamonds");
   };
   const openMyRoom = async () => {
     if (!requireLogin() || !accessToken || openingVoiceRoom) return;

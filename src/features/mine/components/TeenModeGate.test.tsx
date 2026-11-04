@@ -139,7 +139,7 @@ describe("TeenModeGate 独立设置页状态同步", () => {
       enabled: true,
       passwordSet: true,
       remainingAttempts: 10,
-      // 23:30 在默认锁定窗口 9:00-23:00 之外
+      // 23:30 在服务端配置窗口 9:00-23:00 之外
       serverTime: Date.parse("2026-11-03T23:30:00+08:00"),
     };
     apiMock.status.mockResolvedValue(enabled);
@@ -207,7 +207,7 @@ describe("TeenModeGate 独立设置页状态同步", () => {
       enabled: true,
       passwordSet: true,
       remainingAttempts: 10,
-      // 22:59:30 距默认窗口 9:00-23:00 的下一边界 23:00 还有 30 秒
+      // 22:59:30 距服务端配置窗口 9:00-23:00 的下一边界 23:00 还有 30 秒
       serverTime: Date.parse("2026-11-03T22:59:30+08:00"),
     } satisfies TeenModeStatus);
 
@@ -264,7 +264,7 @@ describe("TeenModeGate 独立设置页状态同步", () => {
         resolveConfig = resolve;
       }),
     );
-    // 12:00 在默认窗口 9:00-23:00 内锁定，在服务端配置 22:00-次日6:00 外应解锁
+    // 12:00 在默认窗口 22:00-次日6:00 之外不锁定，服务端配置 9:00-23:00 到达后应锁定
     apiMock.status.mockResolvedValue({
       enabled: true,
       passwordSet: true,
@@ -275,13 +275,13 @@ describe("TeenModeGate 独立设置页状态同步", () => {
     await act(async () => {
       renderer = create(<TeenModeGate />);
     });
-    expect(lockedScreenCount()).toBe(1);
+    expect(lockedScreenCount()).toBe(0);
 
     await act(async () => {
-      resolveConfig({ lockStartHour: 22, lockEndHour: 6 });
+      resolveConfig({ lockStartHour: 9, lockEndHour: 23 });
     });
-    expect(lockedScreenCount()).toBe(0);
-    // 配置到达后边界定时器按 22:00-6:00 重排：12:00 距 22:00 还有 10 小时
-    expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Function), 10 * 60 * 60 * 1000);
+    expect(lockedScreenCount()).toBe(1);
+    // 配置到达后边界定时器按 9:00-23:00 重排：12:00 距 23:00 还有 11 小时
+    expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Function), 11 * 60 * 60 * 1000);
   });
 });

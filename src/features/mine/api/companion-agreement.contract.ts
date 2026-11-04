@@ -21,9 +21,11 @@ type Requester = <T>(
   },
 ) => Promise<T>;
 type Response<T> = { code: string; info?: string; data?: T | null };
-const code = "user_playmate";
-
-export function createCompanionAgreementApi(request: Requester) {
+export function createCompanionAgreementApi(
+  request: Requester,
+  platform: string = "web",
+) {
+  const code = platform === "ios" ? "user_playmate_ios" : "user_playmate";
   return {
     async status(
       token: string,
