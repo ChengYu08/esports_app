@@ -1048,8 +1048,9 @@ const ProfileCover = memo(function ProfileCover({
       <ProfileIdentity profile={profile} isBlacklisted={isBlacklisted} />
       <View style={styles.headerStats}>
         <Pressable
-          accessibilityRole="button"
+          accessibilityRole={isMine ? "button" : "text"}
           accessibilityLabel={`关注列表，${profile.followCount}人`}
+          disabled={!isMine}
           onPress={() => onSelectRelation("following")}
           style={styles.headerStat}
         >
@@ -1057,8 +1058,9 @@ const ProfileCover = memo(function ProfileCover({
           <Text style={styles.headerStatLabel}>关注</Text>
         </Pressable>
         <Pressable
-          accessibilityRole="button"
+          accessibilityRole={isMine ? "button" : "text"}
           accessibilityLabel={`粉丝列表，${profile.fansCount}人`}
+          disabled={!isMine}
           onPress={() => onSelectRelation("fans")}
           style={styles.headerStat}
         >

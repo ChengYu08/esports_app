@@ -1,12 +1,28 @@
 import { storage } from "@/core/storage/storage";
+import type { TeenModeStatus } from "@/features/mine/api/teen-mode.contract";
 
 const TEEN_POPUP_CACHE_KEY = "mine:teen-popup";
 const TEEN_ENABLED_MIRROR_KEY = "mine:teen-enabled-mirror";
-const TEEN_CLOCK_OFFSET_KEY = "mine:teen-clock-offset";
 
-/** 镜像与偏移按账号维度存储：多账号同设备互不串扰（未取到 userId 时退化为全局 key） */
-function userScopedKey(base: string, userId?: string | null): string {
-  return userId ? `${base}:${userId}` : base;
+type TeenModeStatusListener = (
+  status: TeenModeStatus,
+  token: string,
+) => void;
+
+const statusListeners = new Set<TeenModeStatusListener>();
+
+export function subscribeTeenModeStatus(listener: TeenModeStatusListener) {
+  statusListeners.add(listener);
+  return () => {
+    statusListeners.delete(listener);
+  };
+}
+
+export function publishTeenModeStatus(
+  status: TeenModeStatus,
+  token: string,
+) {
+  statusListeners.forEach((listener) => listener(status, token));
 }
 
 export type TeenPopupCache = {
@@ -53,7 +69,10 @@ export async function saveTeenPopupCache(patch: TeenPopupCachePatch) {
 export async function readLastTeenEnabled(
   userId?: string | null,
 ): Promise<boolean | null> {
-  const raw = await storage.get(userScopedKey(TEEN_ENABLED_MIRROR_KEY, userId));
+  if (!userId) {
+    return null;
+  }
+  const raw = await storage.get(`${TEEN_ENABLED_MIRROR_KEY}:${userId}`);
   if (raw === "true") {
     return true;
   }
@@ -67,34 +86,11 @@ export async function saveLastTeenEnabled(
   enabled: boolean,
   userId?: string | null,
 ) {
-  await storage.set(
-    userScopedKey(TEEN_ENABLED_MIRROR_KEY, userId),
-    enabled ? "true" : "false",
-  );
-}
-
-/**
- * 最近一次由 serverTime 计算的本地时钟偏移量（serverTime - Date.now()，毫秒）。
- * 锁定时段判定用它把本地时间校准成服务端时间，防止改设备时间/断网绕过；
- * null 表示从未校准过（只能退化为本地时间）。
- */
-export async function readTeenClockOffset(
-  userId?: string | null,
-): Promise<number | null> {
-  const raw = await storage.get(userScopedKey(TEEN_CLOCK_OFFSET_KEY, userId));
-  if (raw === null || raw === undefined) {
-    return null;
+  if (!userId) {
+    return;
   }
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-export async function saveTeenClockOffset(
-  offsetMs: number,
-  userId?: string | null,
-) {
   await storage.set(
-    userScopedKey(TEEN_CLOCK_OFFSET_KEY, userId),
-    String(offsetMs),
+    `${TEEN_ENABLED_MIRROR_KEY}:${userId}`,
+    enabled ? "true" : "false",
   );
 }

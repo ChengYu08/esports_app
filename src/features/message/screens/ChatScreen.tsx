@@ -856,15 +856,19 @@ const ChatComposer = memo(function ChatComposer({
         </View>
       </View>
       <EmojiPicker
-        // 库内用的是 RN SafeAreaView（Android 不生效），需手动叠加底部安全区，避免emoji底行被导航条遮挡
-        defaultHeight={340 + bottomInset}
+        // 库默认 categoryPosition 是 floating：分类栏绝对定位悬浮在列表上，emoji 会从栏后滑过；
+        // 改为 bottom 让分类栏占布局流，emoji 滚动区底部与分类栏顶边重合
+        categoryPosition="bottom"
+        // 库内用的是 RN SafeAreaView（Android 不生效），需手动叠加底部安全区；
+        // 再额外抬高 10px，避免 emoji 与分类栏贴住屏幕底部不好按
+        defaultHeight={340 + bottomInset + 10}
         enableRecentlyUsed
         // 不需要分类标题栏（默认显示英文如 Smileys & Emotion）
         hideHeader
         onClose={() => setEmojiPickerOpen(false)}
         onEmojiSelected={selectEmoji}
         open={emojiPickerOpen}
-        styles={{ container: { paddingBottom: bottomInset } }}
+        styles={{ container: { paddingBottom: bottomInset + 10 } }}
         theme={{
           backdrop: "rgba(0, 0, 0, 0.18)",
           knob: "#CCCCCC",
