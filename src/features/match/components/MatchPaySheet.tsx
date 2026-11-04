@@ -19,7 +19,9 @@ import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 
 const CONFIRM_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
-const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");type MatchPaySheetProps = {
+const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
+
+type MatchPaySheetProps = {
   visible: boolean;
   requestNo: string | null;
   token: string | null;

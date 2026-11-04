@@ -108,6 +108,13 @@ export function OrderDetailInfoBlocks({
             label={freeSummary ? `原${amountLabel}` : amountLabel}
             value={`${order.totalPrice}钻石`}
           />
+          {(order.discountAmount ?? 0) > 0 ? (
+            <OrderDetailInfoRow
+              acceptStyle={scope === "accept"}
+              label="优惠"
+              value={`已优惠 ${formatStar(order.discountAmount ?? 0)} 星钻`}
+            />
+          ) : null}
           {freeSummary ? (
             <>
               <OrderDetailInfoRow acceptStyle={scope === "accept"} label="免单" value={freeSummary} />

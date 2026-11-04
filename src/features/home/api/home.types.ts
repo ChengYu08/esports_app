@@ -21,12 +21,16 @@ export type ClubFilters = {
   gameCategoryId?: string;
 };
 
+/** 后台按端配置的跳转协议（linkConfig 结构化字段原样下发，PC 端为外链，App 端为路由）。 */
+export type BannerJumpConfig = Record<string, unknown>;
+
 export type Banner = {
   id: string;
   imageUrl: string;
   title?: string;
   contentImageUrl?: string;
   linkUrl?: string;
+  linkConfig?: BannerJumpConfig;
 };
 
 export type HomeBannerSlotCode = "APP_HOME_FLOOR1" | "APP_HOME_FLOOR2" | "APP_HOME_FLOOR3";

@@ -1,0 +1,114 @@
+import type { ElementType } from "react";
+import { act, create, type ReactTestRenderer } from "react-test-renderer";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const { storageMock, linkingMock, linksMock } = vi.hoisted(() => ({
+  storageMock: { set: vi.fn() },
+  linkingMock: { openURL: vi.fn() },
+  linksMock: {
+    userAgreement: "https://example.test/protocols?code=user_server",
+    privacyPolicy: "https://example.test/protocols?code=user_privacy",
+  },
+}));
+
+vi.mock("react-native", () => ({
+  BackHandler: { exitApp: vi.fn() },
+  Modal: ({ children }: { children: React.ReactNode }) => children,
+  Platform: {
+    OS: "android",
+    select: <T,>(options: { ios?: T; android?: T; default?: T }) =>
+      options.android ?? options.default,
+  },
+  Pressable: "Pressable",
+  ScrollView: ({ children }: { children: React.ReactNode }) => children,
+  StyleSheet: {
+    hairlineWidth: 0.5,
+    create: <T,>(styles: T) => styles,
+  },
+  Text: "Text",
+  View: "View",
+}));
+vi.mock("react-native-safe-area-context", () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+vi.mock("react-native-webview", () => ({ WebView: "WebView" }));
+vi.mock("react-native/Libraries/Linking/Linking", () => linkingMock);
+vi.mock("@/shared/navigation/open-external-link", () => ({
+  openExternalLink: linkingMock.openURL,
+}));
+vi.mock("@/core/config/links", () => ({ APP_LINKS: linksMock }));
+vi.mock("@/core/storage/storage", () => ({ storage: storageMock }));
+vi.mock("@/shared/ui/ScreenHeader", () => ({ ScreenHeader: "ScreenHeader" }));
+
+Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+
+const { createRequire } = await import("node:module");
+const nodeRequire = createRequire(import.meta.url);
+nodeRequire.extensions[".svg"] = (module) => {
+  module.exports = 1;
+};
+
+const { PrivacyConsentGate } = await import(
+  "@/features/privacy/components/PrivacyConsentGate"
+);
+
+const TextHost = "Text" as unknown as ElementType;
+const WebViewHost = "WebView" as unknown as ElementType;
+const ScreenHeaderHost = "ScreenHeader" as unknown as ElementType;
+
+let renderer: ReactTestRenderer | undefined;
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  storageMock.set.mockResolvedValue(undefined);
+});
+
+afterEach(async () => {
+  if (renderer) {
+    await act(async () => renderer?.unmount());
+  }
+  renderer = undefined;
+});
+
+function pressProtocolLink(label: string) {
+  const link = renderer?.root
+    .findAllByType(TextHost)
+    .find((node) => node.props.children === label);
+  act(() => link?.props.onPress());
+}
+
+describe("PrivacyConsentGate 协议查看", () => {
+  it("点击《用户协议》《隐私政策》用内置协议层打开，不再跳外部浏览器", async () => {
+    await act(async () => {
+      renderer = create(<PrivacyConsentGate onAccepted={() => undefined} />);
+    });
+
+    // 初始没有协议层
+    expect(renderer?.root.findAllByType(WebViewHost).length).toBe(0);
+
+    pressProtocolLink("《用户协议》");
+    expect(renderer?.root.findAllByType(WebViewHost).length).toBe(1);
+    expect(linkingMock.openURL).not.toHaveBeenCalled();
+
+    // 关闭后协议层消失，隐私政策链接可再次打开
+    const header = renderer?.root.findAllByType(ScreenHeaderHost)[0];
+    await act(async () => header?.props.onBack());
+    expect(renderer?.root.findAllByType(WebViewHost).length).toBe(0);
+
+    pressProtocolLink("《隐私政策》");
+    expect(renderer?.root.findAllByType(WebViewHost).length).toBe(1);
+    expect(linkingMock.openURL).not.toHaveBeenCalled();
+  });
+
+  it("协议层 WebView 加载对应链接且标题正确", async () => {
+    await act(async () => {
+      renderer = create(<PrivacyConsentGate onAccepted={() => undefined} />);
+    });
+    pressProtocolLink("《用户协议》");
+    const webView = renderer?.root.findByType(WebViewHost);
+    expect(webView?.props.source).toEqual({ uri: linksMock.userAgreement });
+    expect(renderer?.root.findAllByType(ScreenHeaderHost)[0]?.props.title).toBe(
+      "用户协议",
+    );
+  });
+});

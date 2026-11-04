@@ -1,6 +1,10 @@
 import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { fetchActiveQuickMatch } from "@/features/match/api/match.api";
-import { isQuickMatchActive } from "@/features/match/api/match.types";
+import {
+  isOwnActiveActivityRequest,
+  isQuickMatchActive,
+  type QuickMatchRequestDetail,
+} from "@/features/match/api/match.types";
 import { useQuickMatchEndSignals } from "@/features/match/quick-match-end-signals";
 import { ClubQuickMatchSheet } from "@/features/match/components/ClubQuickMatchSheet";
 import { messageStore } from "@/features/message/message-store";
@@ -38,7 +42,6 @@ import { VoiceRoomConversationsSheet } from "../components/VoiceRoomConversation
 import { VoiceRoomExitDialog } from "../components/VoiceRoomExitDialog";
 import { VoiceRoomMemberSheet } from "../components/VoiceRoomMemberSheet";
 import { VoiceRoomMicBadge } from "../components/VoiceRoomMicrophone";
-import { VoiceRoomSpeakingHalo } from "../components/VoiceRoomSpeakingHalo";
 import { VoiceRoomSpeakingWaves } from "../components/VoiceRoomSpeakingWaves";
 import { VoiceRoomToolbar } from "../components/VoiceRoomToolbar";
 import { exitVoiceRoom } from "../exit-voice-room";
@@ -77,7 +80,6 @@ const closeIcon = require("../../../../assets/voice-room/navbar-exit.svg");
 const inviteIcon = require("../../../../assets/voice-room/toolbar-invite.svg");
 const invitePlaceholderIcon = require("../../../../assets/voice-room/game.svg");
 const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
-const ringOwner = require("../../../../assets/voice-room/ring-owner.svg");
 
 function avatarSource(member: VoiceRoomMember) {
   const avatar = member.avatar?.trim();
@@ -91,7 +93,6 @@ function avatarSource(member: VoiceRoomMember) {
 const MemberSlot = memo(function MemberSlot({
   member,
   columns,
-  ring,
   micOpen,
   speaking,
   inviteLabel,
@@ -99,7 +100,6 @@ const MemberSlot = memo(function MemberSlot({
 }: {
   member: VoiceRoomMember;
   columns: number;
-  ring?: number;
   micOpen: boolean;
   speaking: boolean;
   inviteLabel: string;
@@ -119,8 +119,6 @@ const MemberSlot = memo(function MemberSlot({
       onPress={() => onPress(member)}
     >
       <View style={styles.avatarWrap}>
-        {!invite ? <VoiceRoomSpeakingHalo active={speaking} /> : null}
-        {ring ? <Image source={ring} style={styles.ring} /> : null}
         {invite ? (
           <View style={styles.inviteAvatar}>
             <Image
@@ -215,6 +213,11 @@ export default function VoiceRoomScreen() {
   >(null);
   const [matchActiveForQuickMatchCreated, setMatchActiveForQuickMatchCreated] =
     useState<boolean | null>(null);
+  /** 本人进行中的活动需求（秒杀派单）：进房/聚焦时刷新一次，不轮询 */
+  const [activityRequest, setActivityRequest] =
+    useState<QuickMatchRequestDetail | null>(null);
+  /** 活动需求系统提示只插一次 */
+  const activityTipShownRef = useRef(false);
 
   const chatroomId = room?.rongChatroomId;
   const roomTitle = room?.roomName || "语聊房";
@@ -341,7 +344,8 @@ export default function VoiceRoomScreen() {
   const quickMatchCreatedRequestNo =
     quickMatchCreatedFromSession?.matchRequestNo || undefined;
 
-  // 与「呼叫接待」互斥（对齐 PC）：进行中的派单已包含呼叫客服语义，该位置让给「选择陪玩」
+  // 「选择陪玩」与「呼叫接待」互斥（对齐 PC）：进行中的派单已包含呼叫客服语义，该位置让给「选择陪玩」。
+  // 覆盖三类进行中派单：试音自发、客服代发（QUICK_MATCH_CREATED）、活动需求（activity/publish）
   const showSelectCompanion =
     (isOwner &&
       isAuditionScene &&
@@ -350,7 +354,8 @@ export default function VoiceRoomScreen() {
     (isOwner &&
       isQuickMatchCreatedScene &&
       Boolean(quickMatchCreatedRequestNo) &&
-      matchActiveForQuickMatchCreated === true);
+      matchActiveForQuickMatchCreated === true) ||
+    (isOwner && Boolean(activityRequest));
   const showCallService = isOwner && !hasService && !showSelectCompanion;
 
   const minimize = useCallback(() => {
@@ -426,6 +431,27 @@ export default function VoiceRoomScreen() {
   ]);
 
   const openSelectCompanion = useCallback(() => {
+    // 活动需求进行中：优先取活动详情跳选人页（选人页会按 requestNo 重拉详情）
+    if (activityRequest) {
+      const activityRequestNo = activityRequest.requestNo;
+      if (!activityRequestNo) return;
+      router.push({
+        pathname: "/match/matching/[requestNo]",
+        params: {
+          requestNo: activityRequestNo,
+          ...(activityRequest.expireTime
+            ? { expireTime: activityRequest.expireTime }
+            : {}),
+          ...(activityRequest.gameId && activityRequest.gameName
+            ? {
+                gameId: activityRequest.gameId,
+                gameName: activityRequest.gameName,
+              }
+            : {}),
+        },
+      });
+      return;
+    }
     const useQuickMatchCreated =
       matchActiveForQuickMatchCreated === true &&
       Boolean(quickMatchCreatedRequestNo);
@@ -469,6 +495,7 @@ export default function VoiceRoomScreen() {
       },
     });
   }, [
+    activityRequest,
     auditionRequestNo,
     matchActiveForQuickMatchCreated,
     quickMatchCreatedRequestNo,
@@ -540,7 +567,9 @@ export default function VoiceRoomScreen() {
       void (async () => {
         try {
           const active = await fetchActiveQuickMatch(accessToken);
-          if (cancelled) return;
+          if (cancelled) {
+            return;
+          }
           const ok =
             Boolean(active) &&
             isQuickMatchActive(active) &&
@@ -548,7 +577,9 @@ export default function VoiceRoomScreen() {
           setMatchActiveForAudition(ok);
           if (!ok && roomId) clearAuditionSessionMarkers(roomId);
         } catch (error) {
-          if (cancelled) return;
+          if (cancelled) {
+            return;
+          }
           console.warn("[voice-room] audition match check failed", error);
           setMatchActiveForAudition(false);
           if (roomId) clearAuditionSessionMarkers(roomId);
@@ -591,7 +622,9 @@ export default function VoiceRoomScreen() {
       void (async () => {
         try {
           const active = await fetchActiveQuickMatch(accessToken);
-          if (cancelled) return;
+          if (cancelled) {
+            return;
+          }
           const ok =
             Boolean(active) &&
             isQuickMatchActive(active) &&
@@ -599,7 +632,9 @@ export default function VoiceRoomScreen() {
           setMatchActiveForQuickMatchCreated(ok);
           if (!ok && roomId) clearQuickMatchCreatedSessionMarkers(roomId);
         } catch (error) {
-          if (cancelled) return;
+          if (cancelled) {
+            return;
+          }
           console.warn(
             "[voice-room] quickMatchCreated match check failed",
             error,
@@ -620,6 +655,54 @@ export default function VoiceRoomScreen() {
       quickMatchCreatedRequestNo,
       roomId,
     ]),
+  );
+
+  /** 活动需求进行中判定（任务 4）：进房/聚焦时刷新一次，不轮询 */
+  useFocusEffect(
+    useCallback(() => {
+      if (!accessToken) {
+        setActivityRequest(null);
+        return;
+      }
+      let cancelled = false;
+      void (async () => {
+        try {
+          const active = await fetchActiveQuickMatch(accessToken);
+          if (cancelled) {
+            return;
+          }
+          const own =
+            isOwnActiveActivityRequest(active, currentUser?.id) ? active : null;
+          setActivityRequest(own);
+          // 进房检测到自己是活动需求发起人时插入一次性系统提示
+          if (own && !activityTipShownRef.current) {
+            activityTipShownRef.current = true;
+            setMessages((items) =>
+              items.some((item) => item.id === "activity-match-tip")
+                ? items
+                : [
+                    ...items,
+                    {
+                      id: "activity-match-tip",
+                      kind: "notice" as const,
+                      text: "点击下方「选择陪玩」按钮查看抢单大神，勾选大神下单",
+                      sentAt: Date.now(),
+                    },
+                  ].slice(-80),
+            );
+          }
+        } catch (cause) {
+          if (cancelled) {
+            return;
+          }
+          console.warn("[voice-room] activity match check failed", cause);
+          setActivityRequest(null);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [accessToken, currentUser]),
   );
 
   useEffect(() => {
@@ -865,12 +948,6 @@ export default function VoiceRoomScreen() {
   };
 
   const seatSlots = members.map((member, index) => {
-    const invite = member.userId === "invite";
-    const ring = invite
-      ? undefined
-      : member.role === "owner"
-        ? ringOwner
-        : undefined;
     const micOpen =
       rtcReady &&
       (member.userId === String(currentUser?.id)
@@ -884,7 +961,6 @@ export default function VoiceRoomScreen() {
         key={`${member.userId}-${index}`}
         member={member}
         columns={memberColumns}
-        ring={ring}
         micOpen={micOpen}
         speaking={speaking}
         inviteLabel={inviteSlotLabel}
@@ -1039,6 +1115,12 @@ export default function VoiceRoomScreen() {
         }
         room={room}
         roomId={roomId}
+        /** 活动需求进行中：MemberSheet「主页」入口替换为提示文案，下单统一走「选择陪玩」选人页 */
+        orderEntryBlockedText={
+          activityRequest
+            ? "活动需求进行中，请点击「选择陪玩」按钮选人下单"
+            : undefined
+        }
         onClose={() => setMemberSheetVisible(false)}
         onMemberKicked={(userId) => {
           setMembers((items) =>
@@ -1100,7 +1182,6 @@ const styles = StyleSheet.create({
     overflow: "visible",
   },
   avatar: { width: 48, height: 48, borderRadius: 24 },
-  ring: { position: "absolute", width: 58, height: 58 },
   inviteAvatar: {
     width: 48,
     height: 48,

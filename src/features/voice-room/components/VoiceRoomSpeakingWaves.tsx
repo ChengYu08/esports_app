@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
 import Animated, {
   Easing,
+  cancelAnimation,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -19,12 +20,17 @@ type SpeakingWaveProps = {
 /** 单层声波圆环：说话时呼吸式放大 + 淡出，对齐 Figma Ellipse 33795/33796 */
 function SpeakingWave({ size, maxOpacity, delay = 0, active }: SpeakingWaveProps) {
   const progress = useSharedValue(0);
+  // 显隐独立于 progress：progress=0 对应脉冲起点（峰值透明度），不能兼作「隐藏」
+  const visible = useSharedValue(0);
 
   useEffect(() => {
     if (!active) {
+      cancelAnimation(progress);
+      visible.value = withTiming(0, { duration: 200 });
       progress.value = withTiming(0, { duration: 200 });
       return;
     }
+    visible.value = withTiming(1, { duration: 120 });
     progress.value = 0;
     const timer = setTimeout(() => {
       progress.value = withRepeat(
@@ -37,10 +43,10 @@ function SpeakingWave({ size, maxOpacity, delay = 0, active }: SpeakingWaveProps
       );
     }, delay);
     return () => clearTimeout(timer);
-  }, [active, delay, progress]);
+  }, [active, delay, progress, visible]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    opacity: maxOpacity * (1 - progress.value),
+    opacity: visible.value * maxOpacity * (1 - progress.value),
     transform: [{ scale: 1 + progress.value * 0.18 }],
   }));
 

@@ -1,36 +1,23 @@
-const { withAndroidStyles, withDangerousMod } = require('expo/config-plugins');
-const {
-  compositeImagesAsync,
-  generateImageAsync,
-  generateImageBackgroundAsync,
-} = require('@expo/image-utils');
+const { withAndroidStyles, withDangerousMod, withMainActivity } = require('expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
 
 const TAG = 'pz-fullscreen-splash';
 
-// 与 splash-screen.png 白底对齐，避免 Android 12+ 系统 Splash → 全屏图颜色跳变。
-const SPLASH_BG_COLOR = '#FFFFFF';
-
-// 全屏启动图：API < 31 走 windowBackground；JS 侧 StartupSplash 也会再铺一遍。
+// 全屏启动图：全版本走 windowBackground 方案。31+ 系统 splash 在窗口首帧即结束，
+// 随后全屏图接管；<31 本就直接以 windowBackground 呈现。JS 侧 StartupSplash 渲染
+// 同一张图，与 windowBackground 无缝重叠，内容 ready 后进首页。
 const SPLASH_IMAGE_SOURCE = path.resolve(__dirname, '../assets/images/splash-screen.png');
 const SPLASH_IMAGE_NAME = 'pz_splash_fullscreen.png';
 
-// Android 12+ 系统 Splash 居中图标：覆盖 expo 生成的 splashscreen_logo.png
-const SPLASH_ICON_SOURCE = path.resolve(__dirname, '../assets/images/icon.png');
-const SPLASH_LOGO_FILENAME = 'splashscreen_logo.png';
-/** Android SplashScreen 无 icon 底时的标准尺寸（dp） */
-const SPLASH_ICON_BASE_DP = 288;
-/** icon 在画布中的占比，留白边让圆形裁剪更接近全屏启动页观感 */
-const SPLASH_ICON_SCALE = 0.72;
-
-const SPLASH_LOGO_DENSITIES = [
-  { folder: 'drawable-mdpi', multiplier: 1 },
-  { folder: 'drawable-hdpi', multiplier: 1.5 },
-  { folder: 'drawable-xhdpi', multiplier: 2 },
-  { folder: 'drawable-xxhdpi', multiplier: 3 },
-  { folder: 'drawable-xxxhdpi', multiplier: 4 },
-];
+// API 31+ 系统 splash 无法关闭，icon 也不能不设（会回退到 launcher 图标），
+// 只能指向全透明 drawable 让系统 splash 呈纯白，窗口首帧即被全屏图接管。
+const BLANK_ICON_NAME = 'pz_splash_blank.xml';
+const BLANK_ICON_DRAWABLE = `<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#00000000" />
+</shape>
+`;
 
 const WINDOW_BG_DRAWABLE = `<?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
@@ -43,9 +30,38 @@ const WINDOW_BG_DRAWABLE = `<?xml version="1.0" encoding="utf-8"?>
 </layer-list>
 `;
 
+// 替换 expo-splash-screen 在 MainActivity 生成的 registerOnActivity：
+// 其 onPreDraw 拦截会把窗口首帧推迟到 React 内容出现，全屏图无法提前接管。
+const MAIN_ACTIVITY_PATCH_MARKER = 'pz-fullscreen-splash windowBackground';
+// 还原白色窗口背景的延时：JS 启动图在 React 挂载即开始解码，700ms 后基本已绘制
+// （React 层不透明，换底色不可见），且早于首页 fade 转场的透明期。
+const MAIN_ACTIVITY_PATCH_BODY = `    // ${MAIN_ACTIVITY_PATCH_MARKER}
+    setTheme(R.style.AppTheme)
+    val restoreWindowBackground = object : ReactMarker.MarkerListener {
+      override fun logMarker(name: ReactMarkerConstants, tag: String?, instanceKey: Int) {
+        if (name == ReactMarkerConstants.CONTENT_APPEARED) {
+          ReactMarker.removeListener(this)
+          runOnUiThread {
+            window.decorView.postDelayed(
+              { window.setBackgroundDrawable(ColorDrawable(0xFFFFFFFF.toInt())) },
+              700L,
+            )
+          }
+        }
+      }
+    }
+    ReactMarker.addListener(restoreWindowBackground)`;
+
+const MAIN_ACTIVITY_PATCH_IMPORTS = [
+  'import android.graphics.drawable.ColorDrawable',
+  'import com.facebook.react.bridge.ReactMarker',
+  'import com.facebook.react.bridge.ReactMarkerConstants',
+];
+
 /**
- * 保留 Theme.SplashScreen（API < 31 需要 splashScreenIconSize 等 attr），
- * Android 12+ 用品牌 icon 覆盖 splashscreen_logo；旧机用 windowBackground 铺全屏图。
+ * 保留 Theme.SplashScreen（API < 31 需要 splashScreenIconSize 等 attr）：
+ * API 31+ icon 置为全透明，系统 splash 呈纯白且在窗口首帧即结束；
+ * AppTheme.windowBackground 换成全屏图，全版本由 windowBackground 承载启动图。
  */
 function setFullscreenSplashStyle(styles) {
   const { resources } = styles;
@@ -56,7 +72,7 @@ function setFullscreenSplashStyle(styles) {
     target.$.parent = 'Theme.SplashScreen';
     target.item = [
       { $: { name: 'windowSplashScreenBackground' }, _: '@color/splashscreen_background' },
-      { $: { name: 'windowSplashScreenAnimatedIcon' }, _: '@drawable/splashscreen_logo' },
+      { $: { name: 'windowSplashScreenAnimatedIcon' }, _: '@drawable/pz_splash_blank' },
       { $: { name: 'postSplashScreenTheme' }, _: '@style/AppTheme' },
       { $: { name: 'android:windowBackground' }, _: '@drawable/pz_splash_window' },
     ];
@@ -67,74 +83,62 @@ function setFullscreenSplashStyle(styles) {
   }
 
   const appTheme = styleList.find((s) => s.$?.name === 'AppTheme');
-  if (appTheme) {
-    const hasWindowBg = (appTheme.item || []).some(
-      (i) => i.$?.name === 'android:windowBackground',
-    );
-    if (!hasWindowBg) {
-      appTheme.item = appTheme.item || [];
-      appTheme.item.push({
-        $: { name: 'android:windowBackground' },
-        _: '@color/splashscreen_background',
-      });
-    }
+  if (!appTheme) {
+    throw new Error(`[${TAG}] AppTheme not found in styles.xml; expo prebuild template may have changed.`);
+  }
+  appTheme.item = appTheme.item || [];
+  // windowBackground 用全屏启动图：React 首帧出现前由它兜底展示，
+  // 之后 MainActivity 的监听会把窗口背景还原成纯白，避免启动图透过透明 UI 泄漏。
+  const windowBg = appTheme.item.find((i) => i.$?.name === 'android:windowBackground');
+  if (windowBg) {
+    windowBg._ = '@drawable/pz_splash_window';
+  } else {
+    appTheme.item.push({
+      $: { name: 'android:windowBackground' },
+      _: '@drawable/pz_splash_window',
+    });
   }
 
   return styles;
 }
 
-/**
- * 用 icon.png 覆盖 expo 生成的各密度 splashscreen_logo.png（含 night，若存在）。
- * 须在 expo-splash-screen 的 dangerousMod 之后执行。
- */
-async function overwriteSplashLogosWithBrandIcon(projectRoot, resDir) {
-  if (!fs.existsSync(SPLASH_ICON_SOURCE)) {
-    throw new Error(`[${TAG}] brand icon not found: ${SPLASH_ICON_SOURCE}`);
+function patchMainActivity(contents, language) {
+  if (language === 'java') {
+    throw new Error(`[${TAG}] MainActivity.java is not supported; kotlin only.`);
   }
 
-  for (const { folder, multiplier } of SPLASH_LOGO_DENSITIES) {
-    const canvasSize = Math.round(SPLASH_ICON_BASE_DP * multiplier);
-    const iconSize = Math.round(canvasSize * SPLASH_ICON_SCALE);
-
-    const background = await generateImageBackgroundAsync({
-      width: canvasSize,
-      height: canvasSize,
-      backgroundColor: SPLASH_BG_COLOR,
-      resizeMode: 'cover',
-    });
-    const { source: foreground } = await generateImageAsync(
-      { projectRoot, cacheType: 'pz-splash-brand-logo' },
-      {
-        src: SPLASH_ICON_SOURCE,
-        resizeMode: 'cover',
-        width: iconSize,
-        height: iconSize,
-      },
+  const blockRe =
+    /( *\/\/ @generated begin expo-splashscreen[^\n]*\n)([\s\S]*?)( *\/\/ @generated end expo-splashscreen\n)/;
+  const match = contents.match(blockRe);
+  if (!match) {
+    throw new Error(
+      `[${TAG}] expo-splashscreen generated block not found in MainActivity.kt; expo-splash-screen plugin may have changed.`,
     );
-    const source = await compositeImagesAsync({
-      background,
-      foreground,
-      x: (canvasSize - iconSize) / 2,
-      y: (canvasSize - iconSize) / 2,
-    });
+  }
+  if (
+    !match[2].includes('SplashScreenManager.registerOnActivity(this)') &&
+    !match[2].includes(MAIN_ACTIVITY_PATCH_MARKER)
+  ) {
+    throw new Error(
+      `[${TAG}] unexpected expo-splashscreen block content in MainActivity.kt; expo-splash-screen plugin may have changed.`,
+    );
+  }
 
-    const lightDir = path.join(resDir, folder);
-    fs.mkdirSync(lightDir, { recursive: true });
-    fs.writeFileSync(path.join(lightDir, SPLASH_LOGO_FILENAME), source);
+  // Expo mod 链是后注册先执行：本插件须排在 app.json 里 expo-splash-screen 之前，
+  // 这样本 patch 在 splash 写入 registerOnActivity 之后执行，才能覆盖掉它。
+  // 每次都重写为规范形态（splash 会注释掉原 setTheme 并补回 SplashScreenManager import）。
+  let patched = contents.replace(
+    blockRe,
+    (m, begin, body, end) => `${begin}${MAIN_ACTIVITY_PATCH_BODY}\n${end}`,
+  );
 
-    const nightFolder = folder.replace(/^drawable-/, 'drawable-night-');
-    const nightPath = path.join(resDir, nightFolder, SPLASH_LOGO_FILENAME);
-    if (fs.existsSync(nightPath) || fs.existsSync(path.join(resDir, nightFolder))) {
-      fs.mkdirSync(path.dirname(nightPath), { recursive: true });
-      fs.writeFileSync(nightPath, source);
+  patched = patched.replace(/import expo\.modules\.splashscreen\.SplashScreenManager\n/, '');
+  for (const statement of MAIN_ACTIVITY_PATCH_IMPORTS) {
+    if (!patched.includes(`${statement}\n`)) {
+      patched = patched.replace(/^(import .*\n)/m, `${statement}\n$1`);
     }
   }
-
-  // 清理旧方案单独拷贝的品牌图，避免残留两套资源
-  const legacyBrand = path.join(resDir, 'drawable-xxxhdpi', 'pz_splash_brand_icon.png');
-  if (fs.existsSync(legacyBrand)) {
-    fs.unlinkSync(legacyBrand);
-  }
+  return patched;
 }
 
 function withAndroidFullscreenSplash(config) {
@@ -143,10 +147,17 @@ function withAndroidFullscreenSplash(config) {
     return config;
   });
 
+  config = withMainActivity(config, (config) => {
+    config.modResults.contents = patchMainActivity(
+      config.modResults.contents,
+      config.modResults.language,
+    );
+    return config;
+  });
+
   config = withDangerousMod(config, [
     'android',
     async (config) => {
-      const projectRoot = config.modRequest.projectRoot;
       const resDir = path.join(
         config.modRequest.platformProjectRoot,
         'app',
@@ -162,12 +173,11 @@ function withAndroidFullscreenSplash(config) {
         WINDOW_BG_DRAWABLE,
         'utf8',
       );
+      fs.writeFileSync(path.join(drawableDir, BLANK_ICON_NAME), BLANK_ICON_DRAWABLE, 'utf8');
 
       const targetDir = path.join(resDir, 'drawable-xxxhdpi');
       fs.mkdirSync(targetDir, { recursive: true });
       fs.copyFileSync(SPLASH_IMAGE_SOURCE, path.join(targetDir, SPLASH_IMAGE_NAME));
-
-      await overwriteSplashLogosWithBrandIcon(projectRoot, resDir);
 
       return config;
     },
@@ -177,3 +187,5 @@ function withAndroidFullscreenSplash(config) {
 }
 
 module.exports = withAndroidFullscreenSplash;
+// 导出仅供一次性验证补丁逻辑使用
+module.exports.patchMainActivity = patchMainActivity;
