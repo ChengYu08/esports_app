@@ -47,6 +47,7 @@ export type ClubGameIcon = {
   id: number;
   name: string;
   iconUrl?: string;
+  companionCount?: number;
 };
 
 export type Club = {
@@ -55,6 +56,7 @@ export type Club = {
   description: string;
   coverUrl?: string;
   onlineCount: number;
+  onlineCompanionCount?: number;
   memberCount: number;
   clubCode: string;
   isSelfOperated?: boolean;
