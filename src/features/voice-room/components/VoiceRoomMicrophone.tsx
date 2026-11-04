@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Line, Path } from 'react-native-svg';
 
-const microphoneIcon = require('../../../../assets/voice-room/toolbar-mic.svg');
+const microphoneIcon = require('../../../../assets/svgs/toolbar-mic.svg');
 
 // Keep the open/muted silhouettes aligned with pzdj-pc/components/icons/MicIcon.vue.
 function MicrophoneIcon({ muted, color, size }: { muted: boolean; color: string; size: number }) {

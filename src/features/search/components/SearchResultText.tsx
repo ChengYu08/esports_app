@@ -4,7 +4,7 @@ import { StyleSheet, Text, View, type StyleProp, type TextStyle } from "react-na
 import { colors, spacing } from "@/shared/theme/tokens";
 import { searchTypography } from "../search-typography";
 
-const idIcon = require("../../../../assets/court/ticket-id.svg");
+const idIcon = require("../../../../assets/svgs/ticket-id.svg");
 
 export function HighlightedSearchText({
   text,

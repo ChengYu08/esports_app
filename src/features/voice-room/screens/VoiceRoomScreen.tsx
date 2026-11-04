@@ -76,9 +76,9 @@ const SEAT_AREA_MAX_HEIGHT =
   MEMBER_SLOT_HEIGHT * SEAT_MAX_ROWS +
   MEMBER_ROW_GAP * (SEAT_MAX_ROWS - 1);
 
-const closeIcon = require("../../../../assets/voice-room/navbar-exit.svg");
-const inviteIcon = require("../../../../assets/voice-room/toolbar-invite.svg");
-const invitePlaceholderIcon = require("../../../../assets/voice-room/game.svg");
+const closeIcon = require("../../../../assets/svgs/navbar-exit.svg");
+const inviteIcon = require("../../../../assets/svgs/toolbar-invite.svg");
+const invitePlaceholderIcon = require("../../../../assets/svgs/game.svg");
 const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
 
 function avatarSource(member: VoiceRoomMember) {

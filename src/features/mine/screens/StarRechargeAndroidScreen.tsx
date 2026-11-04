@@ -29,7 +29,7 @@ import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import AlipayPayment from "../../../../modules/alipay-payment";
 
-const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
+const diamondIcon = require("../../../../assets/mine/star-recharge-diamond-3f6fcf.png");
 const headerBg = require("../../../../assets/images/star-recharge-header-bg.png");
 const alipayIcon = require("../../../../assets/images/star-recharge-alipay.png");
 const wechatIcon = require("../../../../assets/images/star-recharge-wechat.png");

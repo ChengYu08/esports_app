@@ -24,9 +24,9 @@ export function CourtSelectedReviewCard({ source, disabled }: { source: CourtSou
             <View accessible accessibilityLabel={`评分 ${rating} 星，满分 5 星`} style={styles.stars}>
               {[0, 1, 2, 3, 4].map((index) => (
                 <View key={index} style={styles.star}>
-                  <CachedImage source={require("../../../../assets/order/review-star.svg")} tintColor="#D9D9D9" style={styles.star} />
+                  <CachedImage source={require("../../../../assets/svgs/review-star.svg")} tintColor="#D9D9D9" style={styles.star} />
                   <View style={[styles.starFill, { width: 12 * Math.min(1, Math.max(0, rating - index)) }]}>
-                    <CachedImage source={require("../../../../assets/order/review-star.svg")} tintColor="#FF943D" style={styles.star} />
+                    <CachedImage source={require("../../../../assets/svgs/review-star.svg")} tintColor="#FF943D" style={styles.star} />
                   </View>
                 </View>
               ))}

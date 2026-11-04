@@ -14,8 +14,8 @@ import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { Skeleton } from "@/shared/ui/Skeleton";
 
-const headerBg = require("../../../../assets/mine/figma/star-recharge-bg.webp");
-const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond.png");
+const headerBg = require("../../../../assets/mine/star-recharge-bg.webp");
+const diamondIcon = require("../../../../assets/mine/star-recharge-diamond.png");
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const HEADER_BG_HEIGHT = (SCREEN_WIDTH * 552) / 750;

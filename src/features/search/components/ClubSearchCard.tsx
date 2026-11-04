@@ -9,7 +9,7 @@ import { CachedImage } from "@/shared/ui/CachedImage";
 import { searchTypography } from "../search-typography";
 import { HighlightedSearchText, SearchResultId } from "./SearchResultText";
 
-const memberIcon = require("../../../../assets/home/h_user.svg");
+const memberIcon = require("../../../../assets/svgs/h_user.svg");
 
 export const ClubSearchCard = memo(function ClubSearchCard({
   club,

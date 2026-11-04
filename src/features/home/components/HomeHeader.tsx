@@ -14,9 +14,9 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-const searchIcon = require("../../../../assets/home/h_search.svg");
-const tabLeftCorner = require("../../../../assets/home/h_tab_left.svg");
-const tabRightCorner = require("../../../../assets/home/h_tab_right.svg");
+const searchIcon = require("../../../../assets/svgs/h_search.svg");
+const tabLeftCorner = require("../../../../assets/svgs/h_tab_left.svg");
+const tabRightCorner = require("../../../../assets/svgs/h_tab_right.svg");
 type HomeHeaderProps = {
   tab: HomeTab;
   game: GameKey;
@@ -29,6 +29,8 @@ type HomeHeaderProps = {
   bannerSlots: HomeBannerSlot[];
   onTabChange: (tab: HomeTab) => void;
   onGameChange: (game: GameKey) => void;
+  /** 外层列表滚动期间暂停轮播自动跳页。 */
+  carouselPaused?: boolean;
 };
 
 export function HomeHeader({
@@ -43,12 +45,13 @@ export function HomeHeader({
   bannerSlots,
   onTabChange,
   onGameChange,
+  carouselPaused = false,
 }: HomeHeaderProps) {
   return (
     <>
       {tab === "home" && (
         <>
-          <HomeBannerSections slots={bannerSlots} />
+          <HomeBannerSections slots={bannerSlots} carouselPaused={carouselPaused} />
           <GameCategoryTabs categories={categories} selectedId={category} onChange={onCategoryChange} />
           {filterError && (
             <Pressable accessibilityRole="button" onPress={onRetryFilters} style={styles.filterRetry}>

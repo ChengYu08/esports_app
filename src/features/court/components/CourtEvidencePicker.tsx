@@ -167,7 +167,7 @@ export function CourtEvidencePicker({
               style={styles.removeImage}
             >
               <CachedImage
-                source={require("../../../../assets/voice-room/close.svg")}
+                source={require("../../../../assets/svgs/close.svg")}
                 tintColor="#FFFFFF"
                 style={styles.removeIcon}
               />
@@ -175,7 +175,7 @@ export function CourtEvidencePicker({
             {image.key && (
               <View style={styles.uploaded}>
                 <CachedImage
-                  source={require("../../../../assets/order/order-step-check.svg")}
+                  source={require("../../../../assets/svgs/order-step-check.svg")}
                   style={styles.uploadedIcon}
                 />
               </View>
@@ -194,7 +194,7 @@ export function CourtEvidencePicker({
               <ActivityIndicator color="#979799" />
             ) : (
               <CachedImage
-                source={require("../../../../assets/court/ticket-add.svg")}
+                source={require("../../../../assets/svgs/ticket-add.svg")}
                 style={styles.addIcon}
               />
             )}

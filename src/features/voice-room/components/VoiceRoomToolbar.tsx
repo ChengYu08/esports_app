@@ -11,10 +11,10 @@ import {
 
 import { VoiceRoomMicControl } from "./VoiceRoomMicrophone";
 
-const sendIcon = require("../../../../assets/voice-room/toolbar-send.svg");
-const messageIcon = require("../../../../assets/voice-room/toolbar-message.svg");
-const inviteIcon = require("../../../../assets/voice-room/toolbar-invite.svg");
-const selectCompanionIcon = require("../../../../assets/voice-room/toolbar-select-companion.svg");
+const sendIcon = require("../../../../assets/svgs/toolbar-send.svg");
+const messageIcon = require("../../../../assets/svgs/toolbar-message.svg");
+const inviteIcon = require("../../../../assets/svgs/toolbar-invite.svg");
+const selectCompanionIcon = require("../../../../assets/svgs/toolbar-select-companion.svg");
 
 type VoiceRoomToolbarProps = {
   bottomInset: number;

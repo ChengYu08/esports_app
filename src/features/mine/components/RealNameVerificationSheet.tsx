@@ -21,8 +21,8 @@ import {
 import { submitRealNameVerification } from "@/features/mine/real-name-session";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 
-const nameIcon = require("../../../../assets/home/h_user.svg");
-const idCardIcon = require("../../../../assets/home/h_id.svg");
+const nameIcon = require("../../../../assets/svgs/h_user.svg");
+const idCardIcon = require("../../../../assets/svgs/h_id.svg");
 
 export function RealNameVerificationSheet({
   visible,

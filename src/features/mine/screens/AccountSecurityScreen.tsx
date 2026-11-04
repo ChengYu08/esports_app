@@ -6,8 +6,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
-const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
-const arrowIcon = require("../../../../assets/mine/figma/mine-arrow-right.svg");
+const backIcon = require("../../../../assets/svgs/icon-back.svg");
+const arrowIcon = require("../../../../assets/svgs/mine-arrow-right.svg");
 
 export default function AccountSecurityScreen() {
   const insets = useSafeAreaInsets();

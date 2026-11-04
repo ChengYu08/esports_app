@@ -2,6 +2,7 @@ import type { GameCategory } from "@/features/home/api/home.types";
 import { radius, spacing } from "@/shared/theme/tokens";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import { memo } from "react";
 import {
   Pressable,
   ScrollView,
@@ -17,7 +18,8 @@ type GameCategoryTabsProps = {
   onChange: (id: string) => void;
 };
 
-export function GameCategoryTabs({
+// 品类筛选参数稳定；memo 后头部因轮播暂停重渲染时不再逐项重建品类行。
+export const GameCategoryTabs = memo(function GameCategoryTabs({
   categories,
   selectedId,
   onChange,
@@ -65,7 +67,7 @@ export function GameCategoryTabs({
       })}
     </ScrollView>
   );
-}
+});
 
 const styles = StyleSheet.create({
   content: {

@@ -72,7 +72,7 @@ export const CourtSourceCard = memo(function CourtSourceCard({
               {[1, 2, 3, 4, 5].map((value) => (
                 <CachedImage
                   key={value}
-                  source={require("../../../../assets/order/review-star.svg")}
+                  source={require("../../../../assets/svgs/review-star.svg")}
                   tintColor={value <= rating ? "#FF943D" : "#D9D9D9"}
                   style={styles.star}
                 />
@@ -125,9 +125,9 @@ export const CourtSourceCard = memo(function CourtSourceCard({
                 source={
                   iconUri && iconUri !== failedIconUrl
                     ? { uri: iconUri }
-                    : require("../../../../assets/voice-room/game.svg")
+                    : require("../../../../assets/svgs/game.svg")
                 }
-                placeholder={require("../../../../assets/voice-room/game.svg")}
+                placeholder={require("../../../../assets/svgs/game.svg")}
                 contentFit="cover"
                 placeholderContentFit="contain"
                 recyclingKey={iconUri || "default-game"}
