@@ -16,7 +16,7 @@ import {
 import { Image } from "expo-image";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -195,6 +195,18 @@ export default function VoiceRoomScreen() {
   const exitInFlight = useRef(false);
   const kickedRef = useRef(false);
   const focusedRef = useRef(false);
+  /** 是否已发生过首次聚焦：守卫只在「重新聚焦」时生效，避开首次进房 session 尚未建立的时序 */
+  const everFocusedRef = useRef(false);
+  /** 本屏实例标识（React useId，每次 mount 唯一），写入 session.screenFocusOwnerId 作为聚焦权归属 */
+  const roomScreenId = useId();
+  // 守卫经 ref 读最新 roomId，不进 useFocusEffect deps：房内 dismissTo 切房
+  // 只变 params 不产生真实 blur→focus，若进 deps 会触发 cleanup→重跑，
+  // 此时旧房已 exit（activeRoom 为空）、新房 beginRoomJoin 尚未执行，守卫会误判空壳并弹出新房。
+  // 本 effect 声明在守卫之前，聚焦守卫执行时 ref 已同步完成。
+  const roomIdRef = useRef(roomId);
+  useEffect(() => {
+    roomIdRef.current = roomId;
+  }, [roomId]);
   const [micChanging, setMicChanging] = useState(false);
   const [distanceEnabled, setDistanceEnabled] = useState(false);
   /**
@@ -538,12 +550,34 @@ export default function VoiceRoomScreen() {
   useFocusEffect(
     useCallback(() => {
       focusedRef.current = true;
+      // 聚焦标记：navigateToVoiceRoom 据此区分「房内原地切房（dismissTo）」
+      // 与「其他页面进入（push 保留中间路由）」
+      useVoiceRoomSessionStore.getState().setScreenFocused(true);
       // A private chat can cover this screen while the global listener exits it.
       if (kickedRef.current) minimize();
+      // 旧实例兜底：非聚焦页进房（如聊天页点邀请卡）会叠出同房第二个屏实例，
+      // 栈里历史遗留的旧房实例、session 已清空的场景同理。只有最后聚焦过的
+      // 实例是当前房屏：重新聚焦时聚焦权不在自己手上、或 session 已切走/清空，
+      // 则自动弹出自己，保证返回路径不再出现重复/失效的房屏。
+      // 只在真实 blur→focus 时执行；roomId 经 ref 读取（见 roomIdRef 注释）。
+      if (everFocusedRef.current && roomIdRef.current) {
+        const { activeRoom, joiningRoom, screenFocusOwnerId } =
+          useVoiceRoomSessionStore.getState();
+        const sessionMismatch =
+          !joiningRoom &&
+          (!activeRoom || activeRoom.roomId !== roomIdRef.current);
+        if (sessionMismatch || screenFocusOwnerId !== roomScreenId) {
+          minimize();
+          return;
+        }
+      }
+      everFocusedRef.current = true;
+      useVoiceRoomSessionStore.getState().setScreenFocusOwner(roomScreenId);
       return () => {
         focusedRef.current = false;
+        useVoiceRoomSessionStore.getState().setScreenFocused(false);
       };
-    }, [minimize]),
+    }, [minimize, roomScreenId]),
   );
 
   /** 场景 A：试音自发 — fetchActiveQuickMatch 校验 */
