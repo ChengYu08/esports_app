@@ -86,6 +86,7 @@
     "vitest": "^5.0.3"
   },
   "scripts": {
+    "postinstall": "node scripts/patch-reanimated.cjs",
     "start": "node scripts/with-env.cjs test expo start",
     "start:test": "node scripts/with-env.cjs test expo start",
     "start:prod": "node scripts/with-env.cjs prod expo start",

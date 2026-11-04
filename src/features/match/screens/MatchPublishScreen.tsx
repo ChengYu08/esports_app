@@ -45,7 +45,7 @@ import type { VoiceRoomDetail } from "@/features/voice-room/voice-room.types";
 import { getDDinProStyle } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 
-const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
+const diamondIcon = require("../../../../assets/mine/star-recharge-diamond-3f6fcf.png");
 const bgPublishDark = require("../../../../assets/images/bg_publish_dark.webp");
 
 const PUBLISH_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;

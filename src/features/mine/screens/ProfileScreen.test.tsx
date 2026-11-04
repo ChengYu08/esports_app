@@ -95,6 +95,7 @@ vi.mock("@/features/mine/hooks/use-customer-service-entry", () => ({
 vi.mock("@/features/mine/blacklist", () => ({
   addToBlacklist: vi.fn(),
   isUserBlacklisted: vi.fn().mockResolvedValue(false),
+  removeFromBlacklist: vi.fn(),
   subscribeBlacklist: vi.fn(() => vi.fn()),
 }));
 vi.mock("@/shared/audio/use-voice-player", () => ({

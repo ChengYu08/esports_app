@@ -129,7 +129,7 @@ function BlacklistRow({
   );
 }
 
-const fallbackAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
+const fallbackAvatar = require("../../../../assets/mine/mine-avatar.png");
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F7F7" },

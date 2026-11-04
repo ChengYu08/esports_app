@@ -29,10 +29,10 @@ import { RankingRulesSheet } from "../components/RankingRulesSheet";
 import { useRankingData } from "../hooks/use-ranking-data";
 import { DEFAULT_RANKING_FILTERS, getRankingBoard } from "../ranking.config";
 
-const godLabel = require("../../../../assets/ranking/ranking-title-god.svg");
-const orderLabel = require("../../../../assets/ranking/ranking-title-order.svg");
-const turnoverLabel = require("../../../../assets/ranking/ranking-title-turnover.svg");
-const trophy = require("../../../../assets/ranking/ranking-trophy.svg");
+const godLabel = require("../../../../assets/svgs/ranking-title-god.svg");
+const orderLabel = require("../../../../assets/svgs/ranking-title-order.svg");
+const turnoverLabel = require("../../../../assets/svgs/ranking-title-turnover.svg");
+const trophy = require("../../../../assets/svgs/ranking-trophy.svg");
 const emptyRows: RankingItem[] = [];
 const TAB_BAR_HEIGHT = 58;
 

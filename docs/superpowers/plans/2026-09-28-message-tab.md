@@ -14,7 +14,7 @@
 
 - 页面背景为 `#F7F7F7`，顶部栏和列表为白色。
 - 不绘制 Figma 模拟状态栏或底部导航栏。
-- 所有新增图片资源保存到 `assets/message/` 且扩展名为 `.svg`。
+- 所有新增 SVG 资源保存到 `assets/svgs/`。
 - 不新增依赖，不创建或修改 `ios/`、`android/`。
 - 不实现聊天详情、后端接口、实时通信或持久化。
 - 所有按钮提供中文无障碍标签，图标操作区至少为 44×44。
@@ -25,13 +25,13 @@
 ### Task 1: 导出 Figma 消息页资源
 
 **Files:**
-- Create: `assets/message/message-clear.svg`
-- Create: `assets/message/message-search.svg`
-- Create: `assets/message/message-system.svg`
-- Create: `assets/message/avatar-wangzhe.svg`
-- Create: `assets/message/avatar-sorry.svg`
-- Create: `assets/message/avatar-delta.svg`
-- Create: `assets/message/avatar-ada.svg`
+- Create: `assets/svgs/message-clear.svg`
+- Create: `assets/svgs/message-search.svg`
+- Create: `assets/svgs/message-system.svg`
+- Create: `assets/svgs/avatar-wangzhe.svg`
+- Create: `assets/svgs/avatar-sorry.svg`
+- Create: `assets/svgs/avatar-delta.svg`
+- Create: `assets/svgs/avatar-ada.svg`
 
 **Interfaces:**
 - Consumes: Figma 文件 `RiaC2pmggaf13Xisz9X0I2` 的节点 `13:8692`。
@@ -49,14 +49,14 @@ Expected: 文档确认当前项目所用 `expo-image` 的静态资源用法；�
 
 - [ ] **Step 3: 校验资源文件**
 
-Run: `file assets/message/*.svg`
+Run: `file assets/svgs/*.svg`
 
 Expected: 七个文件均存在且可识别为 SVG/XML 文本，无 PNG 内容伪装为 `.svg`。
 
 - [ ] **Step 4: 提交资源**
 
 ```bash
-git add assets/message
+git add assets/svgs
 git commit -m "assets: add message tab figma icons"
 ```
 
@@ -234,6 +234,6 @@ Expected: 两条命令均以 0 退出。
 - [ ] **Step 5: 若验证产生修复则提交**
 
 ```bash
-git add assets/message src/features/message 'src/app/(tabs)/message.tsx'
+git add assets/svgs src/features/message 'src/app/(tabs)/message.tsx'
 git commit -m "fix: polish message tab layout"
 ```

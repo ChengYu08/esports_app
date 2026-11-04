@@ -14,7 +14,7 @@ import {
 import { getConversationAvatarUri, resolveConversationAvatar } from "../message-avatar";
 
 const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
-const systemNotificationAvatar = require("../../../../assets/message/message-system-notice.svg");
+const systemNotificationAvatar = require("../../../../assets/svgs/message-system-notice.svg");
 const AUTO_DISMISS_MS = 4000;
 
 function InAppNotificationBannerImpl({ visible = true }: { visible?: boolean }) {

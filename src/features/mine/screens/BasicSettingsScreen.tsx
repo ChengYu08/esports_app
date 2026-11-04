@@ -27,8 +27,8 @@ import { useAuthStore } from "@esports/auth";
 import { readLastTeenEnabled } from "@/features/mine/teen-mode-store";
 import { useSmsNotifyStatus } from "@/features/mine/hooks/use-sms-notify";
 
-const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
-const arrowIcon = require("../../../../assets/mine/figma/mine-arrow-right.svg");
+const backIcon = require("../../../../assets/svgs/icon-back.svg");
+const arrowIcon = require("../../../../assets/svgs/mine-arrow-right.svg");
 
 function readCacheSize() {
   if (Platform.OS === "web") return 0;

@@ -236,7 +236,7 @@ export default function CourtDetailScreen() {
                   avatar={item.plaintiff?.avatar}
                   role="原告"
                 />
-                <CachedImage source={require("../../../../assets/court/versus.svg")} contentFit="contain" style={styles.vs} />
+                <CachedImage source={require("../../../../assets/svgs/versus.svg")} contentFit="contain" style={styles.vs} />
                 <Profile
                   name={item.defendant?.nickname || "未知用户"}
                   avatar={item.defendant?.avatar}
@@ -310,7 +310,7 @@ export default function CourtDetailScreen() {
           )}
           <View style={styles.stats}>
             <View style={styles.stat}>
-              <CachedImage source={require("../../../../assets/court/eye.svg")} style={styles.statIcon} />
+              <CachedImage source={require("../../../../assets/svgs/eye.svg")} style={styles.statIcon} />
               <Text style={styles.statText}>{formatCount(item.viewCount)}</Text>
             </View>
             <Pressable
@@ -322,7 +322,7 @@ export default function CourtDetailScreen() {
               onPress={favorite}
               style={styles.stat}
             >
-              <CachedImage source={item.favorited ? require("../../../../assets/court/star-filled.svg") : require("../../../../assets/court/star.svg")} style={styles.statIcon} />
+              <CachedImage source={item.favorited ? require("../../../../assets/svgs/star-filled.svg") : require("../../../../assets/svgs/star.svg")} style={styles.statIcon} />
               <Text style={styles.statText}>{formatCount(item.favoriteCount)}</Text>
             </Pressable>
           </View>
@@ -346,7 +346,7 @@ export default function CourtDetailScreen() {
                 >
                   {value}
                 </Text>
-                {tab === value && <CachedImage source={require("../../../../assets/court/tab-indicator.svg")} style={styles.tabLine} />}
+                {tab === value && <CachedImage source={require("../../../../assets/svgs/tab-indicator.svg")} style={styles.tabLine} />}
               </Pressable>
             ),
           )}

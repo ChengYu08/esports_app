@@ -11,7 +11,13 @@ const floorLayouts: Record<HomeBannerSlotCode, { aspectRatio: number; columns: 1
   APP_HOME_FLOOR3: { aspectRatio: 167 / 88, columns: 2 },
 };
 
-export function HomeBannerSections({ slots }: { slots: HomeBannerSlot[] }) {
+export function HomeBannerSections({
+  slots,
+  carouselPaused = false,
+}: {
+  slots: HomeBannerSlot[];
+  carouselPaused?: boolean;
+}) {
   return slots.map((slot) => {
     if (slot.items.length === 0) {
       return null;
@@ -24,7 +30,7 @@ export function HomeBannerSections({ slots }: { slots: HomeBannerSlot[] }) {
         slot.code === "APP_HOME_FLOOR3" && styles.thirdFloor,
       ]}>
         {isBannerSlotCarousel(slot) ? (
-          <HomeBannerCarousel slot={slot} {...layout} />
+          <HomeBannerCarousel slot={slot} paused={carouselPaused} {...layout} />
         ) : (
           <View style={styles.tiles}>
             {slot.items.map((banner, index) => (

@@ -13,7 +13,7 @@ type EmptyStateProps = StateProps & {
   illustration?: ReactNode;
 };
 
-const emptyStateIllustration = require("../../../assets/coms/empty-state-illustration.svg");
+const emptyStateIllustration = require("../../../assets/svgs/empty-state-illustration.svg");
 
 export function LoadingState({ message = "加载中…", style, messageStyle }: StateProps & { style?: StyleProp<ViewStyle>; messageStyle?: StyleProp<TextStyle> }) {
   return (

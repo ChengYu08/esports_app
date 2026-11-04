@@ -11,10 +11,10 @@ import {
 
 import { VoiceRoomMicControl } from "./VoiceRoomMicrophone";
 
-const sendIcon = require("../../../../assets/voice-room/toolbar-send.svg");
-const messageIcon = require("../../../../assets/voice-room/toolbar-message.svg");
-const inviteIcon = require("../../../../assets/voice-room/toolbar-invite.svg");
-const selectCompanionIcon = require("../../../../assets/voice-room/toolbar-select-companion.svg");
+const sendIcon = require("../../../../assets/svgs/toolbar-send.svg");
+const messageIcon = require("../../../../assets/svgs/toolbar-message.svg");
+const inviteIcon = require("../../../../assets/svgs/toolbar-invite.svg");
+const selectCompanionIcon = require("../../../../assets/svgs/toolbar-select-companion.svg");
 /** Figma 542:121702 / 542:121821：接待派单左侧耳机图标 */
 const dispatchIcon = require("../../../../assets/voice-room/toolbar-dispatch.svg");
 

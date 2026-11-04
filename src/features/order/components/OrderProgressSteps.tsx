@@ -3,9 +3,9 @@ import { StyleSheet, Text, View } from "react-native";
 
 import type { OrderItemModel, OrderScope } from "@/features/order/order.types";
 
-const orderStepCheck = require("../../../../assets/order/order-step-check.svg");
-const orderStepActive = require("../../../../assets/order/order-step-active.svg");
-const orderStepPending = require("../../../../assets/order/order-step-pending.svg");
+const orderStepCheck = require("../../../../assets/svgs/order-step-check.svg");
+const orderStepActive = require("../../../../assets/svgs/order-step-active.svg");
+const orderStepPending = require("../../../../assets/svgs/order-step-pending.svg");
 
 /** 订单进度步骤条：支付 → 陪玩确认/抢单 → 陪玩服务 → 服务完成 */
 export function OrderProgressSteps({

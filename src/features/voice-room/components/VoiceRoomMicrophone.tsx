@@ -1,7 +1,7 @@
 import { Image } from "expo-image";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 
-const microphoneIcon = require("../../../../assets/voice-room/toolbar-mic.svg");
+const microphoneIcon = require("../../../../assets/svgs/toolbar-mic.svg");
 const microphoneMuteIcon = require("../../../../assets/voice-room/toolbar-mic-mute.svg");
 
 type MicControlProps = {

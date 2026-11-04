@@ -32,10 +32,10 @@ import { teenLockWindowLabel } from "@/features/mine/utils/teen-lock-window";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { colors } from "@/shared/theme/tokens";
 
-const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
-const closedIllustration = require("../../../../assets/mine/figma/teen-mode-closed.svg");
-const openIllustration = require("../../../../assets/mine/figma/teen-mode-open.svg");
-const starIcon = require("../../../../assets/mine/figma/teen-mode-star.svg");
+const backIcon = require("../../../../assets/svgs/icon-back.svg");
+const closedIllustration = require("../../../../assets/svgs/teen-mode-closed.svg");
+const openIllustration = require("../../../../assets/svgs/teen-mode-open.svg");
+const starIcon = require("../../../../assets/svgs/teen-mode-star.svg");
 
 type Phase =
   | "overview"

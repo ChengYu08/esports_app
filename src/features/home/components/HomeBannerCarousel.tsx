@@ -21,12 +21,15 @@ type HomeBannerCarouselProps = {
   slot: HomeBannerSlot;
   aspectRatio: number;
   columns: 1 | 2;
+  /** 外层列表滚动期间暂停自动跳页，避免与纵向滚动争抢 JS 线程。 */
+  paused?: boolean;
 };
 
 export function HomeBannerCarousel({
   slot,
   aspectRatio,
   columns,
+  paused = false,
 }: HomeBannerCarouselProps) {
   const [width, setWidth] = useState(0);
   const height = (width - (columns - 1) * 8) / columns / aspectRatio;
@@ -51,6 +54,7 @@ export function HomeBannerCarousel({
           width={width}
           height={height}
           columns={columns}
+          paused={paused}
         />
       )}
     </View>
@@ -62,11 +66,13 @@ function BannerSlides({
   width,
   height,
   columns,
+  paused,
 }: {
   slot: HomeBannerSlot;
   width: number;
   height: number;
   columns: 1 | 2;
+  paused: boolean;
 }) {
   const list = useRef<FlatList<Banner[]>>(null);
   const pages = useMemo(
@@ -96,7 +102,7 @@ function BannerSlides({
   }, []);
 
   useEffect(() => {
-    if (!focused || appState !== "active" || dragging || pages.length < 2) {
+    if (!focused || appState !== "active" || dragging || paused || pages.length < 2) {
       return;
     }
     const timer = setTimeout(() => {
@@ -115,6 +121,7 @@ function BannerSlides({
     dragging,
     focused,
     index,
+    paused,
     slot.intervalMs,
     width,
   ]);

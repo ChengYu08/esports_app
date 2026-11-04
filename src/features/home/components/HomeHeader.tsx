@@ -14,9 +14,9 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-const searchIcon = require("../../../../assets/home/h_search.svg");
-const tabLeftCorner = require("../../../../assets/home/h_tab_left.svg");
-const tabRightCorner = require("../../../../assets/home/h_tab_right.svg");
+const searchIcon = require("../../../../assets/svgs/h_search.svg");
+const tabLeftCorner = require("../../../../assets/svgs/h_tab_left.svg");
+const tabRightCorner = require("../../../../assets/svgs/h_tab_right.svg");
 type HomeHeaderProps = {
   tab: HomeTab;
   game: GameKey;
@@ -29,6 +29,8 @@ type HomeHeaderProps = {
   bannerSlots: HomeBannerSlot[];
   onTabChange: (tab: HomeTab) => void;
   onGameChange: (game: GameKey) => void;
+  /** 外层列表滚动期间暂停轮播自动跳页。 */
+  carouselPaused?: boolean;
 };
 
 export function HomeHeader({
@@ -43,12 +45,13 @@ export function HomeHeader({
   bannerSlots,
   onTabChange,
   onGameChange,
+  carouselPaused = false,
 }: HomeHeaderProps) {
   return (
     <>
       {tab === "home" && (
         <>
-          <HomeBannerSections slots={bannerSlots} />
+          <HomeBannerSections slots={bannerSlots} carouselPaused={carouselPaused} />
           <GameCategoryTabs categories={categories} selectedId={category} onChange={onCategoryChange} />
           {filterError && (
             <Pressable accessibilityRole="button" onPress={onRetryFilters} style={styles.filterRetry}>
@@ -174,7 +177,7 @@ function Tab({
       onPress={onPress}
       style={styles.tab}
     >
-      {selected && <View style={styles.line} />}
+      {selected && <View style={[styles.line, { width: label.length === 2 ? 34 : 51 }]} />}
       <Text style={[styles.tabText, selected && styles.tabSelected, court && styles.courtTabText, court && selected && styles.courtTabSelected]}>
         {label}
       </Text>
@@ -197,25 +200,24 @@ const styles = StyleSheet.create({
     color: "#CACACC",
     fontSize: 18,
     lineHeight: 26,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   tabSelected: {
     fontFamily: SYSTEM_FONT,
     color: "#0D0D0F",
     fontSize: 20,
     lineHeight: 28,
-    fontWeight: "600",
+    fontWeight: "700",
   },
-  courtTabText: { fontFamily: COURT_FONT_FAMILY, color: "#CACACC", fontWeight: "600", lineHeight: 26 },
+  courtTabText: { fontFamily: COURT_FONT_FAMILY, color: "#CACACC", fontWeight: "700", lineHeight: 26 },
   courtTabSelected: { color: "#0D0D0F", lineHeight: 28 },
   line: {
     position: "absolute",
     bottom: 11,
-    left: 3,
-    right: 3,
+    alignSelf: "center",
     height: 6,
     borderRadius: 2,
-    backgroundColor: "#FFC2C6",
+    backgroundColor: "#FFC2CE",
   },
   actions: { alignItems: "center", flexDirection: "row", gap: 10, height: "100%", paddingRight: 12 },
   search: { alignItems: "center", height: 44, justifyContent: "center", width: 40 },

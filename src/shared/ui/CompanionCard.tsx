@@ -5,12 +5,12 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { getDDinProStyle } from "@/shared/theme/typography";
 
-const maleIcon = require("../../../assets/home/club-detail/male.svg");
-const femaleIcon = require("../../../assets/mine/figma/mine-female.svg");
+const maleIcon = require("../../../assets/svgs/male.svg");
+const femaleIcon = require("../../../assets/svgs/mine-female.svg");
 const diamondIcon = require("../../../assets/message/order-assistant-coin-3f6fcf.webp");
-const emptyAvatar = require("../../../assets/mine/figma/mine-avatar.png");
-const statusPlayingIcon = require("../../../assets/home/club-detail/status-playing.svg");
-const statusIdleIcon = require("../../../assets/home/club-detail/status-idle.svg");
+const emptyAvatar = require("../../../assets/mine/mine-avatar.png");
+const statusPlayingIcon = require("../../../assets/svgs/club-status-playing.svg");
+const statusIdleIcon = require("../../../assets/svgs/club-status-idle.svg");
 
 export type CompanionCardProps = {
   nickname: string;

@@ -2,6 +2,7 @@ import type { GameCategory } from "@/features/home/api/home.types";
 import { radius, spacing } from "@/shared/theme/tokens";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import { memo } from "react";
 import {
   Pressable,
   ScrollView,
@@ -17,7 +18,8 @@ type GameCategoryTabsProps = {
   onChange: (id: string) => void;
 };
 
-export function GameCategoryTabs({
+// 品类筛选参数稳定；memo 后头部因轮播暂停重渲染时不再逐项重建品类行。
+export const GameCategoryTabs = memo(function GameCategoryTabs({
   categories,
   selectedId,
   onChange,
@@ -46,9 +48,9 @@ export function GameCategoryTabs({
             onPress={() => onChange(selected ? "" : category.id)}
             style={[styles.item, { width: itemWidth }]}
           >
-            {category.iconUrl ? (
+            {category.mobileIconUrl ? (
               <CachedImage
-                source={{ uri: category.iconUrl }}
+                source={{ uri: category.mobileIconUrl }}
                 contentFit="contain"
                 style={styles.image}
               />
@@ -65,7 +67,7 @@ export function GameCategoryTabs({
       })}
     </ScrollView>
   );
-}
+});
 
 const styles = StyleSheet.create({
   content: {
@@ -74,8 +76,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
     gap: spacing.sm,
   },
-  // 按品类图原始比例确定高度，避免 contain 在固定高度内产生上下留白。
-  item: { aspectRatio: 15 / 4, borderRadius: radius.md, overflow: "hidden" },
+  item: { flexShrink: 0, aspectRatio: 109 / 56, borderRadius: radius.md, overflow: "hidden" },
   selected: {
     position: "absolute",
     top: 0,

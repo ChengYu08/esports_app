@@ -74,6 +74,7 @@ export default function CourtComplaintScreen() {
   const [ticketReason, setTicketReason] = useState<string>("RULE_VIOLATION");
   const [claim, setClaim] = useState("");
   const [content, setContent] = useState("");
+  const contentLimit = mode === "appeal" ? 500 : 1000;
   const [footerHeight, setFooterHeight] = useState(0);
   const formScrollRef = useRef<KeyboardAwareScrollViewRef>(null);
   const [sourceSessionId] = useState(() => makeIdempotencyKey("court-source"));
@@ -307,6 +308,10 @@ export default function CourtComplaintScreen() {
       showToast("请填写投诉内容");
       return;
     }
+    if (mode === "appeal" && content.length > contentLimit) {
+      showToast(`申诉理由最多${contentLimit}个字符`);
+      return;
+    }
     if (
       mode === "court" &&
       (!caseType || !selectedSource || !claim.trim() || !agree)
@@ -525,7 +530,7 @@ export default function CourtComplaintScreen() {
             onChangeText={setContent}
             multiline
             editable={!formDisabled}
-            maxLength={1000}
+            maxLength={contentLimit}
             placeholder={
               mode === "evidence"
                 ? "请描述证据内容"
@@ -539,7 +544,7 @@ export default function CourtComplaintScreen() {
             style={[styles.input, styles.textArea]}
             textAlignVertical="top"
           />
-          <Text style={styles.counter}>{content.length}/1000</Text>
+          <Text style={styles.counter}>{content.length}/{contentLimit}</Text>
         </FormField>
         <CourtEvidencePicker
           images={images}
