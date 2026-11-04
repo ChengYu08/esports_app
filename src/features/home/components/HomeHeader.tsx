@@ -29,6 +29,8 @@ type HomeHeaderProps = {
   bannerSlots: HomeBannerSlot[];
   onTabChange: (tab: HomeTab) => void;
   onGameChange: (game: GameKey) => void;
+  /** 外层列表滚动期间暂停轮播自动跳页。 */
+  carouselPaused?: boolean;
 };
 
 export function HomeHeader({
@@ -43,12 +45,13 @@ export function HomeHeader({
   bannerSlots,
   onTabChange,
   onGameChange,
+  carouselPaused = false,
 }: HomeHeaderProps) {
   return (
     <>
       {tab === "home" && (
         <>
-          <HomeBannerSections slots={bannerSlots} />
+          <HomeBannerSections slots={bannerSlots} carouselPaused={carouselPaused} />
           <GameCategoryTabs categories={categories} selectedId={category} onChange={onCategoryChange} />
           {filterError && (
             <Pressable accessibilityRole="button" onPress={onRetryFilters} style={styles.filterRetry}>

@@ -19,7 +19,7 @@ import {
 } from "@fluentui/react-native-icons";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useIsFocused, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -259,6 +259,15 @@ export default function ClubDetailScreen() {
     [companionsQuery.data],
   );
   const voicePlayer = useVoicePlayer();
+  const focused = useIsFocused();
+  const stopVoice = voicePlayer.stop;
+  // 从详情页 push 进入成员主页/下单等页面时本页不卸载，需失焦主动停语音，
+  // 避免与新页面的语音播放器叠音。口径同 GodListScreen/ProfileScreen。
+  useEffect(() => {
+    if (!focused) {
+      stopVoice();
+    }
+  }, [focused, stopVoice]);
   const clubId = club?.id ?? "";
   const quickMatchClub = useMemo(
     () => (club ? { id: club.id, name: club.name } : { id: "", name: "" }),

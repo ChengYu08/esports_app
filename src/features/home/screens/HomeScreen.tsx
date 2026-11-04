@@ -4,6 +4,13 @@ import RankingScreen from "@/features/ranking/screens/RankingScreen";
 import { RankingBackground } from "@/features/ranking/components/RankingBackground";
 import type { GameKey, HomeTab } from "@/features/home/api/home.types";
 import { ClubCard } from "@/features/home/components/ClubCard";
+import {
+  beginClubListScroll,
+  CLUB_LIST_SCROLL_SETTLE_MS,
+  initialClubListScrollState,
+  markClubListEndReached,
+  settleClubListScroll,
+} from "@/features/home/club-list-scroll";
 import { useClubOnlineCounts } from "@/features/home/hooks/use-club-online-counts";
 import { HomeBackground } from "@/features/home/components/HomeBackground";
 import { HomeHeader, HomeTopBar } from "@/features/home/components/HomeHeader";
@@ -21,7 +28,7 @@ import {
   useIsFocused,
   useLocalSearchParams,
 } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   RefreshControl,
@@ -35,6 +42,7 @@ import { showToast, toastDurations } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const clubViewabilityConfig = { itemVisiblePercentThreshold: 20 };
+const CLUB_VIEWABILITY_SETTLE_MS = 250;
 
 function sameClubIds(current: string[], next: string[]) {
   return current.length === next.length && current.every((id, index) => id === next[index]);
@@ -114,6 +122,70 @@ export default function HomeScreen() {
   );
   const bannerSlots = useMemo(() => banners.data ?? [], [banners.data]);
 
+  // 用拖拽/惯性的起止事件跟踪列表滚动，不在逐帧 onScroll 里做 JS 状态更新。
+  const scrollStateRef = useRef(initialClubListScrollState);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [carouselPaused, setCarouselPaused] = useState(false);
+  const clubsRef = useRef(clubs);
+  useEffect(() => {
+    clubsRef.current = clubs;
+  });
+  const markListScrollActive = useCallback(() => {
+    if (settleTimer.current !== null) {
+      clearTimeout(settleTimer.current);
+      settleTimer.current = null;
+    }
+    const wasScrolling = scrollStateRef.current.scrolling;
+    scrollStateRef.current = beginClubListScroll(scrollStateRef.current);
+    if (!wasScrolling) {
+      setCarouselPaused(true);
+    }
+  }, []);
+  const flushPendingEndReached = useCallback(() => {
+    const { pendingEndReached } = scrollStateRef.current;
+    scrollStateRef.current = settleClubListScroll(scrollStateRef.current);
+    setCarouselPaused(false);
+    const current = clubsRef.current;
+    if (pendingEndReached && current.hasNextPage && !current.isFetching) {
+      current.fetchNextPage();
+    }
+  }, []);
+  const scheduleListScrollSettle = useCallback(() => {
+    if (settleTimer.current !== null) {
+      clearTimeout(settleTimer.current);
+    }
+    settleTimer.current = setTimeout(() => {
+      settleTimer.current = null;
+      flushPendingEndReached();
+    }, CLUB_LIST_SCROLL_SETTLE_MS);
+  }, [flushPendingEndReached]);
+  // 切走频道/失焦会中断惯性滚动事件流，滚动标志可能永远停在 true（轮播暂停、分页挂起失效），事件侧兜底复位。
+  const resetListScrollState = useCallback(() => {
+    if (settleTimer.current !== null) {
+      clearTimeout(settleTimer.current);
+      settleTimer.current = null;
+    }
+    if (scrollStateRef.current.scrolling || scrollStateRef.current.pendingEndReached) {
+      scrollStateRef.current = initialClubListScrollState;
+      setCarouselPaused(false);
+    }
+  }, []);
+  useEffect(() => {
+    return () => {
+      if (settleTimer.current !== null) {
+        clearTimeout(settleTimer.current);
+      }
+    };
+  }, []);
+  // 失焦（跳俱乐部详情等）时惯性事件流被切断，回来前先复位滚动标志。
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        resetListScrollState();
+      };
+    }, [resetListScrollState]),
+  );
+
   useFocusEffect(
     useCallback(() => {
       if (reviewerApplied !== "1" && ticketSubmitted !== "1") {
@@ -146,30 +218,49 @@ export default function HomeScreen() {
     [clubs.data],
   );
   const [visibleClubIds, setVisibleClubIds] = useState<string[]>([]);
+  const viewabilityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onClubViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
-    const next = viewableItems.map(({ item }) => item.id as string);
-    setVisibleClubIds((current) => sameClubIds(current, next) ? current : next);
+    // 有服务端在线人数的卡片无需逐项查询；滚动稳定后再更新可见项，避免惯性滚动期间重渲染整页。
+    const next = viewableItems
+      .filter(({ item }) => item.onlineCompanionCount == null)
+      .map(({ item }) => item.id as string);
+    if (viewabilityTimer.current !== null) {
+      clearTimeout(viewabilityTimer.current);
+    }
+    viewabilityTimer.current = setTimeout(() => {
+      viewabilityTimer.current = null;
+      setVisibleClubIds((current) => sameClubIds(current, next) ? current : next);
+    }, CLUB_VIEWABILITY_SETTLE_MS);
+  }, []);
+  useEffect(() => {
+    return () => {
+      if (viewabilityTimer.current !== null) {
+        clearTimeout(viewabilityTimer.current);
+      }
+    };
   }, []);
   // 精确在线人数需要逐游戏分页查询，只计算屏幕上的卡片。
-  const visibleClubs = useMemo(
-    () => clubItems.filter((club) => visibleClubIds.includes(club.id)),
-    [clubItems, visibleClubIds],
-  );
   const onlineGameIds = useMemo(
     () => selectedGame ? [Number(selectedGame)] : selectedCategory ? categoryGames.map((item) => item.id) : undefined,
     [selectedGame, selectedCategory, categoryGames],
   );
   const legacyVisibleClubs = useMemo(
-    () => visibleClubs.filter((club) => club.onlineCompanionCount == null),
-    [visibleClubs],
+    () => {
+      const visibleIds = new Set(visibleClubIds);
+      return clubItems.filter((club) =>
+        club.onlineCompanionCount == null && visibleIds.has(club.id),
+      );
+    },
+    [clubItems, visibleClubIds],
   );
   const onlineCounts = useClubOnlineCounts(legacyVisibleClubs, onlineGameIds, topTab === "home");
   const selectTopTab = useCallback((tab: HomeTab) => {
+    resetListScrollState();
     setTopTab(tab);
     setMountedTabs((current) =>
       current[tab] ? current : { ...current, [tab]: true },
     );
-  }, []);
+  }, [resetListScrollState]);
   const selectCategory = useCallback((id: string) => {
     setCategory(id);
     setGame("");
@@ -187,9 +278,15 @@ export default function HomeScreen() {
     ]);
   };
   const loadMoreClubs = () => {
-    if (clubs.hasNextPage && !clubs.isFetching) {
-      clubs.fetchNextPage();
+    if (!clubs.hasNextPage || clubs.isFetching) {
+      return;
     }
+    // 惯性滚动中触底先挂起，滚动稳定后补发，避免分页数据落地时整页重渲染与滚动抢主线程。
+    if (scrollStateRef.current.scrolling) {
+      scrollStateRef.current = markClubListEndReached(scrollStateRef.current);
+      return;
+    }
+    clubs.fetchNextPage();
   };
   const renderClub = useCallback(
     ({ item }: { item: (typeof clubItems)[number] }) => (
@@ -215,6 +312,7 @@ export default function HomeScreen() {
           bannerSlots={bannerSlots}
           onTabChange={selectTopTab}
           onGameChange={setGame}
+          carouselPaused={carouselPaused}
         />
       </View>
     ),
@@ -231,6 +329,7 @@ export default function HomeScreen() {
       bannerSlots,
       selectTopTab,
       measureHeader,
+      carouselPaused,
     ],
   );
   const isHomeLoading = games.isLoading || categories.isLoading;
@@ -303,6 +402,10 @@ export default function HomeScreen() {
                 initialNumToRender={8}
                 onScroll={handleScroll}
                 scrollEventThrottle={16}
+                onScrollBeginDrag={markListScrollActive}
+                onScrollEndDrag={scheduleListScrollSettle}
+                onMomentumScrollBegin={markListScrollActive}
+                onMomentumScrollEnd={scheduleListScrollSettle}
                 ListEmptyComponent={
                   clubs.isLoading ? (
                     <LoadingState />
