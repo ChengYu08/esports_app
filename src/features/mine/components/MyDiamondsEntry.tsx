@@ -14,13 +14,6 @@ function formatTime(value?: string): string {
   return String(value).replace("T", " ").slice(0, 16);
 }
 
-/** chargeRecords 仅含充值/退款；无 transactionType 时按金额正负推断类型文案 */
-function resolveTypeLabel(amount: number, remark?: string): string {
-  if (amount < 0) return "充值退款";
-  if (amount > 0) return "充值钻石";
-  return remark?.trim() || "-";
-}
-
 export const MyDiamondsEntry = memo(function MyDiamondsEntry({
   entry,
 }: {
@@ -29,14 +22,15 @@ export const MyDiamondsEntry = memo(function MyDiamondsEntry({
   const amount = Number(entry.amount ?? 0);
   const isPositive = amount >= 0;
   const amountColor = isPositive ? styles.positive : styles.negative;
-  const title = entry.remark?.trim() || "钻石变动";
+  // ClientWalletTransactionVO 无 transactionType，标题与类型均取 remark
+  const remark = entry.remark?.trim() || "-";
 
   return (
     <View style={styles.card}>
       <View style={styles.section}>
         <View style={styles.amountRow}>
           <Text style={styles.label} numberOfLines={1}>
-            {title}
+            {remark}
           </Text>
           <View style={styles.amountGroup}>
             <Text style={[styles.amount, amountColor]}>
@@ -47,7 +41,7 @@ export const MyDiamondsEntry = memo(function MyDiamondsEntry({
           </View>
         </View>
         <LedgerRow label="剩余钻石" value={formatAmount(entry.balanceAfter)} />
-        <LedgerRow label="类型" value={resolveTypeLabel(amount, entry.remark)} />
+        <LedgerRow label="类型" value={remark} />
       </View>
       <View style={styles.divider} />
       <View style={styles.section}>
