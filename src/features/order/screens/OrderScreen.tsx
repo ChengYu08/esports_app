@@ -4,7 +4,7 @@ import { showToast } from "@/shared/ui/app-toast";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { useAuthStore } from "@esports/auth";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useIsFocused, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -74,7 +74,8 @@ import type {
 } from "../order.types";
 
 export default function OrderScreen() {
-  const games = useHomeGames();
+  const focused = useIsFocused();
+  const games = useHomeGames(focused);
   const gameIconsByName = useMemo(() => {
     const icons = new Map<string, string | null>();
     for (const game of games.data ?? []) {
@@ -113,12 +114,27 @@ export default function OrderScreen() {
       : filter === "grabbing" || filter === "history"
         ? "all"
         : filter;
-  const orders = useOrderPage(scope, visibleFilter);
+  const orders = useOrderPage(scope, visibleFilter, focused);
   const token = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.user);
   const currentUserId = currentUser?.id;
   const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
   const pendingOrderRef = useRef<string | null>(null);
+  const expiryRefetchTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const expiryRefetchScheduled = useRef(false);
+  const clearExpiryRefetch = useCallback(() => {
+    expiryRefetchTimers.current.forEach(clearTimeout);
+    expiryRefetchTimers.current = [];
+    expiryRefetchScheduled.current = false;
+  }, []);
+  useFocusEffect(
+    useCallback(() => () => {
+      // 离开订单页后取消补拉，避免回到首页时继续请求旧列表。
+      clearExpiryRefetch();
+    }, [clearExpiryRefetch]),
+  );
+  // 切换订单范围时，旧范围的延迟补拉不再占用新范围的刷新窗口。
+  useEffect(() => clearExpiryRefetch, [clearExpiryRefetch, scope, visibleFilter, currentUserId]);
   useFocusEffect(
     useCallback(() => {
       if (token && currentUserId)
@@ -169,6 +185,7 @@ export default function OrderScreen() {
     items
       .filter((item) => !item.clubName && item.clubId != null)
       .map((item) => Number(item.clubId)),
+    focused,
   );
   const emptyMessage =
     scope === "dispatch"
@@ -180,6 +197,10 @@ export default function OrderScreen() {
         : `暂无${visibleFilter === "inProgress" ? "进行中" : visibleFilter === "completed" ? "已完成" : "已取消"}订单`;
 
   const handlePaymentExpired = useCallback(() => {
+    if (expiryRefetchScheduled.current) {
+      return;
+    }
+    expiryRefetchScheduled.current = true;
     // 同时到期的订单复用进行中的列表请求，状态以服务端结果为准。
     // 服务端延迟消息关单比客户端倒计时归零晚几秒，一次重拉可能抢在关单前，错峰补拉两轮。
     const refetch = () =>
@@ -194,8 +215,14 @@ export default function OrderScreen() {
         )
         .catch(() => undefined);
     refetch();
-    setTimeout(refetch, 4000);
-    setTimeout(refetch, 12000);
+    expiryRefetchTimers.current = [
+      setTimeout(refetch, 4000),
+      setTimeout(() => {
+        refetch();
+        expiryRefetchTimers.current = [];
+        expiryRefetchScheduled.current = false;
+      }, 12000),
+    ];
   }, [scope, visibleFilter, currentUserId]);
 
   // 用 useCallback 固定回调引用，保证 OrderCard 的 memo 不被每次渲染的新闭包击穿
@@ -453,6 +480,7 @@ export default function OrderScreen() {
     ({ item }: { item: OrderItemModel }) => (
       <OrderCard
         item={item}
+        active={focused}
         scope={scope}
         gameIcon={gameIconsByName.get(item.gameName) ? { uri: gameIconsByName.get(item.gameName)! } : undefined}
         clubName={
@@ -465,7 +493,7 @@ export default function OrderScreen() {
         onPaymentExpired={handlePaymentExpired}
       />
     ),
-    [clubNameById, pendingOrderId, handleOrderAction, handleOrderPress, handlePaymentExpired, scope, gameIconsByName],
+    [clubNameById, pendingOrderId, handleOrderAction, handleOrderPress, handlePaymentExpired, scope, gameIconsByName, focused],
   );
 
   // refetch 在 react-query 中是稳定引用，解构后作为依赖可让 memo 长效命中

@@ -3,16 +3,26 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export function useVoicePlayer() {
   const playerRef = useRef<AudioPlayer | null>(null);
+  const subscriptionRef = useRef<{ remove: () => void } | null>(null);
   const playingUrlRef = useRef<string | null>(null);
   const [playingUrl, setPlayingUrl] = useState<string | null>(null);
 
-  const stop = useCallback(() => {
+  const release = useCallback((updateState: boolean) => {
+    // 手动停止和页面离开时都先移除事件订阅，避免旧播放器回调继续持有页面。
+    subscriptionRef.current?.remove();
+    subscriptionRef.current = null;
     playerRef.current?.pause();
     playerRef.current?.remove();
     playerRef.current = null;
     playingUrlRef.current = null;
-    setPlayingUrl(null);
+    if (updateState) {
+      setPlayingUrl(null);
+    }
   }, []);
+
+  const stop = useCallback(() => {
+    release(true);
+  }, [release]);
 
   const toggle = useCallback((voiceUrl: string) => {
     if (playingUrlRef.current === voiceUrl) {
@@ -24,26 +34,22 @@ export function useVoicePlayer() {
     playerRef.current = player;
     playingUrlRef.current = voiceUrl;
     setPlayingUrl(voiceUrl);
-    const subscription = player.addListener("playbackStatusUpdate", (status) => {
+    subscriptionRef.current = player.addListener("playbackStatusUpdate", (status) => {
       if (
         status.didJustFinish ||
         (status.duration > 0 &&
           status.currentTime >= status.duration &&
           !status.playing)
       ) {
-        subscription.remove();
-        player.remove();
         if (playerRef.current === player) {
-          playerRef.current = null;
-          playingUrlRef.current = null;
-          setPlayingUrl(null);
+          stop();
         }
       }
     });
     player.play();
   }, [stop]);
 
-  useEffect(() => stop, [stop]);
+  useEffect(() => () => release(false), [release]);
 
   return { playingUrl, stop, toggle };
 }

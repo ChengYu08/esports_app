@@ -168,6 +168,8 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   input: {
+    // 撑满计数器以上剩余空间，让计数器贴住卡片底部
+    flex: 1,
     minHeight: 48,
     color: "#333333",
     fontFamily: DOUYIN_SANS,

@@ -1,8 +1,8 @@
 import { useAuthStore } from "@esports/auth";
 import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { useQuery } from "@tanstack/react-query";
-import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { router, useFocusEffect, useIsFocused } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -36,6 +36,7 @@ export function OrderDetailScreen({
   scope: OrderDetailScope;
 }) {
   const insets = useSafeAreaInsets();
+  const focused = useIsFocused();
   const token = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.user);
   const { openCustomerService } = useCustomerServiceEntry();
@@ -48,6 +49,9 @@ export function OrderDetailScreen({
     // 不一定下发 ORDER_NOTIFY），停留期间对活跃订单轮询兜底。
     refetchOnMount: "always",
     refetchInterval: (query) => {
+      if (!focused) {
+        return false;
+      }
       const status = query.state.data?.status;
       if (
         status === "paid" ||
@@ -59,6 +63,19 @@ export function OrderDetailScreen({
       return false;
     },
   });
+  const hasFocused = useRef(false);
+  const refetchDetail = detail.refetch;
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasFocused.current) {
+        hasFocused.current = true;
+        return;
+      }
+      if (id && token) {
+        void refetchDetail({ cancelRefetch: false });
+      }
+    }, [id, refetchDetail, token]),
+  );
   const actions = useOrderDetailActions({
     order: detail.data,
     scope,
@@ -76,12 +93,12 @@ export function OrderDetailScreen({
   const [clock, setClock] = useState(() => Date.now());
   const dispatchDeadline = detail.data?.dispatchDeadline;
   useEffect(() => {
-    if (scope !== "accept" || !dispatchDeadline) {
+    if (!focused || scope !== "accept" || !dispatchDeadline) {
       return;
     }
     const timer = setInterval(() => setClock(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [dispatchDeadline, scope]);
+  }, [dispatchDeadline, focused, scope]);
   if (detail.isLoading) {
     return (
       <View style={styles.center}>

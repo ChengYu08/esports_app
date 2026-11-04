@@ -14,7 +14,12 @@ import {
   useHomeGames,
 } from "@/features/home/hooks/use-home-data";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import {
+  router,
+  useFocusEffect,
+  useIsFocused,
+  useLocalSearchParams,
+} from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Animated,
@@ -36,12 +41,13 @@ function sameClubIds(current: string[], next: string[]) {
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const focused = useIsFocused();
   const { reviewerApplied, ticketSubmitted } = useLocalSearchParams<{
     reviewerApplied?: string;
     ticketSubmitted?: string;
   }>();
   const [topTab, setTopTab] = useState<HomeTab>("home");
-  // 顶部频道懒挂载 + 常驻：首次选中才挂载，之后仅显隐切换，避免低端机反复整屏重挂载。
+  // 顶部频道首次选中才挂载，之后保留筛选状态和列表滚动位置。
   const [mountedTabs, setMountedTabs] = useState<Record<HomeTab, boolean>>({
     home: true,
     god: false,
@@ -75,8 +81,8 @@ export default function HomeScreen() {
       }),
     [headerHeight, scrollY],
   );
-  const games = useHomeGames();
-  const categories = useHomeGameCategories();
+  const games = useHomeGames(topTab === "home" && focused);
+  const categories = useHomeGameCategories(topTab === "home" && focused);
   const { refetch: refetchGames } = games;
   const { refetch: refetchCategories } = categories;
   const selectedCategory = categories.data?.some((item) => item.id === category)
@@ -96,11 +102,15 @@ export default function HomeScreen() {
     categoryGames.some((item) => String(item.id) === game)
       ? game
       : "";
-  const banners = useHomeBanners(topTab);
-  const clubs = useHomeClubs(topTab, {
-    gameId: selectedGame || undefined,
-    gameCategoryId: selectedCategory || undefined,
-  });
+  const banners = useHomeBanners(topTab, focused);
+  const clubs = useHomeClubs(
+    topTab,
+    {
+      gameId: selectedGame || undefined,
+      gameCategoryId: selectedCategory || undefined,
+    },
+    focused,
+  );
   const bannerSlots = useMemo(() => banners.data ?? [], [banners.data]);
 
   useFocusEffect(
@@ -310,7 +320,7 @@ export default function HomeScreen() {
         )}
         {mountedTabs.ranking && (
           <View style={[styles.pane, topTab !== "ranking" && styles.paneHidden]}>
-            <RankingScreen embedded />
+            <RankingScreen embedded active={topTab === "ranking"} />
           </View>
         )}
         {topTab === "court" && (
