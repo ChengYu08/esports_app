@@ -16,6 +16,7 @@ vi.mock('@/features/mine/api/blacklist.api', () => ({
 vi.mock('./rongcloud-im', () => ({
   isRongCloudAvailable: vi.fn(),
   initializeRongCloud: vi.fn(),
+  isRongCloudConnected: vi.fn(() => true),
   getRongConversations: vi.fn(),
   getRongMessages: vi.fn(),
   sendRongText: vi.fn(),
@@ -39,6 +40,7 @@ function makeAdapter(overrides: Partial<MessageAdapter> = {}) {
   const adapter: MessageAdapter = {
     available: () => true,
     initialize: vi.fn(async () => true),
+    isConnected: () => true,
     getConversations: vi.fn(async () => []),
     getMessages: vi.fn(async (): Promise<MessageHistoryPage> => ({ messages: [], nextCursor: null, hasMore: false })),
     sendText: vi.fn(async () => sentMessage),
