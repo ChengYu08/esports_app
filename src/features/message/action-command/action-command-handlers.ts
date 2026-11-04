@@ -22,8 +22,8 @@ const QUICK_MATCH_EXPIRED = "QUICK_MATCH_EXPIRED";
 const QUICK_MATCH_CANCELLED = "QUICK_MATCH_CANCELLED";
 const ORDER_NOTIFY = "ORDER_NOTIFY";
 const MAX_ACTION_NOTICE_DURATION_MS = 15_000;
-/** 离线消息重放门控：通知比这更旧视为离线积压，不弹条（超过即为离线重放） */
-const QUICK_MATCH_NOTICE_STALE_MAX_MS = 30 * 60_000;
+/** 离线消息重放门控：命令通知比这更旧视为离线积压，不弹条（超过即为离线重放） */
+const COMMAND_STALE_MAX_MS = 15 * 60_000;
 
 type QuickMatchEndReason = "expired" | "cancelled";
 
@@ -105,7 +105,7 @@ export function handleQuickMatchNotice(command: RongCommand, now = Date.now()) {
     Number.isFinite(payload.expireAtMs) && payload.expireAtMs - now <= 0;
   const stale =
     command.sentTime != null &&
-    now - command.sentTime > QUICK_MATCH_NOTICE_STALE_MAX_MS;
+    now - command.sentTime > COMMAND_STALE_MAX_MS;
   logger.info("QUICK_MATCH_NOTICE", {
     requestNo: payload.requestNo,
     expired,
@@ -161,6 +161,20 @@ export function handleOrderNotifyPopup(command: RongCommand, now = Date.now()) {
 
   const payload = parseOrderNotifyPopup(command.data);
   if (!payload) return;
+
+  // 催单无业务过期字段，按 sentTime 门控离线重放（长时间未登录后重连会整批重放旧消息）
+  const stale =
+    command.sentTime != null &&
+    now - command.sentTime > COMMAND_STALE_MAX_MS;
+  if (stale) {
+    logger.warn("order_notify.stale_dropped", {
+      orderNo: payload.orderNo,
+      sentTime: formatServerDateTime(command.sentTime ?? now),
+      skewMs: now - (command.sentTime ?? now),
+    });
+    return;
+  }
+
   if (orderPayKeys.has(payload.orderNo)) return;
 
   const noticeId = `pay:${payload.orderNo}`;
