@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { getDDinProStyle } from "../theme/typography";
 import { VoiceWaveform } from "./VoiceWaveform";
 
-const playTriangleIcon = require("../../../assets/shared/play-triangle-white.svg");
+const playTriangleIcon = require("../../../assets/svgs/play-triangle-white.svg");
 
 type VoicePlayButtonProps = {
   url: string;

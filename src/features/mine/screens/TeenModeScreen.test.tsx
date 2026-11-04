@@ -24,10 +24,10 @@ const { apiMock, storeMock, authState } = vi.hoisted(() => ({
 
 vi.mock("expo-image", () => ({ Image: "Image" }));
 vi.mock("expo-router", () => ({ router: { back: vi.fn() } }));
-vi.mock("../../../../assets/home/club-detail/icon-back.svg", () => ({ default: 1 }));
-vi.mock("../../../../assets/mine/figma/teen-mode-closed.svg", () => ({ default: 1 }));
-vi.mock("../../../../assets/mine/figma/teen-mode-open.svg", () => ({ default: 1 }));
-vi.mock("../../../../assets/mine/figma/teen-mode-star.svg", () => ({ default: 1 }));
+vi.mock("../../../../assets/svgs/icon-back.svg", () => ({ default: 1 }));
+vi.mock("../../../../assets/svgs/teen-mode-closed.svg", () => ({ default: 1 }));
+vi.mock("../../../../assets/svgs/teen-mode-open.svg", () => ({ default: 1 }));
+vi.mock("../../../../assets/svgs/teen-mode-star.svg", () => ({ default: 1 }));
 vi.mock("@/shared/ui/app-toast", () => ({
   showToast: vi.fn(),
   toastDurations: { LONG: 3500 },

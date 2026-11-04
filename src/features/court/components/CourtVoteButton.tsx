@@ -15,14 +15,14 @@ type Props = {
 
 const ASSETS = {
   plaintiff: {
-    default: require("../../../../assets/court/vote-plaintiff-default.svg"),
-    selected: require("../../../../assets/court/vote-plaintiff-selected.svg"),
-    muted: require("../../../../assets/court/vote-plaintiff-muted.svg"),
+    default: require("../../../../assets/svgs/vote-plaintiff-default.svg"),
+    selected: require("../../../../assets/svgs/vote-plaintiff-selected.svg"),
+    muted: require("../../../../assets/svgs/vote-plaintiff-muted.svg"),
   },
   defendant: {
-    default: require("../../../../assets/court/vote-defendant-default.svg"),
-    selected: require("../../../../assets/court/vote-defendant-selected.svg"),
-    muted: require("../../../../assets/court/vote-defendant-muted.svg"),
+    default: require("../../../../assets/svgs/vote-defendant-default.svg"),
+    selected: require("../../../../assets/svgs/vote-defendant-selected.svg"),
+    muted: require("../../../../assets/svgs/vote-defendant-muted.svg"),
   },
 };
 

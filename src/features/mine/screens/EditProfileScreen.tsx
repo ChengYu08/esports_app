@@ -20,8 +20,8 @@ import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
-const fallbackAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
-const cameraIcon = require("../../../../assets/mine/figma/edit-camera.svg");
+const fallbackAvatar = require("../../../../assets/mine/mine-avatar.png");
+const cameraIcon = require("../../../../assets/svgs/edit-camera.svg");
 
 type EditRow = {
   // nickname/signature 行跳转独立页面，birth 行走滚轮弹层，均不走 BottomSheet 编辑态

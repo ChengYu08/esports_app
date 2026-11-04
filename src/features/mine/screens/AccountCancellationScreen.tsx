@@ -34,7 +34,7 @@ import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
-const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
+const backIcon = require("../../../../assets/svgs/icon-back.svg");
 const closeIcon = require("../../../../assets/svgs/icon-close.svg");
 
 const DEFAULT_COOLING_DAYS = 15;
@@ -458,7 +458,12 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   sendCodeButton: { marginLeft: 12 },
-  sendCodeText: { color: "#0A0A0A", fontSize: 14, lineHeight: 22 },
+  sendCodeText: {
+    color: "#FE1F4C",
+    fontSize: 14,
+    fontWeight: "400",
+    lineHeight: 22,
+  },
   sendCodeCounting: { color: "#CCCCCC" },
   divider: {
     height: StyleSheet.hairlineWidth,

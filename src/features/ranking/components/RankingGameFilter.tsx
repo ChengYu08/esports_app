@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { Game } from "@/features/home/api/home.types";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
 
-const allGamesIcon = require("../../../../assets/mine/figma/god-all-games.svg");
+const allGamesIcon = require("../../../../assets/svgs/god-all-games.svg");
 
 type Props = { games: Game[]; value: string; onChange: (id: string) => void };
 const allGames: Game = { id: 0, name: "全部" };

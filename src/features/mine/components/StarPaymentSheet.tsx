@@ -13,7 +13,7 @@ import {
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 
-const starDiamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
+const starDiamondIcon = require("../../../../assets/mine/star-recharge-diamond-3f6fcf.png");
 const CONFIRM_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
 
 type StarPaymentSheetProps = {

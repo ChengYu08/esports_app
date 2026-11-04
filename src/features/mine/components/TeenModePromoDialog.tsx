@@ -3,7 +3,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 
 
-const promoIllustration = require("../../../../assets/mine/figma/teen-promo-illustration.png");
+const promoIllustration = require("../../../../assets/mine/teen-promo-illustration.png");
 
 /**
  * 青少年模式每日首启促销弹窗（设计稿 571-59836）：

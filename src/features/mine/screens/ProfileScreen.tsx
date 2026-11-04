@@ -77,17 +77,17 @@ import { showToast } from "@/shared/ui/app-toast";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 
-const fallbackAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
-const background = require("../../../../assets/mine/figma/profile-bg.webp");
-const maleIcon = require("../../../../assets/home/club-detail/male.svg");
-const femaleIcon = require("../../../../assets/mine/figma/mine-female.svg");
-const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
-const customerIcon = require("../../../../assets/coms/customer.svg");
-const clubIcon = require("../../../../assets/mine/figma/mine-club-flag.svg");
-const arrowDownIcon = require("../../../../assets/mine/figma/profile-arrow-down.svg");
+const fallbackAvatar = require("../../../../assets/mine/mine-avatar.png");
+const background = require("../../../../assets/mine/profile-bg.webp");
+const maleIcon = require("../../../../assets/svgs/male.svg");
+const femaleIcon = require("../../../../assets/svgs/mine-female.svg");
+const backIcon = require("../../../../assets/svgs/icon-back.svg");
+const customerIcon = require("../../../../assets/svgs/customer.svg");
+const clubIcon = require("../../../../assets/svgs/mine-club-flag.svg");
+const arrowDownIcon = require("../../../../assets/svgs/intro-toggle.svg");
 const diamondIcon = require("../../../../assets/message/order-assistant-coin-3f6fcf.webp");
-const idleStatusIcon = require("../../../../assets/home/club-detail/status-idle.svg");
-const playingStatusIcon = require("../../../../assets/home/club-detail/status-playing.svg");
+const idleStatusIcon = require("../../../../assets/svgs/club-status-idle.svg");
+const playingStatusIcon = require("../../../../assets/svgs/club-status-playing.svg");
 const NAV_BAR_CONTENT_HEIGHT = 44;
 const PROFILE_IDENTITY_TOP_GAP = 12;
 type ProfileTab = "技能" | "评价";
@@ -1584,9 +1584,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   introToggleIcon: {
-    width: 8,
-    height: 4.5,
-    tintColor: "#fff",
+    width: 20,
+    height: 16,
   },
   introToggleIconUp: {
     transform: [{ rotate: "180deg" }],

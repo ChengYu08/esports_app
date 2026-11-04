@@ -53,7 +53,7 @@ import type {
 
 const background = require("../../../../assets/voice-room/background.svg");
 const backIcon = require("../../../../assets/voice-room/back.svg");
-const closeIcon = require("../../../../assets/voice-room/close.svg");
+const closeIcon = require("../../../../assets/svgs/close.svg");
 const inviteIcon = require("../../../../assets/voice-room/invite.svg");
 const defaultAvatar = require("../../../../assets/voice-room/avatar-default.png");
 const ringOwner = require("../../../../assets/voice-room/ring-owner.svg");

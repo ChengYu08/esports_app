@@ -15,11 +15,11 @@ import { submitRealNameVerification } from "@/features/mine/real-name-session";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { colors } from "@/shared/theme/tokens";
 
-const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
-const warningIcon = require("../../../../assets/mine/figma/real-name-warning.svg");
-const checkIcon = require("../../../../assets/mine/figma/real-name-check.svg");
-const errorIcon = require("../../../../assets/mine/figma/real-name-error.svg");
-const csArrowIcon = require("../../../../assets/mine/figma/real-name-arrow-right.svg");
+const backIcon = require("../../../../assets/svgs/icon-back.svg");
+const warningIcon = require("../../../../assets/svgs/real-name-warning.svg");
+const checkIcon = require("../../../../assets/svgs/real-name-check.svg");
+const errorIcon = require("../../../../assets/svgs/real-name-error.svg");
+const csArrowIcon = require("../../../../assets/svgs/real-name-arrow-right.svg");
 
 type Phase = "form" | "success" | "failure";
 

@@ -16,7 +16,7 @@ import {
   useUpdateSmsNotify,
 } from "@/features/mine/hooks/use-sms-notify";
 
-const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
+const backIcon = require("../../../../assets/svgs/icon-back.svg");
 
 const SWITCH_WIDTH = 40;
 const SWITCH_HEIGHT = 22;

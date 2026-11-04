@@ -87,7 +87,7 @@ export function PublishTypeSection({
       >
         <FormLabel label="发布类型" required />
         <CachedImage
-          source={require("../../../../assets/court/ticket-arrow-up.svg")}
+          source={require("../../../../assets/svgs/ticket-arrow-up.svg")}
           style={[styles.collapseIcon, !expanded && styles.collapsedIcon]}
         />
       </Pressable>
@@ -279,7 +279,7 @@ export function TicketFormSection({
         >
           <FormLabel label="诉求类型" required />
           <CachedImage
-            source={require("../../../../assets/court/ticket-arrow-up.svg")}
+            source={require("../../../../assets/svgs/ticket-arrow-up.svg")}
             style={[styles.collapseIcon, !expanded && styles.collapsedIcon]}
           />
         </Pressable>

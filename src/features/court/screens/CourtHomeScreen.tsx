@@ -32,8 +32,8 @@ import {
 import { showToast } from "@/shared/ui/app-toast";
 
 // 静态资源提为模块级常量，避免渲染时重复 require 且保证引用稳定
-const tabIndicatorSource = require("../../../../assets/court/tab-indicator.svg");
-const editSource = require("../../../../assets/court/edit.svg");
+const tabIndicatorSource = require("../../../../assets/svgs/tab-indicator.svg");
+const editSource = require("../../../../assets/svgs/edit.svg");
 
 const FEEDS: { key: CourtScope; label: string }[] = [
   { key: "ALL", label: "全部" },
@@ -577,7 +577,7 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
         >
           <CachedImage
             accessible={false}
-            source={require("../../../../assets/court/back-to-top.svg")}
+            source={require("../../../../assets/svgs/back-to-top.svg")}
             contentFit="contain"
             style={styles.backToTopIcon}
           />
