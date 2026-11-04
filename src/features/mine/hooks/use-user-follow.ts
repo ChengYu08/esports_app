@@ -116,6 +116,9 @@ export function useToggleUserFollow() {
           };
         },
       );
+      // 关注/粉丝列表强依赖关注状态（取关需移出行、回关需回显），
+      // 且全局 staleTime 30s 会挡住 tab 切换/返回时的自然重拉，必须显式失效
+      void queryClient.invalidateQueries({ queryKey: ["user-follow-page"] });
     },
   });
 }

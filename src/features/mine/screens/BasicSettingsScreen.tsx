@@ -62,10 +62,17 @@ export default function BasicSettingsScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      let active = true;
+      setTeenModeEnabled(false);
       // 展示最近一次服务端状态镜像；以 /youth/status 拉取结果为准
-      readLastTeenEnabled(userId).then((enabled) =>
-        setTeenModeEnabled(enabled ?? false),
-      );
+      readLastTeenEnabled(userId).then((enabled) => {
+        if (active) {
+          setTeenModeEnabled(enabled ?? false);
+        }
+      });
+      return () => {
+        active = false;
+      };
     }, [userId]),
   );
 
