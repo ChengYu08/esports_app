@@ -6,7 +6,7 @@ import type {
   GameKey,
   HomeTab,
 } from "@/features/home/api/home.types";
-import { DOUYIN_SANS, SYSTEM_FONT } from "@/shared/theme/typography";
+import { SYSTEM_FONT } from "@/shared/theme/typography";
 import { GameCategoryTabs } from "./GameCategoryTabs";
 import { HomeBannerSections } from "./HomeBannerSections";
 import { CachedImage } from "@/shared/ui/CachedImage";
@@ -168,7 +168,12 @@ function Tab({
   court?: boolean;
 }) {
   return (
-    <Pressable onPress={onPress} style={styles.tab}>
+    <Pressable
+      accessibilityRole="tab"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={styles.tab}
+    >
       {selected && <View style={[styles.line, { width: label.length === 2 ? 34 : 51 }]} />}
       <Text style={[styles.tabText, selected && styles.tabSelected, court && styles.courtTabText, court && selected && styles.courtTabSelected]}>
         {label}
@@ -188,15 +193,17 @@ const styles = StyleSheet.create({
   topTabs: { flexDirection: "row", gap: 20, height: "100%" },
   tab: { justifyContent: "center", minWidth: 42, position: "relative" },
   tabText: {
-    fontFamily: DOUYIN_SANS,
-    color: "#999",
+    fontFamily: SYSTEM_FONT,
+    color: "#CACACC",
     fontSize: 18,
+    lineHeight: 26,
     fontWeight: "700",
   },
   tabSelected: {
-    fontFamily: DOUYIN_SANS,
-    color: "#1a1a1a",
+    fontFamily: SYSTEM_FONT,
+    color: "#0D0D0F",
     fontSize: 20,
+    lineHeight: 28,
     fontWeight: "700",
   },
   courtTabText: { fontFamily: COURT_FONT_FAMILY, color: "#CACACC", fontWeight: "700", lineHeight: 26 },
@@ -243,7 +250,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   gameLogoText: {
-    fontFamily: DOUYIN_SANS,
     color: "#fff",
     fontSize: 12,
     fontWeight: "800",

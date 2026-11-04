@@ -2,10 +2,11 @@ import { handlePendingPushClick } from "@/features/message/push-click-handler";
 import { showToast } from "@/shared/ui/app-toast";
 import { useAuthStore } from "@esports/auth";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { useFonts } from "expo-font";
 import { router, Stack, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { PermissionsAndroid, Platform } from "react-native";
+import { AppState, PermissionsAndroid, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { RootSiblingParent } from "react-native-root-siblings";
@@ -36,6 +37,7 @@ import { OrderNotifySyncHost } from "@/features/order/order-notify-sync";
 import { PushyUpdateHost } from "@/features/ota/PushyUpdateHost";
 import { PrivacyConsentGate } from "@/features/privacy/components/PrivacyConsentGate";
 import { readPrivacyConsent } from "@/features/privacy/privacy-consent";
+import { D_DIN_PRO_FONTS } from "@/shared/theme/typography";
 import { VoiceRoomKickListener } from "@/features/voice-room/components/VoiceRoomKickListener";
 import { VoiceRoomMiniPlayer } from "@/features/voice-room/components/VoiceRoomMiniPlayer";
 import { VoiceRoomJoinedSyncHost } from "@/features/voice-room/use-sync-joined-voice-room";
@@ -75,6 +77,7 @@ function withStartupTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
 
 export default function RootLayout() {
   const pathname = usePathname();
+  const [fontsLoaded, fontError] = useFonts(D_DIN_PRO_FONTS);
   const [splashReady, setSplashReady] = useState(false);
   const finishSplash = useCallback(() => setSplashReady(true), []);
   const [sessionReady, setSessionReady] = useState(false);
@@ -172,6 +175,18 @@ export default function RootLayout() {
   }, [accessToken]);
 
   useEffect(() => {
+    // 回前台时确认融云长连接：后台挂起/互踢断开后 SDK 未必自动恢复，
+    // 以登录态为前提触发一次幂等重连（实际已连接时 initialize 会直接跳过）
+    const subscription = AppState.addEventListener("change", (appState) => {
+      if (appState !== "active") return;
+      const token = useAuthStore.getState().accessToken;
+      if (!token) return;
+      void messageStore.getState().initialize(token);
+    });
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
     let active = true;
     void (async () => {
       const hasPrivacyConsent = await withStartupTimeout(
@@ -231,7 +246,7 @@ export default function RootLayout() {
     [],
   );
 
-  if (!splashReady || !sessionReady || !privacyReady) {
+  if ((!fontsLoaded && !fontError) || !splashReady || !sessionReady || !privacyReady) {
     return <StartupSplash onFinished={finishSplash} />;
   }
 

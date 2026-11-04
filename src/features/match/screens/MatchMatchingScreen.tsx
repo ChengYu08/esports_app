@@ -27,7 +27,6 @@ import { MatchingGrabListView } from "@/features/match/components/MatchingGrabLi
 import { MatchingWaitingView } from "@/features/match/components/MatchingWaitingView";
 import { useQuickMatchSession } from "@/features/match/hooks/use-quick-match-session";
 import { messageStore } from "@/features/message/message-store";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { showToast } from "@/shared/ui/app-toast";
 
@@ -333,7 +332,6 @@ const styles = StyleSheet.create({
   },
   navTitle: {
     flex: 1,
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "600",
@@ -348,7 +346,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   navCancel: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     color: "#FFFFFF",

@@ -3,7 +3,6 @@ import { Image } from "expo-image";
 import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import type { OrderNotifyCardMessage } from "../chat-message";
 
 const orderAssistantCoin = require("../../../../assets/message/order-assistant-coin-3f6fcf.webp");
@@ -83,7 +82,6 @@ const styles = StyleSheet.create({
   cardPressed: { opacity: 0.78 },
   title: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "500",
     lineHeight: 22,
@@ -99,14 +97,12 @@ const styles = StyleSheet.create({
   copy: { minWidth: 0, gap: 4 },
   service: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     fontWeight: "500",
     lineHeight: 18,
   },
   metadataText: {
     color: "#999999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 10,
     lineHeight: 14,
   },
@@ -120,7 +116,6 @@ const styles = StyleSheet.create({
   amount: {
     flexShrink: 1,
     color: "#FE1F4C",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     fontWeight: "500",
     lineHeight: 18,

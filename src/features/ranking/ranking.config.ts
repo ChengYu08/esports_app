@@ -1,9 +1,30 @@
 import type { RankingBoard, RankingFilters, RankingPeriod } from "./api/ranking.types";
 
 export const RANKING_BOARDS = [
-  { key: "GOD", label: "神豪榜", metricLabel: "神豪值", hasGame: false },
-  { key: "ORDER_RECEIVE", label: "接单榜", metricLabel: "接单数", hasGame: true },
-  { key: "TURNOVER", label: "流水榜", metricLabel: "流水值", hasGame: true },
+  {
+    key: "GOD",
+    label: "神豪榜",
+    title: "神豪榜",
+    nameColumnLabel: "用户昵称",
+    metricLabel: "豪气值",
+    hasGame: false,
+  },
+  {
+    key: "ORDER_RECEIVE",
+    label: "接单榜",
+    title: "接单榜",
+    nameColumnLabel: "陪玩昵称",
+    metricLabel: "总订单",
+    hasGame: true,
+  },
+  {
+    key: "TURNOVER",
+    label: "流水榜",
+    title: "流水榜",
+    nameColumnLabel: "陪玩昵称",
+    metricLabel: "竹子收益",
+    hasGame: true,
+  },
 ] as const;
 
 export const RANKING_PERIODS = [
@@ -26,10 +47,16 @@ export function getRankingRulesTitle(board: RankingBoard, period: RankingPeriod)
   return `${getRankingBoard(board).label}（${period === "DAILY" ? "日榜" : "周榜"}）规则`;
 }
 
-/** Match the PC display units; the API already returns display values, not cents. */
+/** 接口已返回展示数值（不是分），这里只负责按移动端榜单样式缩写。 */
 export function formatRankingMetric(value: number, board: RankingBoard): string {
-  if (board === "ORDER_RECEIVE") return `${Math.round(value).toLocaleString("en-US")} 单`;
-  const divisor = board === "GOD" ? 1000 : 10000;
-  if (value < divisor) return String(value);
-  return `${(value / divisor).toFixed(1).replace(/\.0$/, "")}${board === "GOD" ? "K" : "万"}`;
+  if (board === "ORDER_RECEIVE") {
+    return `${Math.round(value)}单`;
+  }
+  if (board === "TURNOVER") {
+    return String(Math.round(value));
+  }
+  if (value < 1000) {
+    return String(value);
+  }
+  return `${(value / 1000).toFixed(1).replace(/\.0$/, "")}k`;
 }

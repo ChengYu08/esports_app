@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
-import { router } from "expo-router";
+import { router, useIsFocused } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Animated,
@@ -196,16 +196,17 @@ const GodCard = memo(function GodCard({
 
 export default function GodListScreen({ active = true }: { active?: boolean }) {
   const insets = useSafeAreaInsets();
+  const focused = useIsFocused();
   const voicePlayer = useVoicePlayer();
 
-  // keep-alive 常驻后卸载清理不再触发，切走频道时显式停止语音，保持与卸载版行为一致。
+  // 切走频道或进入详情页时停止语音，避免后台播放器继续占用资源。
   const stopVoice = voicePlayer.stop;
   useEffect(() => {
-    if (active) {
+    if (active && focused) {
       return;
     }
     stopVoice();
-  }, [active, stopVoice]);
+  }, [active, focused, stopVoice]);
 
   const [gameKey, setGameKey] = useState(ALL_GAME_KEY);
   const [filters, setFilters] = useState<GodFilters>(GOD_EMPTY_FILTERS);
@@ -219,9 +220,15 @@ export default function GodListScreen({ active = true }: { active?: boolean }) {
     setOpenFilter(null);
   };
 
-  const activeFilterDef = FILTER_DEFS.find((def) => def.key === openFilter) ?? null;
+  const activeFilterDef = active
+    ? FILTER_DEFS.find((def) => def.key === openFilter) ?? null
+    : null;
 
-  const games = useQuery({ queryKey: ["god-games"], queryFn: ({ signal }) => fetchGames(signal) });
+  const games = useQuery({
+    queryKey: ["home-games"],
+    queryFn: ({ signal }) => fetchGames(signal),
+    enabled: active && focused,
+  });
 
   const gameId = useMemo(() => {
     if (gameKey === ALL_GAME_KEY) return null;
@@ -240,6 +247,7 @@ export default function GodListScreen({ active = true }: { active?: boolean }) {
 
   const godList = useInfiniteQuery({
     queryKey: ["god-list", gameId, filters],
+    enabled: active && focused,
     queryFn: ({ pageParam, signal }) =>
       fetchGodPage({ gameId, filters, page: pageParam, pageSize: PAGE_SIZE, signal }),
     initialPageParam: 1,
@@ -320,9 +328,9 @@ export default function GodListScreen({ active = true }: { active?: boolean }) {
       <View style={styles.listSheet}>
         <View style={styles.filterBar}>
           {FILTER_DEFS.map((def) => {
-            const active = Boolean(filters[def.key]);
+            const filterSelected = Boolean(filters[def.key]);
             const selected = def.options.find((option) => option.value === filters[def.key]);
-            const open = openFilter === def.key;
+            const open = active && openFilter === def.key;
             return (
               <View key={def.key} style={styles.filterWrap}>
                 <Pressable
@@ -334,17 +342,17 @@ export default function GodListScreen({ active = true }: { active?: boolean }) {
                   <Text
                     style={[
                       styles.filterText,
-                      (active || open) && styles.filterTextActive,
+                      (filterSelected || open) && styles.filterTextActive,
                       open && styles.filterTextOpen,
                     ]}
                   >
-                    {active ? `${def.label}·${selected?.label ?? ""}` : def.label}
+                    {filterSelected ? `${def.label}·${selected?.label ?? ""}` : def.label}
                   </Text>
                   <Image
                     source={def.arrow === "sort" ? arrowUpDownIcon : arrowDownIcon}
                     style={[
                       styles.filterArrowIcon,
-                      (active || open) && styles.filterArrowActive,
+                      (filterSelected || open) && styles.filterArrowActive,
                       def.arrow === "down" && open && styles.filterArrowOpen,
                     ]}
                   />
@@ -363,7 +371,8 @@ export default function GodListScreen({ active = true }: { active?: boolean }) {
               <EmptyState message="暂无大神，换个筛选条件试试" />
             )
           }
-          contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 + insets.bottom }}
+          // 与首页俱乐部列表同口径：悬浮 tab 栏高 58 + 底部安全区，24 不足会被遮末行
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: 100 + insets.bottom }}
           refreshControl={
             <RefreshControl
               refreshing={godList.isRefetching && !godList.isFetchingNextPage}

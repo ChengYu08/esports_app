@@ -9,7 +9,7 @@ import {
 } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useIsFocused, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
   memo,
@@ -65,7 +65,6 @@ import {
 } from "@/features/mine/hooks/use-user-follow";
 import {
   createImagePreviewParams,
-  type ImagePreviewParams,
 } from "@/features/mine/image-preview.params";
 import { createProfileAvatarPreviewParams } from "@/features/mine/profile-avatar-preview";
 import { createProfileChatParams } from "@/features/mine/profile-chat";
@@ -74,7 +73,6 @@ import { invalidateOrderQueries } from "@/features/order/order-query";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { requireLogin } from "@/shared/navigation/require-login";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { showToast } from "@/shared/ui/app-toast";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { EmptyState } from "@/shared/ui/AsyncStates";
@@ -100,6 +98,7 @@ const profileRenderItem = ({ item }: { item: ProfileListItem }) => item.content;
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const focused = useIsFocused();
   const user = useAuthStore((state) => state.user);
   const route = useLocalSearchParams<{
     clubId?: string | string[];
@@ -111,7 +110,12 @@ export default function ProfileScreen() {
     reorderService?: string;
     reorderQuantity?: string;
   }>();
-  const routeParams = getProfileRouteParams(route);
+  const routeClubId = route.clubId;
+  const routeUserId = route.userId;
+  const routeParams = useMemo(
+    () => getProfileRouteParams({ clubId: routeClubId, userId: routeUserId }),
+    [routeClubId, routeUserId],
+  );
   const fromSearchPage = route.fromSearch === "1";
   const isMine = !routeParams || String(user?.id ?? "") === routeParams.userId;
   const [tab, setTab] = useState<ProfileTab>("技能");
@@ -166,10 +170,11 @@ export default function ProfileScreen() {
   const chatCheckPendingRef = useRef(false);
   const { entering: enteringCS, openCustomerService } =
     useCustomerServiceEntry();
-  const detailQuery = useProfileDetail(routeParams);
+  const detailQuery = useProfileDetail(routeParams, focused);
   const detail = detailQuery.data;
   const followStateQuery = useUserFollowState(
     !isMine && detail ? String(detail.userId) : undefined,
+    focused,
   );
   const followMutation = useToggleUserFollow();
   const firstGameId = getFirstProfileGameId(detail?.games ?? []);
@@ -187,13 +192,22 @@ export default function ProfileScreen() {
           gameId: activeGameId,
         }
       : null,
+    focused,
   );
   // 评价按陪玩师整体拉取（全部游戏），不做游戏分类过滤
   const reviewQuery = useProfileReviews(
     tab === "评价" && routeParams
       ? { companionUserId: routeParams.userId }
       : null,
+    focused,
   );
+  const gameDetailLoading = gameDetailQuery.isLoading;
+  const gameDetailError = gameDetailQuery.isError;
+  const refetchGameDetail = gameDetailQuery.refetch;
+  const reviewLoading = reviewQuery.isLoading;
+  const reviewError = reviewQuery.isError;
+  const reviewItems = reviewQuery.data?.items;
+  const refetchReviews = reviewQuery.refetch;
   const localProfile = useMemo(() => toLocalProfile(user), [user]);
   const profile = detail ?? localProfile;
   const measureCover = useCallback((height: number) => {
@@ -201,7 +215,9 @@ export default function ProfileScreen() {
   }, []);
 
   useEffect(() => {
-    if (isMine || profile.userId <= 0) return;
+    if (!focused || isMine || profile.userId <= 0) {
+      return;
+    }
 
     let active = true;
     const refreshBlacklistStatus = () => {
@@ -230,7 +246,7 @@ export default function ProfileScreen() {
       active = false;
       unsubscribe();
     };
-  }, [isMine, profile.userId]);
+  }, [focused, isMine, profile.userId]);
 
   const gameDetail = gameDetailQuery.data;
   const games = useMemo(() => detail?.games ?? [], [detail]);
@@ -239,14 +255,12 @@ export default function ProfileScreen() {
   const stopVoice = voicePlayer.stop;
   const toggleVoice = voicePlayer.toggle;
   const playingVoiceUrl = voicePlayer.playingUrl;
-  const coverPreviewParams = useMemo(
-    () => (coverImageUrl ? createImagePreviewParams([coverImageUrl], 0) : null),
-    [coverImageUrl],
-  );
 
   useEffect(() => {
-    if (tab !== "技能") stopVoice();
-  }, [tab, stopVoice]);
+    if (tab !== "技能" || !focused) {
+      stopVoice();
+    }
+  }, [focused, tab, stopVoice]);
   const openProfileRelation = useCallback(
     (type: "following" | "fans") => {
       if (profile.userId <= 0) return;
@@ -381,7 +395,6 @@ export default function ProfileScreen() {
             topInset={insets.top}
             profile={profile}
             coverImageUrl={coverImageUrl}
-            coverPreviewParams={coverPreviewParams}
             isMine={isMine}
             isBlacklisted={
               !isMine &&
@@ -433,7 +446,7 @@ export default function ProfileScreen() {
           ),
         });
 
-        if (gameDetailQuery.isLoading) {
+        if (gameDetailLoading) {
           profileListItems.push({
             key: "skills-loading",
             content: (
@@ -442,7 +455,7 @@ export default function ProfileScreen() {
               </View>
             ),
           });
-        } else if (gameDetailQuery.isError || !gameDetail) {
+        } else if (gameDetailError || !gameDetail) {
           profileListItems.push({
             key: "skills-error",
             content: (
@@ -450,7 +463,7 @@ export default function ProfileScreen() {
                 <InlineState
                   text="游戏技能加载失败"
                   actionLabel="重试"
-                  onAction={() => void gameDetailQuery.refetch()}
+                  onAction={() => void refetchGameDetail()}
                 />
               </View>
             ),
@@ -504,7 +517,7 @@ export default function ProfileScreen() {
           }
         }
       }
-    } else if (reviewQuery.isLoading) {
+    } else if (reviewLoading) {
       profileListItems.push({
         key: "reviews-loading",
         content: (
@@ -513,7 +526,7 @@ export default function ProfileScreen() {
           </View>
         ),
       });
-    } else if (reviewQuery.isError) {
+    } else if (reviewError) {
       profileListItems.push({
         key: "reviews-error",
         content: (
@@ -521,13 +534,13 @@ export default function ProfileScreen() {
             <InlineState
               text="评价加载失败"
               actionLabel="重试"
-              onAction={() => void reviewQuery.refetch()}
+              onAction={() => void refetchReviews()}
             />
           </View>
         ),
       });
     } else {
-      const reviews = reviewQuery.data?.items ?? [];
+      const reviews = reviewItems ?? [];
       if (reviews.length === 0) {
         profileListItems.push({
           key: "reviews-empty",
@@ -555,7 +568,6 @@ export default function ProfileScreen() {
     insets.top,
     profile,
     coverImageUrl,
-    coverPreviewParams,
     isMine,
     blacklistStatus,
     openProfileRelation,
@@ -565,15 +577,20 @@ export default function ProfileScreen() {
     tab,
     games,
     activeGameId,
-    gameDetailQuery,
+    gameDetailLoading,
+    gameDetailError,
+    refetchGameDetail,
     gameDetail,
-    reviewQuery,
+    reviewLoading,
+    reviewError,
+    reviewItems,
+    refetchReviews,
     toggleVoice,
     playingVoiceUrl,
     openOrder,
   ]);
 
-  if (routeParams && detailQuery.isLoading) {
+  if (routeParams && (detailQuery.isLoading || (!focused && !detail))) {
     return (
       <ProfileSkeleton
         topInset={insets.top}
@@ -934,7 +951,6 @@ const ProfileCover = memo(function ProfileCover({
   topInset,
   profile,
   coverImageUrl,
-  coverPreviewParams,
   isMine,
   isBlacklisted,
   onSelectRelation,
@@ -943,7 +959,6 @@ const ProfileCover = memo(function ProfileCover({
   topInset: number;
   profile: ProfileDetail;
   coverImageUrl?: string;
-  coverPreviewParams: ImagePreviewParams | null;
   isMine: boolean;
   isBlacklisted: boolean;
   onSelectRelation: (type: "following" | "fans") => void;
@@ -962,33 +977,13 @@ const ProfileCover = memo(function ProfileCover({
       ]}
       onLayout={(event) => onMeasure(event.nativeEvent.layout.height)}
     >
-      {coverPreviewParams ? (
-        <Pressable
-          accessibilityLabel="预览主页背景图"
-          accessibilityRole="button"
-          onPress={() =>
-            router.push({
-              pathname: "/image-preview",
-              params: coverPreviewParams,
-            })
-          }
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Image
+          source={coverImageUrl ? { uri: coverImageUrl } : background}
+          contentFit="cover"
           style={StyleSheet.absoluteFill}
-        >
-          <Image
-            source={{ uri: coverImageUrl }}
-            contentFit="cover"
-            style={StyleSheet.absoluteFill}
-          />
-        </Pressable>
-      ) : (
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Image
-            source={background}
-            contentFit="cover"
-            style={StyleSheet.absoluteFill}
-          />
-        </View>
-      )}
+        />
+      </View>
       <LinearGradient
         pointerEvents="none"
         style={StyleSheet.absoluteFill}
@@ -1285,6 +1280,7 @@ function ImageGallery({ images }: { images: string[] }) {
         >
           <CachedImage
             source={{ uri: image }}
+            cachePolicy="disk"
             contentFit="cover"
             style={StyleSheet.absoluteFill}
           />
@@ -1386,6 +1382,7 @@ const ReviewCard = memo(function ReviewCard({
               >
                 <CachedImage
                   source={{ uri: image }}
+                  cachePolicy="disk"
                   contentFit="cover"
                   style={StyleSheet.absoluteFill}
                 />
@@ -1521,12 +1518,11 @@ const styles = StyleSheet.create({
   errorBackIcon: { width: 24, height: 24, tintColor: "#0D0D0F" },
   stateText: {
     color: "#999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     textAlign: "center",
     padding: 24,
   },
-  retryText: { color: "#FF3158", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  retryText: { color: "#FF3158", fontSize: 14 },
   cover: {
     overflow: "hidden",
     backgroundColor: "#617181",
@@ -1718,7 +1714,6 @@ const styles = StyleSheet.create({
   },
   blacklistTagText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 10,
     lineHeight: 14,
     fontWeight: "500",
@@ -1768,7 +1763,6 @@ const styles = StyleSheet.create({
   },
   companionTagText: {
     color: "#FFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 10,
     lineHeight: 13,
     fontWeight: "500",
@@ -1777,7 +1771,6 @@ const styles = StyleSheet.create({
   },
   idRow: {
     color: "rgba(255,255,255,0.6)",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -1790,7 +1783,6 @@ const styles = StyleSheet.create({
   clubIcon: { width: 16, height: 16 },
   clubName: {
     color: "rgba(255,255,255,0.6)",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     flexShrink: 1,
@@ -1839,7 +1831,6 @@ const styles = StyleSheet.create({
   },
   editProfileText: {
     color: "#0D0D0F",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "500",
     lineHeight: 22,
@@ -1848,16 +1839,14 @@ const styles = StyleSheet.create({
   stat: { flexDirection: "row", alignItems: "baseline", gap: 5 },
   statValue: {
     color: "#111",
-    fontFamily: DOUYIN_SANS,
     fontSize: 20,
     lineHeight: 28,
     fontWeight: "700",
   },
-  statLabel: { color: "#999", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  statLabel: { color: "#999", fontSize: 14 },
   signature: {
     marginTop: 12,
     color: "#161616",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 21,
   },
@@ -1871,7 +1860,6 @@ const styles = StyleSheet.create({
   },
   tabText: {
     color: "#999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -1911,7 +1899,6 @@ const styles = StyleSheet.create({
   gameLogo: { width: 15, height: 12.8, borderRadius: 4 },
   gameText: {
     color: "#656566",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -1924,7 +1911,6 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "500",
@@ -1932,7 +1918,6 @@ const styles = StyleSheet.create({
   description: {
     marginTop: 14,
     color: "#656566",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -1977,14 +1962,12 @@ const styles = StyleSheet.create({
   successTitle: {
     marginTop: 16,
     color: "#111",
-    fontFamily: DOUYIN_SANS,
     fontSize: 20,
     fontWeight: "600",
   },
   successHint: {
     marginTop: 8,
     color: "#888",
-    fontFamily: DOUYIN_SANS,
     fontSize: 13,
     lineHeight: 20,
     textAlign: "center",
@@ -2000,7 +1983,6 @@ const styles = StyleSheet.create({
   },
   successButtonText: {
     color: "#fff",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     fontWeight: "600",
   },
@@ -2020,14 +2002,12 @@ const styles = StyleSheet.create({
   serviceCopy: { flex: 1, minWidth: 0, gap: 6 },
   serviceName: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "400",
   },
   serviceMeta: { flexDirection: "row", alignItems: "center", gap: 7 },
   price: {
     color: "#FF1F4C",
-    fontFamily: DOUYIN_SANS,
     fontSize: 18,
     lineHeight: 22,
     fontWeight: "600",
@@ -2035,7 +2015,6 @@ const styles = StyleSheet.create({
   diamond: { color: "#FF3158", fontSize: 14 },
   metaText: {
     color: "#979799",
-    fontFamily: DOUYIN_SANS,
     fontSize: 11,
     lineHeight: 16,
   },
@@ -2050,17 +2029,15 @@ const styles = StyleSheet.create({
   },
   orderText: {
     color: "#fff",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
   inlineState: { alignItems: "center", paddingVertical: 48 },
   empty: { alignItems: "center", paddingVertical: 48 },
-  emptyText: { color: "#777", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  emptyText: { color: "#777", fontSize: 14 },
   emptyHint: {
     marginTop: 8,
     color: "#aaa",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
   },
   reviewList: { marginHorizontal: 8, marginTop: 8 },
@@ -2084,13 +2061,11 @@ const styles = StyleSheet.create({
   reviewer: {
     flex: 1,
     color: "#999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
   reviewText: {
     color: "#333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -2098,7 +2073,6 @@ const styles = StyleSheet.create({
   reviewImage: { width: 57, height: 57, borderRadius: 6, overflow: "hidden" },
   reviewDate: {
     color: "#999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -2126,7 +2100,6 @@ const styles = StyleSheet.create({
   },
   followText: {
     color: "#111",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     fontWeight: "600",
   },
@@ -2140,7 +2113,6 @@ const styles = StyleSheet.create({
   },
   chatText: {
     color: "#fff",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     fontWeight: "600",
   },

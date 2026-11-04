@@ -3,7 +3,6 @@ import { AppState, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 import { useAuthStore } from "@esports/auth";
 
-import { didLoginThisLaunch } from "@/features/auth/client-auth-flow";
 import TeenModeScreen from "@/features/mine/screens/TeenModeScreen";
 import { TeenModePromoDialog } from "@/features/mine/components/TeenModePromoDialog";
 import { teenModeApi, fetchTeenModeConfig } from "@/features/mine/api/teen-mode.api";
@@ -35,7 +34,7 @@ import {
 
 /**
  * 青少年模式启动门：
- * - 联网状态用 serverTime + 单调时钟判定锁定时段（窗口随 /youth/config 服务端配置下发，默认 9:00-23:00），
+ * - 联网状态用 serverTime + 单调时钟判定锁定时段（窗口随 /youth/config 服务端配置下发，默认 22:00-次日6:00），
  *   改设备时间不影响结果；
  * - 已开启账号离线或尚未取得可信时间时直接锁定，不退回设备时间；
  * - 缓存、状态请求和锁定页回调均校验登录会话，换号后旧结果不能落地。
@@ -132,7 +131,7 @@ function TeenModeGateSession({
       applyStatus(next, session, targetUserId);
     });
 
-    // 锁定窗口跟随服务端配置（/youth/config，Nacos 动态下发）；失败回退默认 9:00-23:00
+    // 锁定窗口跟随服务端配置（/youth/config，Nacos 动态下发）；失败回退默认 22:00-次日6:00
     void (async () => {
       try {
         const config = await fetchTeenModeConfig(targetToken);
@@ -166,7 +165,7 @@ function TeenModeGateSession({
         if (!applyStatus(next, session, targetUserId)) {
           return;
         }
-        if (allowPromo && !next.enabled && !didLoginThisLaunch()) {
+        if (allowPromo && !next.enabled) {
           const cache = await readTeenPopupCache();
           if (guard.isCurrent(snapshot)) {
             setPromoVisible(shouldShowTeenPopup(cache, todayString()));

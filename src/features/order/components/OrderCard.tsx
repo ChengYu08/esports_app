@@ -43,6 +43,7 @@ type OrderCardProps = {
   onAction: (item: OrderItemModel, action: OrderActionKey) => void;
   onPress?: (item: OrderItemModel) => void;
   actionPending?: boolean;
+  active?: boolean;
   onPaymentExpired?: () => void;
   scope: OrderScope;
   gameIcon?: ImageSource;
@@ -53,6 +54,7 @@ export const OrderCard = memo(function OrderCard({
   onAction,
   onPress,
   actionPending = false,
+  active = true,
   onPaymentExpired,
   scope,
   gameIcon,
@@ -247,6 +249,7 @@ export const OrderCard = memo(function OrderCard({
               key={`${action.key}:${paymentDeadline}`}
               action={action}
               deadline={paymentDeadline}
+              active={active}
               disabled={actionPending}
               onPress={() => onAction(item, action.key)}
               onExpired={onPaymentExpired}
@@ -288,12 +291,14 @@ function OrderDetailRow({
 function PaymentActionButton({
   action,
   deadline,
+  active,
   disabled,
   onPress,
   onExpired,
 }: {
   action: OrderAction;
   deadline: number;
+  active: boolean;
   disabled: boolean;
   onPress: () => void;
   onExpired?: () => void;
@@ -302,6 +307,9 @@ function PaymentActionButton({
   const [expired, setExpired] = useState(false);
 
   useEffect(() => {
+    if (!active) {
+      return;
+    }
     let stopped = false;
     const update = () => {
       if (stopped) {
@@ -330,7 +338,7 @@ function PaymentActionButton({
       clearInterval(timer);
       subscription.remove();
     };
-  }, [deadline, onExpired]);
+  }, [active, deadline, onExpired]);
 
   return (
     <ActionButton

@@ -121,7 +121,20 @@ steps:
         npm ci --prefer-offline --no-audit --no-fund
 
         # 冷构建可能远超 60 分钟（NDK + 全量 Gradle 依赖），放宽 pipeline 超时后再跑
+        # 构建失败时输出 JVM 崩溃摘要（hs_err），便于区分代码问题与构建机环境问题
+        set +e
         node scripts/build_apk.cjs --env "$${BUILD_ENV}" --abi "$${BUILD_ABI}"
+        BUILD_STATUS=$?
+        set -e
+        if [ "$${BUILD_STATUS}" -ne 0 ]; then
+          echo "构建失败（exit $${BUILD_STATUS}）"
+          for hs_err in android/hs_err_pid*.log; do
+            [ -f "$${hs_err}" ] || continue
+            echo "================ $${hs_err}（前 80 行） ================"
+            sed -n '1,80p' "$${hs_err}"
+          done
+          exit "$${BUILD_STATUS}"
+        fi
 
         echo "构建完成，产物:"
         ls -lh ./apks/ 2>/dev/null || echo "未找到 APK"

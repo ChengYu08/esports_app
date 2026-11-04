@@ -15,6 +15,21 @@ test("accepted accounts need no protocol; status uses authenticated Web endpoint
   assert.deepEqual(await api.status("account-a"), { accepted: true, protocol: null });
 });
 
+test("iOS requests and accepts the iOS protocol code", async () => {
+  const api = createCompanionAgreementApi(async (path, options) => {
+    const code = "user_playmate_ios";
+    if (path.endsWith("/accept")) {
+      assert.deepEqual(options.body, { code, agreementId: 17, version: "2" });
+      return { code: "SUCCESS", data: true };
+    }
+    assert.deepEqual(options.body, { code });
+    return { code: "SUCCESS", data: { accepted: false, protocol: { ...protocol, code } } };
+  }, "ios");
+  const result = await api.status("account-a");
+  assert.equal(result.protocol.code, "user_playmate_ios");
+  await api.accept("account-a", result.protocol);
+});
+
 test("first confirmation persists exact protocol and is independent per account", async () => {
   const accepted = new Set();
   const api = createCompanionAgreementApi(async (path, options) => {

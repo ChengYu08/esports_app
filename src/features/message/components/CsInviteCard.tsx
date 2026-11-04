@@ -2,7 +2,6 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { showToast } from "@/shared/ui/app-toast";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import type { CsInviteCardMessage } from "../chat-message";
 import {
   getCsInviteClaimState,
@@ -115,21 +114,18 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "500",
     lineHeight: 22,
   },
   countdown: {
     color: "#FF8A9B",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     flexShrink: 0,
   },
   subtitle: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     fontWeight: "400",
     lineHeight: 18,
@@ -152,14 +148,12 @@ const styles = StyleSheet.create({
   buttonPressed: { opacity: 0.78 },
   buttonText: {
     color: "#FE1F4C",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     fontWeight: "500",
     lineHeight: 18,
   },
   status: {
     color: "#999999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },

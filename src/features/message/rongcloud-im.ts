@@ -366,6 +366,13 @@ function installListeners() {
   engine.setOnMessageReceivedListener((message, _left, offline) => {
     const sdk = loadSdk();
     if (sdk && message.messageType === sdk.RCIMIWMessageType.COMMAND) {
+      logger.info('rong_command.message_received', {
+        name: (message as RongSdkMessage).name,
+        senderId: message.senderUserId,
+        conversationType: message.conversationType,
+        targetId: message.targetId,
+        offline,
+      });
       const command = parseRongCommand(message, {
         private: sdk.RCIMIWConversationType.PRIVATE,
         command: sdk.RCIMIWMessageType.COMMAND,
@@ -414,7 +421,8 @@ function installListeners() {
     conversationReadSyncListeners.forEach((listener) => listener(peerId, timestamp));
   });
   engine.setOnConnectionStatusChangedListener((status) => {
-    publishConnectionStatus(status);
+    const signal = publishConnectionStatus(status);
+    logger.info('rong_connection.status_changed', { status, signal });
   });
 }
 
@@ -823,6 +831,7 @@ export async function disconnectRongCloud() {
   cancelConnectionAttempt?.();
   connectionAttempt = null;
   hasStartedConnection = false;
+  logger.info('rong_connection.disconnect_invoked');
   if (engine) await engine.disconnect(false);
   connected = false;
   businessToken = '';

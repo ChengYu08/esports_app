@@ -24,6 +24,7 @@ import {
 } from "@/features/mine/api/recharge.api";
 import { WechatPayQrModal } from "@/features/mine/components/WechatPayQrModal";
 import { openInAppWebView } from "@/shared/navigation/open-web-view";
+import { getDDinProStyle } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import AlipayPayment from "../../../../modules/alipay-payment";
@@ -436,7 +437,10 @@ export default function StarRechargeAndroidScreen() {
             <Text
               style={styles.agreementLink}
               onPress={() =>
-                openInAppWebView(APP_LINKS.rechargeAgreement, "盼之电竞购买须知")
+                openInAppWebView(
+                  APP_LINKS.rechargeAgreement,
+                  "盼之电竞购买须知",
+                )
               }
             >
               《盼之电竞购买须知》
@@ -633,8 +637,8 @@ const styles = StyleSheet.create({
     color: "#0A0A0A",
     fontSize: 18,
     lineHeight: 22,
-    fontWeight: "600",
     fontVariant: ["tabular-nums"],
+    ...getDDinProStyle(600),
   },
   packagePrice: {
     color: "#656566",
@@ -744,6 +748,6 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     lineHeight: 22,
-    fontWeight: "500",
+    ...getDDinProStyle(500),
   },
 });

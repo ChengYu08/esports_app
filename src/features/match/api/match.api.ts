@@ -104,6 +104,8 @@ type ApiRequestDetail = {
 type ApiPayable = {
   orderCount?: number;
   totalPrice?: number | string;
+  discountAmount?: number | string;
+  realPayAmount?: number | string;
 };
 
 type ApiPaymentMethodItem = {
@@ -491,6 +493,8 @@ export async function fetchQuickMatchPayable(
   return {
     orderCount: Number(data.orderCount) || 0,
     totalPrice: toNumber(data.totalPrice),
+    discountAmount: toOptionalNumber(data.discountAmount),
+    realPayAmount: toOptionalNumber(data.realPayAmount),
   };
 }
 

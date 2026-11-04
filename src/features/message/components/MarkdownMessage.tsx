@@ -1,7 +1,6 @@
 import { memo, useMemo } from "react";
 import { StyleSheet, Text, View, type StyleProp, type TextStyle } from "react-native";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { parseMarkdown, type MarkdownInline } from "../markdown";
 
 const headingFontSizes: Record<number, number> = { 1: 18, 2: 17, 3: 16, 4: 15, 5: 15, 6: 15 };
@@ -75,14 +74,12 @@ export const MarkdownMessage = memo(function MarkdownMessage({ content }: { cont
 const styles = StyleSheet.create({
   text: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
   blockGap: { marginTop: 4 },
   heading: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontWeight: "700",
   },
   bold: { fontWeight: "700" },
@@ -99,7 +96,6 @@ const styles = StyleSheet.create({
   },
   listMarker: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     marginRight: 6,

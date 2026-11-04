@@ -8,7 +8,6 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { grabQuickMatchAndEnterAudition } from "@/features/match/grab-quick-match-flow";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { fetchDispatchDetail, isActivityDispatchRequest } from "../dispatch.api";
@@ -309,8 +308,8 @@ const styles = StyleSheet.create({
     gap: 12,
     backgroundColor: "#FFF",
   },
-  muted: { color: "#999", fontFamily: DOUYIN_SANS, fontSize: 14 },
-  retry: { color: "#FF3158", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  muted: { color: "#999", fontSize: 14 },
+  retry: { color: "#FF3158", fontSize: 14 },
   // 外层只管总高（minHeight 88，含 paddingTop insets.top）与内容贴底（paddingBottom 12 + flex-end）；
   // 内部 ScreenHeader 传 height 28（原返回键文本 lineHeight），总高 = max(88, insets.top + 40) 与迁移前一致
   header: {
@@ -322,7 +321,6 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: "#111",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     fontWeight: "600",
   },
@@ -335,14 +333,12 @@ const styles = StyleSheet.create({
   },
   statusTitle: {
     color: "#F02A45",
-    fontFamily: DOUYIN_SANS,
     fontSize: 22,
     fontWeight: "700",
   },
   grabbedTitle: { color: "#228B66" },
   statusHint: {
     color: "#777",
-    fontFamily: DOUYIN_SANS,
     fontSize: 13,
     lineHeight: 20,
   },
@@ -362,11 +358,10 @@ const styles = StyleSheet.create({
   userCopy: { flex: 1, gap: 3 },
   userName: {
     color: "#111",
-    fontFamily: DOUYIN_SANS,
     fontSize: 15,
     fontWeight: "600",
   },
-  userSub: { color: "#999", fontFamily: DOUYIN_SANS, fontSize: 12 },
+  userSub: { color: "#999", fontSize: 12 },
   divider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: "#EEE",
@@ -375,7 +370,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     marginBottom: 10,
     color: "#111",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "600",
   },
@@ -386,12 +380,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   gameIcon: { width: 20, height: 20 },
-  gameName: { flex: 1, color: "#222", fontFamily: DOUYIN_SANS, fontSize: 13 },
+  gameName: { flex: 1, color: "#222", fontSize: 13 },
   activityCard: { gap: 6, padding: 12, borderRadius: 8, backgroundColor: "#FFF5F6" },
-  activityCardTitle: { color: "#F02A45", fontFamily: DOUYIN_SANS, fontSize: 13, fontWeight: "600" },
+  activityCardTitle: { color: "#F02A45", fontSize: 13, fontWeight: "600" },
   activityRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
-  activityLabel: { width: 70, color: "#B98A90", fontFamily: DOUYIN_SANS, fontSize: 12, lineHeight: 20 },
-  activityValue: { flex: 1, color: "#F02A45", fontFamily: DOUYIN_SANS, fontSize: 12, lineHeight: 20, textAlign: "right" },
+  activityLabel: { width: 70, color: "#B98A90", fontSize: 12, lineHeight: 20 },
+  activityValue: { flex: 1, color: "#F02A45", fontSize: 12, lineHeight: 20, textAlign: "right" },
   infoRow: {
     minHeight: 34,
     flexDirection: "row",
@@ -403,14 +397,12 @@ const styles = StyleSheet.create({
   label: {
     width: 70,
     color: "#999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 20,
   },
   value: {
     flex: 1,
     color: "#222",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 20,
     textAlign: "right",
@@ -426,9 +418,9 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: "#EEE",
   },
-  totalLabel: { color: "#555", fontFamily: DOUYIN_SANS, fontSize: 12 },
+  totalLabel: { color: "#555", fontSize: 12 },
   totalValue: { color: "#F02A45", fontSize: 20, fontWeight: "700" },
-  totalUnit: { color: "#F02A45", fontFamily: DOUYIN_SANS, fontSize: 12 },
+  totalUnit: { color: "#F02A45", fontSize: 12 },
   bottom: {
     paddingHorizontal: 16,
     paddingTop: 12,
@@ -452,13 +444,11 @@ const styles = StyleSheet.create({
   },
   actionText: {
     color: "#FFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 15,
     fontWeight: "600",
   },
   actionDisabledText: {
     color: "#888",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "500",
   },

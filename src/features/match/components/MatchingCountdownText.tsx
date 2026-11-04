@@ -10,7 +10,6 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 /** 剩余 ≤ URGENT_SECONDS 时数字每秒心跳一次提示用户注意 */
 const URGENT_SECONDS = 10;
@@ -69,13 +68,11 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   muted: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     color: "rgba(255,255,255,0.6)",
   },
   accent: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     color: "#FE4267",

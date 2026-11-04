@@ -14,7 +14,6 @@ import {
   useWindowDimensions,
 } from "react-native";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 type ProfileActionsSheetProps = {
   visible: boolean;
@@ -176,7 +175,6 @@ const styles = StyleSheet.create({
   profileActionLabel: {
     marginLeft: 12,
     color: "#222",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
   },
   profileActionsDivider: {

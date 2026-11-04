@@ -1,7 +1,6 @@
 import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import type { MessageListItemModel } from "../message.types";
 import { formatUnreadCount } from "../message-unread";
@@ -86,7 +85,6 @@ const styles = StyleSheet.create({
   heading: { flexDirection: "row", alignItems: "center", gap: 16 },
   title: {
     flex: 1,
-    fontFamily: DOUYIN_SANS,
     color: "#333333",
     fontSize: 14,
     lineHeight: 22,
@@ -94,13 +92,11 @@ const styles = StyleSheet.create({
   },
   time: {
     flexShrink: 0,
-    fontFamily: DOUYIN_SANS,
     color: "#CCCCCC",
     fontSize: 12,
     lineHeight: 18,
   },
   preview: {
-    fontFamily: DOUYIN_SANS,
     color: "#999999",
     fontSize: 14,
     lineHeight: 22,
@@ -129,7 +125,6 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 11,
     lineHeight: 16,
   },

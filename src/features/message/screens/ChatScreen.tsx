@@ -9,6 +9,7 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AppState,
+  BackHandler,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
@@ -24,7 +25,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import EmojiPicker, { type EmojiType } from "rn-emoji-keyboard";
+import { EmojiKeyboard, type EmojiType } from "rn-emoji-keyboard";
 
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import type { AfterSaleCardPayload } from "@/features/order/after-sale-card";
@@ -32,7 +33,6 @@ import { afterSaleCardRows } from "@/features/order/after-sale-card";
 import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
 import { convertToJpeg } from "@/shared/media-picker/image-compat";
 import { showToast } from "@/shared/ui/app-toast";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
@@ -754,8 +754,24 @@ const ChatComposer = memo(function ChatComposer({
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [imageSending, setImageSending] = useState(false);
 
+  useEffect(() => {
+    if (!emojiPickerOpen || Platform.OS !== "android") {
+      return;
+    }
+
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        setEmojiPickerOpen(false);
+        return true;
+      },
+    );
+    return () => subscription.remove();
+  }, [emojiPickerOpen]);
+
   const selectEmoji = useCallback((emoji: EmojiType) => {
     setDraft((current) => `${current}${emoji.emoji}`);
+    setEmojiPickerOpen(false);
   }, []);
 
   const sendMessage = async () => {
@@ -800,7 +816,10 @@ const ChatComposer = memo(function ChatComposer({
   return (
     <>
       <View
-        style={[styles.composer, { paddingBottom: Math.max(bottomInset, 16) }]}
+        style={[
+          styles.composer,
+          { paddingBottom: emojiPickerOpen ? 12 : Math.max(bottomInset, 16) },
+        ]}
       >
         <TextInput
           accessibilityLabel="输入消息"
@@ -820,7 +839,7 @@ const ChatComposer = memo(function ChatComposer({
               hitSlop={8}
               onPress={() => {
                 Keyboard.dismiss();
-                setEmojiPickerOpen(true);
+                setEmojiPickerOpen((current) => !current);
               }}
               style={styles.toolButton}
             >
@@ -855,28 +874,31 @@ const ChatComposer = memo(function ChatComposer({
           </Pressable>
         </View>
       </View>
-      <EmojiPicker
-        // 库默认 categoryPosition 是 floating：分类栏绝对定位悬浮在列表上，emoji 会从栏后滑过；
-        // 改为 bottom 让分类栏占布局流，emoji 滚动区底部与分类栏顶边重合
-        categoryPosition="bottom"
-        // 库内用的是 RN SafeAreaView（Android 不生效），需手动叠加底部安全区；
-        // 再额外抬高 10px，避免 emoji 与分类栏贴住屏幕底部不好按
-        defaultHeight={340 + bottomInset + 10}
-        enableRecentlyUsed
-        // 不需要分类标题栏（默认显示英文如 Smileys & Emotion）
-        hideHeader
-        onClose={() => setEmojiPickerOpen(false)}
-        onEmojiSelected={selectEmoji}
-        open={emojiPickerOpen}
-        styles={{ container: { paddingBottom: bottomInset + 10 } }}
-        theme={{
-          backdrop: "rgba(0, 0, 0, 0.18)",
-          knob: "#CCCCCC",
-          container: "#FFFFFF",
-          header: "#333333",
-          category: { icon: "#999999", iconActive: "#FE1F4C" },
-        }}
-      />
+      {/* 表情面板参与页面布局，打开时与系统键盘一样顶起输入框和消息列表 */}
+      {emojiPickerOpen ? (
+        <View style={[styles.emojiPanel, { height: 340 + bottomInset + 10 }]}>
+          <EmojiKeyboard
+            categoryPosition="bottom"
+            disableSafeArea
+            enableRecentlyUsed
+            hideHeader
+            onEmojiSelected={selectEmoji}
+            styles={{
+              container: {
+                paddingBottom: bottomInset + 10,
+                borderRadius: 0,
+                elevation: 0,
+                shadowOpacity: 0,
+              },
+            }}
+            theme={{
+              container: "#FFFFFF",
+              header: "#333333",
+              category: { icon: "#999999", iconActive: "#FE1F4C" },
+            }}
+          />
+        </View>
+      ) : null}
     </>
   );
 });
@@ -1087,13 +1109,12 @@ const styles = StyleSheet.create({
   name: {
     flexShrink: 1,
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "600",
     lineHeight: 22,
   },
   onlineIcon: { width: 6, height: 6 },
-  onlineText: { color: "#2FC273", fontFamily: DOUYIN_SANS, fontSize: 12 },
+  onlineText: { color: "#2FC273", fontSize: 12 },
   offlineText: { color: "#999999" },
   messageList: {
     flexGrow: 1,
@@ -1113,7 +1134,6 @@ const styles = StyleSheet.create({
   },
   timeSeparatorText: {
     color: "#999999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -1143,7 +1163,6 @@ const styles = StyleSheet.create({
   mineBubble: { backgroundColor: "#FFF2F5" },
   retryLabel: {
     color: "#FE1F4C",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     marginLeft: 4,
     marginTop: 8,
@@ -1151,7 +1170,6 @@ const styles = StyleSheet.create({
   errorBanner: {
     color: "#FE1F4C",
     backgroundColor: "#FFF1F3",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     paddingHorizontal: 16,
@@ -1160,7 +1178,6 @@ const styles = StyleSheet.create({
   },
   bubbleText: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -1200,7 +1217,6 @@ const styles = StyleSheet.create({
   roomInviteBody: { flex: 1, minWidth: 0, gap: 2 },
   roomInviteTitle: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "500",
@@ -1210,7 +1226,6 @@ const styles = StyleSheet.create({
   roomInviteName: {
     flexShrink: 1,
     color: "#808080",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 16,
   },
@@ -1223,7 +1238,6 @@ const styles = StyleSheet.create({
   },
   roomInviteButtonText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 16,
     fontWeight: "500",
@@ -1237,6 +1251,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     gap: 8,
   },
+  emojiPanel: { backgroundColor: "#FFFFFF" },
   input: {
     minHeight: 60,
     maxHeight: 120,
@@ -1273,7 +1288,6 @@ const styles = StyleSheet.create({
   sendButtonDisabled: { opacity: 0.55 },
   sendText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -1365,7 +1379,6 @@ const styles = StyleSheet.create({
   },
   sheetTitle: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "500",
@@ -1395,7 +1408,6 @@ const styles = StyleSheet.create({
   },
   sheetOptionText: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "500",
@@ -1409,7 +1421,6 @@ const styles = StyleSheet.create({
   },
   sheetNote: {
     color: "#999999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 13,
     maxWidth: 160,
   },
@@ -1446,7 +1457,6 @@ const styles = StyleSheet.create({
   },
   noteTitle: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     fontWeight: "600",
     lineHeight: 24,
@@ -1458,7 +1468,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: "#F7F7F7",
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
   },
   noteActions: {
@@ -1473,7 +1482,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  noteCancelText: { color: "#666666", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  noteCancelText: { color: "#666666", fontSize: 14 },
   noteConfirm: {
     minWidth: 64,
     height: 36,
@@ -1485,7 +1494,6 @@ const styles = StyleSheet.create({
   },
   noteConfirmText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "600",
   },

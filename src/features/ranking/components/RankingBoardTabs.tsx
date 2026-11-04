@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
-import { colors } from "@/shared/theme/tokens";
+import { LinearGradient } from "expo-linear-gradient";
+import { SYSTEM_FONT } from "@/shared/theme/typography";
 import type { RankingBoard } from "../api/ranking.types";
 import { RANKING_BOARDS } from "../ranking.config";
 
@@ -17,8 +17,18 @@ export function RankingBoardTabs({ value, onChange }: { value: RankingBoard; onC
             onPress={() => onChange(board.key)}
             style={styles.tab}
           >
-            <Text style={[styles.label, selected && styles.selected]}>{board.label}</Text>
-            {selected && <View style={styles.indicator} />}
+            {selected ? (
+              <LinearGradient
+                colors={["#995C3D", "#4D2E1F"]}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={styles.selectedTab}
+              >
+                <Text style={[styles.label, styles.selectedLabel]}>{board.label}</Text>
+              </LinearGradient>
+            ) : (
+              <Text style={styles.label}>{board.label}</Text>
+            )}
           </Pressable>
         );
       })}
@@ -27,9 +37,34 @@ export function RankingBoardTabs({ value, onChange }: { value: RankingBoard; onC
 }
 
 const styles = StyleSheet.create({
-  tabs: { flexDirection: "row", gap: 32, paddingHorizontal: 20, backgroundColor: colors.surface },
-  tab: { minHeight: 48, justifyContent: "center", alignItems: "center", paddingBottom: 6 },
-  label: { fontFamily: DOUYIN_SANS, fontSize: 16, color: colors.textMuted },
-  selected: { color: colors.text, fontWeight: "600" },
-  indicator: { position: "absolute", bottom: 3, height: 3, width: 22, borderRadius: 2, backgroundColor: colors.brand },
+  tabs: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 2,
+    borderRadius: 99,
+    borderWidth: 1,
+    borderColor: "#FFFFFF",
+    backgroundColor: "rgba(255, 255, 255, 0.6)",
+  },
+  tab: {
+    height: 28,
+    minWidth: 76,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  selectedTab: {
+    height: 28,
+    paddingHorizontal: 16,
+    borderRadius: 99,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  label: {
+    fontFamily: SYSTEM_FONT,
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: "500",
+    color: "#8F5233",
+  },
+  selectedLabel: { color: "#FFFFFF" },
 });

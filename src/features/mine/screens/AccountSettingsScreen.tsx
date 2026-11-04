@@ -25,10 +25,10 @@ import {
   clearAuthSession,
   saveAuthSession,
 } from "@/features/auth/session-persistence";
+import { getLogoutConfirmMessage } from "@/features/auth/sign-out";
 import { messageStore } from "@/features/message/message-store";
 import { RealNameVerificationSheet } from "@/features/mine/components/RealNameVerificationSheet";
 import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
@@ -205,7 +205,7 @@ export default function AccountSettingsScreen() {
     void (async () => {
       const confirmed = await useAppConfirm.getState().confirm({
         title: "退出登录",
-        message: "确认退出当前账号吗？您的数据将被清除！",
+        message: getLogoutConfirmMessage(user?.id),
         cancelText: "取消",
         confirmText: "退出登录",
       });
@@ -507,17 +507,15 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F7F7" },
   headerTitle: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 17,
     lineHeight: 24,
     fontWeight: "600",
   },
   signedOut: { padding: 24, gap: 20, alignItems: "center" },
-  signedOutText: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  signedOutText: { color: "#666", fontSize: 14 },
   section: { marginTop: 20 },
   sectionTitle: {
     color: "#666",
-    fontFamily: DOUYIN_SANS,
     fontSize: 13,
     lineHeight: 20,
     marginHorizontal: 16,
@@ -532,7 +530,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "#EBEBEB",
   },
-  label: { color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 15 },
+  label: { color: "#0A0A0A", fontSize: 15 },
   rowValue: {
     maxWidth: "68%",
     flexDirection: "row",
@@ -556,7 +554,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  logoutText: { color: "#FF1F4C", fontFamily: DOUYIN_SANS, fontSize: 15 },
+  logoutText: { color: "#FF1F4C", fontSize: 15 },
   modalBackdrop: {
     flex: 1,
     justifyContent: "flex-end",
@@ -588,13 +586,11 @@ const styles = StyleSheet.create({
   feedbackMarkText: { color: "#FF1F4C", fontSize: 22, fontWeight: "700" },
   feedbackTitle: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 17,
     fontWeight: "600",
   },
   feedbackMessage: {
     color: "#666",
-    fontFamily: DOUYIN_SANS,
     fontSize: 13,
     lineHeight: 20,
     marginTop: 8,
@@ -609,7 +605,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 22,
   },
-  feedbackButtonText: { color: "#FFF", fontFamily: DOUYIN_SANS, fontSize: 15 },
+  feedbackButtonText: { color: "#FFF", fontSize: 15 },
   modalCard: {
     backgroundColor: "#FFF",
     borderTopLeftRadius: 16,
@@ -620,13 +616,11 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 18,
     fontWeight: "600",
   },
   notice: {
     color: "#666",
-    fontFamily: DOUYIN_SANS,
     fontSize: 13,
     lineHeight: 20,
   },
@@ -649,7 +643,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   genderOptionActive: { backgroundColor: "#FFE8ED" },
-  genderOptionText: { color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  genderOptionText: { color: "#0A0A0A", fontSize: 14 },
   modalActions: { flexDirection: "row", gap: 12, marginTop: 4 },
   cancelButton: {
     flex: 1,
@@ -659,7 +653,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  cancelText: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 15 },
+  cancelText: { color: "#666", fontSize: 15 },
   confirmButton: {
     flex: 1,
     height: 44,
@@ -668,5 +662,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  confirmText: { color: "#FFF", fontFamily: DOUYIN_SANS, fontSize: 15 },
+  confirmText: { color: "#FFF", fontSize: 15 },
 });

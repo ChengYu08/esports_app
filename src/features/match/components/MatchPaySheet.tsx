@@ -14,7 +14,7 @@ import {
   confirmQuickMatchPay,
   type ConfirmPayState,
 } from "@/features/match/quick-match-confirm-pay";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { getDDinProStyle } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 
@@ -57,7 +57,10 @@ export function MatchPaySheet({
     orders: [],
   }));
   const [paying, setPaying] = useState(false);
-  const [prompt, setPrompt] = useState<{ title?: string; message: string } | null>(null);
+  const [prompt, setPrompt] = useState<{
+    title?: string;
+    message: string;
+  } | null>(null);
 
   // 余额直接取预览返回的支付方式余额（对齐 PC），不再单独请求 starBalance
   const method = preview?.paymentMethods[0];
@@ -99,7 +102,9 @@ export function MatchPaySheet({
     <>
       <BottomSheet
         visible={visible}
-        onClose={() => onClose(state.ordersCreated ? "ordersCreated" : "previewing")}
+        onClose={() =>
+          onClose(state.ordersCreated ? "ordersCreated" : "previewing")
+        }
         dismissOnBackdropPress={!paying}
         contentStyle={[
           styles.sheet,
@@ -118,11 +123,17 @@ export function MatchPaySheet({
             accessibilityLabel="关闭"
             disabled={paying}
             hitSlop={8}
-            onPress={() => onClose(state.ordersCreated ? "ordersCreated" : "previewing")}
+            onPress={() =>
+              onClose(state.ordersCreated ? "ordersCreated" : "previewing")
+            }
             style={styles.closeButton}
           >
             <View style={styles.closeIcon}>
-              <Dismiss16Regular color="rgba(0, 0, 0, 0.2)" width={15} height={15} />
+              <Dismiss16Regular
+                color="rgba(0, 0, 0, 0.2)"
+                width={15}
+                height={15}
+              />
             </View>
           </Pressable>
         </View>
@@ -235,14 +246,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   title: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "500",
     color: "#0A0A0A",
   },
   hint: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     color: "#808080",
@@ -274,7 +283,6 @@ const styles = StyleSheet.create({
   },
   rowLabel: {
     width: 96,
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     color: "#666666",
@@ -285,18 +293,16 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   totalValue: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
-    fontWeight: "500",
     color: "#0A0A0A",
     textAlign: "right",
+    ...getDDinProStyle(500),
   },
   balanceValue: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
-    fontWeight: "500",
+    ...getDDinProStyle(500),
     color: "#FE1F4C",
     textAlign: "right",
   },
@@ -316,7 +322,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   confirmText: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "500",
