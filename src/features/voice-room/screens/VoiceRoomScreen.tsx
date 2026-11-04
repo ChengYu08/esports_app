@@ -41,7 +41,6 @@ import { VoiceRoomBackground, VOICE_ROOM_BG_BASE } from "../components/VoiceRoom
 import { VoiceRoomConversationsSheet } from "../components/VoiceRoomConversationsSheet";
 import { VoiceRoomExitDialog } from "../components/VoiceRoomExitDialog";
 import { VoiceRoomMemberSheet } from "../components/VoiceRoomMemberSheet";
-import { VoiceRoomMicBadge } from "../components/VoiceRoomMicrophone";
 import { VoiceRoomSpeakingWaves } from "../components/VoiceRoomSpeakingWaves";
 import { VoiceRoomToolbar } from "../components/VoiceRoomToolbar";
 import { exitVoiceRoom } from "../exit-voice-room";
@@ -89,18 +88,16 @@ function avatarSource(member: VoiceRoomMember) {
 }
 
 // 成员槽位独立 memo 组件：消息到达/输入框打字等父组件重渲染时麦位不参与重渲，
-// 仅 speaking/micOpen 变化的槽位更新。
+// 仅 speaking 变化的槽位更新。头像不做开麦/闭麦角标，也不展示房主标签。
 const MemberSlot = memo(function MemberSlot({
   member,
   columns,
-  micOpen,
   speaking,
   inviteLabel,
   onPress,
 }: {
   member: VoiceRoomMember;
   columns: number;
-  micOpen: boolean;
   speaking: boolean;
   inviteLabel: string;
   onPress: (member: VoiceRoomMember) => void;
@@ -113,7 +110,7 @@ const MemberSlot = memo(function MemberSlot({
       accessibilityLabel={
         invite
           ? inviteLabel
-          : `查看${member.nickname}的资料，${micOpen ? "已开麦" : "已闭麦"}${speaking ? "，正在说话" : ""}`
+          : `查看${member.nickname}的资料${speaking ? "，正在说话" : ""}`
       }
       style={[styles.memberSlot, { width: `${100 / columns}%` }]}
       onPress={() => onPress(member)}
@@ -132,9 +129,6 @@ const MemberSlot = memo(function MemberSlot({
           <Image source={avatarSource(member)} style={styles.avatar} />
         )}
         {!invite ? <VoiceRoomSpeakingWaves active={speaking} /> : null}
-        {!invite ? (
-          <VoiceRoomMicBadge muted={!micOpen} speaking={speaking} />
-        ) : null}
         {isService ? (
           <View style={styles.serviceBadge}>
             <Text style={styles.serviceBadgeText}>接待</Text>
@@ -948,20 +942,13 @@ export default function VoiceRoomScreen() {
   };
 
   const seatSlots = members.map((member, index) => {
-    const micOpen =
-      rtcReady &&
-      (member.userId === String(currentUser?.id)
-        ? !muted
-        : Boolean(member.micOpen));
-    // speaking 来自独立的 speakingUserIds（声网音量回调高频更新的原子 state），
-    // 能说话即代表已开麦，不再用可能滞后的 micOpen 二次短路
+    // speaking 来自独立的 speakingUserIds（声网音量回调高频更新的原子 state）
     const speaking = rtcReady && speakingUserIds.includes(member.userId);
     return (
       <MemberSlot
         key={`${member.userId}-${index}`}
         member={member}
         columns={memberColumns}
-        micOpen={micOpen}
         speaking={speaking}
         inviteLabel={inviteSlotLabel}
         onPress={handleSlotPress}
