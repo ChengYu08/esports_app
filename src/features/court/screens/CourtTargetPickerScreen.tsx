@@ -197,7 +197,7 @@ export default function CourtTargetPickerScreen() {
                   source={
                     item.headImage
                       ? { uri: item.headImage }
-                      : require("../../../../assets/coms/avatar_default.webp")
+                      : require("../../../../assets/images/avatar_default.webp")
                   }
                   style={styles.avatar}
                   contentFit="cover"

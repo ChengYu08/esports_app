@@ -11,7 +11,7 @@ import { VoiceWaveform } from '@/shared/audio/VoiceWaveform';
 import { navigateToVoiceRoom } from '../navigate-voice-room';
 import { useVoiceRoomSessionStore } from '../voice-room-session';
 
-const fallbackAvatar = require('../../../../assets/voice-room/floating-avatar.png');
+const fallbackAvatar = require('../../../../assets/images/avatar_default.webp');
 const recordingIcon = require('../../../../assets/svgs/floating-recording.svg');
 const PLAYER_WIDTH = 50;
 const PLAYER_HEIGHT = 48;

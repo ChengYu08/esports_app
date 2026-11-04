@@ -78,7 +78,7 @@ const SEAT_AREA_MAX_HEIGHT =
 const closeIcon = require("../../../../assets/svgs/navbar-exit.svg");
 const inviteIcon = require("../../../../assets/svgs/toolbar-invite.svg");
 const invitePlaceholderIcon = require("../../../../assets/svgs/game.svg");
-const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
+const defaultAvatar = require("../../../../assets/images/avatar_default.webp");
 
 function avatarSource(member: VoiceRoomMember) {
   const avatar = member.avatar?.trim();

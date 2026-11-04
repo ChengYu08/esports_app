@@ -38,7 +38,7 @@ import { searchTypography } from "../search-typography";
 
 type SearchResult = Club | SearchUser | MessageListItemModel;
 
-const defaultConversationAvatar = require("../../../../assets/coms/avatar_default.webp");
+const defaultConversationAvatar = require("../../../../assets/images/avatar_default.webp");
 
 const SEARCH_DEBOUNCE_MS = 300;
 const MAX_SEARCH_LENGTH = 100;

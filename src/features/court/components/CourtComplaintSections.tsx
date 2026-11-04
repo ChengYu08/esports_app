@@ -334,7 +334,7 @@ export function TicketFormSection({
                 source={
                   target.headImage
                     ? { uri: target.headImage }
-                    : require("../../../../assets/coms/avatar_default.webp")
+                    : require("../../../../assets/images/avatar_default.webp")
                 }
                 style={styles.targetAvatar}
               />

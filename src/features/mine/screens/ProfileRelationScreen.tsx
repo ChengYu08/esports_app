@@ -26,7 +26,7 @@ import { CachedImage } from "@/shared/ui/CachedImage";
 import { EmptyState, ErrorState } from "@/shared/ui/AsyncStates";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
-const fallbackAvatar = require("../../../../assets/coms/avatar_default.webp");
+const fallbackAvatar = require("../../../../assets/images/avatar_default.webp");
 
 function isUnavailableUser(user: UserFollowUser) {
   return user.nickname === "账号被封禁" || user.nickname === "账号已注销";

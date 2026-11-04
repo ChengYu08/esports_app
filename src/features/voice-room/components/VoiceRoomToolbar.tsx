@@ -16,7 +16,7 @@ const messageIcon = require("../../../../assets/svgs/toolbar-message.svg");
 const inviteIcon = require("../../../../assets/svgs/toolbar-invite.svg");
 const selectCompanionIcon = require("../../../../assets/svgs/toolbar-select-companion.svg");
 /** Figma 542:121702 / 542:121821：接待派单左侧耳机图标 */
-const dispatchIcon = require("../../../../assets/voice-room/toolbar-dispatch.svg");
+const dispatchIcon = require("../../../../assets/svgs/toolbar-dispatch.svg");
 
 type VoiceRoomToolbarProps = {
   bottomInset: number;

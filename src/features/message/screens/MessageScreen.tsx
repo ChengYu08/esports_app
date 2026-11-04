@@ -23,7 +23,7 @@ import {
   normalizeSystemConversationId,
 } from "../system-conversations";
 
-const defaultConversationAvatar = require("../../../../assets/coms/avatar_default.webp");
+const defaultConversationAvatar = require("../../../../assets/images/avatar_default.webp");
 const systemNotificationAvatar = require("../../../../assets/svgs/message-system-notice.svg");
 
 export default function MessageScreen() {

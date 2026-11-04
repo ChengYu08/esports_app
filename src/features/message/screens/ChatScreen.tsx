@@ -57,7 +57,7 @@ import {
 // 聊天单次发送图片数量上限（相册多选防刷屏）
 const CHAT_IMAGE_MAX = 10;
 
-const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
+const defaultAvatar = require("../../../../assets/images/avatar_default.webp");
 const defaultMyAvatar = require("../../../../assets/mine/mine-avatar.png");
 const chatMore = require("../../../../assets/svgs/chat-more.svg");
 const chatOnline = require("../../../../assets/svgs/chat-online.svg");
