@@ -1,16 +1,16 @@
 /**
  * 青少年模式启动锁定页的生效时间窗：
  * 锁定时段起止小时跟随服务端配置（/youth/config，Nacos 动态下发），
- * 须同时支持两种形态：start < end 同日锁定（联调口径 9:00-23:00）、
- * start > end 跨午夜锁定（正式口径 22:00-次日 6:00）；start == end 视为全天锁定。
- * 拉取配置失败时回退默认 9:00-23:00（与服务端默认值一致）。
+ * 须同时支持两种形态：start < end 同日锁定（如 9:00-23:00）、
+ * start > end 跨午夜锁定（当前口径 22:00-次日 6:00，白天 6:00-22:00 不锁定）；start == end 视为全天锁定。
+ * 拉取配置失败时回退默认 22:00-次日 6:00（与服务端默认值一致）。
  *
  * 判定输入为 epoch 毫秒（由调用方用服务端时间校准后的「当前时间」传入），
  * 时区固定按 UTC+8 换算，不使用设备时区——防止改设备时区绕过；口径与后端
  * YouthModeLockWindow（Asia/Shanghai）保持一致。
  */
-export const TEEN_DEFAULT_LOCK_START_HOUR = 9;
-export const TEEN_DEFAULT_LOCK_END_HOUR = 23;
+export const TEEN_DEFAULT_LOCK_START_HOUR = 22;
+export const TEEN_DEFAULT_LOCK_END_HOUR = 6;
 
 export type TeenLockWindow = {
   startHour: number;

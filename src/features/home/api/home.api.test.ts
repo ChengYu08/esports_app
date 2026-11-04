@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { apiClient } from "@/core/network/api-client";
-import { fetchBanners, fetchClubGameCompanionCounts, fetchClubGameModes, fetchClubOnlineCount, fetchClubPage, fetchCompanionPage, fetchGameCategories, fetchGames } from "./home.api";
+import { fetchBanners, fetchClubDetail, fetchClubGameCompanionCounts, fetchClubGameModes, fetchClubOnlineCount, fetchClubPage, fetchCompanionPage, fetchGameCategories, fetchGames } from "./home.api";
 
 vi.mock("@/core/network/api-client", () => ({ apiClient: vi.fn() }));
 
@@ -171,6 +171,30 @@ describe("首页品类筛选与店铺标签", () => {
     await expect(fetchClubPage({}, 1)).rejects.toThrow("服务暂不可用");
     await expect(fetchGameCategories()).rejects.toThrow("服务暂不可用");
     await expect(fetchGames()).rejects.toThrow("服务暂不可用");
+  });
+});
+
+describe("俱乐部详情字段映射", () => {
+  it("透传后台店铺标签，与俱乐部列表角标同源", async () => {
+    vi.mocked(apiClient).mockResolvedValue({
+      code: "SUCCESS",
+      data: { id: 7, clubName: "奶蛙俱乐部", clubTag: "服务天花板", clubGames: [] },
+    });
+
+    const detail = await fetchClubDetail("7");
+
+    expect(detail.clubTag).toBe("服务天花板");
+  });
+
+  it("未配置店铺标签时保持空值，详情页据此隐藏角标", async () => {
+    vi.mocked(apiClient).mockResolvedValue({
+      code: "SUCCESS",
+      data: { id: 8, clubName: "普通俱乐部", clubTag: null, clubGames: [] },
+    });
+
+    const detail = await fetchClubDetail("8");
+
+    expect(detail.clubTag).toBeUndefined();
   });
 });
 
