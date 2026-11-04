@@ -22,12 +22,18 @@ import {
   useActivityCountdown,
   useActivityDetail,
 } from "@/features/activity/hooks/use-activity-detail";
+import { fetchActiveQuickMatch } from "@/features/match/api/match.api";
+import {
+  isQuickMatchActive,
+  type QuickMatchRequestDetail,
+} from "@/features/match/api/match.types";
 import { openAuditionRoom } from "@/features/match/enter-audition-room";
 import { requireLogin } from "@/shared/navigation/require-login";
 import { showToast } from "@/shared/ui/app-toast";
 
 const BG_COLOR = "#0C0C2E";
 const LOADING_COLOR = "#4D8BFF";
+const EXISTING_DISPATCH_HINT = "已有派单";
 const OSS_BASE = "https://djoss.panzhi.com/dj-oss-upload/moblie";
 const ACTIVITY_SECKILL_ASSETS = {
   bg: `${OSS_BASE}/bg_activity_seckill.webp`,
@@ -41,6 +47,23 @@ const ACTIVITY_SECKILL_ASSETS = {
 
 const FOOTER_CONTENT_BOTTOM = 28;
 const COUNTDOWN_OVERLAP = 18;
+
+/** 恢复进匹配中页（对齐 useRestoreActiveMatch 参数） */
+function goMatchingFromActive(active: QuickMatchRequestDetail) {
+  router.replace({
+    pathname: "/match/matching/[requestNo]",
+    params: {
+      requestNo: active.requestNo,
+      ...(active.expireTime ? { expireTime: active.expireTime } : {}),
+      ...(active.gameId && active.gameName
+        ? {
+            gameId: String(active.gameId),
+            gameName: active.gameName,
+          }
+        : {}),
+    },
+  });
+}
 
 export default function ActivityLandingScreen({ activityCode }: { activityCode: string }) {
   const insets = useSafeAreaInsets();
@@ -128,7 +151,29 @@ export default function ActivityLandingScreen({ activityCode }: { activityCode: 
         requireLogin();
         return;
       }
-      showToast(error instanceof Error ? error.message : "参与活动失败，请重试");
+      const message = error instanceof Error ? error.message : "参与活动失败，请重试";
+      // 已有未过期派单：查 active → ensure 进试音房；进房失败再回退匹配中页。
+      if (message.includes(EXISTING_DISPATCH_HINT)) {
+        try {
+          const active = await fetchActiveQuickMatch(token);
+          if (active && isQuickMatchActive(active)) {
+            if (active.needVoice === false) {
+              goMatchingFromActive(active);
+              return;
+            }
+            const entered = await openAuditionRoom(active.requestNo, token, {
+              expireTime: active.expireTime || undefined,
+            });
+            if (!entered) {
+              goMatchingFromActive(active);
+            }
+            return;
+          }
+        } catch {
+          // 恢复查询失败则落回原错误文案
+        }
+      }
+      showToast(message);
     } finally {
       setPublishing(false);
     }
