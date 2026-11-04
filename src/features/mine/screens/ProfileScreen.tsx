@@ -84,7 +84,7 @@ const femaleIcon = require("../../../../assets/svgs/mine-female.svg");
 const backIcon = require("../../../../assets/svgs/icon-back.svg");
 const customerIcon = require("../../../../assets/svgs/customer.svg");
 const clubIcon = require("../../../../assets/svgs/mine-club-flag.svg");
-const arrowDownIcon = require("../../../../assets/svgs/profile-arrow-down.svg");
+const arrowDownIcon = require("../../../../assets/svgs/intro-toggle.svg");
 const diamondIcon = require("../../../../assets/message/order-assistant-coin-3f6fcf.webp");
 const idleStatusIcon = require("../../../../assets/svgs/club-status-idle.svg");
 const playingStatusIcon = require("../../../../assets/svgs/club-status-playing.svg");
@@ -1584,9 +1584,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   introToggleIcon: {
-    width: 8,
-    height: 4.5,
-    tintColor: "#fff",
+    width: 20,
+    height: 16,
   },
   introToggleIconUp: {
     transform: [{ rotate: "180deg" }],
