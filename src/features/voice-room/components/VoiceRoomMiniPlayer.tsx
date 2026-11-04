@@ -15,28 +15,11 @@ const recordingIcon = require('../../../../assets/voice-room/floating-recording.
 const PLAYER_WIDTH = 50;
 const PLAYER_HEIGHT = 48;
 const DRAG_THRESHOLD = 6;
-/** 与 MatchQuickOrderFab 一致；默认位固定在 FAB 上方，切 Tab 不跳动 */
-const QUICK_ORDER_FAB_HEIGHT = 60;
-const QUICK_ORDER_TAB_CONTENT_HEIGHT = 58;
-const QUICK_ORDER_FAB_BOTTOM_FROM_SCREEN = 144;
-const QUICK_ORDER_MIN_GAP_ABOVE_TAB = 8;
-/** Figma 2364:96434 MiniPlayer 底 → FAB 顶 */
-const GAP_ABOVE_QUICK_ORDER_FAB = 16;
-
-function resolveDefaultY(params: {
-  height: number;
-  insetTop: number;
-  insetBottom: number;
-}): number {
-  const { height, insetTop, insetBottom } = params;
-  const tabTopInWindow = height - (QUICK_ORDER_TAB_CONTENT_HEIGHT + insetBottom);
-  const fabBottomInWindow = Math.min(
-    height - QUICK_ORDER_FAB_BOTTOM_FROM_SCREEN,
-    tabTopInWindow - QUICK_ORDER_MIN_GAP_ABOVE_TAB,
-  );
-  const fabTopInWindow = fabBottomInWindow - QUICK_ORDER_FAB_HEIGHT;
-  return Math.max(insetTop, fabTopInWindow - GAP_ABOVE_QUICK_ORDER_FAB - PLAYER_HEIGHT);
-}
+/**
+ * Figma 2364:96434 / 812 画布：MiniPlayer 底边 y=608 → 距屏幕底 204。
+ * 与 FAB 距底 128 错开，切 Tab 固定不跳动。
+ */
+const FIGMA_PLAYER_BOTTOM_FROM_SCREEN = 204;
 
 /** Figma 102.85° 底层蓝渐变 */
 const BLUE_GRADIENT = {
@@ -63,12 +46,10 @@ export function VoiceRoomMiniPlayer() {
   // Keep offsets mounted while the room screen is open so minimizing restores the position.
   const offsetY = useSharedValue(0);
   const dragStartY = useSharedValue(0);
-  // 固定默认位：FAB 上方 16px（Figma 2364:96434），与当前 Tab 无关
-  const defaultY = resolveDefaultY({
-    height,
-    insetTop: insets.top,
-    insetBottom: insets.bottom,
-  });
+  const defaultY = Math.max(
+    insets.top,
+    height - FIGMA_PLAYER_BOTTOM_FROM_SCREEN - PLAYER_HEIGHT,
+  );
   const minY = insets.top - defaultY;
   const maxY = Math.max(0, height - insets.bottom - PLAYER_HEIGHT - defaultY);
 

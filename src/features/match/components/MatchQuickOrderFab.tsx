@@ -33,11 +33,11 @@ const EDGE_MARGIN = 8;
 /** 与 AppTabBar 一致：内容区 58 + 底部安全区 */
 const TAB_CONTENT_HEIGHT = 58;
 /**
- * Figma 812 画布：FAB 底边 y=668 → 距屏幕底 144；
- * Tabbar 顶 y=732 → FAB 底到 Tab 顶间距 64。
+ * Figma 2364:96434 / 812 画布：FAB 底边 y=684 → 距屏幕底 128；
+ * Tabbar 顶 y=732 → FAB 底到 Tab 顶间距 48。
  * 用「距屏幕底」定位，避免 Tab 场景高度是否含 Tab 时重复扣减。
  */
-const FIGMA_FAB_BOTTOM_FROM_SCREEN = 144;
+const FIGMA_FAB_BOTTOM_FROM_SCREEN = 128;
 const MIN_GAP_ABOVE_TAB = 8;
 const DRAG_THRESHOLD = 6;
 
@@ -72,7 +72,7 @@ export function MatchQuickOrderFab() {
 
   const tabBarHeight = TAB_CONTENT_HEIGHT + insets.bottom;
   const tabTopInWindow = windowHeight - tabBarHeight;
-  /** 对齐 Figma 距底 144，且不压到 Tab（至少留 MIN_GAP_ABOVE_TAB） */
+  /** 对齐 Figma 距底 128，且不压到 Tab（至少留 MIN_GAP_ABOVE_TAB） */
   const fabBottomInWindow = Math.min(
     windowHeight - FIGMA_FAB_BOTTOM_FROM_SCREEN,
     tabTopInWindow - MIN_GAP_ABOVE_TAB,
