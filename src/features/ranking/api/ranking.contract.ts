@@ -20,8 +20,11 @@ function requireSuccess<T>(response: Envelope<T> | null, fallback: string): T {
 }
 
 export function getRankingParams(filters: RankingFilters): RankingFilters {
-  // The GOD board never has a game dimension, even after switching from another board.
-  return { ...filters, gameId: filters.boardCode === "GOD" ? "0" : filters.gameId };
+  // 神豪榜没有游戏维度，切换过去时请求总榜；接单榜和流水榜保留当前游戏。
+  return {
+    ...filters,
+    gameId: filters.boardCode === "GOD" ? "0" : filters.gameId,
+  };
 }
 
 function queryString(filters: RankingFilters) {
@@ -30,7 +33,9 @@ function queryString(filters: RankingFilters) {
 }
 
 export function getRankingProfileParams(item: RankingItem) {
-  if (!item.clubId || Number(item.clubId) <= 0 || Number(item.userId) <= 0) return null;
+  if (!item.clubId || Number(item.clubId) <= 0 || Number(item.userId) <= 0) {
+    return null;
+  }
   return { userId: item.userId, clubId: item.clubId };
 }
 
@@ -52,7 +57,9 @@ export function createRankingContract(request: Requester) {
       }));
     },
     async fetchMyRank(filters: RankingFilters, token: string, signal?: AbortSignal): Promise<MyRanking> {
-      if (!token) throw new Error("请先登录");
+      if (!token) {
+        throw new Error("请先登录");
+      }
       const data = requireSuccess(
         await request<ApiMyRanking | null>(`/client/v1/rank/myRank?${queryString(filters)}`, { token, ...(signal ? { signal } : {}) }),
         "我的排名加载失败，请重试",

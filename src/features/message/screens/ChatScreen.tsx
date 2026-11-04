@@ -9,6 +9,7 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AppState,
+  BackHandler,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
@@ -24,7 +25,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import EmojiPicker, { type EmojiType } from "rn-emoji-keyboard";
+import { EmojiKeyboard, type EmojiType } from "rn-emoji-keyboard";
 
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import type { AfterSaleCardPayload } from "@/features/order/after-sale-card";
@@ -753,8 +754,24 @@ const ChatComposer = memo(function ChatComposer({
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [imageSending, setImageSending] = useState(false);
 
+  useEffect(() => {
+    if (!emojiPickerOpen || Platform.OS !== "android") {
+      return;
+    }
+
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        setEmojiPickerOpen(false);
+        return true;
+      },
+    );
+    return () => subscription.remove();
+  }, [emojiPickerOpen]);
+
   const selectEmoji = useCallback((emoji: EmojiType) => {
     setDraft((current) => `${current}${emoji.emoji}`);
+    setEmojiPickerOpen(false);
   }, []);
 
   const sendMessage = async () => {
@@ -799,7 +816,10 @@ const ChatComposer = memo(function ChatComposer({
   return (
     <>
       <View
-        style={[styles.composer, { paddingBottom: Math.max(bottomInset, 16) }]}
+        style={[
+          styles.composer,
+          { paddingBottom: emojiPickerOpen ? 12 : Math.max(bottomInset, 16) },
+        ]}
       >
         <TextInput
           accessibilityLabel="输入消息"
@@ -819,7 +839,7 @@ const ChatComposer = memo(function ChatComposer({
               hitSlop={8}
               onPress={() => {
                 Keyboard.dismiss();
-                setEmojiPickerOpen(true);
+                setEmojiPickerOpen((current) => !current);
               }}
               style={styles.toolButton}
             >
@@ -854,28 +874,31 @@ const ChatComposer = memo(function ChatComposer({
           </Pressable>
         </View>
       </View>
-      <EmojiPicker
-        // 库默认 categoryPosition 是 floating：分类栏绝对定位悬浮在列表上，emoji 会从栏后滑过；
-        // 改为 bottom 让分类栏占布局流，emoji 滚动区底部与分类栏顶边重合
-        categoryPosition="bottom"
-        // 库内用的是 RN SafeAreaView（Android 不生效），需手动叠加底部安全区；
-        // 再额外抬高 10px，避免 emoji 与分类栏贴住屏幕底部不好按
-        defaultHeight={340 + bottomInset + 10}
-        enableRecentlyUsed
-        // 不需要分类标题栏（默认显示英文如 Smileys & Emotion）
-        hideHeader
-        onClose={() => setEmojiPickerOpen(false)}
-        onEmojiSelected={selectEmoji}
-        open={emojiPickerOpen}
-        styles={{ container: { paddingBottom: bottomInset + 10 } }}
-        theme={{
-          backdrop: "rgba(0, 0, 0, 0.18)",
-          knob: "#CCCCCC",
-          container: "#FFFFFF",
-          header: "#333333",
-          category: { icon: "#999999", iconActive: "#FE1F4C" },
-        }}
-      />
+      {/* 表情面板参与页面布局，打开时与系统键盘一样顶起输入框和消息列表 */}
+      {emojiPickerOpen ? (
+        <View style={[styles.emojiPanel, { height: 340 + bottomInset + 10 }]}>
+          <EmojiKeyboard
+            categoryPosition="bottom"
+            disableSafeArea
+            enableRecentlyUsed
+            hideHeader
+            onEmojiSelected={selectEmoji}
+            styles={{
+              container: {
+                paddingBottom: bottomInset + 10,
+                borderRadius: 0,
+                elevation: 0,
+                shadowOpacity: 0,
+              },
+            }}
+            theme={{
+              container: "#FFFFFF",
+              header: "#333333",
+              category: { icon: "#999999", iconActive: "#FE1F4C" },
+            }}
+          />
+        </View>
+      ) : null}
     </>
   );
 });
@@ -1228,6 +1251,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     gap: 8,
   },
+  emojiPanel: { backgroundColor: "#FFFFFF" },
   input: {
     minHeight: 60,
     maxHeight: 120,

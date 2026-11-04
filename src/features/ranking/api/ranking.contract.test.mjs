@@ -23,9 +23,10 @@ test("public ranking requests preserve filters and normalize decimal and ID stri
   assert.deepEqual(getRankingProfileParams(row), { userId: "42", clubId: "7" });
 });
 
-test("GOD resets the request game dimension without changing the selected game", async () => {
+test("the GOD board resets the request game dimension without changing the selected game", async () => {
   const selected = { ...filters, boardCode: "GOD" };
   assert.equal(getRankingParams(selected).gameId, "0");
+  assert.equal(getRankingParams(filters).gameId, "8");
   assert.equal(selected.gameId, "8");
   const api = createRankingContract(async (path) => {
     assert.match(path, /boardCode=GOD&rankType=WEEKLY&gameId=0$/);
@@ -73,15 +74,15 @@ test("games reuse Home's normalized cache shape and contain only API-provided ga
   assert.deepEqual(await api.fetchGames(), [{ id: 8, name: "三角洲行动", iconUrl: "game.png", backgroundUrl: undefined, category: undefined }]);
 });
 
-test("display units and rules titles match PC for each board and period", () => {
-  assert.equal(formatRankingMetric(1234, "ORDER_RECEIVE"), "1,234 单");
-  assert.equal(formatRankingMetric(0, "ORDER_RECEIVE"), "0 单");
+test("display units and rules titles match mobile ranking presentation", () => {
+  assert.equal(formatRankingMetric(1234, "ORDER_RECEIVE"), "1234单");
+  assert.equal(formatRankingMetric(0, "ORDER_RECEIVE"), "0单");
   assert.equal(formatRankingMetric(999, "GOD"), "999");
-  assert.equal(formatRankingMetric(1000, "GOD"), "1K");
-  assert.equal(formatRankingMetric(1250, "GOD"), "1.3K");
+  assert.equal(formatRankingMetric(1000, "GOD"), "1k");
+  assert.equal(formatRankingMetric(1250, "GOD"), "1.3k");
   assert.equal(formatRankingMetric(9999, "TURNOVER"), "9999");
-  assert.equal(formatRankingMetric(10000, "TURNOVER"), "1万");
-  assert.equal(formatRankingMetric(12500, "TURNOVER"), "1.3万");
+  assert.equal(formatRankingMetric(10000, "TURNOVER"), "10000");
+  assert.equal(formatRankingMetric(12500, "TURNOVER"), "12500");
   assert.equal(getRankingRulesTitle("ORDER_RECEIVE", "DAILY"), "接单榜（日榜）规则");
   assert.equal(getRankingRulesTitle("TURNOVER", "WEEKLY"), "流水榜（周榜）规则");
   assert.equal(getRankingRulesTitle("GOD", "WEEKLY"), "榜单说明");

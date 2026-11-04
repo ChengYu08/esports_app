@@ -56,6 +56,7 @@ vi.mock("expo-image", () => ({ Image: "Image" }));
 vi.mock("expo-linear-gradient", () => ({ LinearGradient: "LinearGradient" }));
 vi.mock("expo-router", () => ({
   router: { back: vi.fn(), dismissTo: vi.fn(), push: vi.fn() },
+  useIsFocused: () => true,
   useLocalSearchParams: () => ({}),
 }));
 vi.mock("expo-status-bar", () => ({ StatusBar: "StatusBar" }));

@@ -168,7 +168,12 @@ function Tab({
   court?: boolean;
 }) {
   return (
-    <Pressable onPress={onPress} style={styles.tab}>
+    <Pressable
+      accessibilityRole="tab"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={styles.tab}
+    >
       {selected && <View style={styles.line} />}
       <Text style={[styles.tabText, selected && styles.tabSelected, court && styles.courtTabText, court && selected && styles.courtTabSelected]}>
         {label}
@@ -188,14 +193,18 @@ const styles = StyleSheet.create({
   topTabs: { flexDirection: "row", gap: 20, height: "100%" },
   tab: { justifyContent: "center", minWidth: 42, position: "relative" },
   tabText: {
-    color: "#999",
+    fontFamily: SYSTEM_FONT,
+    color: "#CACACC",
     fontSize: 18,
-    fontWeight: "400",
+    lineHeight: 26,
+    fontWeight: "600",
   },
   tabSelected: {
-    color: "#1a1a1a",
+    fontFamily: SYSTEM_FONT,
+    color: "#0D0D0F",
     fontSize: 20,
-    fontWeight: "700",
+    lineHeight: 28,
+    fontWeight: "600",
   },
   courtTabText: { fontFamily: COURT_FONT_FAMILY, color: "#CACACC", fontWeight: "600", lineHeight: 26 },
   courtTabSelected: { color: "#0D0D0F", lineHeight: 28 },

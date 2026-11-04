@@ -18,7 +18,7 @@ import { saveAuthSession } from "@/features/auth/session-persistence";
 import { validateNickname } from "@/features/mine/utils/nickname-rules";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
-const NICKNAME_MAX_LENGTH = 18;
+const NICKNAME_MAX_LENGTH = 20;
 
 export default function EditNicknameScreen() {
   const insets = useSafeAreaInsets();
@@ -69,7 +69,7 @@ export default function EditNicknameScreen() {
   return (
     <View style={styles.screen}>
       <ScreenHeader
-        title="编辑名字"
+        title="昵称编辑"
         onBack={() => router.back()}
         backgroundColor="#F7F7F7"
         titleStyle={styles.headerTitle}
@@ -116,7 +116,7 @@ export default function EditNicknameScreen() {
             </View>
           </View>
           <Text style={styles.hintText}>
-            {"最多18字，不能使用@<>/等无效字符，30天内可修改4次名字"}
+            {"最多20字，不能使用@<>/等无效字符，30天内可修改4次名字"}
           </Text>
         </View>
       </ScrollView>

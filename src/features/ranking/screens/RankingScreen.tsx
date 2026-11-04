@@ -1,6 +1,9 @@
-import { colors } from "@/shared/theme/tokens";
+import { SYSTEM_FONT } from "@/shared/theme/typography";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
-import { router } from "expo-router";
+import { Info16Regular } from "@fluentui/react-native-icons";
+import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
+import { router, useIsFocused } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   FlatList,
@@ -15,8 +18,9 @@ import {
   getRankingParams,
   getRankingProfileParams,
 } from "../api/ranking.contract";
-import type { RankingItem } from "../api/ranking.types";
+import type { RankingBoard, RankingItem } from "../api/ranking.types";
 import { MyRankingCard } from "../components/MyRankingCard";
+import { RankingBackground } from "../components/RankingBackground";
 import { RankingBoardTabs } from "../components/RankingBoardTabs";
 import { RankingCard } from "../components/RankingCard";
 import { RankingGameFilter } from "../components/RankingGameFilter";
@@ -25,28 +29,44 @@ import { RankingRulesSheet } from "../components/RankingRulesSheet";
 import { useRankingData } from "../hooks/use-ranking-data";
 import { DEFAULT_RANKING_FILTERS, getRankingBoard } from "../ranking.config";
 
+const godLabel = require("../../../../assets/ranking/ranking-title-god.svg");
+const orderLabel = require("../../../../assets/ranking/ranking-title-order.svg");
+const turnoverLabel = require("../../../../assets/ranking/ranking-title-turnover.svg");
+const trophy = require("../../../../assets/ranking/ranking-trophy.svg");
 const emptyRows: RankingItem[] = [];
+const TAB_BAR_HEIGHT = 58;
 
 export default function RankingScreen({
   embedded = false,
+  active = true,
 }: {
-  /** 作为首页顶部 tab 内嵌时为 true：顶部留白交给首页导航栏，只保留少量间距 */
+  /** 作为首页顶部 tab 内嵌时，安全区和首页大导航由父页面负责。 */
   embedded?: boolean;
+  active?: boolean;
 }) {
   const insets = useSafeAreaInsets();
+  const focused = useIsFocused();
   const [filters, setFilters] = useState(DEFAULT_RANKING_FILTERS);
   const [rulesVisible, setRulesVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const { top, games, myRank, user, isAuthenticated } = useRankingData(filters);
+  const { top, games, myRank, user, isAuthenticated } = useRankingData(
+    filters,
+    active && focused,
+  );
+
   const board = getRankingBoard(filters.boardCode);
   const params = getRankingParams(filters);
   const listKey = `${params.boardCode}-${params.rankType}-${params.gameId}`;
+  const visibleMyRank =
+    isAuthenticated && myRank.data?.visible === true ? myRank.data : undefined;
 
   const viewProfile = useCallback((item: RankingItem) => {
     const profileParams = getRankingProfileParams(item);
-    if (profileParams)
+    if (profileParams) {
       router.push({ pathname: "/profile", params: profileParams });
+    }
   }, []);
+
   const renderItem = useCallback(
     ({ item }: { item: RankingItem }) => (
       <RankingCard
@@ -58,8 +78,34 @@ export default function RankingScreen({
     [filters.boardCode, viewProfile],
   );
 
+  const changeBoard = (boardCode: RankingBoard) => {
+    setFilters((value) => ({ ...value, boardCode }));
+  };
+
+  const retryTop = () => {
+    top.refetch();
+  };
+
+  const retryGames = () => {
+    games.refetch();
+  };
+
+  const retryMyRank = () => {
+    myRank.refetch();
+  };
+
+  const openRules = () => {
+    setRulesVisible(true);
+  };
+
+  const closeRules = () => {
+    setRulesVisible(false);
+  };
+
   async function refresh() {
-    if (refreshing) return;
+    if (refreshing) {
+      return;
+    }
     setRefreshing(true);
     try {
       await Promise.all([
@@ -76,17 +122,11 @@ export default function RankingScreen({
   if (top.data === undefined) {
     if (top.isError) {
       emptyContent = (
-        <ErrorState
-          message={top.error.message}
-          onRetry={() => void top.refetch()}
-        />
+        <ErrorState message={top.error.message} onRetry={retryTop} />
       );
     } else if (top.fetchStatus === "paused") {
       emptyContent = (
-        <ErrorState
-          message="网络未连接，请连接后重试"
-          onRetry={() => void top.refetch()}
-        />
+        <ErrorState message="网络未连接，请连接后重试" onRetry={retryTop} />
       );
     } else {
       emptyContent = <LoadingState message="榜单加载中…" />;
@@ -96,7 +136,7 @@ export default function RankingScreen({
       <View style={styles.empty}>
         <EmptyState message="本期暂无上榜用户" />
         <Text style={styles.emptyHint}>试试其他游戏或切换榜单周期</Text>
-        {board.hasGame && filters.gameId !== "0" && (
+        {board.hasGame && filters.gameId !== "0" ? (
           <Pressable
             accessibilityRole="button"
             style={styles.reset}
@@ -104,7 +144,7 @@ export default function RankingScreen({
           >
             <Text style={styles.resetLabel}>查看总榜</Text>
           </Pressable>
-        )}
+        ) : null}
       </View>
     );
   }
@@ -113,115 +153,167 @@ export default function RankingScreen({
     <View
       style={[
         styles.screen,
+        embedded && styles.embeddedScreen,
         {
-          paddingTop: embedded ? 6 : insets.top,
-          paddingBottom: 60 + insets.bottom,
+          paddingTop: embedded ? 0 : insets.top,
+          paddingBottom: TAB_BAR_HEIGHT + insets.bottom,
           paddingLeft: insets.left,
           paddingRight: insets.right,
         },
       ]}
     >
-      <View style={styles.boardRow}>
-        <RankingBoardTabs
-          value={filters.boardCode}
-          onChange={(boardCode) =>
-            setFilters((value) => ({ ...value, boardCode }))
-          }
-        />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="查看榜单规则"
-          onPress={() => setRulesVisible(true)}
-          style={styles.rulesButton}
+      {embedded ? null : <RankingBackground />}
+      <View style={styles.boardTabsArea}>
+        <RankingBoardTabs value={filters.boardCode} onChange={changeBoard} />
+      </View>
+      <RankingTitle board={filters.boardCode} />
+      <View style={styles.panel}>
+        <LinearGradient
+          colors={["rgba(255,255,255,0.6)", "#FFFFFF", "#FFFFFF"]}
+          locations={[0, 0.5, 1]}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={styles.controls}
         >
-          <View style={styles.infoIcon}>
-            <Text style={styles.infoLabel}>i</Text>
-          </View>
-          <Text style={styles.rulesLabel}>榜单规则</Text>
-        </Pressable>
-      </View>
-      {board.hasGame && (
-        <>
-          <RankingGameFilter
-            games={games.data ?? []}
-            value={filters.gameId}
-            onChange={(gameId) => setFilters((value) => ({ ...value, gameId }))}
-          />
-          {games.isError ? (
-            <RetryNotice
-              message="游戏筛选加载失败"
-              onRetry={() => void games.refetch()}
-            />
-          ) : games.data === undefined ? (
-            <Text style={styles.gameStatus}>
-              {games.fetchStatus === "paused"
-                ? "网络未连接，暂无法加载游戏"
-                : "游戏筛选加载中…"}
-            </Text>
+          {board.hasGame ? (
+            <>
+              <RankingGameFilter
+                games={games.data ?? []}
+                value={filters.gameId}
+                onChange={(gameId) =>
+                  setFilters((value) => ({ ...value, gameId }))
+                }
+              />
+              {games.isError ? (
+                <RetryNotice message="游戏筛选加载失败" onRetry={retryGames} />
+              ) : games.data === undefined ? (
+                <Text style={styles.gameStatus}>
+                  {games.fetchStatus === "paused"
+                    ? "网络未连接，暂无法加载游戏"
+                    : "游戏筛选加载中…"}
+                </Text>
+              ) : null}
+            </>
           ) : null}
-        </>
-      )}
-      <View style={styles.periodRow}>
-        <RankingPeriodTabs
-          value={filters.rankType}
-          onChange={(rankType) =>
-            setFilters((value) => ({ ...value, rankType }))
-          }
-        />
-        <Text style={styles.sortLabel}>按{board.metricLabel}排序</Text>
-      </View>
-      <FlatList
-        key={listKey}
-        data={top.data ?? emptyRows}
-        keyExtractor={(item) => item.userId}
-        renderItem={renderItem}
-        style={styles.list}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        initialNumToRender={8}
-        windowSize={7}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => void refresh()}
-            tintColor={colors.brand}
-            colors={[colors.brand]}
-          />
-        }
-        ListHeaderComponent={
-          top.data !== undefined && top.isError ? (
-            <RetryNotice
-              message="刷新失败，当前显示上次榜单"
-              onRetry={() => void top.refetch()}
+          <View style={styles.periodRow}>
+            <RankingPeriodTabs
+              value={filters.rankType}
+              onChange={(rankType) =>
+                setFilters((value) => ({ ...value, rankType }))
+              }
             />
-          ) : null
-        }
-        ListEmptyComponent={emptyContent}
-        ListFooterComponent={
-          top.data?.length ? (
-            <Text style={styles.endNote}>已展示本期上榜用户</Text>
-          ) : null
-        }
-      />
-      {isAuthenticated && myRank.isError && (
-        <RetryNotice
-          message="我的排名暂不可用"
-          onRetry={() => void myRank.refetch()}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="查看榜单规则"
+              onPress={openRules}
+              style={styles.rulesButton}
+            >
+              <Info16Regular color="#656566" />
+              <Text style={styles.rulesLabel}>榜单规则</Text>
+            </Pressable>
+          </View>
+        </LinearGradient>
+        <RankingColumnHeader
+          nameLabel={board.nameColumnLabel}
+          metricLabel={board.metricLabel}
         />
-      )}
-      {isAuthenticated && myRank.data?.visible && (
-        <MyRankingCard
-          rank={myRank.data}
-          board={filters.boardCode}
-          avatar={user?.headImage}
+        <FlatList
+          key={listKey}
+          data={top.data ?? emptyRows}
+          keyExtractor={(item) => item.userId}
+          renderItem={renderItem}
+          style={styles.list}
+          contentContainerStyle={[
+            styles.listContent,
+            visibleMyRank && styles.listContentWithMyRank,
+          ]}
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={refresh}
+              tintColor="#FE1F4C"
+              colors={["#FE1F4C"]}
+            />
+          }
+          ListHeaderComponent={
+            top.data !== undefined && top.isError ? (
+              <RetryNotice
+                message="刷新失败，当前显示上次榜单"
+                onRetry={retryTop}
+              />
+            ) : null
+          }
+          ListEmptyComponent={emptyContent}
         />
-      )}
+      </View>
+      {isAuthenticated && myRank.isError ? (
+        <View style={styles.myRankNotice}>
+          <RetryNotice message="我的排名暂不可用" onRetry={retryMyRank} />
+        </View>
+      ) : null}
+      {visibleMyRank ? (
+        <View
+          style={[
+            styles.myRank,
+            { bottom: TAB_BAR_HEIGHT + insets.bottom + 10 },
+          ]}
+        >
+          <MyRankingCard
+            rank={visibleMyRank}
+            board={filters.boardCode}
+            avatar={user?.headImage}
+            nickname={user?.nickname}
+          />
+        </View>
+      ) : null}
       <RankingRulesSheet
-        visible={rulesVisible}
+        visible={active && rulesVisible}
         board={filters.boardCode}
         period={filters.rankType}
-        onClose={() => setRulesVisible(false)}
+        onClose={closeRules}
       />
+    </View>
+  );
+}
+
+function RankingTitle({ board }: { board: RankingBoard }) {
+  const titleSource =
+    board === "GOD"
+      ? godLabel
+      : board === "ORDER_RECEIVE"
+        ? orderLabel
+        : turnoverLabel;
+
+  return (
+    <View style={styles.title}>
+      <Image
+        source={titleSource}
+        contentFit="contain"
+        style={styles.titleLabel}
+      />
+      <Image source={trophy} contentFit="contain" style={styles.trophy} />
+    </View>
+  );
+}
+
+function RankingColumnHeader({
+  nameLabel,
+  metricLabel,
+}: {
+  nameLabel: string;
+  metricLabel: string;
+}) {
+  return (
+    <View style={styles.columns}>
+      <Text style={[styles.columnLabel, styles.rankColumn]}>排名</Text>
+      <Text style={[styles.columnLabel, styles.nameColumn]}>{nameLabel}</Text>
+      <Text style={[styles.columnLabel, styles.metricColumn]}>
+        {metricLabel}
+      </Text>
     </View>
   );
 }
@@ -247,69 +339,107 @@ function RetryNotice({
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.surface },
-  boardRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  screen: {
+    flex: 1,
+    backgroundColor: "#FFF8F1",
+    overflow: "hidden",
+  },
+  embeddedScreen: { backgroundColor: "transparent" },
+  boardTabsArea: {
+    height: 56,
     alignItems: "center",
+    justifyContent: "center",
+  },
+  title: {
+    height: 88,
+    width: "100%",
+    paddingTop: 24,
+    position: "relative",
+  },
+  titleLabel: {
+    height: 32,
+    position: "absolute",
+    left: 12,
+    bottom: 25,
+    width: 128,
+  },
+  trophy: {
+    position: "absolute",
+    bottom: -4,
+    right: 12,
+    width: 72,
+    height: 72,
+  },
+  panel: {
+    flex: 1,
+    overflow: "hidden",
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#FFFFFF",
+    backgroundColor: "#FFFFFF",
+  },
+  controls: { paddingTop: 4 },
+  periodRow: {
+    minHeight: 46,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   rulesButton: {
+    minHeight: 30,
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    minHeight: 44,
-    paddingHorizontal: 16,
+    gap: 4,
+    paddingLeft: 12,
   },
   rulesLabel: {
-    fontSize: 11,
-    color: colors.textSecondary,
-  },
-  infoIcon: {
-    width: 13,
-    height: 13,
-    borderRadius: 7,
-    borderWidth: 1,
-    borderColor: colors.textMuted,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  infoLabel: {
-    fontSize: 9,
-    fontWeight: "600",
-    color: colors.textMuted,
-    lineHeight: 11,
+    fontFamily: SYSTEM_FONT,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "400",
+    color: "#656566",
   },
   gameStatus: {
+    fontFamily: SYSTEM_FONT,
     fontSize: 10,
-    color: colors.textMuted,
+    lineHeight: 16,
+    color: "#979799",
     paddingHorizontal: 20,
-    paddingTop: 4,
+    paddingBottom: 4,
   },
-  periodRow: {
+  columns: {
+    minHeight: 34,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 12,
-    gap: 12,
+    backgroundColor: "#FFFFFF",
   },
-  sortLabel: {
-    fontSize: 11,
-    color: colors.textMuted,
-    flexShrink: 1,
+  columnLabel: {
+    fontFamily: SYSTEM_FONT,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "400",
+    color: "#979799",
   },
-  list: { flex: 1, backgroundColor: "#F7F7F9" },
+  rankColumn: { width: 44, textAlign: "center" },
+  nameColumn: { flex: 1, paddingLeft: 40 },
+  metricColumn: { width: 64, textAlign: "right" },
+  list: { flex: 1, backgroundColor: "#FFFFFF" },
   listContent: {
     flexGrow: 1,
     paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 16,
+    paddingVertical: 4,
   },
+  listContentWithMyRank: { paddingBottom: 92 },
   empty: { alignItems: "center" },
   emptyHint: {
+    fontFamily: SYSTEM_FONT,
     fontSize: 11,
-    color: colors.textMuted,
+    color: "#979799",
     marginTop: -12,
   },
   reset: {
@@ -318,29 +448,44 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 12,
   },
-  resetLabel: { fontSize: 12, color: colors.brand },
-  endNote: {
-    fontSize: 10,
-    color: "#B0B0B8",
-    textAlign: "center",
-    paddingVertical: 14,
+  resetLabel: {
+    fontFamily: SYSTEM_FONT,
+    fontSize: 12,
+    color: "#FE1F4C",
+  },
+  myRank: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    zIndex: 10,
+  },
+  myRankNotice: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: TAB_BAR_HEIGHT + 10,
+    zIndex: 10,
   },
   notice: {
-    minHeight: 44,
+    minHeight: 36,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
     gap: 12,
     backgroundColor: "#FFF5F5",
     borderRadius: 8,
   },
   noticeMessage: {
     flex: 1,
+    fontFamily: SYSTEM_FONT,
     fontSize: 11,
     lineHeight: 17,
-    color: colors.textSecondary,
+    color: "#656566",
   },
-  retryLabel: { fontSize: 12, color: colors.brand },
+  retryLabel: {
+    fontFamily: SYSTEM_FONT,
+    fontSize: 12,
+    color: "#FE1F4C",
+  },
 });

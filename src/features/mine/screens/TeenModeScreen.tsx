@@ -113,7 +113,7 @@ function TeenModeScreenSession({
       return;
     }
     const snapshot = guard.snapshot();
-    // 锁定时段文案跟随服务端配置（/youth/config）；失败回退默认 9:00-23:00（与服务端默认一致）
+    // 锁定时段文案跟随服务端配置（/youth/config）；失败回退默认 22:00-次日6:00（与服务端默认一致）
     void (async () => {
       try {
         const config = await fetchTeenModeConfig(token);

@@ -9,7 +9,7 @@ import {
 } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useIsFocused, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
   memo,
@@ -65,7 +65,6 @@ import {
 } from "@/features/mine/hooks/use-user-follow";
 import {
   createImagePreviewParams,
-  type ImagePreviewParams,
 } from "@/features/mine/image-preview.params";
 import { createProfileAvatarPreviewParams } from "@/features/mine/profile-avatar-preview";
 import { createProfileChatParams } from "@/features/mine/profile-chat";
@@ -99,6 +98,7 @@ const profileRenderItem = ({ item }: { item: ProfileListItem }) => item.content;
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const focused = useIsFocused();
   const user = useAuthStore((state) => state.user);
   const route = useLocalSearchParams<{
     clubId?: string | string[];
@@ -110,7 +110,12 @@ export default function ProfileScreen() {
     reorderService?: string;
     reorderQuantity?: string;
   }>();
-  const routeParams = getProfileRouteParams(route);
+  const routeClubId = route.clubId;
+  const routeUserId = route.userId;
+  const routeParams = useMemo(
+    () => getProfileRouteParams({ clubId: routeClubId, userId: routeUserId }),
+    [routeClubId, routeUserId],
+  );
   const fromSearchPage = route.fromSearch === "1";
   const isMine = !routeParams || String(user?.id ?? "") === routeParams.userId;
   const [tab, setTab] = useState<ProfileTab>("技能");
@@ -165,10 +170,11 @@ export default function ProfileScreen() {
   const chatCheckPendingRef = useRef(false);
   const { entering: enteringCS, openCustomerService } =
     useCustomerServiceEntry();
-  const detailQuery = useProfileDetail(routeParams);
+  const detailQuery = useProfileDetail(routeParams, focused);
   const detail = detailQuery.data;
   const followStateQuery = useUserFollowState(
     !isMine && detail ? String(detail.userId) : undefined,
+    focused,
   );
   const followMutation = useToggleUserFollow();
   const firstGameId = getFirstProfileGameId(detail?.games ?? []);
@@ -186,13 +192,22 @@ export default function ProfileScreen() {
           gameId: activeGameId,
         }
       : null,
+    focused,
   );
   // 评价按陪玩师整体拉取（全部游戏），不做游戏分类过滤
   const reviewQuery = useProfileReviews(
     tab === "评价" && routeParams
       ? { companionUserId: routeParams.userId }
       : null,
+    focused,
   );
+  const gameDetailLoading = gameDetailQuery.isLoading;
+  const gameDetailError = gameDetailQuery.isError;
+  const refetchGameDetail = gameDetailQuery.refetch;
+  const reviewLoading = reviewQuery.isLoading;
+  const reviewError = reviewQuery.isError;
+  const reviewItems = reviewQuery.data?.items;
+  const refetchReviews = reviewQuery.refetch;
   const localProfile = useMemo(() => toLocalProfile(user), [user]);
   const profile = detail ?? localProfile;
   const measureCover = useCallback((height: number) => {
@@ -200,7 +215,9 @@ export default function ProfileScreen() {
   }, []);
 
   useEffect(() => {
-    if (isMine || profile.userId <= 0) return;
+    if (!focused || isMine || profile.userId <= 0) {
+      return;
+    }
 
     let active = true;
     const refreshBlacklistStatus = () => {
@@ -229,7 +246,7 @@ export default function ProfileScreen() {
       active = false;
       unsubscribe();
     };
-  }, [isMine, profile.userId]);
+  }, [focused, isMine, profile.userId]);
 
   const gameDetail = gameDetailQuery.data;
   const games = useMemo(() => detail?.games ?? [], [detail]);
@@ -238,14 +255,12 @@ export default function ProfileScreen() {
   const stopVoice = voicePlayer.stop;
   const toggleVoice = voicePlayer.toggle;
   const playingVoiceUrl = voicePlayer.playingUrl;
-  const coverPreviewParams = useMemo(
-    () => (coverImageUrl ? createImagePreviewParams([coverImageUrl], 0) : null),
-    [coverImageUrl],
-  );
 
   useEffect(() => {
-    if (tab !== "技能") stopVoice();
-  }, [tab, stopVoice]);
+    if (tab !== "技能" || !focused) {
+      stopVoice();
+    }
+  }, [focused, tab, stopVoice]);
   const openProfileRelation = useCallback(
     (type: "following" | "fans") => {
       if (profile.userId <= 0) return;
@@ -380,7 +395,6 @@ export default function ProfileScreen() {
             topInset={insets.top}
             profile={profile}
             coverImageUrl={coverImageUrl}
-            coverPreviewParams={coverPreviewParams}
             isMine={isMine}
             isBlacklisted={
               !isMine &&
@@ -432,7 +446,7 @@ export default function ProfileScreen() {
           ),
         });
 
-        if (gameDetailQuery.isLoading) {
+        if (gameDetailLoading) {
           profileListItems.push({
             key: "skills-loading",
             content: (
@@ -441,7 +455,7 @@ export default function ProfileScreen() {
               </View>
             ),
           });
-        } else if (gameDetailQuery.isError || !gameDetail) {
+        } else if (gameDetailError || !gameDetail) {
           profileListItems.push({
             key: "skills-error",
             content: (
@@ -449,7 +463,7 @@ export default function ProfileScreen() {
                 <InlineState
                   text="游戏技能加载失败"
                   actionLabel="重试"
-                  onAction={() => void gameDetailQuery.refetch()}
+                  onAction={() => void refetchGameDetail()}
                 />
               </View>
             ),
@@ -503,7 +517,7 @@ export default function ProfileScreen() {
           }
         }
       }
-    } else if (reviewQuery.isLoading) {
+    } else if (reviewLoading) {
       profileListItems.push({
         key: "reviews-loading",
         content: (
@@ -512,7 +526,7 @@ export default function ProfileScreen() {
           </View>
         ),
       });
-    } else if (reviewQuery.isError) {
+    } else if (reviewError) {
       profileListItems.push({
         key: "reviews-error",
         content: (
@@ -520,13 +534,13 @@ export default function ProfileScreen() {
             <InlineState
               text="评价加载失败"
               actionLabel="重试"
-              onAction={() => void reviewQuery.refetch()}
+              onAction={() => void refetchReviews()}
             />
           </View>
         ),
       });
     } else {
-      const reviews = reviewQuery.data?.items ?? [];
+      const reviews = reviewItems ?? [];
       if (reviews.length === 0) {
         profileListItems.push({
           key: "reviews-empty",
@@ -554,7 +568,6 @@ export default function ProfileScreen() {
     insets.top,
     profile,
     coverImageUrl,
-    coverPreviewParams,
     isMine,
     blacklistStatus,
     openProfileRelation,
@@ -564,15 +577,20 @@ export default function ProfileScreen() {
     tab,
     games,
     activeGameId,
-    gameDetailQuery,
+    gameDetailLoading,
+    gameDetailError,
+    refetchGameDetail,
     gameDetail,
-    reviewQuery,
+    reviewLoading,
+    reviewError,
+    reviewItems,
+    refetchReviews,
     toggleVoice,
     playingVoiceUrl,
     openOrder,
   ]);
 
-  if (routeParams && detailQuery.isLoading) {
+  if (routeParams && (detailQuery.isLoading || (!focused && !detail))) {
     return (
       <ProfileSkeleton
         topInset={insets.top}
@@ -933,7 +951,6 @@ const ProfileCover = memo(function ProfileCover({
   topInset,
   profile,
   coverImageUrl,
-  coverPreviewParams,
   isMine,
   isBlacklisted,
   onSelectRelation,
@@ -942,7 +959,6 @@ const ProfileCover = memo(function ProfileCover({
   topInset: number;
   profile: ProfileDetail;
   coverImageUrl?: string;
-  coverPreviewParams: ImagePreviewParams | null;
   isMine: boolean;
   isBlacklisted: boolean;
   onSelectRelation: (type: "following" | "fans") => void;
@@ -961,33 +977,13 @@ const ProfileCover = memo(function ProfileCover({
       ]}
       onLayout={(event) => onMeasure(event.nativeEvent.layout.height)}
     >
-      {coverPreviewParams ? (
-        <Pressable
-          accessibilityLabel="预览主页背景图"
-          accessibilityRole="button"
-          onPress={() =>
-            router.push({
-              pathname: "/image-preview",
-              params: coverPreviewParams,
-            })
-          }
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Image
+          source={coverImageUrl ? { uri: coverImageUrl } : background}
+          contentFit="cover"
           style={StyleSheet.absoluteFill}
-        >
-          <Image
-            source={{ uri: coverImageUrl }}
-            contentFit="cover"
-            style={StyleSheet.absoluteFill}
-          />
-        </Pressable>
-      ) : (
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Image
-            source={background}
-            contentFit="cover"
-            style={StyleSheet.absoluteFill}
-          />
-        </View>
-      )}
+        />
+      </View>
       <LinearGradient
         pointerEvents="none"
         style={StyleSheet.absoluteFill}
@@ -1284,6 +1280,7 @@ function ImageGallery({ images }: { images: string[] }) {
         >
           <CachedImage
             source={{ uri: image }}
+            cachePolicy="disk"
             contentFit="cover"
             style={StyleSheet.absoluteFill}
           />
@@ -1385,6 +1382,7 @@ const ReviewCard = memo(function ReviewCard({
               >
                 <CachedImage
                   source={{ uri: image }}
+                  cachePolicy="disk"
                   contentFit="cover"
                   style={StyleSheet.absoluteFill}
                 />

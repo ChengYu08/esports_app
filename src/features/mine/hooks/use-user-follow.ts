@@ -35,14 +35,14 @@ export function useUserFollowCount(userId?: string) {
   });
 }
 
-export function useUserFollowState(followUserId?: string) {
+export function useUserFollowState(followUserId?: string, active = true) {
   const token = useAuthStore((state) => state.accessToken);
   const viewerUserId = useAuthStore((state) => state.user?.id);
 
   return useQuery({
     queryKey: userFollowStateQueryKey(followUserId, viewerUserId),
     queryFn: ({ signal }) => fetchUserFollowState(followUserId as string, token as string, signal),
-    enabled: Boolean(followUserId && token),
+    enabled: active && Boolean(followUserId && token),
   });
 }
 

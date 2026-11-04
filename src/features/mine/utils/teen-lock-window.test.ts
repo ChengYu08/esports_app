@@ -19,9 +19,18 @@ function beijingAt(hour: number, minute = 0, day = 15) {
 const HOUR_MS = 60 * 60 * 1000;
 
 describe("默认锁定窗口", () => {
-  it("默认值为服务端联调口径 9:00-23:00", () => {
-    expect(TEEN_DEFAULT_LOCK_START_HOUR).toBe(9);
-    expect(TEEN_DEFAULT_LOCK_END_HOUR).toBe(23);
+  it("默认值为服务端正式口径 22:00-次日6:00", () => {
+    expect(TEEN_DEFAULT_LOCK_START_HOUR).toBe(22);
+    expect(TEEN_DEFAULT_LOCK_END_HOUR).toBe(6);
+  });
+
+  it("配置拉取失败回退默认窗口：白天不锁定，夜间锁定", () => {
+    expect(shouldLockTeenMode(true, beijingAt(6, 0))).toBe(false);
+    expect(shouldLockTeenMode(true, beijingAt(12, 0))).toBe(false);
+    expect(shouldLockTeenMode(true, beijingAt(21, 59))).toBe(false);
+    expect(shouldLockTeenMode(true, beijingAt(22, 0))).toBe(true);
+    expect(shouldLockTeenMode(true, beijingAt(0, 30))).toBe(true);
+    expect(shouldLockTeenMode(true, beijingAt(5, 59))).toBe(true);
   });
 });
 
