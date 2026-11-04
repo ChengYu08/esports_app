@@ -14,7 +14,6 @@ import QRCodeSvg from "react-native-qrcode-svg";
 import { showToast, toastDurations } from "@/shared/ui/app-toast";
 import { captureRef } from "react-native-view-shot";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const appIcon = require("../../../../assets/images/icon.png");
 
@@ -179,7 +178,6 @@ const styles = StyleSheet.create({
   },
   title: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 17,
     lineHeight: 24,
     fontWeight: "600",
@@ -195,7 +193,6 @@ const styles = StyleSheet.create({
   summary: {
     marginTop: 8,
     color: "#656566",
-    fontFamily: DOUYIN_SANS,
     fontSize: 13,
     lineHeight: 20,
   },
@@ -217,7 +214,6 @@ const styles = StyleSheet.create({
   saveButtonDisabled: { opacity: 0.45 },
   saveButtonText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "500",
@@ -225,7 +221,6 @@ const styles = StyleSheet.create({
   hint: {
     marginTop: 12,
     color: "#979799",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     textAlign: "center",

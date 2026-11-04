@@ -2,7 +2,6 @@ import { Image } from "expo-image";
 import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
 import type { Game } from "@/features/home/api/home.types";
 import { colors } from "@/shared/theme/tokens";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const allGamesIcon = require("../../../../assets/mine/figma/god-all-games.svg");
 
@@ -52,6 +51,6 @@ const styles = StyleSheet.create({
   },
   gameSelected: { backgroundColor: "#FFF5F7", borderColor: "#FF99AD" },
   icon: { width: 20, height: 20, borderRadius: 4 },
-  label: { fontFamily: DOUYIN_SANS, fontSize: 12, color: "#0D0D0F", lineHeight: 18 },
+  label: { fontSize: 12, color: "#0D0D0F", lineHeight: 18 },
   labelSelected: { color: "#FE1F4C", fontWeight: "500" },
 });

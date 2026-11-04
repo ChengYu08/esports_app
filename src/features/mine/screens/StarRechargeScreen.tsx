@@ -2,19 +2,14 @@ import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import {
-  Dimensions,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { APP_LINKS } from "@/core/config/links";
 import { useStarIap } from "@/features/iap/use-star-iap";
 import { fetchStarBalance } from "@/features/mine/api/companion-order.api";
-import { APP_LINKS } from "@/core/config/links";
 import { openInAppWebView } from "@/shared/navigation/open-web-view";
+import { getDDinProStyle } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { Skeleton } from "@/shared/ui/Skeleton";
@@ -235,10 +230,7 @@ export default function StarRechargeScreen() {
       </View>
 
       <View
-        style={[
-          styles.purchaseFooter,
-          { paddingBottom: insets.bottom + 8 },
-        ]}
+        style={[styles.purchaseFooter, { paddingBottom: insets.bottom + 8 }]}
       >
         <View style={styles.agreementRow}>
           <Pressable
@@ -265,7 +257,10 @@ export default function StarRechargeScreen() {
             <Text
               style={styles.agreementLink}
               onPress={() =>
-                openInAppWebView(APP_LINKS.rechargeAgreement, "盼之电竞购买须知")
+                openInAppWebView(
+                  APP_LINKS.rechargeAgreement,
+                  "盼之电竞购买须知",
+                )
               }
             >
               《盼之电竞购买须知》
@@ -397,6 +392,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: GRID_GAP,
+    ...getDDinProStyle(600),
   },
   packageCard: {
     width: CARD_WIDTH,
@@ -491,6 +487,6 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     lineHeight: 22,
-    fontWeight: "500",
+    ...getDDinProStyle(500),
   },
 });

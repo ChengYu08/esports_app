@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 import { Image } from "expo-image";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const icons = {
   clear: require("../../../../assets/message/message-clear.svg"),
@@ -68,7 +67,6 @@ const styles = StyleSheet.create({
     paddingRight: 6,
   },
   title: {
-    fontFamily: DOUYIN_SANS,
     color: "#333333",
     fontSize: 20,
     lineHeight: 28,

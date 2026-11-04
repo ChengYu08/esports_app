@@ -16,7 +16,6 @@ import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { toAuthUser } from "@/features/auth/client-auth-flow";
 import { saveAuthSession } from "@/features/auth/session-persistence";
 import { validateNickname } from "@/features/mine/utils/nickname-rules";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 const NICKNAME_MAX_LENGTH = 18;
@@ -132,7 +131,6 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "600",
@@ -145,7 +143,6 @@ const styles = StyleSheet.create({
   },
   saveText: {
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -165,7 +162,6 @@ const styles = StyleSheet.create({
   input: {
     minHeight: 48,
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     padding: 0,
@@ -183,7 +179,6 @@ const styles = StyleSheet.create({
   },
   counterText: {
     color: "#CCCCCC",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -192,7 +187,6 @@ const styles = StyleSheet.create({
   counterLimit: { color: "#FF4754" },
   hintText: {
     color: "#808080",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     paddingHorizontal: 8,

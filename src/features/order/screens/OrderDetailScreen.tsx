@@ -22,7 +22,6 @@ import { formatOrderTime } from "@/features/order/order-detail-format";
 import { orderClubQueryKey, orderDetailQueryKey } from "@/features/order/order-query";
 import { fetchOrderClub, fetchOrderDetail, mapOrder } from "@/features/order/order.api";
 import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 
 /** 详情页只有接单方/下单方两种视角 */
@@ -356,6 +355,6 @@ const styles = StyleSheet.create({
   headerSlot: { width: 32 },
   scroll: { flex: 1 },
   content: { paddingBottom: 8 },
-  muted: { color: "#999", fontFamily: DOUYIN_SANS, fontSize: 13 },
+  muted: { color: "#999", fontSize: 13 },
   acceptScreen: { backgroundColor: "#F7F7F7" },
 });

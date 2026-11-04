@@ -2,7 +2,6 @@ import { Image } from "expo-image";
 import { StyleSheet, Text, View } from "react-native";
 
 import type { OrderItemModel, OrderScope } from "@/features/order/order.types";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const orderStepCheck = require("../../../../assets/order/order-step-check.svg");
 const orderStepActive = require("../../../../assets/order/order-step-active.svg");
@@ -110,7 +109,6 @@ const styles = StyleSheet.create({
   acceptPendingIcon: { position: "absolute", width: 20, height: 20 },
   acceptFlowNumber: {
     color: "#FFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     fontWeight: "500",
   },
@@ -149,7 +147,6 @@ const styles = StyleSheet.create({
   flowNumber: { color: "#FFF", fontSize: 14, fontWeight: "600" },
   flowLabel: {
     color: "#222",
-    fontFamily: DOUYIN_SANS,
     fontSize: 13,
     marginTop: 9,
   },

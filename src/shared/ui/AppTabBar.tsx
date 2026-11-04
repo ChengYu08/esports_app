@@ -1,4 +1,3 @@
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { router } from "expo-router";
@@ -214,13 +213,11 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 10,
     lineHeight: 13,
     fontWeight: "400",
   },
   bottomLabel: {
-    fontFamily: DOUYIN_SANS,
     color: "#979799",
     fontSize: 10,
     lineHeight: 12,

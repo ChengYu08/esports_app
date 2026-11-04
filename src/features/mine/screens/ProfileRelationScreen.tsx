@@ -22,7 +22,6 @@ import {
   useUserFollowPage,
 } from "@/features/mine/hooks/use-user-follow";
 import { requireLogin } from "@/shared/navigation/require-login";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { EmptyState, ErrorState } from "@/shared/ui/AsyncStates";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
@@ -361,7 +360,6 @@ const styles = StyleSheet.create({
   },
   tabText: {
     color: "#999999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "400",
@@ -408,7 +406,6 @@ const styles = StyleSheet.create({
   nickname: {
     flexShrink: 1,
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "600",
@@ -416,7 +413,6 @@ const styles = StyleSheet.create({
   signature: {
     marginTop: 0,
     color: "#666666",
-    fontFamily: DOUYIN_SANS,
     fontSize: 11,
     lineHeight: 16,
   },
@@ -435,19 +431,17 @@ const styles = StyleSheet.create({
   actionButtonDone: { backgroundColor: "#F7F7F7" },
   actionText: {
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
   actionTextDone: { color: "#999999" },
   emptyState: { flex: 1 },
   emptyLoading: { flex: 1, alignSelf: "center" },
-  retryText: { color: "#E62336", fontFamily: DOUYIN_SANS, fontSize: 13 },
+  retryText: { color: "#E62336", fontSize: 13 },
   footer: { alignItems: "center", paddingVertical: 20 },
   footerText: {
     paddingVertical: 20,
     color: "#BBBBBB",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     textAlign: "center",
   },

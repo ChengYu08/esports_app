@@ -10,7 +10,6 @@ import {
   fetchStarBalance,
   payCompanionOrder,
 } from "@/features/mine/api/companion-order.api";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 
@@ -185,14 +184,12 @@ const styles = StyleSheet.create({
   paymentModalHeading: { gap: 8 },
   paymentModalTitle: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     fontWeight: "500",
     lineHeight: 24,
   },
   paymentModalHint: {
     color: "#808080",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -224,7 +221,6 @@ const styles = StyleSheet.create({
   paymentRowLabel: {
     width: 96,
     color: "#666666",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -235,7 +231,6 @@ const styles = StyleSheet.create({
   },
   paymentTotalValue: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "500",
     lineHeight: 22,
@@ -243,7 +238,6 @@ const styles = StyleSheet.create({
   },
   paymentBalanceValue: {
     color: "#FE1F4C",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "500",
     lineHeight: 22,
@@ -272,7 +266,6 @@ const styles = StyleSheet.create({
   },
   paySubmitText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "500",
     lineHeight: 22,

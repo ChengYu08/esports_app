@@ -17,7 +17,6 @@ import { uploadClientObject } from "@/features/auth/oss-upload";
 import { saveAuthSession } from "@/features/auth/session-persistence";
 import { BirthDatePickerSheet } from "@/features/mine/components/BirthDatePickerSheet";
 import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
@@ -330,7 +329,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F7F7" },
   headerTitle: {
     color: "#0D0D0F",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "600",
@@ -369,7 +367,6 @@ const styles = StyleSheet.create({
   capsuleDisabled: { opacity: 0.6 },
   changeAvatarText: {
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: "600",
@@ -389,7 +386,6 @@ const styles = StyleSheet.create({
   },
   rowLabel: {
     color: "#666666",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -405,7 +401,6 @@ const styles = StyleSheet.create({
   rowValue: {
     flexShrink: 1,
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -439,7 +434,6 @@ const styles = StyleSheet.create({
   },
   genderOptionText: {
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
   },
   sheetTitleRow: {
@@ -451,7 +445,6 @@ const styles = StyleSheet.create({
   },
   sheetTitle: {
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "600",
@@ -473,7 +466,6 @@ const styles = StyleSheet.create({
   },
   genderRadioText: {
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },

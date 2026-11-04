@@ -1,7 +1,6 @@
 import { Add16Regular, Subtract16Regular } from "@fluentui/react-native-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 type MatchStepperProps = {
   value: number;
@@ -85,7 +84,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   numberText: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "500",
