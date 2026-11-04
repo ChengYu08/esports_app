@@ -4,6 +4,7 @@ import { fetchStarBalance } from "@/features/mine/api/companion-order.api";
 import {
   chargeRecordsNextPage,
   fetchChargeRecords,
+  type ChargeRecord,
 } from "@/features/mine/api/recharge.api";
 import { MyDiamondsBalanceCard } from "@/features/mine/components/MyDiamondsBalanceCard";
 import { MyDiamondsEntry } from "@/features/mine/components/MyDiamondsEntry";
@@ -15,17 +16,22 @@ import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { router, useIsFocused } from "expo-router";
+import { useCallback, useMemo } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
+  type ListRenderItem,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const emptyIllustration = require("../../../../assets/svgs/my-diamonds-empty.svg");
+
+const keyExtractor = (entry: ChargeRecord) => String(entry.id);
 
 export default function MyDiamondsScreen() {
   const insets = useSafeAreaInsets();
@@ -37,7 +43,7 @@ export default function MyDiamondsScreen() {
     queryKey: ["pay", "starBalance", accessToken],
     queryFn: () => fetchStarBalance(accessToken!),
     enabled,
-    staleTime: 0,
+    staleTime: 30_000,
   });
 
   const recordsQuery = useInfiniteQuery({
@@ -47,23 +53,135 @@ export default function MyDiamondsScreen() {
       fetchChargeRecords(accessToken!, pageParam, undefined, signal),
     getNextPageParam: (last, _pages, page) => chargeRecordsNextPage(last, page),
     enabled,
-    staleTime: 0,
+    staleTime: 30_000,
   });
 
-  const entries =
-    recordsQuery.data?.pages.flatMap((page) => page.records ?? []) ?? [];
+  const entries = useMemo(
+    () => recordsQuery.data?.pages.flatMap((page) => page.records ?? []) ?? [],
+    [recordsQuery.data],
+  );
 
   const pullToRefresh = usePullToRefresh(async () => {
     await Promise.all([balanceQuery.refetch(), recordsQuery.refetch()]);
   });
 
-  const openRecharge = () => {
+  const openRecharge = useCallback(() => {
     router.push("/star-recharge");
-  };
+  }, []);
 
-  const openAgreement = () => {
+  const openAgreement = useCallback(() => {
     openInAppWebView(APP_LINKS.rechargeAgreement, "充值协议");
-  };
+  }, []);
+
+  const onEndReached = useCallback(() => {
+    if (
+      recordsQuery.hasNextPage &&
+      !recordsQuery.isFetching &&
+      !recordsQuery.isError
+    ) {
+      void recordsQuery.fetchNextPage();
+    }
+  }, [
+    recordsQuery.hasNextPage,
+    recordsQuery.isFetching,
+    recordsQuery.isError,
+    recordsQuery.fetchNextPage,
+  ]);
+
+  const renderItem = useCallback<ListRenderItem<ChargeRecord>>(
+    ({ item }) => <MyDiamondsEntry entry={item} />,
+    [],
+  );
+
+  const balance = balanceQuery.isError ? null : (balanceQuery.data ?? null);
+
+  const listHeader = useMemo(
+    () => (
+      <View style={styles.headerBlock}>
+        <View style={styles.cardWrap}>
+          <MyDiamondsBalanceCard balance={balance} onRecharge={openRecharge} />
+        </View>
+        <View style={styles.sectionTitleWrap}>
+          <Text style={styles.sectionTitle}>钻石明细</Text>
+        </View>
+      </View>
+    ),
+    [balance, openRecharge],
+  );
+
+  const listEmpty = useMemo(
+    () => (
+      <View style={styles.emptyWrap}>
+        {recordsQuery.isPending ? (
+          <ActivityIndicator color="#FE1F4C" style={styles.loading} />
+        ) : !recordsQuery.isError ? (
+          <EmptyState
+            message="空空如也～"
+            style={styles.emptyState}
+            illustration={
+              <Image
+                accessibilityIgnoresInvertColors
+                contentFit="contain"
+                source={emptyIllustration}
+                style={styles.emptyIllustration}
+              />
+            }
+          />
+        ) : null}
+      </View>
+    ),
+    [recordsQuery.isPending, recordsQuery.isError],
+  );
+
+  const listFooter = useMemo(() => {
+    if (recordsQuery.isError && entries.length === 0) {
+      return (
+        <ErrorState
+          message={recordsQuery.error.message}
+          onRetry={() => recordsQuery.refetch()}
+        />
+      );
+    }
+    if (recordsQuery.isError) {
+      return (
+        <ErrorState
+          message={recordsQuery.error.message}
+          onRetry={() => {
+            if (recordsQuery.isFetchNextPageError) {
+              void recordsQuery.fetchNextPage();
+            } else {
+              void recordsQuery.refetch();
+            }
+          }}
+        />
+      );
+    }
+    if (recordsQuery.isFetchingNextPage) {
+      return <ActivityIndicator color="#FE1F4C" style={styles.loading} />;
+    }
+    if (entries.length > 0 && !recordsQuery.hasNextPage) {
+      return <Text style={styles.end}>没有更多啦～</Text>;
+    }
+    return null;
+  }, [
+    entries.length,
+    recordsQuery.error,
+    recordsQuery.fetchNextPage,
+    recordsQuery.hasNextPage,
+    recordsQuery.isError,
+    recordsQuery.isFetchNextPageError,
+    recordsQuery.isFetchingNextPage,
+    recordsQuery.refetch,
+  ]);
+
+  const contentContainerStyle = useMemo(
+    () => [
+      styles.listContent,
+      { paddingBottom: Math.max(insets.bottom, spacing.lg) },
+      entries.length === 0 ? styles.listContentEmpty : null,
+    ],
+    [entries.length, insets.bottom],
+  );
 
   return (
     <View style={styles.screen}>
@@ -94,87 +212,23 @@ export default function MyDiamondsScreen() {
           automaticallyAdjustsScrollIndicatorInsets={false}
           style={styles.list}
           data={entries}
-          keyExtractor={(entry) => String(entry.id)}
-          contentContainerStyle={[
-            styles.listContent,
-            { paddingBottom: Math.max(insets.bottom, spacing.lg) },
-            entries.length === 0 ? styles.listContentEmpty : null,
-          ]}
+          keyExtractor={keyExtractor}
+          contentContainerStyle={contentContainerStyle}
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={EntrySeparator}
           refreshing={focused && pullToRefresh.refreshing}
           onRefresh={pullToRefresh.onRefresh}
-          onEndReached={() => {
-            if (
-              recordsQuery.hasNextPage &&
-              !recordsQuery.isFetching &&
-              !recordsQuery.isError
-            ) {
-              recordsQuery.fetchNextPage();
-            }
-          }}
-          onEndReachedThreshold={0.3}
-          ListHeaderComponent={
-            <View style={styles.headerBlock}>
-              <View style={styles.cardWrap}>
-                <MyDiamondsBalanceCard
-                  balance={
-                    balanceQuery.isError
-                      ? null
-                      : (balanceQuery.data ?? null)
-                  }
-                  onRecharge={openRecharge}
-                />
-              </View>
-              <View style={styles.sectionTitleWrap}>
-                <Text style={styles.sectionTitle}>钻石明细</Text>
-              </View>
-            </View>
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyWrap}>
-              {recordsQuery.isPending ? (
-                <ActivityIndicator color="#FE1F4C" style={styles.loading} />
-              ) : !recordsQuery.isError ? (
-                <EmptyState
-                  message="空空如也～"
-                  style={styles.emptyState}
-                  illustration={
-                    <Image
-                      accessibilityIgnoresInvertColors
-                      contentFit="contain"
-                      source={emptyIllustration}
-                      style={styles.emptyIllustration}
-                    />
-                  }
-                />
-              ) : null}
-            </View>
-          }
-          ListFooterComponent={
-            recordsQuery.isError && entries.length === 0 ? (
-              <ErrorState
-                message={recordsQuery.error.message}
-                onRetry={() => recordsQuery.refetch()}
-              />
-            ) : recordsQuery.isError ? (
-              <ErrorState
-                message={recordsQuery.error.message}
-                onRetry={() => {
-                  if (recordsQuery.isFetchNextPageError) {
-                    recordsQuery.fetchNextPage();
-                  } else {
-                    recordsQuery.refetch();
-                  }
-                }}
-              />
-            ) : recordsQuery.isFetchingNextPage ? (
-              <ActivityIndicator color="#FE1F4C" style={styles.loading} />
-            ) : entries.length > 0 && !recordsQuery.hasNextPage ? (
-              <Text style={styles.end}>没有更多啦～</Text>
-            ) : null
-          }
-          renderItem={({ item }) => <MyDiamondsEntry entry={item} />}
+          onEndReached={onEndReached}
+          onEndReachedThreshold={0.4}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={listEmpty}
+          ListFooterComponent={listFooter}
+          renderItem={renderItem}
+          initialNumToRender={8}
+          maxToRenderPerBatch={6}
+          updateCellsBatchingPeriod={50}
+          windowSize={7}
+          removeClippedSubviews={Platform.OS === "android"}
         />
       )}
     </View>

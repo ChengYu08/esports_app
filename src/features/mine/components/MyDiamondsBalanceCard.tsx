@@ -1,5 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
+import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 const walletCardBg = require("../../../../assets/images/my-diamonds-wallect-card.png");
@@ -17,7 +18,7 @@ function formatBalance(value: number | null): string {
   return value.toLocaleString("en-US");
 }
 
-export function MyDiamondsBalanceCard({
+export const MyDiamondsBalanceCard = memo(function MyDiamondsBalanceCard({
   balance,
   onRecharge,
 }: MyDiamondsBalanceCardProps) {
@@ -57,7 +58,7 @@ export function MyDiamondsBalanceCard({
       </Pressable>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {
