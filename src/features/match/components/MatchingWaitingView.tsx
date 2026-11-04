@@ -26,7 +26,6 @@ import { useEffect, useState } from "react";
 
 import type { MatchGame } from "@/features/match/api/match.types";
 import { MatchingCountdownText } from "@/features/match/components/MatchingCountdownText";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const FOOTER_CONTENT_BOTTOM = 22;
 
@@ -415,7 +414,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   title: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 20,
     lineHeight: 28,
     fontWeight: "600",
@@ -427,7 +425,6 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   ellipsisDot: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 20,
     lineHeight: 28,
     fontWeight: "600",
@@ -489,7 +486,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.12)",
   },
   logoInitial: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 28,
     lineHeight: 36,
     fontWeight: "600",
@@ -507,7 +503,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.1)",
   },
   cancelText: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "500",

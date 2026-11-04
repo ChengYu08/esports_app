@@ -19,7 +19,6 @@ import {
   realNameFailureMessage,
 } from "@/features/mine/real-name";
 import { submitRealNameVerification } from "@/features/mine/real-name-session";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 
 const nameIcon = require("../../../../assets/home/h_user.svg");
@@ -196,13 +195,11 @@ const styles = StyleSheet.create({
   },
   title: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 18,
     fontWeight: "600",
   },
   notice: {
     color: "#7C818C",
-    fontFamily: DOUYIN_SANS,
     fontSize: 13,
     lineHeight: 20,
     marginTop: 7,
@@ -210,7 +207,6 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     color: "#30343B",
-    fontFamily: DOUYIN_SANS,
     fontSize: 13,
     fontWeight: "600",
     marginBottom: 8,
@@ -261,7 +257,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#F7F7F7",
   },
-  cancelText: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 15 },
+  cancelText: { color: "#666", fontSize: 15 },
   confirmButton: {
     flex: 1,
     height: 44,
@@ -270,5 +266,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#FF1F4C",
   },
-  confirmText: { color: "#FFF", fontFamily: DOUYIN_SANS, fontSize: 15 },
+  confirmText: { color: "#FFF", fontSize: 15 },
 });

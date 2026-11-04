@@ -1,6 +1,5 @@
 import { StyleSheet, Text, View } from "react-native";
 import { colors } from "@/shared/theme/tokens";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import type { MyRanking, RankingBoard } from "../api/ranking.types";
 import { formatRankingMetric, getRankingBoard } from "../ranking.config";
 import { RankingAvatar } from "./RankingAvatar";
@@ -29,9 +28,9 @@ const styles = StyleSheet.create({
   container: { backgroundColor: colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingHorizontal: 16, paddingVertical: 10 },
   card: { minHeight: 52, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: "#FFF2F5", flexDirection: "row", alignItems: "center", gap: 10 },
   identity: { flex: 1, minWidth: 0, gap: 4 },
-  label: { fontFamily: DOUYIN_SANS, fontSize: 12, color: colors.text },
-  rank: { fontFamily: DOUYIN_SANS, fontSize: 12, color: colors.brand, fontWeight: "600" },
+  label: { fontSize: 12, color: colors.text },
+  rank: { fontSize: 12, color: colors.brand, fontWeight: "600" },
   metric: { maxWidth: "45%", alignItems: "flex-end", gap: 4 },
-  metricLabel: { fontFamily: DOUYIN_SANS, fontSize: 10, color: colors.textMuted },
-  value: { fontFamily: DOUYIN_SANS, fontSize: 16, fontWeight: "600", color: colors.text },
+  metricLabel: { fontSize: 10, color: colors.textMuted },
+  value: { fontSize: 16, fontWeight: "600", color: colors.text },
 });

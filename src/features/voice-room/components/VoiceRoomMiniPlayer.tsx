@@ -15,6 +15,11 @@ const recordingIcon = require('../../../../assets/voice-room/floating-recording.
 const PLAYER_WIDTH = 50;
 const PLAYER_HEIGHT = 48;
 const DRAG_THRESHOLD = 6;
+/**
+ * Figma 2364:96434 / 812 画布：MiniPlayer 底边 y=608 → 距屏幕底 204。
+ * 与 FAB 距底 128 错开，切 Tab 固定不跳动。
+ */
+const FIGMA_PLAYER_BOTTOM_FROM_SCREEN = 204;
 
 /** Figma 102.85° 底层蓝渐变 */
 const BLUE_GRADIENT = {
@@ -41,7 +46,10 @@ export function VoiceRoomMiniPlayer() {
   // Keep offsets mounted while the room screen is open so minimizing restores the position.
   const offsetY = useSharedValue(0);
   const dragStartY = useSharedValue(0);
-  const defaultY = Math.max(insets.top, height - insets.bottom - 126 - PLAYER_HEIGHT);
+  const defaultY = Math.max(
+    insets.top,
+    height - FIGMA_PLAYER_BOTTOM_FROM_SCREEN - PLAYER_HEIGHT,
+  );
   const minY = insets.top - defaultY;
   const maxY = Math.max(0, height - insets.bottom - PLAYER_HEIGHT - defaultY);
 

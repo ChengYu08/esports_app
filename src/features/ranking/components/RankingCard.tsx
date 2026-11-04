@@ -1,5 +1,4 @@
 import { colors } from "@/shared/theme/tokens";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { LinearGradient } from "expo-linear-gradient";
 import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -131,29 +130,25 @@ const styles = StyleSheet.create({
   },
   top: { fontSize: 8, fontWeight: "700", color: "#FFF" },
   medalNumber: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 18,
     lineHeight: 22,
     fontWeight: "700",
     color: "#FFF",
   },
   rank: {
-    fontFamily: DOUYIN_SANS,
     color: "#85858E",
     fontSize: 10,
     fontWeight: "500",
   },
   identity: { flex: 1, minWidth: 0, gap: 6 },
   name: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     color: colors.text,
     fontWeight: "500",
   },
-  club: { fontFamily: DOUYIN_SANS, fontSize: 11, color: colors.textMuted },
+  club: { fontSize: 11, color: colors.textMuted },
   metric: { alignItems: "flex-end", maxWidth: "34%", gap: 5 },
   metricLabel: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 10,
     color: colors.textMuted,
   },
@@ -179,11 +174,10 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingLeft: 8,
   },
-  actionLabel: { fontFamily: DOUYIN_SANS, fontSize: 11, color: colors.brand },
+  actionLabel: { fontSize: 11, color: colors.brand },
   arrow: { fontSize: 18, lineHeight: 20, color: colors.brand },
   pressed: { opacity: 0.6 },
   unavailable: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 10,
     color: colors.textMuted,
   },

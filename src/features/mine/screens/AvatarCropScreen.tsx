@@ -17,7 +17,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import Svg, { Path } from "react-native-svg";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import {
   completeMediaPick,
   isMediaPickActive,
@@ -353,14 +352,12 @@ const styles = StyleSheet.create({
   saving: { opacity: 0.7 },
   buttonText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "500",
   },
   hintText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
   },
   hintActionWrap: {
@@ -368,7 +365,6 @@ const styles = StyleSheet.create({
   },
   hintAction: {
     color: "#FE1F4C",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
   },
 });

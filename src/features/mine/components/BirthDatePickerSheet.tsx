@@ -15,7 +15,6 @@ import {
   daysInMonth,
   parseBirth,
 } from "@/features/mine/utils/birthday-columns";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 
 const ITEM_HEIGHT = 46;
@@ -228,20 +227,17 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "center",
     color: "#0D0D0F",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "500",
   },
   cancelText: {
     color: "#999999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
   confirmText: {
     color: "#0D0D0F",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -263,7 +259,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   itemText: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },

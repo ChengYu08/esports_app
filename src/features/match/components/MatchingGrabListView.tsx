@@ -18,7 +18,6 @@ import { MatchLinearGradient } from "@/features/match/components/MatchLinearGrad
 import { MatchingCountdownText } from "@/features/match/components/MatchingCountdownText";
 import { useProfileDetail } from "@/features/mine/hooks/use-profile-data";
 import { calculateAge } from "@/features/mine/profile-utils";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const PUBLISH_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
 const FOOTER_CONTENT_BOTTOM = 22;
@@ -276,7 +275,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   title: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 20,
     lineHeight: 28,
     fontWeight: "600",
@@ -327,7 +325,6 @@ const styles = StyleSheet.create({
   name: {
     flexShrink: 1,
     maxWidth: 152,
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "500",
@@ -344,7 +341,6 @@ const styles = StyleSheet.create({
     height: 12,
   },
   age: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: "500",
@@ -356,13 +352,11 @@ const styles = StyleSheet.create({
     color: "#FF42A1",
   },
   multiCompanionTip: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 11,
     lineHeight: 16,
     color: "#FFFFFF",
   },
   signature: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 11,
     lineHeight: 16,
     color: "rgba(255,255,255,0.6)",
@@ -384,7 +378,6 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   confirmText: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "500",

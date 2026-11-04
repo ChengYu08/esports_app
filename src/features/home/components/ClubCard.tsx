@@ -1,7 +1,6 @@
 import type { Club } from "@/features/home/api/home.types";
 import { computeGameIconLayout } from "@/features/mine/utils/game-icons-layout";
 import { colors } from "@/shared/theme/tokens";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -134,7 +133,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   coverText: {
-    fontFamily: DOUYIN_SANS,
     color: "rgba(255,255,255,.78)",
     fontSize: 34,
     fontWeight: "800",
@@ -157,7 +155,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FF4754",
   },
   tagText: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 10,
     fontWeight: "600",
     lineHeight: 12,
@@ -173,7 +170,6 @@ const styles = StyleSheet.create({
   },
   // 设计稿 L2 Tag/bold：浅粉底 #FFE5EB 红字 #FF42A1，600/10/14，pad 4/1/4/1
   self: {
-    fontFamily: DOUYIN_SANS,
     color: "#FF42A1",
     backgroundColor: "#FFE5EB",
     paddingHorizontal: 4,
@@ -185,7 +181,6 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
   name: {
-    fontFamily: DOUYIN_SANS,
     color: "#0A0A0A",
     fontSize: 16,
     lineHeight: 24,
@@ -205,13 +200,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#2FC273",
   },
   onlineText: {
-    fontFamily: DOUYIN_SANS,
     color: "#2FC273",
     fontSize: 12,
     lineHeight: 17,
   },
   desc: {
-    fontFamily: DOUYIN_SANS,
     color: "#979799",
     fontSize: 11,
     lineHeight: 16,
@@ -237,7 +230,6 @@ const styles = StyleSheet.create({
   },
   meta: { flexDirection: "row", alignItems: "center", gap: 4 },
   metaText: {
-    fontFamily: DOUYIN_SANS,
     color: "#7F7F80",
     fontSize: 11,
     lineHeight: 16,

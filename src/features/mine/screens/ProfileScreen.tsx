@@ -73,7 +73,6 @@ import { invalidateOrderQueries } from "@/features/order/order-query";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { requireLogin } from "@/shared/navigation/require-login";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { showToast } from "@/shared/ui/app-toast";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { EmptyState } from "@/shared/ui/AsyncStates";
@@ -1519,12 +1518,11 @@ const styles = StyleSheet.create({
   errorBackIcon: { width: 24, height: 24, tintColor: "#0D0D0F" },
   stateText: {
     color: "#999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     textAlign: "center",
     padding: 24,
   },
-  retryText: { color: "#FF3158", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  retryText: { color: "#FF3158", fontSize: 14 },
   cover: {
     overflow: "hidden",
     backgroundColor: "#617181",
@@ -1716,7 +1714,6 @@ const styles = StyleSheet.create({
   },
   blacklistTagText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 10,
     lineHeight: 14,
     fontWeight: "500",
@@ -1766,7 +1763,6 @@ const styles = StyleSheet.create({
   },
   companionTagText: {
     color: "#FFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 10,
     lineHeight: 13,
     fontWeight: "500",
@@ -1775,7 +1771,6 @@ const styles = StyleSheet.create({
   },
   idRow: {
     color: "rgba(255,255,255,0.6)",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -1788,7 +1783,6 @@ const styles = StyleSheet.create({
   clubIcon: { width: 16, height: 16 },
   clubName: {
     color: "rgba(255,255,255,0.6)",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     flexShrink: 1,
@@ -1837,7 +1831,6 @@ const styles = StyleSheet.create({
   },
   editProfileText: {
     color: "#0D0D0F",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "500",
     lineHeight: 22,
@@ -1846,16 +1839,14 @@ const styles = StyleSheet.create({
   stat: { flexDirection: "row", alignItems: "baseline", gap: 5 },
   statValue: {
     color: "#111",
-    fontFamily: DOUYIN_SANS,
     fontSize: 20,
     lineHeight: 28,
     fontWeight: "700",
   },
-  statLabel: { color: "#999", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  statLabel: { color: "#999", fontSize: 14 },
   signature: {
     marginTop: 12,
     color: "#161616",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 21,
   },
@@ -1869,7 +1860,6 @@ const styles = StyleSheet.create({
   },
   tabText: {
     color: "#999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -1909,7 +1899,6 @@ const styles = StyleSheet.create({
   gameLogo: { width: 15, height: 12.8, borderRadius: 4 },
   gameText: {
     color: "#656566",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -1922,7 +1911,6 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "500",
@@ -1930,7 +1918,6 @@ const styles = StyleSheet.create({
   description: {
     marginTop: 14,
     color: "#656566",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -1975,14 +1962,12 @@ const styles = StyleSheet.create({
   successTitle: {
     marginTop: 16,
     color: "#111",
-    fontFamily: DOUYIN_SANS,
     fontSize: 20,
     fontWeight: "600",
   },
   successHint: {
     marginTop: 8,
     color: "#888",
-    fontFamily: DOUYIN_SANS,
     fontSize: 13,
     lineHeight: 20,
     textAlign: "center",
@@ -1998,7 +1983,6 @@ const styles = StyleSheet.create({
   },
   successButtonText: {
     color: "#fff",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     fontWeight: "600",
   },
@@ -2018,14 +2002,12 @@ const styles = StyleSheet.create({
   serviceCopy: { flex: 1, minWidth: 0, gap: 6 },
   serviceName: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "400",
   },
   serviceMeta: { flexDirection: "row", alignItems: "center", gap: 7 },
   price: {
     color: "#FF1F4C",
-    fontFamily: DOUYIN_SANS,
     fontSize: 18,
     lineHeight: 22,
     fontWeight: "600",
@@ -2033,7 +2015,6 @@ const styles = StyleSheet.create({
   diamond: { color: "#FF3158", fontSize: 14 },
   metaText: {
     color: "#979799",
-    fontFamily: DOUYIN_SANS,
     fontSize: 11,
     lineHeight: 16,
   },
@@ -2048,17 +2029,15 @@ const styles = StyleSheet.create({
   },
   orderText: {
     color: "#fff",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
   inlineState: { alignItems: "center", paddingVertical: 48 },
   empty: { alignItems: "center", paddingVertical: 48 },
-  emptyText: { color: "#777", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  emptyText: { color: "#777", fontSize: 14 },
   emptyHint: {
     marginTop: 8,
     color: "#aaa",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
   },
   reviewList: { marginHorizontal: 8, marginTop: 8 },
@@ -2082,13 +2061,11 @@ const styles = StyleSheet.create({
   reviewer: {
     flex: 1,
     color: "#999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
   reviewText: {
     color: "#333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -2096,7 +2073,6 @@ const styles = StyleSheet.create({
   reviewImage: { width: 57, height: 57, borderRadius: 6, overflow: "hidden" },
   reviewDate: {
     color: "#999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -2124,7 +2100,6 @@ const styles = StyleSheet.create({
   },
   followText: {
     color: "#111",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     fontWeight: "600",
   },
@@ -2138,7 +2113,6 @@ const styles = StyleSheet.create({
   },
   chatText: {
     color: "#fff",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     fontWeight: "600",
   },

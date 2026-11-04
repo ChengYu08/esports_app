@@ -32,7 +32,6 @@ import { afterSaleCardRows } from "@/features/order/after-sale-card";
 import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
 import { convertToJpeg } from "@/shared/media-picker/image-compat";
 import { showToast } from "@/shared/ui/app-toast";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
@@ -1087,13 +1086,12 @@ const styles = StyleSheet.create({
   name: {
     flexShrink: 1,
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "600",
     lineHeight: 22,
   },
   onlineIcon: { width: 6, height: 6 },
-  onlineText: { color: "#2FC273", fontFamily: DOUYIN_SANS, fontSize: 12 },
+  onlineText: { color: "#2FC273", fontSize: 12 },
   offlineText: { color: "#999999" },
   messageList: {
     flexGrow: 1,
@@ -1113,7 +1111,6 @@ const styles = StyleSheet.create({
   },
   timeSeparatorText: {
     color: "#999999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -1143,7 +1140,6 @@ const styles = StyleSheet.create({
   mineBubble: { backgroundColor: "#FFF2F5" },
   retryLabel: {
     color: "#FE1F4C",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     marginLeft: 4,
     marginTop: 8,
@@ -1151,7 +1147,6 @@ const styles = StyleSheet.create({
   errorBanner: {
     color: "#FE1F4C",
     backgroundColor: "#FFF1F3",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     paddingHorizontal: 16,
@@ -1160,7 +1155,6 @@ const styles = StyleSheet.create({
   },
   bubbleText: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -1200,7 +1194,6 @@ const styles = StyleSheet.create({
   roomInviteBody: { flex: 1, minWidth: 0, gap: 2 },
   roomInviteTitle: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "500",
@@ -1210,7 +1203,6 @@ const styles = StyleSheet.create({
   roomInviteName: {
     flexShrink: 1,
     color: "#808080",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 16,
   },
@@ -1223,7 +1215,6 @@ const styles = StyleSheet.create({
   },
   roomInviteButtonText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 16,
     fontWeight: "500",
@@ -1273,7 +1264,6 @@ const styles = StyleSheet.create({
   sendButtonDisabled: { opacity: 0.55 },
   sendText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -1365,7 +1355,6 @@ const styles = StyleSheet.create({
   },
   sheetTitle: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "500",
@@ -1395,7 +1384,6 @@ const styles = StyleSheet.create({
   },
   sheetOptionText: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "500",
@@ -1409,7 +1397,6 @@ const styles = StyleSheet.create({
   },
   sheetNote: {
     color: "#999999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 13,
     maxWidth: 160,
   },
@@ -1446,7 +1433,6 @@ const styles = StyleSheet.create({
   },
   noteTitle: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     fontWeight: "600",
     lineHeight: 24,
@@ -1458,7 +1444,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: "#F7F7F7",
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
   },
   noteActions: {
@@ -1473,7 +1458,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  noteCancelText: { color: "#666666", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  noteCancelText: { color: "#666666", fontSize: 14 },
   noteConfirm: {
     minWidth: 64,
     height: 36,
@@ -1485,7 +1470,6 @@ const styles = StyleSheet.create({
   },
   noteConfirmText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "600",
   },

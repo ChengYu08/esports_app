@@ -1,5 +1,4 @@
 import { colors } from "@/shared/theme/tokens";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
 import { router, useIsFocused } from "expo-router";
 import { useCallback, useState } from "react";
@@ -269,7 +268,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   rulesLabel: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 11,
     color: colors.textSecondary,
   },
@@ -289,7 +287,6 @@ const styles = StyleSheet.create({
     lineHeight: 11,
   },
   gameStatus: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 10,
     color: colors.textMuted,
     paddingHorizontal: 20,
@@ -305,7 +302,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   sortLabel: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 11,
     color: colors.textMuted,
     flexShrink: 1,
@@ -319,7 +315,6 @@ const styles = StyleSheet.create({
   },
   empty: { alignItems: "center" },
   emptyHint: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 11,
     color: colors.textMuted,
     marginTop: -12,
@@ -330,9 +325,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 12,
   },
-  resetLabel: { fontFamily: DOUYIN_SANS, fontSize: 12, color: colors.brand },
+  resetLabel: { fontSize: 12, color: colors.brand },
   endNote: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 10,
     color: "#B0B0B8",
     textAlign: "center",
@@ -351,10 +345,9 @@ const styles = StyleSheet.create({
   },
   noticeMessage: {
     flex: 1,
-    fontFamily: DOUYIN_SANS,
     fontSize: 11,
     lineHeight: 17,
     color: colors.textSecondary,
   },
-  retryLabel: { fontFamily: DOUYIN_SANS, fontSize: 12, color: colors.brand },
+  retryLabel: { fontSize: 12, color: colors.brand },
 });

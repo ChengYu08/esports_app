@@ -26,10 +26,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { publishQuickMatch } from "@/features/match/api/match.api";
 import type { MatchGame } from "@/features/match/api/match.types";
-import { openAuditionRoom } from "@/features/match/enter-audition-room";
 import { LightGameOptionChip } from "@/features/match/components/LightGameOptionChip";
 import { LightOptionChip } from "@/features/match/components/LightOptionChip";
 import { MatchLinearGradient } from "@/features/match/components/MatchLinearGradient";
+import { openAuditionRoom } from "@/features/match/enter-audition-room";
 import {
   MATCH_COMPANION_PREFERENCE_OPTIONS,
   MATCH_GENDER_OPTIONS,
@@ -43,7 +43,7 @@ import {
   voiceRoomApi,
 } from "@/features/voice-room/voice-room.api";
 import type { VoiceRoomDetail } from "@/features/voice-room/voice-room.types";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { getDDinProStyle } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { showToast } from "@/shared/ui/app-toast";
@@ -726,7 +726,6 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   title: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "600",
@@ -771,14 +770,12 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   labelText: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: "500",
     color: "#656566",
   },
   required: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: "500",
@@ -793,13 +790,11 @@ const styles = StyleSheet.create({
   },
   clubName: {
     flex: 1,
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     color: "#0D0D0F",
   },
   hint: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     color: "#999999",
@@ -818,7 +813,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   stepperGlyph: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 20,
     fontWeight: "500",
@@ -840,7 +834,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   stepperNumberText: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 22,
     fontWeight: "500",
@@ -856,7 +849,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   remarkInput: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     color: "#0D0D0F",
@@ -865,7 +857,6 @@ const styles = StyleSheet.create({
   remarkError: {
     marginLeft: 77,
     marginTop: -8,
-    fontFamily: DOUYIN_SANS,
     fontSize: 11,
     lineHeight: 16,
     color: "#FE4267",
@@ -876,11 +867,10 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   priceText: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 18,
     lineHeight: 22,
-    fontWeight: "600",
     color: "#0D0D0F",
+    ...getDDinProStyle(600),
   },
   diamondIcon: {
     width: 16,
@@ -904,7 +894,6 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   publishText: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "500",

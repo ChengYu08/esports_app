@@ -1,6 +1,5 @@
 import { StyleSheet, Text, View } from "react-native";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 export function OrderHeader() {
   return (
@@ -21,7 +20,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   title: {
-    fontFamily: DOUYIN_SANS,
     color: "#333333",
     fontSize: 20,
     lineHeight: 28,

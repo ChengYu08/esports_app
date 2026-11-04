@@ -1,6 +1,5 @@
 import { StyleSheet, Text, type StyleProp, type TextStyle } from "react-native";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 type HighlightedTextProps = {
   text: string;
@@ -63,7 +62,6 @@ export function HighlightedText({
 
 const styles = StyleSheet.create({
   base: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     color: "#161823",

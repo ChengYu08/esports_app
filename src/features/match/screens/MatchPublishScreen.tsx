@@ -42,7 +42,7 @@ import {
   voiceRoomApi,
 } from "@/features/voice-room/voice-room.api";
 import type { VoiceRoomDetail } from "@/features/voice-room/voice-room.types";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
+import { getDDinProStyle } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 
 const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
@@ -96,11 +96,17 @@ export default function MatchPublishScreen() {
   }, []);
 
   useEffect(() => {
-    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
 
-    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
-    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+    const showSub = Keyboard.addListener(showEvent, () =>
+      setKeyboardVisible(true),
+    );
+    const hideSub = Keyboard.addListener(hideEvent, () =>
+      setKeyboardVisible(false),
+    );
     return () => {
       showSub.remove();
       hideSub.remove();
@@ -109,7 +115,10 @@ export default function MatchPublishScreen() {
 
   useEffect(() => {
     if (!keyboardVisible || !remarkFocusedRef.current) return;
-    const timer = setTimeout(ensureRemarkAboveKeyboard, Platform.OS === "android" ? 64 : 32);
+    const timer = setTimeout(
+      ensureRemarkAboveKeyboard,
+      Platform.OS === "android" ? 64 : 32,
+    );
     return () => clearTimeout(timer);
   }, [keyboardVisible, ensureRemarkAboveKeyboard]);
 
@@ -277,7 +286,12 @@ export default function MatchPublishScreen() {
               onPress={goBack}
               style={styles.backButton}
             >
-              <ChevronLeft24Regular color="white" width={24} height={24} style={styles.backIcon} />
+              <ChevronLeft24Regular
+                color="white"
+                width={24}
+                height={24}
+                style={styles.backIcon}
+              />
             </Pressable>
             <Text style={styles.navTitle}>一键匹配</Text>
             <View style={styles.navRight} />
@@ -312,13 +326,17 @@ export default function MatchPublishScreen() {
                     {form.gamesLoading ? (
                       <ActivityIndicator color="#FE4267" />
                     ) : form.games.length === 0 ? (
-                      <HintText text={form.token ? "暂无可选游戏" : "请先登录"} />
+                      <HintText
+                        text={form.token ? "暂无可选游戏" : "请先登录"}
+                      />
                     ) : (
                       form.games.map((game) => (
                         <MatchGameOptionChip
                           key={game.id}
                           label={game.name}
-                          icon={game.iconUrl ? { uri: game.iconUrl } : undefined}
+                          icon={
+                            game.iconUrl ? { uri: game.iconUrl } : undefined
+                          }
                           iconFallback
                           selected={form.gameId === game.id}
                           onPress={() => form.selectGame(game.id)}
@@ -440,7 +458,9 @@ export default function MatchPublishScreen() {
                           key={option.value}
                           label={option.label}
                           selected={form.companionPreference === option.value}
-                          onPress={() => form.setCompanionPreference(option.value)}
+                          onPress={() =>
+                            form.setCompanionPreference(option.value)
+                          }
                         />
                       ))}
                     </View>
@@ -449,7 +469,10 @@ export default function MatchPublishScreen() {
 
                 <View style={[styles.field, styles.fieldCenter]}>
                   <FieldLabel label="数量" required />
-                  <MatchStepper value={form.quantity} onChange={form.setQuantity} />
+                  <MatchStepper
+                    value={form.quantity}
+                    onChange={form.setQuantity}
+                  />
                 </View>
 
                 <View style={styles.field}>
@@ -490,13 +513,17 @@ export default function MatchPublishScreen() {
                   </View>
                 </View>
                 {form.remarkOverLimit ? (
-                  <Text style={styles.remarkError}>备注最多{MATCH_REMARK_MAX}字</Text>
+                  <Text style={styles.remarkError}>
+                    备注最多{MATCH_REMARK_MAX}字
+                  </Text>
                 ) : null}
 
                 <View style={[styles.field, styles.fieldCenter]}>
                   <FieldLabel label="预估价格" required />
                   <View style={styles.priceRow}>
-                    <Text style={styles.priceText}>{form.estimatedPriceText}</Text>
+                    <Text style={styles.priceText}>
+                      {form.estimatedPriceText}
+                    </Text>
                     <Image source={diamondIcon} style={styles.diamondIcon} />
                   </View>
                 </View>
@@ -505,14 +532,20 @@ export default function MatchPublishScreen() {
 
             {keyboardVisible ? null : (
               <View
-                style={[styles.footer, { paddingBottom: insets.bottom + FOOTER_CONTENT_BOTTOM }]}
+                style={[
+                  styles.footer,
+                  { paddingBottom: insets.bottom + FOOTER_CONTENT_BOTTOM },
+                ]}
               >
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="立即发布，匹配陪玩"
                   disabled={submitting || form.remarkOverLimit}
                   onPress={handlePublish}
-                  style={({ pressed }) => [styles.publishWrap, pressed && styles.pressed]}
+                  style={({ pressed }) => [
+                    styles.publishWrap,
+                    pressed && styles.pressed,
+                  ]}
                 >
                   <MatchLinearGradient
                     colors={PUBLISH_GRADIENT}
@@ -520,7 +553,8 @@ export default function MatchPublishScreen() {
                     end={{ x: 1, y: 1 }}
                     style={[
                       styles.publishButton,
-                      (submitting || form.remarkOverLimit) && styles.publishDisabled,
+                      (submitting || form.remarkOverLimit) &&
+                        styles.publishDisabled,
                     ]}
                   >
                     <Text style={styles.publishText}>
@@ -648,7 +682,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   hintText: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     color: "rgba(255,255,255,0.4)",
@@ -662,7 +695,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   remarkInput: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     height: 32,
@@ -673,7 +705,6 @@ const styles = StyleSheet.create({
   remarkError: {
     marginLeft: 56,
     marginTop: -16,
-    fontFamily: DOUYIN_SANS,
     fontSize: 11,
     lineHeight: 16,
     color: "#FE4267",
@@ -684,11 +715,10 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   priceText: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 18,
     lineHeight: 22,
-    fontWeight: "600",
     color: "#FFFFFF",
+    ...getDDinProStyle(600),
   },
   diamondIcon: {
     width: 16,
@@ -712,7 +742,6 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   publishText: {
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "500",

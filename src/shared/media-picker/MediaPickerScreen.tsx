@@ -18,7 +18,6 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { showToast } from "@/shared/ui/app-toast";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import {
   completeMediaPick,
   isMediaPickActive,
@@ -435,7 +434,6 @@ const styles = StyleSheet.create({
   },
   titleText: {
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "600",
@@ -455,7 +453,6 @@ const styles = StyleSheet.create({
   },
   confirmText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 13,
     fontWeight: "600",
   },
@@ -481,7 +478,6 @@ const styles = StyleSheet.create({
   },
   albumName: {
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 15,
   },
   albumNameActive: {
@@ -509,14 +505,12 @@ const styles = StyleSheet.create({
     marginTop: 80,
     alignSelf: "center",
     color: "#999999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
   },
   deniedText: {
     marginTop: 16,
     textAlign: "center",
     color: "#666666",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
@@ -534,7 +528,6 @@ const styles = StyleSheet.create({
   },
   retryText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "600",
   },

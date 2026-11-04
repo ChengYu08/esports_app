@@ -14,7 +14,6 @@ import {
   removeFromBlacklist,
   type BlacklistEntry,
 } from "@/features/mine/blacklist";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
@@ -136,7 +135,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F7F7" },
   headerTitle: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 17,
     lineHeight: 24,
     fontWeight: "600",
@@ -166,11 +164,10 @@ const styles = StyleSheet.create({
   copy: { flex: 1, minWidth: 0, marginLeft: 12, gap: 5 },
   nickname: {
     color: "#222",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     fontWeight: "600",
   },
-  clubName: { color: "#999", fontFamily: DOUYIN_SANS, fontSize: 13 },
+  clubName: { color: "#999", fontSize: 13 },
   removeButton: {
     width: REMOVE_ACTION_WIDTH,
     height: 76,
@@ -181,7 +178,6 @@ const styles = StyleSheet.create({
   swipeable: { height: 76, backgroundColor: "#FF3158" },
   removeText: {
     color: "#FFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "600",
   },

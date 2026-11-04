@@ -1,4 +1,3 @@
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -96,7 +95,6 @@ const styles = StyleSheet.create({
   },
   title: {
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     fontWeight: "600",
     lineHeight: 24,
@@ -104,7 +102,6 @@ const styles = StyleSheet.create({
   },
   message: {
     color: "#666666",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "400",
     lineHeight: 22,
@@ -144,7 +141,6 @@ const styles = StyleSheet.create({
   },
   cancelText: {
     color: BRAND,
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "600",
     lineHeight: 22,
@@ -152,7 +148,6 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "600",
     lineHeight: 22,

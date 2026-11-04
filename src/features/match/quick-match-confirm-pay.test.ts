@@ -106,6 +106,7 @@ describe("confirmQuickMatchPay", () => {
     mocks.fetchQuickMatchPayable.mockResolvedValue({
       orderCount: 1,
       totalPrice: 120,
+      realPayAmount: 120,
     });
 
     const result = await confirmQuickMatchPay(initialState(), deps);
@@ -117,11 +118,32 @@ describe("confirmQuickMatchPay", () => {
     expect(result.ordersCreated).toBe(true);
   });
 
+  it("活动优惠：原价与基线不同但实付一致时正常支付", async () => {
+    const deps = makeDeps();
+    mocks.fetchQuickMatchPayable.mockResolvedValue({
+      orderCount: 1,
+      totalPrice: 20,
+      discountAmount: 10.1,
+      realPayAmount: 9.9,
+    });
+
+    // 基线=预览 payableAmount（实付 9.9）；payable.totalPrice 为原价 20，应按 realPayAmount 比对
+    const result = await confirmQuickMatchPay(
+      initialState({ expectedTotal: 9.9 }),
+      deps,
+    );
+
+    expect(showToast).not.toHaveBeenCalledWith("待支付金额已更新，请核对后重新确认支付");
+    expect(mocks.batchPayQuickMatch).toHaveBeenCalledTimes(1);
+    expect(deps.onPaid).toHaveBeenCalledWith(CREATED_ORDERS);
+    expect(result.expectedTotal).toBe(9.9);
+  });
+
   it("金额不一致后按新基线重试可完成支付", async () => {
     const deps = makeDeps();
     mocks.fetchQuickMatchPayable
-      .mockResolvedValueOnce({ orderCount: 1, totalPrice: 120 })
-      .mockResolvedValueOnce({ orderCount: 1, totalPrice: 120 });
+      .mockResolvedValueOnce({ orderCount: 1, totalPrice: 120, realPayAmount: 120 })
+      .mockResolvedValueOnce({ orderCount: 1, totalPrice: 120, realPayAmount: 120 });
 
     const first = await confirmQuickMatchPay(initialState(), deps);
     const second = await confirmQuickMatchPay(first, deps);

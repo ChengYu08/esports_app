@@ -31,7 +31,6 @@ import { createTeenRequestGuard } from "@/features/mine/teen-request-guard";
 import { teenLockWindowLabel } from "@/features/mine/utils/teen-lock-window";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { colors } from "@/shared/theme/tokens";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
 const closedIllustration = require("../../../../assets/mine/figma/teen-mode-closed.svg");
@@ -537,7 +536,6 @@ const styles = StyleSheet.create({
   },
   noticeText: {
     color: "#999999",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
     textAlign: "center",

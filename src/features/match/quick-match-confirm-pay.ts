@@ -80,7 +80,8 @@ export async function confirmQuickMatchPay(
   if (!payable) {
     return { ordersCreated, expectedTotal: state.expectedTotal, orders };
   }
-  const currentTotal = payable.totalPrice;
+  // 对齐 PC：优先实付 realPayAmount，无则回退原价 totalPrice
+  const currentTotal = payable.realPayAmount ?? payable.totalPrice;
   if (payable.orderCount > 0 && Math.abs(currentTotal - state.expectedTotal) > 0.001) {
     showToast("待支付金额已更新，请核对后重新确认支付");
     return { ordersCreated, expectedTotal: currentTotal, orders };

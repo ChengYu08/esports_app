@@ -1,6 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import type { OrderFilter, OrderScope } from "../order.types";
 
 type OrderTabsProps = {
@@ -79,7 +78,6 @@ const styles = StyleSheet.create({
   },
   tabPressed: { opacity: 0.65 },
   label: {
-    fontFamily: DOUYIN_SANS,
     color: "#656566",
     fontSize: 12,
     lineHeight: 18,

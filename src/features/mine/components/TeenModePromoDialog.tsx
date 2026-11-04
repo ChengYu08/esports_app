@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const promoIllustration = require("../../../../assets/mine/figma/teen-promo-illustration.png");
 
@@ -119,14 +118,12 @@ const styles = StyleSheet.create({
   },
   title: {
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "600",
   },
   body: {
     color: "#666666",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     textAlign: "center",
@@ -155,7 +152,6 @@ const styles = StyleSheet.create({
   },
   checkboxLabel: {
     color: "#808080",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 18,
   },
@@ -181,7 +177,6 @@ const styles = StyleSheet.create({
   },
   goEnableText: {
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "600",
@@ -192,7 +187,6 @@ const styles = StyleSheet.create({
   },
   knownText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "600",
