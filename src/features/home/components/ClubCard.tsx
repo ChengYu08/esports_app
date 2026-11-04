@@ -44,20 +44,28 @@ export const ClubCard = memo(function ClubCard({
   };
 
   const gameIds = Array.from(new Set(club.gameIds ?? [])).sort((a, b) => a - b);
+  const serverCountsAvailable = gameIds.length > 0 && gameIds.every((id) =>
+    club.games?.some((game) => game.id === id && typeof game.companionCount === "number"),
+  );
   const gameCounts = useQuery({
     queryKey: ["club-game-companion-counts", club.id, gameIds],
     queryFn: ({ signal }) =>
       fetchClubGameCompanionCounts(club.id, gameIds, signal),
-    enabled: gameIds.length > 0,
+    enabled: gameIds.length > 0 && !serverCountsAvailable,
     staleTime: 5 * 60_000,
   });
-  const counts = gameCounts.data;
+  const counts = serverCountsAvailable
+    ? Object.fromEntries((club.games ?? []).map((game) => [game.id, game.companionCount ?? 0]))
+    : gameCounts.data;
   const gameIcons = new Map((club.games ?? []).map((game) => [game.id, game]));
   const games = counts
     ? [...gameIds]
         .sort((a, b) => counts[b] - counts[a] || a - b)
         .slice(0, 3)
-        .flatMap((id) => (gameIcons.has(id) ? [gameIcons.get(id)!] : []))
+        .flatMap((id) => {
+          const game = gameIcons.get(id);
+          return game?.iconUrl ? [game] : [];
+        })
     : [];
   const gamesLayout = computeGameIconLayout(games.length);
 
