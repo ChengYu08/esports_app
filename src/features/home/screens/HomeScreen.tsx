@@ -148,7 +148,11 @@ export default function HomeScreen() {
     () => selectedGame ? [Number(selectedGame)] : selectedCategory ? categoryGames.map((item) => item.id) : undefined,
     [selectedGame, selectedCategory, categoryGames],
   );
-  const onlineCounts = useClubOnlineCounts(visibleClubs, onlineGameIds, topTab === "home");
+  const legacyVisibleClubs = useMemo(
+    () => visibleClubs.filter((club) => club.onlineCompanionCount == null),
+    [visibleClubs],
+  );
+  const onlineCounts = useClubOnlineCounts(legacyVisibleClubs, onlineGameIds, topTab === "home");
   const selectTopTab = useCallback((tab: HomeTab) => {
     setTopTab(tab);
     setMountedTabs((current) =>
@@ -180,7 +184,7 @@ export default function HomeScreen() {
     ({ item }: { item: (typeof clubItems)[number] }) => (
       <ClubCard
         club={item}
-        onlineCount={onlineCounts.counts[item.id] ?? null}
+        onlineCount={item.onlineCompanionCount ?? onlineCounts.counts[item.id] ?? null}
       />
     ),
     [onlineCounts.counts],

@@ -41,8 +41,11 @@ export const ClubCard = memo(function ClubCard({
     router.push({ pathname: "/club/[id]", params: { id: club.id } });
   };
 
-  // 列表接口已返回俱乐部游戏及顺序，直接展示，避免每张卡按游戏再次请求陪玩列表。
-  const games = club.games?.slice(0, 3) ?? [];
+  // 优先使用服务端批量返回的人数排序；旧数据缺人数时沿用接口顺序，避免逐卡查询。
+  const games = [...(club.games ?? [])]
+    .filter((game) => game.iconUrl)
+    .sort((a, b) => (b.companionCount ?? -1) - (a.companionCount ?? -1))
+    .slice(0, 3);
   const gamesLayout = computeGameIconLayout(games.length);
 
   return (

@@ -78,7 +78,8 @@ type ApiClub = {
   memberCount?: number;
   onlineCount?: number;
   orderNoticeUrl?: string;
-  clubGames?: { gameId: number; gameName?: string; iconUrl?: string; status?: number }[];
+  onlineCompanionCount?: number;
+  clubGames?: { gameId: number; gameName?: string; iconUrl?: string; status?: number; companionCount?: number }[];
 };
 type ApiClubPage = { page?: number; totalPages?: number; total?: number; records?: ApiClub[] };
 type ApiClubDetail = {
@@ -244,6 +245,7 @@ export async function fetchClubPage(filters: ClubFilters, page: number, pageSize
       description: club.intro || '暂无俱乐部简介',
       coverUrl: club.logoUrl,
       onlineCount: club.onlineCount ?? 0,
+      onlineCompanionCount: club.onlineCompanionCount,
       memberCount: club.memberCount ?? 0,
       clubCode: String(club.id),
       isSelfOperated: club.clubName?.includes('自营') ?? false,
@@ -253,11 +255,12 @@ export async function fetchClubPage(filters: ClubFilters, page: number, pageSize
         .map((item) => item.gameId))),
       // 列表接口已带 clubGames（游戏图标），卡片上展示主打游戏。
       games: (club.clubGames ?? [])
-        .filter((item) => item.status !== 0 && item.iconUrl)
+        .filter((item) => item.status !== 0)
         .map((item) => ({
           id: item.gameId,
           name: item.gameName || "未命名游戏",
-          iconUrl: item.iconUrl as string,
+          iconUrl: item.iconUrl,
+          companionCount: item.companionCount,
         })),
     })),
     hasMore: (data?.page ?? page) < (data?.totalPages ?? page),
