@@ -11,7 +11,7 @@
 - 项目使用 Expo SDK 57，生产构建配置位于 `eas.json`，应用和原生资源配置位于 `app.json`。
 - `assets/` 源文件约 35 MB。这个数值包含设计稿遗留和构建资源，不等于最终应用包体积。
 - `assets/images/splash-screen.png` 约 4.4 MB，同时出现在启动图配置及应用启动界面代码中。优化时要检查两处使用场景。
-- `assets/home/club-detail/icon-diamond.svg` 约 730 KB，当前源码有引用，可评估 SVG 路径优化并进行视觉对照。
+- 2026-11 的静态资源整理已移除未被运行时代码引用的 `icon-diamond.svg`，后续包体基线不再包含该文件。
 - `assets/mine/figma/profile-work-1.png`（约 3 MB）、`profile-work-2.png`（约 15.4 MB）及 `assets/home/club-detail/member-1.jpg` 至 `member-5.jpg`（合计约 5.2 MB）在当前全仓源码、配置和文档扫描中没有发现引用。它们疑似为遗留设计素材，但在删除或排除前仍需确认没有动态加载路径。
 - 源码没有发现对 `@expo/ui`、`expo-device`、`expo-glass-effect`、`expo-symbols`、`expo-status-bar`、`expo-system-ui` 的直接引用。这些是依赖清理候选，不代表已确认可删除，也不代表删除后一定会减小正式包。
 - `@rongcloud/react-native-im-wrapper` 支持聊天功能，属于关键依赖；首轮不做移除。图片、音频、路由、存储、字体等当前功能依赖同样先保留。

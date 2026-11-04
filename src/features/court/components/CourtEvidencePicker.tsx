@@ -1,6 +1,7 @@
 import { complaintStyles } from "@/features/court/complaint.styles";
-import { EvidenceImageTooLargeError, preparePickedEvidenceImage } from "@/features/court/court-evidence-image";
-import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
+import { pickCompanionGalleryImages } from "@/features/mine/companion-gallery-picker";
+import { selectCompanionImages } from "@/features/mine/companion-gallery-selection";
+import { File } from "expo-file-system";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import { router } from "expo-router";
@@ -54,40 +55,17 @@ export function useEvidenceImages(
     pickingImagesRef.current = true;
     setPickingImages(true);
     try {
-      // 相册选择页内部处理权限，选图结果经会话桥接回传
-      const pickPending = beginMediaPick();
-      router.push({
-        pathname: "/media-picker",
-        params: { max: String(MAX_IMAGES - images.length) },
-      });
-      const pickedUris = await pickPending;
-      if (!pickedUris?.length) {
-        return;
-      }
-      const picked: UploadItem[] = [];
-      let failed = 0;
-      let tooLarge = 0;
-      for (const imageUri of pickedUris) {
-        try {
-          picked.push(await preparePickedEvidenceImage(imageUri));
-        } catch (error) {
-          if (error instanceof EvidenceImageTooLargeError) {
-            tooLarge += 1;
-          } else {
-            failed += 1;
-          }
-        }
-      }
+      const assets = await pickCompanionGalleryImages(MAX_IMAGES - images.length);
       checkAccountRef.current();
-      setImages((current) => [...current, ...picked].slice(0, MAX_IMAGES));
-      if (failed > 0 || tooLarge > 0) {
-        const reasons = [
-          tooLarge > 0 ? `${tooLarge}张图片超过10MB` : "",
-          failed > 0 ? `${failed}张图片无法读取或转换` : "",
-        ].filter(Boolean).join("，");
-        showToast(`${reasons}，请重新选择`, {
-          duration: toastDurations.LONG,
-        });
+      const { accepted, warnings } = selectCompanionImages(
+        assets.map((asset) => ({ ...asset, fileSize: asset.fileSize ?? new File(asset.uri).size })),
+      );
+      setImages((current) => [
+        ...current,
+        ...accepted.map((asset) => ({ uri: asset.uri, name: asset.fileName || "image.jpg", mimeType: asset.mimeType })),
+      ].slice(0, MAX_IMAGES));
+      if (warnings.length) {
+        showToast(warnings.join("\n"), { duration: toastDurations.LONG });
       }
     } catch (error) {
       showToast(
@@ -189,7 +167,7 @@ export function CourtEvidencePicker({
               style={styles.removeImage}
             >
               <CachedImage
-                source={require("../../../../assets/voice-room/close.svg")}
+                source={require("../../../../assets/svgs/close.svg")}
                 tintColor="#FFFFFF"
                 style={styles.removeIcon}
               />
@@ -197,7 +175,7 @@ export function CourtEvidencePicker({
             {image.key && (
               <View style={styles.uploaded}>
                 <CachedImage
-                  source={require("../../../../assets/order/order-step-check.svg")}
+                  source={require("../../../../assets/svgs/order-step-check.svg")}
                   style={styles.uploadedIcon}
                 />
               </View>
@@ -216,7 +194,7 @@ export function CourtEvidencePicker({
               <ActivityIndicator color="#979799" />
             ) : (
               <CachedImage
-                source={require("../../../../assets/court/ticket-add.svg")}
+                source={require("../../../../assets/svgs/ticket-add.svg")}
                 style={styles.addIcon}
               />
             )}

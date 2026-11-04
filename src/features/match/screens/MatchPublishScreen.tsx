@@ -45,7 +45,7 @@ import type { VoiceRoomDetail } from "@/features/voice-room/voice-room.types";
 import { getDDinProStyle } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 
-const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
+const diamondIcon = require("../../../../assets/mine/star-recharge-diamond-3f6fcf.png");
 const bgPublishDark = require("../../../../assets/images/bg_publish_dark.webp");
 
 const PUBLISH_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
@@ -231,13 +231,31 @@ export default function MatchPublishScreen() {
   }, [form, goMatching, submitting, user?.id]);
 
   const handlePublish = useCallback(async () => {
+    // 先完成表单必填校验，再查语聊房，避免未选俱乐部等就弹退房提示
+    if (!form.token) {
+      showToast("请先登录");
+      return;
+    }
+    if (!form.club?.id) {
+      showToast("请先选择俱乐部");
+      return;
+    }
+    if (!form.gameId || !form.modeId || !form.levelId || !form.serviceId) {
+      showToast("请完整选择服务模式");
+      return;
+    }
+    if (form.showCompanionPreference && !form.companionPreference) {
+      showToast("请选择单陪或双陪");
+      return;
+    }
+    if (form.remarkOverLimit) {
+      showToast(`备注最多${MATCH_REMARK_MAX}字`);
+      return;
+    }
+
     if (form.voice !== "需试音") {
       joinedRoomRef.current = null;
       void runPublish();
-      return;
-    }
-    if (!form.token) {
-      showToast("请先登录");
       return;
     }
     if (checkingJoinedRoomRef.current || submitting) return;
@@ -260,7 +278,7 @@ export default function MatchPublishScreen() {
     } finally {
       checkingJoinedRoomRef.current = false;
     }
-  }, [form.token, form.voice, runPublish, submitting]);
+  }, [form, runPublish, submitting]);
 
   return (
     <View style={styles.root}>

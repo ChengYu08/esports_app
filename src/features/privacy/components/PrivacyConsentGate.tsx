@@ -150,7 +150,7 @@ export function PrivacyConsentGate({ onAccepted }: PrivacyConsentGateProps) {
           <ScreenHeader
             title={protocol.title}
             onBack={closeProtocol}
-            backIcon={require("../../../../assets/home/club-detail/icon-back.svg")}
+            backIcon={require("../../../../assets/svgs/icon-back.svg")}
             style={{ paddingTop: insets.top, height: insets.top + 44 }}
           />
           <View style={styles.protocolContent}>

@@ -46,16 +46,16 @@ import {
 } from "../hooks/use-home-data";
 
 // 切图资源（新设计稿：俱乐部主页 455-68151 / 490-84520 / 557-88105）
-const bgClubImage = require("../../../../assets/home/club-detail/bg-club.webp");
+const bgClubImage = require("../../../../assets/home/bg-club.webp");
 // 设计稿导航栏内容行高度 44（不含状态栏，状态栏高度由安全区 insets 提供）
 const NAV_BAR_CONTENT_HEIGHT = 44;
-const tabCornerLeftIcon = require("../../../../assets/home/club-detail/tab-corner-left.svg");
-const tabCornerRightIcon = require("../../../../assets/home/club-detail/tab-corner.svg");
-const arrowDownIcon = require("../../../../assets/home/club-detail/arrow-fill-down-new.svg");
-const arrowUpRedIcon = require("../../../../assets/home/club-detail/arrow-fill-up-red.svg");
-const introToggleIcon = require("../../../../assets/home/club-detail/intro-toggle.svg");
-const emptyStateIllustration = require("../../../../assets/coms/empty-state-illustration.svg");
-const customerIcon = require("../../../../assets/coms/customer.svg");
+const tabCornerLeftIcon = require("../../../../assets/svgs/tab-corner-left.svg");
+const tabCornerRightIcon = require("../../../../assets/svgs/tab-corner.svg");
+const arrowDownIcon = require("../../../../assets/svgs/arrow-fill-down-new.svg");
+const arrowUpRedIcon = require("../../../../assets/svgs/arrow-fill-up-red.svg");
+const introToggleIcon = require("../../../../assets/svgs/intro-toggle.svg");
+const emptyStateIllustration = require("../../../../assets/svgs/empty-state-illustration.svg");
+const customerIcon = require("../../../../assets/svgs/customer.svg");
 
 // 设计稿色板
 const COLORS = {

@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 
 const icons = {
-  clear: require("../../../../assets/message/message-clear.svg"),
+  clear: require("../../../../assets/svgs/message-clear.svg"),
 };
 
 type MessageHeaderProps = {

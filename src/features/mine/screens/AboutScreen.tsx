@@ -18,8 +18,8 @@ import { openInAppWebView } from "@/shared/navigation/open-web-view";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 const appIcon = require("../../../../assets/images/icon.png");
-const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
-const arrowIcon = require("../../../../assets/mine/figma/mine-arrow-right.svg");
+const backIcon = require("../../../../assets/svgs/icon-back.svg");
+const arrowIcon = require("../../../../assets/svgs/mine-arrow-right.svg");
 
 const VERSION = `v${Constants.expoConfig?.version ?? "1.0.0"}`;
 

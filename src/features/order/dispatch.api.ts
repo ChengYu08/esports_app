@@ -96,7 +96,7 @@ function mapDispatchRequest(request: DispatchRequest, userGender: number, histor
         : historyStatus === "GRABBED" ? "已抢单"
           : request.publishType === "RECEPTION" ? "客服派单" : "用户派单",
     sellerName: request.buyerNickname || "老板",
-    sellerAvatar: request.buyerHeadImage ? { uri: request.buyerHeadImage } : require("../../../assets/order/order-seller-avatar.svg"),
+    sellerAvatar: request.buyerHeadImage ? { uri: request.buyerHeadImage } : require("../../../assets/svgs/order-seller-avatar.svg"),
     gameIcon: request.gameIconUrl ? { uri: request.gameIconUrl } : undefined,
     serviceName: serviceParts.join("-") || "陪玩服务",
     gameName: request.gameName || "未知游戏",

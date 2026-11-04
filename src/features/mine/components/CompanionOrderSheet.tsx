@@ -38,11 +38,11 @@ import { getDDinProStyle } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { CachedImage } from "@/shared/ui/CachedImage";
 
-const fallbackAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
-const maleIcon = require("../../../../assets/home/club-detail/male.svg");
-const femaleIcon = require("../../../../assets/mine/figma/mine-female.svg");
-const clubIcon = require("../../../../assets/mine/figma/mine-club-flag.svg");
-const starDiamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
+const fallbackAvatar = require("../../../../assets/mine/mine-avatar.png");
+const maleIcon = require("../../../../assets/svgs/male.svg");
+const femaleIcon = require("../../../../assets/svgs/mine-female.svg");
+const clubIcon = require("../../../../assets/svgs/mine-club-flag.svg");
+const starDiamondIcon = require("../../../../assets/mine/star-recharge-diamond-3f6fcf.png");
 
 const ORDER_QTY_MIN = 1;
 const ORDER_QTY_MAX = 99;

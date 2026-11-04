@@ -188,13 +188,13 @@ describe("handleQuickMatchNotice", () => {
     expect(refreshDispatchForRemoteChange).not.toHaveBeenCalled();
   });
 
-  it("sentTime 距今超过 30 分钟的离线重放通知不弹条，仍刷新派单中心", () => {
+  it("sentTime 距今超过 15 分钟的离线重放通知不弹条，仍刷新派单中心", () => {
     handleQuickMatchNotice(
       command(
         "QUICK_MATCH_NOTICE",
         { requestNo: "QM1", expireTime: "2026-10-20 12:30:00" },
         PLATFORM,
-        NOW - 1_801_000,
+        NOW - 901_000,
       ),
       NOW,
     );
@@ -202,20 +202,20 @@ describe("handleQuickMatchNotice", () => {
     expect(refreshDispatchForRemoteChange).toHaveBeenCalledTimes(1);
   });
 
-  it("sentTime 距今恰满 30 分钟仍在阈值内，正常弹条", () => {
+  it("sentTime 距今恰满 15 分钟仍在阈值内，正常弹条", () => {
     handleQuickMatchNotice(
       command(
         "QUICK_MATCH_NOTICE",
         { requestNo: "QM1", expireTime: "2026-10-20 12:30:00" },
         PLATFORM,
-        NOW - 1_800_000,
+        NOW - 900_000,
       ),
       NOW,
     );
     expect(useActionNoticeStore.getState().items).toHaveLength(1);
   });
 
-  it("sentTime 在 30 分钟内正常弹条", () => {
+  it("sentTime 在 15 分钟内正常弹条", () => {
     handleQuickMatchNotice(
       command(
         "QUICK_MATCH_NOTICE",
@@ -411,6 +411,34 @@ describe("handleOrderNotifyPopup", () => {
     expect(useActionNoticeStore.getState().items[0]?.text).toBe(
       "「老板」已支付订单，请尽快接单",
     );
+  });
+
+  it("sentTime 距今超过 15 分钟的离线重放催单不弹条", () => {
+    handleOrderNotifyPopup(
+      command("ORDER_NOTIFY", payload, PLATFORM, NOW - 901_000),
+      NOW,
+    );
+    expect(useActionNoticeStore.getState().items).toHaveLength(0);
+    expect(logger.warn).toHaveBeenCalledWith(
+      "order_notify.stale_dropped",
+      expect.objectContaining({ orderNo: "PZ1" }),
+    );
+  });
+
+  it("sentTime 距今恰满 15 分钟仍在阈值内，正常弹条", () => {
+    handleOrderNotifyPopup(
+      command("ORDER_NOTIFY", payload, PLATFORM, NOW - 900_000),
+      NOW,
+    );
+    expect(useActionNoticeStore.getState().items).toHaveLength(1);
+  });
+
+  it("sentTime 缺失不拦截", () => {
+    handleOrderNotifyPopup(
+      command("ORDER_NOTIFY", payload, PLATFORM, undefined),
+      NOW,
+    );
+    expect(useActionNoticeStore.getState().items).toHaveLength(1);
   });
 });
 

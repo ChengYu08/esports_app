@@ -12,8 +12,8 @@ import { CachedImage } from "@/shared/ui/CachedImage";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { fetchDispatchDetail, isActivityDispatchRequest } from "../dispatch.api";
 
-const DEFAULT_AVATAR = require("../../../../assets/order/order-seller-avatar.svg");
-const GAME_FALLBACK = require("../../../../assets/voice-room/game.svg");
+const DEFAULT_AVATAR = require("../../../../assets/svgs/order-seller-avatar.svg");
+const GAME_FALLBACK = require("../../../../assets/svgs/game.svg");
 const ACTION_GRADIENT = ["#FF2145", "#FF3158"] as const;
 
 type GrabStatus = "GRABBED" | "SUCCESS" | "FAILED";

@@ -2,7 +2,7 @@ import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { uploadClientObject } from "@/features/auth/oss-upload";
 import { File } from "expo-file-system";
 
-export async function uploadCompanionMedia(
+export async function uploadCompanionMediaObject(
   token: string,
   media: { uri: string; mimeType?: string | null; fileName?: string | null },
   kind: "image" | "voice",
@@ -26,8 +26,17 @@ export async function uploadCompanionMedia(
   );
   const objectKey = sts.objectList?.[0];
   if (!objectKey) throw new Error("上传凭证缺少文件路径，请重试");
-  return uploadClientObject(sts, objectKey, {
+  const url = await uploadClientObject(sts, objectKey, {
     uri: media.uri,
     mimeType: media.mimeType || (kind === "voice" ? "audio/mp4" : "image/jpeg"),
   });
+  return { url, objectKey };
+}
+
+export async function uploadCompanionMedia(
+  token: string,
+  media: { uri: string; mimeType?: string | null; fileName?: string | null },
+  kind: "image" | "voice",
+) {
+  return (await uploadCompanionMediaObject(token, media, kind)).url;
 }

@@ -24,7 +24,7 @@ import {
 } from "../system-conversations";
 
 const defaultConversationAvatar = require("../../../../assets/coms/avatar_default.webp");
-const systemNotificationAvatar = require("../../../../assets/message/message-system-notice.svg");
+const systemNotificationAvatar = require("../../../../assets/svgs/message-system-notice.svg");
 
 export default function MessageScreen() {
   const insets = useSafeAreaInsets();

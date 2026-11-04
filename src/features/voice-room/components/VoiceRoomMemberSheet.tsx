@@ -17,9 +17,9 @@ import { voiceRoomApi } from '../voice-room.api';
 import type { VoiceRoomDetail, VoiceRoomMember } from '../voice-room.types';
 
 const defaultAvatar = require('../../../../assets/coms/avatar_default.webp');
-const femaleIcon = require('../../../../assets/voice-room/member-female.svg');
-const maleIcon = require('../../../../assets/home/club-detail/male.svg');
-const idIcon = require('../../../../assets/voice-room/member-id.svg');
+const femaleIcon = require('../../../../assets/svgs/member-female.svg');
+const maleIcon = require('../../../../assets/svgs/male.svg');
+const idIcon = require('../../../../assets/svgs/member-id.svg');
 
 type Props = {
   visible: boolean;

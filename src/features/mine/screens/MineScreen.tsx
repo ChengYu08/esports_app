@@ -30,19 +30,19 @@ import {
 } from "@/features/voice-room/voice-room.api";
 import { requireLogin } from "@/shared/navigation/require-login";
 
-const avatar = require("../../../../assets/mine/figma/mine-avatar.png");
-const heroBackground = require("../../../../assets/mine/figma/mine-hero-bg.webp");
-const menuClubIcon = require("../../../../assets/mine/figma/mine-menu-club.svg");
-const settingsIcon = require("../../../../assets/mine/figma/mine-settings.svg");
-const maleIcon = require("../../../../assets/home/club-detail/male.svg");
-const femaleIcon = require("../../../../assets/mine/figma/mine-female.svg");
+const avatar = require("../../../../assets/mine/mine-avatar.png");
+const heroBackground = require("../../../../assets/mine/mine-hero-bg.webp");
+const menuClubIcon = require("../../../../assets/svgs/mine-menu-club.svg");
+const settingsIcon = require("../../../../assets/svgs/mine-settings.svg");
+const maleIcon = require("../../../../assets/svgs/male.svg");
+const femaleIcon = require("../../../../assets/svgs/mine-female.svg");
 const companionEntryQrCode = require("../../../../assets/coms/qrcode-pws.webp");
 const clubEntryQrCode = require("../../../../assets/coms/qrcode-jlb.webp");
-const menuRoomIcon = require("../../../../assets/mine/figma/mine-menu-room.svg");
-const menuCompanionIcon = require("../../../../assets/mine/figma/mine-menu-companion.svg");
-const menuSettingsIcon = require("../../../../assets/mine/figma/mine-menu-settings.svg");
-const menuServiceIcon = require("../../../../assets/mine/figma/mine-menu-service.svg");
-const menuOrderIcon = require("../../../../assets/svgs/tab-order.svg");
+const menuRoomIcon = require("../../../../assets/svgs/mine-menu-room.svg");
+const menuCompanionIcon = require("../../../../assets/svgs/mine-menu-companion.svg");
+const menuSettingsIcon = require("../../../../assets/svgs/mine-menu-settings.svg");
+const menuServiceIcon = require("../../../../assets/svgs/mine-menu-service.svg");
+const menuOrderIcon = require("../../../../assets/svgs/mine-menu-order.svg");
 
 type MenuItem = {
   key: string;
@@ -143,7 +143,7 @@ export default function MineScreen() {
   };
   const openStarRecharge = () => {
     if (!requireLogin()) return;
-    router.push("/star-recharge");
+    router.push("/my-diamonds");
   };
   const openMyRoom = async () => {
     if (!requireLogin() || !accessToken || openingVoiceRoom) return;

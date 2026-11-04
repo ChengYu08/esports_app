@@ -9,8 +9,8 @@ import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 const icons = {
-  user: require("../../../../assets/home/h_user.svg"),
-  id: require("../../../../assets/home/club-id.svg"),
+  user: require("../../../../assets/svgs/h_user.svg"),
+  id: require("../../../../assets/svgs/club-id.svg"),
 };
 
 // 角标渐变为静态元素，提升到模块级共享，避免每张卡片渲染时重复创建。

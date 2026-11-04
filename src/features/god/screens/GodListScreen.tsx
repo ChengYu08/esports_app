@@ -26,9 +26,9 @@ import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { CompanionCard } from "@/shared/ui/CompanionCard";
 
-const allGamesIcon = require("../../../../assets/mine/figma/god-all-games.svg");
-const arrowDownIcon = require("../../../../assets/home/club-detail/arrow-fill-down.svg");
-const arrowUpDownIcon = require("../../../../assets/home/club-detail/arrow-fill-up-down.svg");
+const allGamesIcon = require("../../../../assets/svgs/god-all-games.svg");
+const arrowDownIcon = require("../../../../assets/svgs/arrow-fill-down.svg");
+const arrowUpDownIcon = require("../../../../assets/svgs/arrow-fill-up-down.svg");
 
 const PAGE_SIZE = 10;
 

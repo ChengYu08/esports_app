@@ -187,8 +187,8 @@ export default function CourtTargetPickerScreen() {
               <CachedImage
                 source={
                   item.id === selected?.id
-                    ? require("../../../../assets/court/ticket-radio-on.svg")
-                    : require("../../../../assets/court/ticket-radio-off.svg")
+                    ? require("../../../../assets/svgs/ticket-radio-on.svg")
+                    : require("../../../../assets/svgs/ticket-radio-off.svg")
                 }
                 style={styles.radio}
               />
@@ -212,7 +212,7 @@ export default function CourtTargetPickerScreen() {
                   {showIds && (
                     <View style={styles.idRow}>
                       <CachedImage
-                        source={require("../../../../assets/court/ticket-id.svg")}
+                        source={require("../../../../assets/svgs/ticket-id.svg")}
                         style={styles.idIcon}
                       />
                       <Text numberOfLines={1} style={styles.userId}>
@@ -237,11 +237,11 @@ export default function CourtTargetPickerScreen() {
               illustration={
                 <View style={styles.searchIllustration}>
                   <CachedImage
-                    source={require("../../../../assets/court/ticket-search-mirror.svg")}
+                    source={require("../../../../assets/svgs/ticket-search-mirror.svg")}
                     style={styles.searchMirror}
                   />
                   <CachedImage
-                    source={require("../../../../assets/court/ticket-search-panda.svg")}
+                    source={require("../../../../assets/svgs/ticket-search-panda.svg")}
                     style={styles.searchPanda}
                   />
                 </View>

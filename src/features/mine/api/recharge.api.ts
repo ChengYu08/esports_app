@@ -91,3 +91,61 @@ export async function createPayOrder(
   );
   return requireSuccess(response, "创建支付订单失败，请稍后再试");
 }
+
+/** 对齐 PC ChargeRecord / ClientWalletTransactionVO（充值与充值退款流水） */
+export type ChargeRecord = {
+  id: number;
+  amount?: number | string;
+  balanceAfter?: number | string;
+  relatedOrderNo?: string;
+  remark?: string;
+  createTime?: string;
+};
+
+export type ChargeRecordsPage = {
+  page?: number;
+  pages?: number;
+  total?: number;
+  totalPages?: number;
+  records?: ChargeRecord[];
+};
+
+const CHARGE_RECORDS_PAGE_SIZE = 20;
+
+export async function fetchChargeRecords(
+  token: string,
+  page = 1,
+  pageSize = CHARGE_RECORDS_PAGE_SIZE,
+  signal?: AbortSignal,
+): Promise<ChargeRecordsPage> {
+  const response = await apiClient<ApiEnvelope<ChargeRecordsPage>>(
+    "/client/v1/pay/chargeRecords",
+    {
+      method: "POST",
+      token,
+      signal,
+      body: { page, pageSize, action: {} },
+    },
+  );
+  return requireSuccess(response, "钻石明细加载失败");
+}
+
+export function chargeRecordsNextPage(
+  page: ChargeRecordsPage,
+  currentPage: number,
+): number | undefined {
+  const count = page.records?.length ?? 0;
+  if (count === 0) return undefined;
+  const totalPages = page.pages ?? page.totalPages;
+  if (typeof totalPages === "number" && Number.isFinite(totalPages)) {
+    return currentPage < totalPages ? currentPage + 1 : undefined;
+  }
+  if (page.total != null) {
+    return currentPage * CHARGE_RECORDS_PAGE_SIZE < Number(page.total)
+      ? currentPage + 1
+      : undefined;
+  }
+  return count === CHARGE_RECORDS_PAGE_SIZE ? currentPage + 1 : undefined;
+}
+
+export { CHARGE_RECORDS_PAGE_SIZE };

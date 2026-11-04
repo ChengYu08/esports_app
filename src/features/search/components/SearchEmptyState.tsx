@@ -4,8 +4,8 @@ import { StyleSheet, View } from "react-native";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { searchTypography } from "../search-typography";
 
-const mirror = require("../../../../assets/court/ticket-search-mirror.svg");
-const panda = require("../../../../assets/court/ticket-search-panda.svg");
+const mirror = require("../../../../assets/svgs/ticket-search-mirror.svg");
+const panda = require("../../../../assets/svgs/ticket-search-panda.svg");
 
 export function SearchEmptyState() {
   return (

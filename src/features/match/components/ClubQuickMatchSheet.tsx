@@ -48,7 +48,7 @@ import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { showToast } from "@/shared/ui/app-toast";
 
-const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
+const diamondIcon = require("../../../../assets/mine/star-recharge-diamond-3f6fcf.png");
 
 const PUBLISH_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
 
