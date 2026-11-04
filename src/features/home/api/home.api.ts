@@ -67,7 +67,7 @@ export async function fetchBanners(signal?: AbortSignal): Promise<HomeBannerSlot
 
 type ApiEnvelope<T> = { success?: boolean; code?: string; info?: string; data?: T };
 type ApiGame = { id: number | string; gameName?: string; iconUrl?: string; backgroundUrl?: string; gameCategory?: number; gameCategoryId?: number | string };
-type ApiGameCategory = { id: number | string; name: string; iconUrl?: string | null };
+type ApiGameCategory = { id: number | string; name: string; iconUrl?: string | null; mobileIconUrl?: string | null; mobile_icon_url?: string | null };
 type ApiClub = {
   id: number | string;
   clubName?: string;
@@ -221,6 +221,7 @@ export async function fetchGameCategories(signal?: AbortSignal): Promise<GameCat
     id: String(category.id),
     name: category.name,
     iconUrl: category.iconUrl ?? undefined,
+    mobileIconUrl: category.mobileIconUrl ?? category.mobile_icon_url ?? undefined,
   }));
 }
 
