@@ -34,7 +34,7 @@ import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
-const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
+const backIcon = require("../../../../assets/svgs/icon-back.svg");
 const closeIcon = require("../../../../assets/svgs/icon-close.svg");
 
 const DEFAULT_COOLING_DAYS = 15;

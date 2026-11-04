@@ -33,7 +33,7 @@ import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
-const avatar = require("../../../../assets/mine/figma/mine-avatar.png");
+const avatar = require("../../../../assets/mine/mine-avatar.png");
 const SMS_NOTIFY_KEY_PREFIX = "pzdj:sms-notify:";
 
 type EditField = "nickname" | "gender" | "birth" | "signature";

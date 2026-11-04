@@ -1,5 +1,5 @@
 import dispatchAssistantAvatar from "../../../assets/images/dispatch-assistant.png";
-import orderAssistantAvatar from "../../../assets/message/order-assistant.svg";
+import orderAssistantAvatar from "../../../assets/svgs/order-assistant.svg";
 import {
   isDispatchAssistantConversationId,
   isOrderAssistantConversationId,

@@ -14,9 +14,9 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-const searchIcon = require("../../../../assets/home/h_search.svg");
-const tabLeftCorner = require("../../../../assets/home/h_tab_left.svg");
-const tabRightCorner = require("../../../../assets/home/h_tab_right.svg");
+const searchIcon = require("../../../../assets/svgs/h_search.svg");
+const tabLeftCorner = require("../../../../assets/svgs/h_tab_left.svg");
+const tabRightCorner = require("../../../../assets/svgs/h_tab_right.svg");
 type HomeHeaderProps = {
   tab: HomeTab;
   game: GameKey;

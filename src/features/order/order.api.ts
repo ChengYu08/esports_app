@@ -20,7 +20,7 @@ type ApiPage<T> =
   | T[];
 type ApiOrder = Record<string, unknown>;
 
-const sellerAvatar = require("../../../assets/order/order-seller-avatar.svg");
+const sellerAvatar = require("../../../assets/svgs/order-seller-avatar.svg");
 
 const statusByFilter: Partial<Record<OrderFilter, OrderQueryStatus>> = {
   inProgress: "PROCESSING",

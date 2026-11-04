@@ -142,7 +142,7 @@ export const OrderCard = memo(function OrderCard({
                   source={
                     item.gameIcon ??
                     gameIcon ??
-                    require("../../../../assets/voice-room/game.svg")
+                    require("../../../../assets/svgs/game.svg")
                   }
                   contentFit="cover"
                   style={styles.gameIcon}
@@ -233,7 +233,7 @@ export const OrderCard = memo(function OrderCard({
                   : item.totalPrice}
               </Text>
               <CachedImage
-                source={require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png")}
+                source={require("../../../../assets/mine/star-recharge-diamond-3f6fcf.png")}
                 contentFit="contain"
                 style={styles.diamondIcon}
               />

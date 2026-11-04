@@ -27,7 +27,7 @@ import { uploadReviewImage } from "../order-review-upload";
 const RATING_LABELS = ["非常差", "差", "一般", "好", "非常好"];
 const MAX_IMAGES = 5;
 const MAX_CONTENT_LENGTH = 50;
-const starIcon = require("../../../../assets/order/review-star.svg");
+const starIcon = require("../../../../assets/svgs/review-star.svg");
 
 type Props = {
   visible: boolean;

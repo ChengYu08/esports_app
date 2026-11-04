@@ -44,10 +44,10 @@ import {
 } from "../hooks/use-companion-management";
 import { useCompanionVoiceUpload } from "../hooks/use-companion-voice-upload";
 
-const bambooIcon = require("../../../../assets/mine/companion/bamboo.svg");
-const ordersIcon = require("../../../../assets/mine/companion/orders.svg");
-const switchOn = require("../../../../assets/mine/companion/switch-on.svg");
-const switchOff = require("../../../../assets/mine/companion/switch-off.svg");
+const bambooIcon = require("../../../../assets/svgs/bamboo.svg");
+const ordersIcon = require("../../../../assets/svgs/orders.svg");
+const switchOn = require("../../../../assets/svgs/switch-on.svg");
+const switchOff = require("../../../../assets/svgs/switch-off.svg");
 
 export default function CompanionDashboardScreen() {
   const insets = useSafeAreaInsets();

@@ -20,10 +20,10 @@ type Props = {
   pendingAction: "vote" | "favorite" | null;
 };
 
-const versus = require("../../../../assets/court/versus.svg");
-const eye = require("../../../../assets/court/eye.svg");
-const star = require("../../../../assets/court/star.svg");
-const starFilled = require("../../../../assets/court/star-filled.svg");
+const versus = require("../../../../assets/svgs/versus.svg");
+const eye = require("../../../../assets/svgs/eye.svg");
+const star = require("../../../../assets/svgs/star.svg");
+const starFilled = require("../../../../assets/svgs/star-filled.svg");
 
 // 列表行组件：父组件交互态（收藏/刷新/切 tab）变化时未变的卡片跳过重渲
 export const CourtCard = memo(function CourtCard({
