@@ -1,7 +1,6 @@
 import Constants from "expo-constants";
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 import { useAppUpgradeStore } from "./app-upgrade.store";
 
@@ -132,7 +131,6 @@ const styles = StyleSheet.create({
   },
   title: {
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     fontWeight: "600",
     lineHeight: 24,
@@ -146,13 +144,11 @@ const styles = StyleSheet.create({
   },
   versionRow: {
     color: "#666666",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
   sectionLabel: {
     color: "#666666",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     marginTop: 4,
@@ -160,13 +156,11 @@ const styles = StyleSheet.create({
   updateContentScroll: { maxHeight: 160, flexGrow: 0 },
   updateContent: {
     color: "#333333",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
   },
   errorText: {
     color: BRAND,
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 20,
     marginTop: 4,
@@ -191,7 +185,6 @@ const styles = StyleSheet.create({
   },
   cancelText: {
     color: BRAND,
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "600",
     lineHeight: 22,
@@ -210,7 +203,6 @@ const styles = StyleSheet.create({
   confirmButtonPressed: { opacity: 0.85 },
   confirmText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "600",
     lineHeight: 22,

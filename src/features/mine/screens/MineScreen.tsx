@@ -29,7 +29,6 @@ import {
   voiceRoomApi,
 } from "@/features/voice-room/voice-room.api";
 import { requireLogin } from "@/shared/navigation/require-login";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const avatar = require("../../../../assets/mine/figma/mine-avatar.png");
 const heroBackground = require("../../../../assets/mine/figma/mine-hero-bg.webp");
@@ -591,7 +590,6 @@ const styles = StyleSheet.create({
   nameLine: { flexDirection: "row", alignItems: "center", gap: 8 },
   name: {
     flexShrink: 1,
-    fontFamily: DOUYIN_SANS,
     color: "#0D0D0F",
     fontSize: 18,
     lineHeight: 26,
@@ -610,7 +608,6 @@ const styles = StyleSheet.create({
   genderIcon: { width: 12, height: 12 },
   signatureText: {
     flexShrink: 1,
-    fontFamily: DOUYIN_SANS,
     color: "#979799",
     fontSize: 12,
     lineHeight: 18,
@@ -653,14 +650,12 @@ const styles = StyleSheet.create({
   },
   stat: { flex: 1, alignItems: "center", gap: 3 },
   statValue: {
-    fontFamily: DOUYIN_SANS,
     color: "#0D0D0F",
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "600",
   },
   statLabel: {
-    fontFamily: DOUYIN_SANS,
     color: "#656566",
     fontSize: 12,
     lineHeight: 18,
@@ -683,7 +678,6 @@ const styles = StyleSheet.create({
   menuIcon: { width: 16, height: 16 },
   menuTitle: {
     flex: 1,
-    fontFamily: DOUYIN_SANS,
     color: "#0A0A0A",
     fontSize: 14,
     lineHeight: 22,
@@ -715,7 +709,6 @@ const styles = StyleSheet.create({
   },
   qrModalTitle: {
     color: "#0A0A0A",
-    fontFamily: DOUYIN_SANS,
     fontSize: 17,
     lineHeight: 24,
     fontWeight: "600",
@@ -736,7 +729,6 @@ const styles = StyleSheet.create({
   qrModalHint: {
     marginTop: 16,
     color: "#666",
-    fontFamily: DOUYIN_SANS,
     fontSize: 13,
     lineHeight: 20,
     textAlign: "center",
@@ -744,7 +736,6 @@ const styles = StyleSheet.create({
   clubAdminNoticeText: {
     marginTop: 20,
     color: "#666",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 22,
     textAlign: "center",
@@ -760,7 +751,6 @@ const styles = StyleSheet.create({
   },
   clubAdminConfirmText: {
     color: "#FFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 20,
     fontWeight: "600",

@@ -20,7 +20,6 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getProtectedNavigationAction } from "@/shared/navigation/tab-access";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 
 const controllerImage = require("../../../../assets/images/quick-order-controller.png");
 const glowImage = require("../../../../assets/svgs/quick-order-glow.svg");
@@ -371,7 +370,6 @@ const styles = StyleSheet.create({
   },
   pillText: {
     color: "#FFFFFF",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     lineHeight: 14,
     fontWeight: "700",

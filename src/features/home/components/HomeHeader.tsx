@@ -6,7 +6,7 @@ import type {
   GameKey,
   HomeTab,
 } from "@/features/home/api/home.types";
-import { DOUYIN_SANS, SYSTEM_FONT } from "@/shared/theme/typography";
+import { SYSTEM_FONT } from "@/shared/theme/typography";
 import { GameCategoryTabs } from "./GameCategoryTabs";
 import { HomeBannerSections } from "./HomeBannerSections";
 import { CachedImage } from "@/shared/ui/CachedImage";
@@ -188,13 +188,11 @@ const styles = StyleSheet.create({
   topTabs: { flexDirection: "row", gap: 20, height: "100%" },
   tab: { justifyContent: "center", minWidth: 42, position: "relative" },
   tabText: {
-    fontFamily: DOUYIN_SANS,
     color: "#999",
     fontSize: 18,
     fontWeight: "400",
   },
   tabSelected: {
-    fontFamily: DOUYIN_SANS,
     color: "#1a1a1a",
     fontSize: 20,
     fontWeight: "700",
@@ -244,7 +242,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   gameLogoText: {
-    fontFamily: DOUYIN_SANS,
     color: "#fff",
     fontSize: 12,
     fontWeight: "800",

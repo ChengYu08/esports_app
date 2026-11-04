@@ -16,7 +16,6 @@ import { showToast } from "@/shared/ui/app-toast";
 import { useAuthStore } from "@esports/auth";
 
 import { submitReport } from "@/features/mine/api/report.api";
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 const REPORT_REASONS = [
@@ -165,14 +164,12 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F7F7" },
   headerTitle: {
     color: "#111111",
-    fontFamily: DOUYIN_SANS,
     fontSize: 17,
     fontWeight: "600",
   },
   content: { paddingHorizontal: 16, paddingTop: 24 },
   sectionTitle: {
     color: "#111111",
-    fontFamily: DOUYIN_SANS,
     fontSize: 16,
     fontWeight: "600",
   },
@@ -191,7 +188,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
   },
-  reasonText: { color: "#222222", fontFamily: DOUYIN_SANS, fontSize: 15 },
+  reasonText: { color: "#222222", fontSize: 15 },
   radio: {
     alignItems: "center",
     borderColor: "#C8C8C8",
@@ -215,7 +212,6 @@ const styles = StyleSheet.create({
   },
   required: {
     color: "#FF3158",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     marginLeft: 6,
   },
@@ -223,7 +219,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 8,
     color: "#222222",
-    fontFamily: DOUYIN_SANS,
     fontSize: 15,
     height: 132,
     lineHeight: 22,
@@ -233,7 +228,6 @@ const styles = StyleSheet.create({
   },
   counter: {
     color: "#AAAAAA",
-    fontFamily: DOUYIN_SANS,
     fontSize: 12,
     marginTop: 6,
     textAlign: "right",
@@ -248,6 +242,6 @@ const styles = StyleSheet.create({
   },
   submitButtonDisabled: { backgroundColor: "#FFB6C4" },
   submitButtonPressed: { opacity: 0.82 },
-  submitText: { color: "#FFFFFF", fontFamily: DOUYIN_SANS, fontSize: 16, fontWeight: "600" },
+  submitText: { color: "#FFFFFF", fontSize: 16, fontWeight: "600" },
   pressed: { opacity: 0.65 },
 });

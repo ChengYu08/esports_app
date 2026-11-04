@@ -2,6 +2,7 @@ import { handlePendingPushClick } from "@/features/message/push-click-handler";
 import { showToast } from "@/shared/ui/app-toast";
 import { useAuthStore } from "@esports/auth";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { useFonts } from "expo-font";
 import { router, Stack, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -36,6 +37,7 @@ import { OrderNotifySyncHost } from "@/features/order/order-notify-sync";
 import { PushyUpdateHost } from "@/features/ota/PushyUpdateHost";
 import { PrivacyConsentGate } from "@/features/privacy/components/PrivacyConsentGate";
 import { readPrivacyConsent } from "@/features/privacy/privacy-consent";
+import { D_DIN_PRO_FONTS } from "@/shared/theme/typography";
 import { VoiceRoomKickListener } from "@/features/voice-room/components/VoiceRoomKickListener";
 import { VoiceRoomMiniPlayer } from "@/features/voice-room/components/VoiceRoomMiniPlayer";
 import { VoiceRoomJoinedSyncHost } from "@/features/voice-room/use-sync-joined-voice-room";
@@ -75,6 +77,7 @@ function withStartupTimeout<T>(promise: Promise<T>, fallback: T): Promise<T> {
 
 export default function RootLayout() {
   const pathname = usePathname();
+  const [fontsLoaded, fontError] = useFonts(D_DIN_PRO_FONTS);
   const [splashReady, setSplashReady] = useState(false);
   const finishSplash = useCallback(() => setSplashReady(true), []);
   const [sessionReady, setSessionReady] = useState(false);
@@ -243,7 +246,7 @@ export default function RootLayout() {
     [],
   );
 
-  if (!splashReady || !sessionReady || !privacyReady) {
+  if ((!fontsLoaded && !fontError) || !splashReady || !sessionReady || !privacyReady) {
     return <StartupSplash onFinished={finishSplash} />;
   }
 

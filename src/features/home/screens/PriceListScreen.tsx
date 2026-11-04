@@ -1,4 +1,3 @@
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -94,7 +93,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#fff" },
   // 原 flex:1 是行内布局里横向铺满用的，ScreenHeader 的 titleWrap 已自适配宽度；
   // 传入后反而会让 Text 在纵向撑满页头导致标题上移，故删除
-  navTitle: { color: "#0A0A0A", fontFamily: DOUYIN_SANS, fontSize: 16, lineHeight: 24, fontWeight: "500", textAlign: "center" },
+  navTitle: { color: "#0A0A0A", fontSize: 16, lineHeight: 24, fontWeight: "500", textAlign: "center" },
   tabsScroll: { flexGrow: 0, height: 54, backgroundColor: "#fff" },
   tabs: { minWidth: "100%", paddingHorizontal: 16, justifyContent: "space-around", backgroundColor: "#fff" },
   tab: {
@@ -104,7 +103,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center", position: "relative",
   },
-  tabText: { color: "#666", fontFamily: DOUYIN_SANS, fontSize: 14, lineHeight: 22 },
+  tabText: { color: "#666", fontSize: 14, lineHeight: 22 },
   tabTextActive: { color: "#333", fontSize: 16, fontWeight: "600" },
   tabIndicator: { position: "absolute", bottom: 9, width: 12, height: 3, borderRadius: 2, backgroundColor: "#E01B28" },
   content: { flex: 1, backgroundColor: "#E6E6E6" },
@@ -115,6 +114,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center", paddingTop: 100,
   },
-  stateText: { padding: 32, color: "rgba(0,0,0,.35)", fontFamily: DOUYIN_SANS, fontSize: 14, textAlign: "center" },
-  retryText: { color: "#E01B28", fontFamily: DOUYIN_SANS, fontSize: 14 },
+  stateText: { padding: 32, color: "rgba(0,0,0,.35)", fontSize: 14, textAlign: "center" },
+  retryText: { color: "#E01B28", fontSize: 14 },
 });

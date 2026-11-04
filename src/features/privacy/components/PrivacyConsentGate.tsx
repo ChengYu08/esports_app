@@ -3,7 +3,6 @@ import { ActivityIndicator, BackHandler, Modal, Pressable, ScrollView, StyleShee
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 
-import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { colors } from "@/shared/theme/tokens";
 import { APP_LINKS } from "@/core/config/links";
 import { savePrivacyConsent } from "@/features/privacy/privacy-consent";
@@ -191,7 +190,6 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.textStrong,
-    fontFamily: DOUYIN_SANS,
     fontSize: 19,
     fontWeight: "600",
     lineHeight: 28,
@@ -199,7 +197,6 @@ const styles = StyleSheet.create({
   },
   body: {
     color: colors.textSecondary,
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     lineHeight: 23,
   },
@@ -246,12 +243,10 @@ const styles = StyleSheet.create({
   },
   declineText: {
     color: colors.textSecondary,
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
   },
   acceptText: {
     color: colors.surface,
-    fontFamily: DOUYIN_SANS,
     fontSize: 14,
     fontWeight: "600",
   },
