@@ -1,12 +1,12 @@
 import { Image } from "expo-image";
-import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { Game } from "@/features/home/api/home.types";
-import { colors } from "@/shared/theme/tokens";
+import { SYSTEM_FONT } from "@/shared/theme/typography";
 
 const allGamesIcon = require("../../../../assets/mine/figma/god-all-games.svg");
 
 type Props = { games: Game[]; value: string; onChange: (id: string) => void };
-const allGames: Game = { id: 0, name: "总榜" };
+const allGames: Game = { id: 0, name: "全部" };
 
 export function RankingGameFilter({ games, value, onChange }: Props) {
   return (
@@ -28,6 +28,7 @@ export function RankingGameFilter({ games, value, onChange }: Props) {
               <Image source={allGamesIcon} contentFit="cover" style={styles.icon} />
             )}
             <Text style={[styles.label, selected && styles.labelSelected]}>{game.name}</Text>
+            {selected ? <View style={styles.indicator} /> : null}
           </Pressable>
         );
       })}
@@ -36,8 +37,14 @@ export function RankingGameFilter({ games, value, onChange }: Props) {
 }
 
 const styles = StyleSheet.create({
-  scroll: { flexGrow: 0, backgroundColor: colors.surface },
-  games: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6, gap: 8, alignItems: "center" },
+  scroll: { flexGrow: 0, backgroundColor: "transparent" },
+  games: {
+    minHeight: 48,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+    alignItems: "center",
+  },
   game: {
     height: 32,
     paddingHorizontal: 8,
@@ -45,12 +52,26 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 4,
     alignItems: "center",
-    backgroundColor: "#F5F5F7",
-    borderWidth: 1,
-    borderColor: "#F5F5F7",
+    position: "relative",
   },
-  gameSelected: { backgroundColor: "#FFF5F7", borderColor: "#FF99AD" },
-  icon: { width: 20, height: 20, borderRadius: 4 },
-  label: { fontSize: 12, color: "#0D0D0F", lineHeight: 18 },
-  labelSelected: { color: "#FE1F4C", fontWeight: "500" },
+  gameSelected: {},
+  icon: { width: 20, height: 20, borderRadius: 10 },
+  label: {
+    fontFamily: SYSTEM_FONT,
+    fontSize: 12,
+    color: "#656566",
+    lineHeight: 18,
+    fontWeight: "400",
+  },
+  labelSelected: { color: "#0D0D0F", fontWeight: "500" },
+  indicator: {
+    position: "absolute",
+    left: "50%",
+    bottom: 0,
+    width: 16,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: "#FE1F4C",
+    transform: [{ translateX: -8 }],
+  },
 });
