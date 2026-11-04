@@ -105,7 +105,7 @@ describe("首页品类筛选与店铺标签", () => {
     vi.mocked(apiClient)
       .mockResolvedValueOnce({
         code: "SUCCESS",
-        data: [{ id: 2, name: "手游", iconUrl: null }, { id: 1, name: "端游", iconUrl: "pc.png" }],
+        data: [{ id: 2, name: "手游", iconUrl: null, mobile_icon_url: "mobile.png" }, { id: 1, name: "端游", iconUrl: "pc.png", mobileIconUrl: "mobile-pc.png" }],
       })
       .mockResolvedValueOnce({
         code: "SUCCESS",
@@ -113,8 +113,8 @@ describe("首页品类筛选与店铺标签", () => {
       });
 
     expect(await fetchGameCategories()).toEqual([
-      { id: "2", name: "手游", iconUrl: undefined },
-      { id: "1", name: "端游", iconUrl: "pc.png" },
+      { id: "2", name: "手游", iconUrl: undefined, mobileIconUrl: "mobile.png" },
+      { id: "1", name: "端游", iconUrl: "pc.png", mobileIconUrl: "mobile-pc.png" },
     ]);
     expect(await fetchGames()).toEqual([expect.objectContaining({ id: 11, gameCategoryId: "2" })]);
   });

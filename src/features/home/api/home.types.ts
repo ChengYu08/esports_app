@@ -14,6 +14,7 @@ export type GameCategory = {
   id: string;
   name: string;
   iconUrl?: string;
+  mobileIconUrl?: string;
 };
 
 export type ClubFilters = {
