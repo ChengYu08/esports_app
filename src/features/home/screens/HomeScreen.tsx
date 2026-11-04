@@ -23,9 +23,16 @@ import {
   View,
   useAnimatedValue,
   type LayoutChangeEvent,
+  type ViewToken,
 } from "react-native";
 import { showToast, toastDurations } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const clubViewabilityConfig = { itemVisiblePercentThreshold: 20 };
+
+function sameClubIds(current: string[], next: string[]) {
+  return current.length === next.length && current.every((id, index) => id === next[index]);
+}
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -127,11 +134,21 @@ export default function HomeScreen() {
     () => clubs.data?.pages.flatMap((page) => page.items) ?? [],
     [clubs.data],
   );
+  const [visibleClubIds, setVisibleClubIds] = useState<string[]>([]);
+  const onClubViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    const next = viewableItems.map(({ item }) => item.id as string);
+    setVisibleClubIds((current) => sameClubIds(current, next) ? current : next);
+  }, []);
+  // 精确在线人数需要逐游戏分页查询，只计算屏幕上的卡片。
+  const visibleClubs = useMemo(
+    () => clubItems.filter((club) => visibleClubIds.includes(club.id)),
+    [clubItems, visibleClubIds],
+  );
   const onlineGameIds = useMemo(
     () => selectedGame ? [Number(selectedGame)] : selectedCategory ? categoryGames.map((item) => item.id) : undefined,
     [selectedGame, selectedCategory, categoryGames],
   );
-  const onlineCounts = useClubOnlineCounts(clubItems, onlineGameIds, topTab === "home");
+  const onlineCounts = useClubOnlineCounts(visibleClubs, onlineGameIds, topTab === "home");
   const selectTopTab = useCallback((tab: HomeTab) => {
     setTopTab(tab);
     setMountedTabs((current) =>
@@ -241,6 +258,8 @@ export default function HomeScreen() {
                 data={clubItems}
                 keyExtractor={(item) => item.id}
                 renderItem={renderClub}
+                onViewableItemsChanged={onClubViewableItemsChanged}
+                viewabilityConfig={clubViewabilityConfig}
                 ListHeaderComponent={header}
                 contentContainerStyle={{
                   flexGrow: 1,

@@ -64,6 +64,28 @@ afterEach(async () => {
 });
 
 describe("useClubOnlineCounts 请求生命周期", () => {
+  it("快速切换可见俱乐部时只查询最后停留的一组", async () => {
+    apiMock.fetchClubOnlineCount.mockResolvedValue(2);
+    const first = [createClub("1")];
+    const last = [createClub("2")];
+
+    await act(async () => {
+      renderer = create(tree(first));
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    await act(async () => {
+      renderer?.update(tree(last));
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+
+    expect(apiMock.fetchClubOnlineCount).toHaveBeenCalledTimes(1);
+    expect(apiMock.fetchClubOnlineCount).toHaveBeenCalledWith("2", [14], expect.anything());
+  });
+
   it("失焦后停止旧批次，不再请求后续俱乐部", async () => {
     const pending: ((count: number) => void)[] = [];
     apiMock.fetchClubOnlineCount.mockImplementation(
@@ -78,6 +100,9 @@ describe("useClubOnlineCounts 请求生命周期", () => {
 
     await act(async () => {
       renderer = create(tree(clubs));
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
     });
     expect(apiMock.fetchClubOnlineCount).toHaveBeenCalledTimes(4);
 
@@ -98,12 +123,18 @@ describe("useClubOnlineCounts 请求生命周期", () => {
     await act(async () => {
       renderer = create(tree(clubs));
     });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
     expect(apiMock.fetchClubOnlineCount).toHaveBeenCalledTimes(1);
 
     focusState.focused = false;
     await act(async () => renderer?.update(tree(clubs)));
     focusState.focused = true;
     await act(async () => renderer?.update(tree(clubs)));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
 
     expect(apiMock.fetchClubOnlineCount).toHaveBeenCalledTimes(1);
   });

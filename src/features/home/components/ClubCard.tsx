@@ -1,10 +1,8 @@
-import { fetchClubGameCompanionCounts } from "@/features/home/api/home.api";
 import type { Club } from "@/features/home/api/home.types";
 import { computeGameIconLayout } from "@/features/mine/utils/game-icons-layout";
 import { colors } from "@/shared/theme/tokens";
 import { DOUYIN_SANS } from "@/shared/theme/typography";
 import { CachedImage } from "@/shared/ui/CachedImage";
-import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -43,22 +41,8 @@ export const ClubCard = memo(function ClubCard({
     router.push({ pathname: "/club/[id]", params: { id: club.id } });
   };
 
-  const gameIds = Array.from(new Set(club.gameIds ?? [])).sort((a, b) => a - b);
-  const gameCounts = useQuery({
-    queryKey: ["club-game-companion-counts", club.id, gameIds],
-    queryFn: ({ signal }) =>
-      fetchClubGameCompanionCounts(club.id, gameIds, signal),
-    enabled: gameIds.length > 0,
-    staleTime: 5 * 60_000,
-  });
-  const counts = gameCounts.data;
-  const gameIcons = new Map((club.games ?? []).map((game) => [game.id, game]));
-  const games = counts
-    ? [...gameIds]
-        .sort((a, b) => counts[b] - counts[a] || a - b)
-        .slice(0, 3)
-        .flatMap((id) => (gameIcons.has(id) ? [gameIcons.get(id)!] : []))
-    : [];
+  // 列表接口已返回俱乐部游戏及顺序，直接展示，避免每张卡按游戏再次请求陪玩列表。
+  const games = club.games?.slice(0, 3) ?? [];
   const gamesLayout = computeGameIconLayout(games.length);
 
   return (

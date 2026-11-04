@@ -21,8 +21,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Easing,
   FlatList,
@@ -94,6 +95,79 @@ const filterDefinitions: { key: FilterKey; label: string }[] = [
 ];
 
 const memberKeyExtractor = (member: Companion) => String(member.profileId);
+
+type ClubMemberRowProps = {
+  item: Companion;
+  clubId: string;
+  fromClubUserId?: string;
+  fromSearchPage: boolean;
+  gameName?: string;
+  gameIconUrl?: string;
+  voicePlayingUrl: string | null;
+  onToggleVoice: (url: string) => void;
+};
+
+const ClubMemberRow = memo(function ClubMemberRow({
+  item,
+  clubId,
+  fromClubUserId,
+  fromSearchPage,
+  gameName,
+  gameIconUrl,
+  voicePlayingUrl,
+  onToggleVoice,
+}: ClubMemberRowProps) {
+  const onPress = useCallback(() => {
+    if (fromClubUserId && fromClubUserId === String(item.userId)) {
+      router.back();
+      return;
+    }
+    router.push({
+      pathname: "/profile",
+      params: {
+        clubId,
+        userId: String(item.userId),
+        fromClubId: clubId,
+        ...(fromSearchPage ? { fromSearch: "1" } : {}),
+      },
+    });
+  }, [clubId, fromClubUserId, fromSearchPage, item.userId]);
+
+  return (
+    <CompanionCard
+      nickname={item.nickname}
+      avatar={item.headImage ?? ""}
+      sex={item.sex ?? 0}
+      age={item.age ?? null}
+      introTagText={item.tagName}
+      introTagColor={item.tagBackgroundColor || "#474748"}
+      gameName={item.gameName || gameName}
+      gameIconUrl={gameIconUrl}
+      modeName={item.modeName}
+      levelName={item.levelName}
+      serviceName={item.serviceName}
+      signature={item.signature}
+      onlineStatus={item.onlineStatus}
+      gameStatus={item.gameStatus}
+      price={item.price}
+      orderCount={item.orderCount}
+      voiceUrl={item.voiceUrl ?? null}
+      voiceDurationSeconds={item.voiceDurationSeconds ?? null}
+      voicePlayingUrl={voicePlayingUrl === item.voiceUrl ? voicePlayingUrl : null}
+      onToggleVoice={onToggleVoice}
+      onPress={onPress}
+    />
+  );
+}, (previous, next) =>
+  previous.item === next.item &&
+  previous.clubId === next.clubId &&
+  previous.fromClubUserId === next.fromClubUserId &&
+  previous.fromSearchPage === next.fromSearchPage &&
+  previous.gameName === next.gameName &&
+  previous.gameIconUrl === next.gameIconUrl &&
+  previous.onToggleVoice === next.onToggleVoice &&
+  (previous.voicePlayingUrl === previous.item.voiceUrl) ===
+    (next.voicePlayingUrl === next.item.voiceUrl));
 
 export default function ClubDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -229,44 +303,15 @@ export default function ClubDetailScreen() {
 
   const renderMember = useCallback(
     ({ item }: { item: Companion }) => (
-      <CompanionCard
-        nickname={item.nickname}
-        avatar={item.headImage ?? ""}
-        sex={item.sex ?? 0}
-        age={item.age ?? null}
-        // 第三行标签对齐 PC 端大神列表：tagName + tagBackgroundColor（PC colorWithAlpha 缺省色）
-        introTagText={item.tagName}
-        introTagColor={item.tagBackgroundColor || "#474748"}
-        // 列表本身按所选游戏过滤，接口记录不带图标时沿用所选游戏
-        gameName={item.gameName || selectedGameInfo?.name}
+      <ClubMemberRow
+        item={item}
+        clubId={clubId}
+        fromClubUserId={fromClubUserId}
+        fromSearchPage={fromSearchPage}
+        gameName={selectedGameInfo?.name}
         gameIconUrl={selectedGameInfo?.iconUrl}
-        modeName={item.modeName}
-        levelName={item.levelName}
-        serviceName={item.serviceName}
-        signature={item.signature}
-        onlineStatus={item.onlineStatus}
-        gameStatus={item.gameStatus}
-        price={item.price}
-        orderCount={item.orderCount}
-        voiceUrl={item.voiceUrl ?? null}
-        voiceDurationSeconds={item.voiceDurationSeconds ?? null}
         voicePlayingUrl={voicePlayer.playingUrl}
         onToggleVoice={voicePlayer.toggle}
-        onPress={() => {
-          if (fromClubUserId && fromClubUserId === String(item.userId)) {
-            router.back();
-            return;
-          }
-          router.push({
-            pathname: "/profile",
-            params: {
-              clubId,
-              userId: String(item.userId),
-              fromClubId: clubId,
-              ...(fromSearchPage ? { fromSearch: "1" } : {}),
-            },
-          });
-        }}
       />
     ),
     [
@@ -279,6 +324,11 @@ export default function ClubDetailScreen() {
       voicePlayer.toggle,
     ],
   );
+  const loadMoreMembers = useCallback(() => {
+    if (companionsQuery.hasNextPage && !companionsQuery.isFetching) {
+      companionsQuery.fetchNextPage();
+    }
+  }, [companionsQuery]);
   // 性别/状态/价格筛选的当前值，统一映射到接口参数
   function openFilterSheet(filter: FilterKey) {
     if (isFilterSheetVisible) {
@@ -481,10 +531,12 @@ export default function ClubDetailScreen() {
           data={members}
           keyExtractor={memberKeyExtractor}
           renderItem={renderMember}
+          onEndReached={loadMoreMembers}
+          onEndReachedThreshold={0.4}
           ItemSeparatorComponent={MemberCardSeparator}
-          initialNumToRender={8}
-          maxToRenderPerBatch={8}
-          windowSize={7}
+          initialNumToRender={5}
+          maxToRenderPerBatch={5}
+          windowSize={5}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[
             styles.listContent,
@@ -583,6 +635,11 @@ export default function ClubDetailScreen() {
             ) : (
               <EmptyState message="暂无大神" style={styles.memberEmpty} />
             )
+          }
+          ListFooterComponent={
+            companionsQuery.isFetchingNextPage ? (
+              <ActivityIndicator color={COLORS.brand} style={styles.memberLoadMore} />
+            ) : null
           }
         />
       </View>
@@ -1317,6 +1374,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   memberEmpty: { alignSelf: "center", marginTop: 24 },
+  memberLoadMore: { paddingVertical: 16 },
   // 成员卡片分隔符（对齐大神列表 hairline 分割线）
   memberSeparator: {
     height: StyleSheet.hairlineWidth,
