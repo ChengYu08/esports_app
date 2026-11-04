@@ -225,7 +225,8 @@ function rewriteGradleDistUrl() {
 
 function ensureGradleJvmArgs() {
   const file = path.join(root, 'android', 'gradle.properties');
-  const desired = 'org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m';
+  // 1G metaspace 在 lintVital 分析阶段会耗尽并导致 Gradle 守护进程崩溃（SIGSEGV），按官方建议放宽到 2G
+  const desired = 'org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=2048m';
   let text = fs.readFileSync(file, 'utf8');
   if (/^org\.gradle\.jvmargs=/m.test(text)) {
     text = text.replace(/^org\.gradle\.jvmargs=.*$/m, desired);
