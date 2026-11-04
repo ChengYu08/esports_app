@@ -1,6 +1,6 @@
 import { colors } from "@/shared/theme/tokens";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
-import { router } from "expo-router";
+import { router, useIsFocused } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   FlatList,
@@ -29,15 +29,22 @@ const emptyRows: RankingItem[] = [];
 
 export default function RankingScreen({
   embedded = false,
+  active = true,
 }: {
   /** 作为首页顶部 tab 内嵌时为 true：顶部留白交给首页导航栏，只保留少量间距 */
   embedded?: boolean;
+  active?: boolean;
 }) {
   const insets = useSafeAreaInsets();
+  const focused = useIsFocused();
   const [filters, setFilters] = useState(DEFAULT_RANKING_FILTERS);
   const [rulesVisible, setRulesVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const { top, games, myRank, user, isAuthenticated } = useRankingData(filters);
+  const { top, games, myRank, user, isAuthenticated } = useRankingData(
+    filters,
+    active && focused,
+  );
+
   const board = getRankingBoard(filters.boardCode);
   const params = getRankingParams(filters);
   const listKey = `${params.boardCode}-${params.rankType}-${params.gameId}`;
@@ -217,7 +224,7 @@ export default function RankingScreen({
         />
       )}
       <RankingRulesSheet
-        visible={rulesVisible}
+        visible={active && rulesVisible}
         board={filters.boardCode}
         period={filters.rankType}
         onClose={() => setRulesVisible(false)}
