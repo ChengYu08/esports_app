@@ -46,9 +46,9 @@ export function GameCategoryTabs({
             onPress={() => onChange(selected ? "" : category.id)}
             style={[styles.item, { width: itemWidth }]}
           >
-            {category.iconUrl ? (
+            {category.mobileIconUrl ? (
               <CachedImage
-                source={{ uri: category.iconUrl }}
+                source={{ uri: category.mobileIconUrl }}
                 contentFit="contain"
                 style={styles.image}
               />
@@ -74,8 +74,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
     gap: spacing.sm,
   },
-  // 按品类图原始比例确定高度，避免 contain 在固定高度内产生上下留白。
-  item: { aspectRatio: 15 / 4, borderRadius: radius.md, overflow: "hidden" },
+  item: { flexShrink: 0, aspectRatio: 109 / 56, borderRadius: radius.md, overflow: "hidden" },
   selected: {
     position: "absolute",
     top: 0,
