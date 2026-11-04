@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -21,6 +22,7 @@ import { useAuthStore } from "@esports/auth";
 import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
+import { ImagePreview } from "@/shared/ui/ImagePreview";
 import type { OrderReview, OrderReviewInput } from "../order.api";
 import { uploadReviewImage } from "../order-review-upload";
 
@@ -51,6 +53,7 @@ export function OrderReviewSheet({
   const [images, setImages] = useState<string[]>([]);
   const [anonymous, setAnonymous] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (detail) {
@@ -214,7 +217,13 @@ export function OrderReviewSheet({
                 <View style={styles.imageRow}>
                   {images.map((uri, index) => (
                     <View key={`${uri}-${index}`} style={styles.imageFrame}>
-                      <Image contentFit="cover" source={{ uri }} style={styles.thumbnail} />
+                      <Pressable
+                        accessibilityLabel={`预览第${index + 1}张评价图片`}
+                        accessibilityRole="button"
+                        onPress={() => setPreviewIndex(index)}
+                      >
+                        <Image contentFit="cover" source={{ uri }} style={styles.thumbnail} />
+                      </Pressable>
                       {!readonly && (
                         <Pressable
                           accessibilityLabel={`删除第${index + 1}张图片`}
@@ -297,6 +306,11 @@ export function OrderReviewSheet({
           )}
         </View>
       </KeyboardAvoidingView>
+      <Modal visible={previewIndex !== null} animationType="fade" onRequestClose={() => setPreviewIndex(null)}>
+        {previewIndex !== null && (
+          <ImagePreview images={images} index={previewIndex} onClose={() => setPreviewIndex(null)} />
+        )}
+      </Modal>
     </BottomSheet>
   );
 }
