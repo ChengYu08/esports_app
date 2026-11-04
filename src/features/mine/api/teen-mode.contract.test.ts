@@ -5,6 +5,7 @@ import { createTeenModeApi } from "./teen-mode.contract";
 type FakeResponse = {
   code: number | string;
   msg?: string;
+  info?: string;
   data?: unknown;
   success?: boolean;
 };
@@ -17,7 +18,7 @@ const SUCCESS_RESPONSE: FakeResponse = {
 };
 
 function createFakeRequester(response: FakeResponse) {
-  const calls = vi.fn(async (path: string, options: { method: "POST"; token?: string; body?: unknown }) => response);
+  const calls = vi.fn(async (path: string, options: { method: "POST" | "GET"; token?: string; body?: unknown }) => response);
   return {
     requester: calls as unknown as Parameters<typeof createTeenModeApi>[0],
     calls,
@@ -88,8 +89,32 @@ describe("createTeenModeApi", () => {
     );
   });
 
+  it("config：GET /client/v1/youth/config，返回锁定时段配置", async () => {
+    const fake = createFakeRequester({
+      code: 0,
+      data: { lockStartHour: 9, lockEndHour: 23 },
+    });
+    const api = createTeenModeApi(fake.requester);
+    await expect(api.config(TOKEN)).resolves.toEqual({
+      lockStartHour: 9,
+      lockEndHour: 23,
+    });
+    expect(fake.calls).toHaveBeenCalledWith(
+      "/client/v1/youth/config",
+      expect.objectContaining({ method: "GET", token: TOKEN }),
+    );
+  });
+
   it("code 非 0 时抛出服务端 msg", async () => {
     const fake = createFakeRequester({ code: 500, msg: "密码有误，今日还剩3次机会！" });
+    const api = createTeenModeApi(fake.requester);
+    await expect(api.close(TOKEN, "0000")).rejects.toThrow("密码有误，今日还剩3次机会！");
+  });
+
+  it("失败信封的错误文案在 info 字段（后端 R 包络）时也必须抛出原文案", async () => {
+    // 实测后端 R.failed 的失败响应文案字段是 info（与全局 apiClient 读取口径一致），
+    // 只有 msg 时会退化成「请求失败，请稍后重试」兜底文案
+    const fake = createFakeRequester({ code: 1, info: "密码有误，今日还剩3次机会！" });
     const api = createTeenModeApi(fake.requester);
     await expect(api.close(TOKEN, "0000")).rejects.toThrow("密码有误，今日还剩3次机会！");
   });

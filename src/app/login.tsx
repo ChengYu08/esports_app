@@ -13,7 +13,7 @@ import {
   type CoolingRecord,
 } from "@/features/auth/cancellation-cooling";
 import { getPasswordLoginErrorMessage } from "@/features/auth/password-login-error";
-import { openExternalLink } from "@/shared/navigation/open-external-link";
+import { openInAppWebView } from "@/shared/navigation/open-web-view";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { createAuthSsoAdapter, LoginScreen, useAuthStore } from "@esports/auth";
 import {
@@ -280,10 +280,10 @@ export default function LoginRoute() {
           router.push({ pathname: "/forgot-password", params: { phone } })
         }
         onUserAgreementPress={() =>
-          void openExternalLink(APP_LINKS.userAgreement)
+          openInAppWebView(APP_LINKS.userAgreement, "用户协议")
         }
         onPrivacyPolicyPress={() =>
-          void openExternalLink(APP_LINKS.privacyPolicy)
+          openInAppWebView(APP_LINKS.privacyPolicy, "隐私政策")
         }
         onQuickLogin={async () => {
           if (!ensureNotCooling()) return;
