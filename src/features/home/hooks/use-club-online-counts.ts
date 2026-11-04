@@ -8,6 +8,7 @@ import type { Club } from "@/features/home/api/home.types";
 const ONLINE_COUNT_BATCH_SIZE = 4;
 const ONLINE_COUNT_BATCH_GAP_MS = 120;
 const ONLINE_COUNT_STALE_TIME_MS = 30_000;
+const ONLINE_COUNT_SETTLE_MS = 250;
 
 type ClubOnlineCountQuery = {
   clubId: string;
@@ -80,7 +81,9 @@ export function useClubOnlineCounts(clubs: readonly Club[], gameIds?: readonly n
     const runId = ++runIdRef.current;
     const activeQueries = queriesRef.current;
     if (activeQueries.length === 0) return;
-    setIsRefetching(true);
+    if (force) {
+      setIsRefetching(true);
+    }
     try {
       for (let index = 0; index < activeQueries.length; index += ONLINE_COUNT_BATCH_SIZE) {
         if (runIdRef.current !== runId) return;
@@ -101,21 +104,29 @@ export function useClubOnlineCounts(clubs: readonly Club[], gameIds?: readonly n
         }
       }
     } finally {
-      if (runIdRef.current === runId) {
+      if (force && runIdRef.current === runId) {
         setIsRefetching(false);
       }
     }
   }, [queryClient]);
 
   useEffect(() => {
-    if (!enabled || !focused) return;
+    if (!enabled || !focused) {
+      return;
+    }
     let cancelled = false;
     applyCounts();
-    fetchAll().then(() => {
-      if (!cancelled) applyCounts();
-    });
+    // 快速滑动时只等待最后一组可见卡片稳定后查询，避免为中途掠过的俱乐部反复启动请求。
+    const timer = setTimeout(() => {
+      fetchAll().then(() => {
+        if (!cancelled) {
+          applyCounts();
+        }
+      });
+    }, ONLINE_COUNT_SETTLE_MS);
     return () => {
       cancelled = true;
+      clearTimeout(timer);
       // 离屏即作废旧代次并中止在途请求，避免多次往返后多个全量批次叠加。
       runIdRef.current += 1;
       void queryClient.cancelQueries({ queryKey: ["club-online-count"] });
