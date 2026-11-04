@@ -25,7 +25,7 @@ let cachedConfig: { token: string; config: TeenModeConfig } | null = null;
 
 /**
  * 拉取锁定时段配置：同一 token 进程内缓存（配置仅 Nacos 手动变更，重启后自然刷新）。
- * 失败抛错，由调用方回退默认窗口 9:00-23:00（与服务端默认值一致）。
+ * 失败抛错，由调用方回退默认窗口 22:00-次日6:00（与服务端默认值一致）。
  */
 export async function fetchTeenModeConfig(
   token: string,

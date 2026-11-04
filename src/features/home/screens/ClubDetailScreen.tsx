@@ -453,9 +453,13 @@ export default function ClubDetailScreen() {
               <Text numberOfLines={1} style={styles.clubName}>
                 {club.name}
               </Text>
-              <View style={styles.selfTag}>
-                <Text style={styles.selfTagText}>自营</Text>
-              </View>
+              {club.clubTag ? (
+                <View style={styles.clubTag}>
+                  <Text numberOfLines={1} style={styles.clubTagText}>
+                    {club.clubTag}
+                  </Text>
+                </View>
+              ) : null}
             </View>
             <View style={styles.clubMetaRow}>
               <View style={styles.clubMetaItem}>
@@ -1107,7 +1111,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     lineHeight: 28,
   },
-  selfTag: {
+  clubTag: {
     height: 17,
     paddingHorizontal: 4,
     justifyContent: "center",
@@ -1115,7 +1119,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.brandLight,
     borderRadius: 3,
   },
-  selfTagText: {
+  clubTagText: {
     color: COLORS.white,
     fontFamily: SYSTEM_FONT,
     fontSize: 10,
