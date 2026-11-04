@@ -1,6 +1,7 @@
 import { CourtHomeScreen } from "@/features/court/screens/CourtHomeScreen";
 import GodListScreen from "@/features/god/screens/GodListScreen";
 import RankingScreen from "@/features/ranking/screens/RankingScreen";
+import { RankingBackground } from "@/features/ranking/components/RankingBackground";
 import type { GameKey, HomeTab } from "@/features/home/api/home.types";
 import { ClubCard } from "@/features/home/components/ClubCard";
 import { useClubOnlineCounts } from "@/features/home/hooks/use-club-online-counts";
@@ -257,6 +258,8 @@ export default function HomeScreen() {
         >
           <HomeBackground />
         </Animated.View>
+      ) : topTab === "ranking" ? (
+        <RankingBackground />
       ) : (
         <HomeBackground />
       )}
