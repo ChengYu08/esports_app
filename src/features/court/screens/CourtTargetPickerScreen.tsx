@@ -1,4 +1,4 @@
-import { ChevronLeft24Regular, Search24Regular } from "@fluentui/react-native-icons";
+import { ChevronLeft24Regular, DismissCircle16Filled, Search24Regular } from "@fluentui/react-native-icons";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
@@ -123,9 +123,19 @@ export default function CourtTargetPickerScreen() {
             autoCorrect={false}
             autoCapitalize="none"
             editable={validSession}
-            clearButtonMode="while-editing"
             style={styles.searchInput}
           />
+          {!!keyword && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="清除搜索内容"
+              hitSlop={8}
+              onPress={() => changeKeyword("")}
+              style={styles.clearSearch}
+            >
+              <DismissCircle16Filled color="#BFBFBF" width={16} height={16} />
+            </Pressable>
+          )}
         </View>
       </View>
       {!validSession ? (
@@ -309,6 +319,7 @@ const styles = StyleSheet.create({
   searchBox: {
     flexDirection: "row",
     alignItems: "center",
+    height: 36,
     gap: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
@@ -317,14 +328,16 @@ const styles = StyleSheet.create({
   searchIcon: { width: 20, height: 20 },
   searchInput: {
     flex: 1,
-    minHeight: 36,
-    paddingVertical: 7,
+    height: 36,
+    paddingVertical: 0,
     paddingHorizontal: 0,
+    includeFontPadding: false,
+    textAlignVertical: "center",
     fontFamily: COURT_FONT_FAMILY,
     color: C.text,
     fontSize: 14,
-    lineHeight: 22,
   },
+  clearSearch: { width: 20, height: 36, alignItems: "center", justifyContent: "center" },
   list: { flexGrow: 1, paddingTop: 8 },
   emptyList: { backgroundColor: C.surface, paddingTop: 0 },
   emptyArea: {
