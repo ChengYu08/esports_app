@@ -165,6 +165,8 @@ export function mapOrder(
       userId: String(candidate.userId ?? ""),
       nickname: stringValue(candidate, "nickname"),
       headImage: stringValue(candidate, "headImage"),
+      clubId: numberValue(candidate, "clubId", "companionClubId"),
+      clubName: stringValue(candidate, "clubName", "companionClubName"),
     }),
   );
   const serviceEnd = times.serviceEndTime

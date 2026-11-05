@@ -279,6 +279,7 @@ export default function CourtTicketDetailScreen() {
                 placeholderTextColor="#aaa"
                 style={styles.replyInput}
                 multiline
+                cursorColor="#FE1F4C"
               />
               <Pressable
                 accessibilityRole="button"

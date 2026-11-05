@@ -359,6 +359,7 @@ export default function AccountSettingsScreen() {
                 editing === "birth" ? "请输入出生日期，如 2000-01-01" : "请输入"
               }
               style={styles.input}
+              cursorColor="#FE1F4C"
             />
           )}
           <View style={styles.modalActions}>

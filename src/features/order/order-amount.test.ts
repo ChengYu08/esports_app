@@ -221,13 +221,13 @@ it("订单详情保留主陪玩以外的参与陪玩及其聊天资料", () => {
     receiverNickname: "主陪玩",
     multiCompanionList: [
       { userId: 10, nickname: "主陪玩", headImage: "main.png" },
-      { userId: 11, nickname: "参与陪玩", headImage: "other.png" },
+      { userId: 11, nickname: "参与陪玩", headImage: "other.png", clubId: 20, clubName: "示例俱乐部" },
       { userId: 12, nickname: "另一位陪玩" },
     ],
   });
   expect(order.receiverUserId).toBe("10");
   expect(order.companions).toEqual([
-    { userId: "11", nickname: "参与陪玩", headImage: "other.png" },
+    { userId: "11", nickname: "参与陪玩", headImage: "other.png", clubId: 20, clubName: "示例俱乐部" },
     { userId: "12", nickname: "另一位陪玩", headImage: undefined },
   ]);
 });

@@ -69,6 +69,7 @@ modules/*/android/.gradle/
 .workbuddy/
 .claude/
 .codex/
+.qoder/
 # Figma 临时渲染产物
 .figma-tmp/
 

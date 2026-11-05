@@ -225,6 +225,7 @@ function CourtSourcePickerScreen({ step }: { step: "orders" | "reviews" }) {
               onSubmitEditing={Keyboard.dismiss}
               autoCorrect={false}
               style={styles.searchInput}
+              cursorColor="#FE1F4C"
             />
             {!!keyword && (
               <Pressable

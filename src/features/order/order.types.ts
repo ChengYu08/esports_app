@@ -36,6 +36,8 @@ export type MultiCompanionCandidateModel = {
   userId: string;
   nickname?: string;
   headImage?: string;
+  clubId?: number;
+  clubName?: string;
 };
 
 export type OrderItemModel = {

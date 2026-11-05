@@ -98,6 +98,7 @@ export function ClubSelectSheet({
               returnKeyType="search"
               autoCorrect={false}
               autoCapitalize="none"
+              cursorColor="#FE1F4C"
             />
             {keyword.length > 0 ? (
               <Pressable

@@ -716,6 +716,7 @@ export default function ChatScreen() {
                 placeholderTextColor="#CCCCCC"
                 style={styles.noteInput}
                 value={noteDraft}
+                cursorColor="#FE1F4C"
               />
               <View style={styles.noteActions}>
                 <Pressable
@@ -830,6 +831,7 @@ const ChatComposer = memo(function ChatComposer({
           placeholderTextColor="#CCCCCC"
           style={styles.input}
           value={draft}
+          cursorColor="#FE1F4C"
         />
         <View style={styles.composerActions}>
           <View style={styles.toolButtons}>

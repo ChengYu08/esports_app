@@ -160,9 +160,9 @@ const styles = StyleSheet.create({
   },
   compactIconCircle: { width: 18, height: 18, borderRadius: 9 },
   lightIconCircle: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: "#FE4267",
   },
   playIcon: {
@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
   compactDuration: { fontSize: 10, lineHeight: 18 },
   lightDuration: {
     color: "#FE4267",
-    fontSize: 10,
+    fontSize: 12,
     lineHeight: 14,
     ...getDDinProStyle(700),
   },

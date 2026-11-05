@@ -4,7 +4,6 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -20,9 +19,6 @@ const dispatchIcon = require("../../../../assets/svgs/toolbar-dispatch.svg");
 
 type VoiceRoomToolbarProps = {
   bottomInset: number;
-  /** 键盘弹出时去掉底部预留 margin，避免输入框被顶得过高 */
-  keyboardOpen?: boolean;
-  input: string;
   muted: boolean;
   rtcReady: boolean;
   connecting: boolean;
@@ -37,9 +33,9 @@ type VoiceRoomToolbarProps = {
   showSelectCompanion?: boolean;
   /** 一键匹配抢单人数；>0 时按钮文案为「选择陪玩(N)」 */
   selectCompanionGrabCount?: number;
+  /** 点击「聊聊」假输入胶囊，唤起键盘评论面板 */
+  onCommentPress: () => void;
   onToggleDistance: () => void;
-  onChangeText: (text: string) => void;
-  onSend: () => void;
   onToggleMute: () => void;
   onOpenMessages: () => void;
   onInvite: () => void;
@@ -50,8 +46,6 @@ type VoiceRoomToolbarProps = {
 
 export function VoiceRoomToolbar({
   bottomInset,
-  keyboardOpen = false,
-  input,
   muted,
   rtcReady,
   connecting,
@@ -63,9 +57,8 @@ export function VoiceRoomToolbar({
   showServiceDispatch = false,
   showSelectCompanion = false,
   selectCompanionGrabCount = 0,
+  onCommentPress,
   onToggleDistance,
-  onChangeText,
-  onSend,
   onToggleMute,
   onOpenMessages,
   onInvite,
@@ -85,36 +78,25 @@ export function VoiceRoomToolbar({
       style={[
         styles.container,
         compact && styles.containerCompact,
-        keyboardOpen && styles.containerKeyboardOpen,
         {
-          paddingBottom: keyboardOpen ? 20 : Math.max(bottomInset, 12),
+          paddingBottom: Math.max(bottomInset, 12),
         },
       ]}
     >
-      <View style={[styles.composer, compact && styles.composerCompact]}>
-        <TextInput
-          accessibilityLabel="语聊房消息"
-          value={input}
-          onChangeText={onChangeText}
-          onSubmitEditing={onSend}
-          multiline
-          maxLength={1000}
-          submitBehavior="submit"
-          returnKeyType="send"
-          placeholder="聊聊"
-          placeholderTextColor="#979799"
-          style={styles.input}
-        />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="发送消息"
-          onPress={onSend}
-          hitSlop={8}
-          style={styles.sendButton}
-        >
-          <Image source={sendIcon} style={styles.icon} contentFit="contain" />
-        </Pressable>
-      </View>
+      {/* Figma 51:15881「底部栏」：假输入胶囊，点击唤起键盘评论面板 */}
+      <Pressable
+        accessibilityLabel="聊聊"
+        accessibilityRole="button"
+        onPress={onCommentPress}
+        style={({ pressed }) => [
+          styles.composer,
+          compact && styles.composerCompact,
+          pressed && styles.pressed,
+        ]}
+      >
+        <Text style={styles.composerPlaceholder}>聊聊</Text>
+        <Image source={sendIcon} style={styles.icon} contentFit="contain" />
+      </Pressable>
       <View style={[styles.tools, compact && styles.toolsCompact]}>
         <VoiceRoomMicControl
           muted={muted}
@@ -286,38 +268,23 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     marginBottom: 40,
   },
-  containerKeyboardOpen: {
-    marginBottom: 0,
-  },
   containerCompact: { gap: 8, paddingHorizontal: 12 },
   composer: {
     flex: 1,
     minWidth: 0,
-    minHeight: 36,
+    height: 36,
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    justifyContent: "space-between",
     paddingHorizontal: 12,
     borderRadius: 18,
     backgroundColor: "rgba(255,255,255,0.08)",
   },
   composerCompact: { paddingHorizontal: 8 },
-  input: {
-    flex: 1,
-    minWidth: 0,
-    minHeight: 36,
-    maxHeight: 180,
-    paddingVertical: 9,
-    paddingHorizontal: 0,
-    textAlignVertical: "center",
-    color: "#FFFFFF",
-    fontSize: 12,
-  },
-  sendButton: {
-    flexShrink: 0,
-    width: 20,
-    height: 36,
-    justifyContent: "center",
+  composerPlaceholder: {
+    color: "#979799",
+    fontSize: 14,
+    lineHeight: 22,
   },
   tools: {
     flexDirection: "row",
