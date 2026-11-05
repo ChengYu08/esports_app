@@ -47,6 +47,7 @@ import { exitVoiceRoom } from "../exit-voice-room";
 import { inviteMember, normalizeMembers } from "../member-normalize";
 import { useCustomerServiceCall } from "../use-customer-service-call";
 import { useVoiceRoomMessages } from "../use-voice-room-messages";
+import { useVoiceRoomMembersReconcile } from "../use-voice-room-members-reconcile";
 import { useVoiceRoomReception } from "../use-voice-room-reception";
 import { useVoiceRoomRtc } from "../use-voice-room-rtc";
 import { useVoiceRoomSessionStore } from "../voice-room-session";
@@ -309,6 +310,16 @@ export default function VoiceRoomScreen() {
       shouldAutoCallService,
       setRoom,
     });
+
+  useVoiceRoomMembersReconcile({
+    roomId,
+    accessToken,
+    currentUser,
+    roomRef,
+    kickedRef,
+    hydrateMemberProfile,
+    setMembers,
+  });
 
   const {
     receptionVisible,
