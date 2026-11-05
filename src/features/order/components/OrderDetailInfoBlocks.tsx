@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Image } from "expo-image";
 
 import { CachedImage } from "@/shared/ui/CachedImage";
 import type { MultiCompanionCandidateModel, OrderItemModel } from "@/features/order/order.types";
@@ -15,6 +16,7 @@ export function OrderDetailInfoBlocks({
   order,
   scope,
   clubName,
+  companionClubs,
   orderNumber,
   onCopy,
   onChat,
@@ -23,12 +25,14 @@ export function OrderDetailInfoBlocks({
   scope: "accept" | "place";
   /** 陪玩师所属俱乐部名（详情接口只回 id，由外部解析后传入） */
   clubName?: string;
+  companionClubs: Record<string, { clubId: number; clubName: string } | undefined>;
   orderNumber: string;
   onCopy: () => void;
   onChat: (companion?: MultiCompanionCandidateModel) => void;
 }) {
   const freeSummary = formatOrderFreeSummary(order);
   const amountLabel = scope === "accept" ? "合计" : "实付款";
+  const multiple = scope === "place" && (order.companions?.length ?? 0) > 0;
   return (
     <>
       <View
@@ -37,7 +41,7 @@ export function OrderDetailInfoBlocks({
           scope === "accept" && styles.acceptInfoBlock,
         ]}
       >
-        <View style={[styles.sellerRow, scope === "accept" && styles.acceptSellerRow]}>
+        <View style={[styles.sellerRow, scope === "accept" && styles.acceptSellerRow, multiple && styles.multiSellerRow]}>
           <CachedImage
             contentFit="cover"
             source={order.sellerAvatar}
@@ -54,7 +58,7 @@ export function OrderDetailInfoBlocks({
               {order.sellerName}
             </Text>
             {clubName ? (
-              <Text style={styles.muted}>{clubName}</Text>
+              <ClubLabel name={clubName} />
             ) : null}
           </View>
           <Pressable
@@ -76,7 +80,7 @@ export function OrderDetailInfoBlocks({
           </Pressable>
         </View>
         {scope === "place" && order.companions?.map((companion, index) => (
-          <View key={`${companion.userId}-${index}`} style={styles.sellerRow}>
+          <View key={`${companion.userId}-${index}`} style={[styles.sellerRow, styles.multiSellerRow]}>
             <CachedImage
               contentFit="cover"
               source={companion.headImage ? { uri: companion.headImage } : require("../../../../assets/images/avatar_default.webp")}
@@ -86,11 +90,14 @@ export function OrderDetailInfoBlocks({
               <Text numberOfLines={1} style={styles.sellerName}>
                 {companion.nickname || "陪玩师"}
               </Text>
+              {(companion.clubName || companionClubs[companion.userId]?.clubName) && (
+                <ClubLabel name={companion.clubName || companionClubs[companion.userId]!.clubName} />
+              )}
             </View>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`联系${companion.nickname || "陪玩师"}`}
-              onPress={() => onChat(companion)}
+              onPress={() => onChat({ ...companion, clubId: companion.clubId ?? companionClubs[companion.userId]?.clubId })}
               style={styles.chatButton}
             >
               <Text style={styles.chatText}>聊一聊</Text>
@@ -204,6 +211,15 @@ export function OrderDetailInfoBlocks({
   );
 }
 
+function ClubLabel({ name }: { name: string }) {
+  return (
+    <View style={styles.clubLine}>
+      <Image source={require("../../../../assets/svgs/mine-club-flag.svg")} style={styles.clubFlag} />
+      <Text numberOfLines={1} style={styles.muted}>{name}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   infoBlock: {
     gap: 0,
@@ -217,6 +233,9 @@ const styles = StyleSheet.create({
   acceptDetailsBlock: { borderTopWidth: 8, paddingVertical: 6, backgroundColor: "#FFF" },
   acceptRows: { paddingVertical: 6 },
   sellerRow: { flexDirection: "row", alignItems: "center", minHeight: 56, paddingVertical: 12 },
+  multiSellerRow: { backgroundColor: "#F7F7F7", borderRadius: 8, paddingHorizontal: 12, marginTop: 8 },
+  clubLine: { flexDirection: "row", alignItems: "center", gap: 2 },
+  clubFlag: { width: 12, height: 12 },
   acceptSellerRow: { minHeight: 56, paddingVertical: 12 },
   avatar: { width: 32, height: 32, borderRadius: 16, marginRight: 8 },
   acceptAvatar: { width: 32, height: 32, borderRadius: 16, marginRight: 8 },
@@ -229,7 +248,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   acceptSellerName: { color: "#0A0A0A", fontSize: 14, fontWeight: "500", lineHeight: 22 },
-  muted: { color: "#999", fontFamily: SYSTEM_FONT, fontSize: 11, lineHeight: 14 },
+  muted: { flexShrink: 1, color: "#999", fontFamily: SYSTEM_FONT, fontSize: 11, lineHeight: 14 },
   chatButton: {
     backgroundColor: "#FF2850",
     borderRadius: 20,

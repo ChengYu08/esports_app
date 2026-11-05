@@ -10,7 +10,9 @@ type UploadInput = {
 
 function normalizeEndpoint(endpoint: string) {
   const value = endpoint.trim().replace(/\/$/, "");
-  if (/^https?:\/\//i.test(value)) return value.replace(/^http:\/\//i, "https://");
+  if (/^https?:\/\//i.test(value)) {
+    return value.replace(/^http:\/\//i, "https://");
+  }
   return `https://${value}`;
 }
 
@@ -48,11 +50,16 @@ export async function uploadClientObject(sts: ClientOssSts, objectKey: string, i
   const signature = CryptoJS.HmacSHA1(stringToSign, sts.accessKeySecret).toString(CryptoJS.enc.Base64);
 
   const localFile = new File(input.uri);
-  if (!localFile.exists) throw new Error("读取图片失败：本地图片文件不存在");
+  if (!localFile.exists) {
+    throw new Error("读取图片失败：本地图片文件不存在");
+  }
+  // Expo fetch 会用 File.type 覆盖 Content-Type；Android 上该值可能为空，
+  // 也可能与 OSS 签名类型不一致。传原始字节，保留签名使用的请求头。
+  const body = await localFile.bytes();
   const response = await fetch(uploadUrl, {
     method: "PUT",
     headers: { ...headers, Authorization: `OSS ${sts.accessKeyId}:${signature}` },
-    body: localFile,
+    body,
   });
   if (!response.ok) {
     const detail = (await response.text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();

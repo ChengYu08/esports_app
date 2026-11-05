@@ -3,12 +3,13 @@ import { getPaymentDeadline } from "@/features/order/payment-countdown";
 import { showToast } from "@/shared/ui/app-toast";
 import { useAuthStore } from "@esports/auth";
 import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { router, useFocusEffect, useIsFocused } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { fetchProfileDetail } from "@/features/mine/api/profile.api";
 import { OrderAfterSaleSheet } from "@/features/order/components/OrderAfterSaleSheet";
 import { OrderCompleteConfirmSheet } from "@/features/order/components/OrderCompleteConfirmSheet";
 import { OrderMultiCompanionSheet } from "@/features/order/components/OrderMultiCompanionSheet";
@@ -93,6 +94,21 @@ export function OrderDetailScreen({
   });
   const [paymentVisible, setPaymentVisible] = useState(false);
   const [paymentError, setPaymentError] = useState("");
+  const companionIds = scope === "place"
+    ? [...new Set((detail.data?.companions ?? []).map((companion) => companion.userId).filter((userId) => /^\d+$/.test(userId) && userId !== "0"))]
+    : [];
+  const companionProfiles = useQueries({
+    queries: companionIds.map((userId) => ({
+      queryKey: ["profile-detail", undefined, userId],
+      queryFn: ({ signal }: { signal: AbortSignal }) => fetchProfileDetail({ userId }, signal),
+      staleTime: 10 * 60_000,
+      retry: 1,
+    })),
+  });
+  const companionClubs = Object.fromEntries(companionIds.map((userId, index) => {
+    const profile = companionProfiles[index]?.data;
+    return [userId, profile?.clubId ? { clubId: profile.clubId, clubName: profile.clubName } : undefined];
+  }));
   const [clock, setClock] = useState(() => Date.now());
   const dispatchDeadline = detail.data?.dispatchDeadline;
   useEffect(() => {
@@ -205,6 +221,7 @@ export function OrderDetailScreen({
           order={order}
           scope={scope}
           clubName={clubName}
+          companionClubs={companionClubs}
           orderNumber={orderNumber}
           onCopy={actions.copyOrderNumber}
           onChat={actions.handleChat}

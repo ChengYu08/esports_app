@@ -25,12 +25,9 @@ const tagGradient = (
 
 export const ClubCard = memo(function ClubCard({
   club,
-  onlineCount = club.onlineCount,
   onSelect,
 }: {
   club: Club;
-  /** 在线陪玩人数，null 表示尚未获取；未传时使用俱乐部自身的统计。 */
-  onlineCount?: number | null;
   onSelect?: (club: Club) => void;
 }) {
   const colors = ["#24354b", "#4a2637", "#2e4650", "#493e2e"];
@@ -73,21 +70,15 @@ export const ClubCard = memo(function ClubCard({
         )}
       </View>
       <View style={styles.body}>
-        <View style={styles.bodyTop}>
-          <View style={styles.titleRow}>
-            {club.isSelfOperated && <Text style={styles.self}>自营</Text>}
-            <Text numberOfLines={1} style={styles.name}>
-              {club.name}
-            </Text>
-            <View style={styles.online}>
-              <View style={styles.onlineDot} />
-              <Text style={styles.onlineText}>{onlineCount ?? "--"}人</Text>
-            </View>
-          </View>
-          <Text numberOfLines={2} style={styles.desc}>
-            {club.description}
+        <View style={styles.titleRow}>
+          {club.isSelfOperated && <Text style={styles.self}>自营</Text>}
+          <Text numberOfLines={1} style={styles.name}>
+            {club.name}
           </Text>
         </View>
+        <Text numberOfLines={2} style={styles.desc}>
+          {club.description}
+        </Text>
         <View style={styles.metaRow}>
           <View style={styles.meta}>
             <Image source={icons.user} style={styles.metaIcon} />
@@ -162,9 +153,7 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
     color: colors.surface,
   },
-  // 设计稿：右侧上下两块（标题+介绍 / 底部信息行）块间距 8，块内 4
-  body: { flex: 1, gap: 8 },
-  bodyTop: { gap: 4 },
+  body: { flex: 1 },
   titleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -190,27 +179,11 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     flexShrink: 1,
   },
-  online: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    flexShrink: 0,
-  },
-  onlineDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: "#2FC273",
-  },
-  onlineText: {
-    color: "#2FC273",
-    fontSize: 12,
-    lineHeight: 17,
-  },
   desc: {
     color: "#979799",
     fontSize: 11,
     lineHeight: 16,
+    marginTop: 4,
   },
   gameIcons: {
     marginLeft: "auto",
@@ -228,6 +201,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    marginTop: 8,
   },
   meta: { flexDirection: "row", alignItems: "center", gap: 4 },
   metaText: {
@@ -235,6 +209,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
   },
-  metaIcon: { width: 16, height: 16 },
+  metaIcon: { width: 12, height: 12 },
 
 });

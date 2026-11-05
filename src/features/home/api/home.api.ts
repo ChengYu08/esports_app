@@ -72,6 +72,7 @@ type ApiClub = {
   id: number | string;
   clubName?: string;
   clubTag?: string | null;
+  clubNature?: "SELF_OPERATED" | "THIRD_PARTY" | null;
   logoUrl?: string;
   intro?: string;
   followCount?: number;
@@ -250,7 +251,9 @@ export async function fetchClubPage(filters: ClubFilters, page: number, pageSize
       onlineCompanionCount: club.onlineCompanionCount,
       memberCount: club.memberCount ?? 0,
       clubCode: String(club.id),
-      isSelfOperated: club.clubName?.includes('自营') ?? false,
+      isSelfOperated: club.clubNature == null
+        ? club.clubName?.includes("自营") ?? false
+        : club.clubNature === "SELF_OPERATED",
       clubTag: club.clubTag || undefined,
       gameIds: Array.from(new Set((club.clubGames ?? [])
         .filter((item) => item.status !== 0)
