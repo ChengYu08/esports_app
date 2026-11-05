@@ -37,6 +37,7 @@ import {
 } from "../free-amount";
 import { useOrderPage } from "../hooks/use-order-page";
 import { useOrderClubNames } from "../hooks/use-order-club-names";
+import { afterOrderPaidOpenChat } from "../notify-order-paid";
 import {
   invalidateOrderQueries,
   refreshOrderAfterAction,
@@ -742,15 +743,17 @@ export default function OrderScreen() {
             void orders.refetch();
           }
           if (paid?.receiverUserId) {
-            router.push({
-              pathname: "/chat/[id]",
-              params: {
-                id: String(paid.receiverUserId),
+            const companionUserId = String(paid.receiverUserId);
+            void afterOrderPaidOpenChat({
+              companionUserIds: [companionUserId],
+              token,
+              chat: {
+                id: companionUserId,
                 title: paid.receiverName || "用户聊天",
                 avatar:
                   paid.receiverAvatar && "uri" in paid.receiverAvatar
                     ? String(paid.receiverAvatar.uri)
-                    : "",
+                    : undefined,
               },
             });
           } else {

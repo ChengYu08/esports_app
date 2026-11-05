@@ -25,6 +25,7 @@ import {
   useToggleUserFollow,
   useUserFollowState,
 } from "@/features/mine/hooks/use-user-follow";
+import { afterOrderPaidOpenChat } from "@/features/order/notify-order-paid";
 import { invalidateOrderQueries } from "@/features/order/order-query";
 import { requireLogin } from "@/shared/navigation/require-login";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
@@ -478,14 +479,27 @@ export function VoiceRoomMemberSheet({
           }}
           onPaid={() => {
             const paidOrderId = paymentOrder.orderId;
+            // 语聊房场景优先用成员 id，避免 profile 查询态抖动导致跳过发消息
+            const companionUserId = String(profile?.userId || member.userId);
+            const chatTitle =
+              profile?.nickname || nickname || member.nickname || "用户聊天";
+            const chatAvatar = profile?.headImage || member.avatar;
+            const chatClubId = profile?.clubId;
+            const accessToken = useAuthStore.getState().accessToken;
             setPaymentSheetVisible(false);
             setPaymentOrder(null);
             setPaymentError(null);
             void invalidateOrderQueries(paidOrderId);
-            onClose();
-            router.push({
-              pathname: "/order/[id]",
-              params: { id: String(paidOrderId) },
+            void afterOrderPaidOpenChat({
+              companionUserIds: [companionUserId],
+              token: accessToken,
+              chat: {
+                id: companionUserId,
+                title: chatTitle,
+                avatar: chatAvatar || undefined,
+                clubId: chatClubId ? String(chatClubId) : undefined,
+              },
+              beforeNavigate: onClose,
             });
           }}
           onPaymentFailed={(message) => setPaymentError(message)}
