@@ -50,10 +50,12 @@ export function displayMessage(
     <View style={styles.chatBubble}>
       <View style={styles.chatInline}>
         <MessageRoleTag role={memberRole} />
-        <Text style={styles.chatName}>{`${name}：`}</Text>
-        {message.imageUrl ? null : (
-          <Text style={styles.chatBody}>{message.text}</Text>
-        )}
+        <Text style={styles.chatCombined}>
+          <Text style={styles.chatName}>{`${name}：`}</Text>
+          {message.imageUrl ? null : (
+            <Text style={styles.chatBody}>{message.text}</Text>
+          )}
+        </Text>
       </View>
       {message.imageUrl ? (
         <Pressable
@@ -127,9 +129,13 @@ const styles = StyleSheet.create({
   },
   chatInline: {
     flexDirection: "row",
-    flexWrap: "wrap",
     alignItems: "center",
     gap: 4,
+  },
+  chatCombined: {
+    flexShrink: 1,
+    fontSize: 12,
+    lineHeight: 18,
   },
   chatName: {
     color: "#55C9D4",
@@ -142,7 +148,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "400",
     lineHeight: 18,
-    flexShrink: 1,
   },
   msgRoleTag: {
     borderRadius: 52,
