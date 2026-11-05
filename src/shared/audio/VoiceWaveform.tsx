@@ -15,12 +15,21 @@ import Animated, {
 
 const BAR_HEIGHTS = [8, 14, 10, 12];
 
-export function VoiceWaveform({ playing, compact = false }: { playing: boolean; compact?: boolean }) {
+export function VoiceWaveform({
+  playing,
+  compact = false,
+  barOpacity = 1,
+}: {
+  playing: boolean;
+  compact?: boolean;
+  barOpacity?: number;
+}) {
   return (
     <View style={[styles.wave, compact && styles.compactWave]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       {BAR_HEIGHTS.map((height, index) => (
         <WaveBar
           key={height}
+          barOpacity={barOpacity}
           delay={index * 120}
           height={compact ? Math.round(height * 0.75) : height}
           playing={playing}
@@ -30,7 +39,17 @@ export function VoiceWaveform({ playing, compact = false }: { playing: boolean; 
   );
 }
 
-function WaveBar({ delay, height, playing }: { delay: number; height: number; playing: boolean }) {
+function WaveBar({
+  barOpacity,
+  delay,
+  height,
+  playing,
+}: {
+  barOpacity: number;
+  delay: number;
+  height: number;
+  playing: boolean;
+}) {
   const reducedMotion = useReducedMotion();
   const scale = useSharedValue(playing && !reducedMotion ? 0.45 : 1);
 
@@ -68,7 +87,11 @@ function WaveBar({ delay, height, playing }: { delay: number; height: number; pl
     transform: [{ scaleY: scale.get() }],
   }));
 
-  return <Animated.View style={[styles.bar, { height }, animatedStyle]} />;
+  return (
+    <Animated.View
+      style={[styles.bar, { height, opacity: barOpacity }, animatedStyle]}
+    />
+  );
 }
 
 const styles = StyleSheet.create({

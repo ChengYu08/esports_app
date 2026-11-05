@@ -40,6 +40,10 @@ vi.mock("@/core/config/links", () => ({ APP_LINKS: linksMock }));
 vi.mock("@/core/storage/storage", () => ({ storage: storageMock }));
 vi.mock("@/shared/ui/ScreenHeader", () => ({ ScreenHeader: "ScreenHeader" }));
 
+const { WEBVIEW_COMPAT_SCRIPT } = await import(
+  "@/shared/navigation/webview-compat-script"
+);
+
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
 const { createRequire } = await import("node:module");
@@ -107,6 +111,10 @@ describe("PrivacyConsentGate 协议查看", () => {
     pressProtocolLink("《用户协议》");
     const webView = renderer?.root.findByType(WebViewHost);
     expect(webView?.props.source).toEqual({ uri: linksMock.userAgreement });
+    // 旧 WebView 缺少 Array.prototype.at 等 API，必须注入兼容补丁
+    expect(webView?.props.injectedJavaScriptBeforeContentLoaded).toBe(
+      WEBVIEW_COMPAT_SCRIPT,
+    );
     expect(renderer?.root.findAllByType(ScreenHeaderHost)[0]?.props.title).toBe(
       "用户协议",
     );
