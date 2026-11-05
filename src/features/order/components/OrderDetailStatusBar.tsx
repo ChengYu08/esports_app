@@ -57,7 +57,7 @@ export function OrderDetailStatusBar({
 const styles = StyleSheet.create({
   statusBlock: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, backgroundColor: "#FFF" },
   statusTitle: {
-    color: "#161616",
+    color: "#0D0D0F",
     fontFamily: SYSTEM_FONT,
     fontSize: 24,
     fontWeight: "600",
@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   acceptStatusBlock: { paddingTop: 8, paddingBottom: 12 },
-  acceptStatusTitle: { color: "#0A0A0A", fontSize: 24, fontWeight: "600", lineHeight: 30 },
+  acceptStatusTitle: { color: "#0D0D0F", fontSize: 24, fontWeight: "600", lineHeight: 30 },
   acceptStatusHint: { color: "#0A0A0A", fontSize: 14, marginTop: 12, lineHeight: 22 },
   countdownAccent: { color: "#FE1F4C" },
 });

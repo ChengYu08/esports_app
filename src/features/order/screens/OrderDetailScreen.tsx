@@ -107,7 +107,7 @@ export function OrderDetailScreen({
   });
   const companionClubs = Object.fromEntries(companionIds.map((userId, index) => {
     const profile = companionProfiles[index]?.data;
-    return [userId, profile?.clubId ? { clubId: profile.clubId, clubName: profile.clubName } : undefined];
+    return [userId, profile?.clubId ? { clubId: profile.clubId, clubName: profile.clubName, logoUrl: profile.logoUrl } : undefined];
   }));
   const [clock, setClock] = useState(() => Date.now());
   const dispatchDeadline = detail.data?.dispatchDeadline;
@@ -221,6 +221,7 @@ export function OrderDetailScreen({
           order={order}
           scope={scope}
           clubName={clubName}
+          clubLogoUrl={clubQuery.data?.logoUrl}
           companionClubs={companionClubs}
           orderNumber={orderNumber}
           onCopy={actions.copyOrderNumber}

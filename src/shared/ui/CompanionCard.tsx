@@ -1,10 +1,14 @@
 import { Image } from "expo-image";
+import { requireOptionalNativeModule } from "expo";
 import { BlurTargetView, BlurView } from "expo-blur";
 import { memo, useRef } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { getDDinProStyle } from "@/shared/theme/typography";
+
+const blurAvailable = requireOptionalNativeModule("ExpoBlur") != null;
+const AvatarTarget = blurAvailable ? BlurTargetView : View;
 
 const maleIcon = require("../../../assets/svgs/gender-male.svg");
 const femaleIcon = require("../../../assets/svgs/gender-female.svg");
@@ -78,14 +82,14 @@ export const CompanionCard = memo(function CompanionCard({
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
     >
       <View style={styles.cardLeft}>
-        <BlurTargetView ref={blurTargetRef} style={styles.avatar}>
+        <AvatarTarget ref={blurTargetRef} style={styles.avatar}>
           <Image
             source={avatar ? { uri: avatar } : emptyAvatar}
             style={styles.avatar}
             contentFit="cover"
           />
-        </BlurTargetView>
-        {voiceUrl ? (
+        </AvatarTarget>
+        {voiceUrl && (blurAvailable ? (
           <BlurView
             blurTarget={blurTargetRef}
             blurMethod="dimezisBlurViewSdk31Plus"
@@ -93,15 +97,14 @@ export const CompanionCard = memo(function CompanionCard({
             tint="light"
             style={styles.voicePill}
           >
-            <VoicePlayButton
-              url={voiceUrl}
-              duration={voiceDurationSeconds}
-              tone="light"
-              playingUrl={voicePlayingUrl}
-              onToggleVoice={onToggleVoice}
-            />
+            <VoicePlayButton url={voiceUrl} duration={voiceDurationSeconds} tone="light" playingUrl={voicePlayingUrl} onToggleVoice={onToggleVoice} />
           </BlurView>
-        ) : null}
+        ) : (
+          <View style={[styles.voicePill, styles.voicePillFallback]}>
+            <VoicePlayButton url={voiceUrl} duration={voiceDurationSeconds} tone="light" playingUrl={voicePlayingUrl} onToggleVoice={onToggleVoice} />
+          </View>
+        ))}
+
       </View>
       <View style={styles.cardRight}>
         <View style={styles.cardContent}>
@@ -209,7 +212,9 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 6,
     bottom: 6,
-    backgroundColor: "rgba(255,255,255,0.35)",
+    backgroundColor: "rgba(255,255,255,0.75)",
+    minWidth: 49,
+    height: 23,
     overflow: "hidden",
     borderWidth: 0.5,
     borderColor: "#FFF",
@@ -218,6 +223,7 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
     paddingRight: 6,
   },
+  voicePillFallback: { backgroundColor: "rgba(255,255,255,0.75)" },
   cardRight: {
     flex: 1,
     justifyContent: "space-between",

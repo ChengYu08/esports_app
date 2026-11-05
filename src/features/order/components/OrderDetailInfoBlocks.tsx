@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Image } from "expo-image";
+import { useState } from "react";
 
 import { CachedImage } from "@/shared/ui/CachedImage";
 import type { MultiCompanionCandidateModel, OrderItemModel } from "@/features/order/order.types";
@@ -16,6 +16,7 @@ export function OrderDetailInfoBlocks({
   order,
   scope,
   clubName,
+  clubLogoUrl,
   companionClubs,
   orderNumber,
   onCopy,
@@ -25,7 +26,8 @@ export function OrderDetailInfoBlocks({
   scope: "accept" | "place";
   /** 陪玩师所属俱乐部名（详情接口只回 id，由外部解析后传入） */
   clubName?: string;
-  companionClubs: Record<string, { clubId: number; clubName: string } | undefined>;
+  clubLogoUrl?: string;
+  companionClubs: Record<string, { clubId: number; clubName: string; logoUrl?: string } | undefined>;
   orderNumber: string;
   onCopy: () => void;
   onChat: (companion?: MultiCompanionCandidateModel) => void;
@@ -58,7 +60,7 @@ export function OrderDetailInfoBlocks({
               {order.sellerName}
             </Text>
             {clubName ? (
-              <ClubLabel name={clubName} />
+              <ClubLabel key={clubLogoUrl || "no-logo"} name={clubName} logoUrl={clubLogoUrl} />
             ) : null}
           </View>
           <Pressable
@@ -91,7 +93,7 @@ export function OrderDetailInfoBlocks({
                 {companion.nickname || "陪玩师"}
               </Text>
               {(companion.clubName || companionClubs[companion.userId]?.clubName) && (
-                <ClubLabel name={companion.clubName || companionClubs[companion.userId]!.clubName} />
+                <ClubLabel key={companionClubs[companion.userId]?.logoUrl || "no-logo"} name={companion.clubName || companionClubs[companion.userId]!.clubName} logoUrl={companionClubs[companion.userId]?.logoUrl} />
               )}
             </View>
             <Pressable
@@ -211,10 +213,13 @@ export function OrderDetailInfoBlocks({
   );
 }
 
-function ClubLabel({ name }: { name: string }) {
+function ClubLabel({ name, logoUrl }: { name: string; logoUrl?: string }) {
+  const [failed, setFailed] = useState(false);
   return (
     <View style={styles.clubLine}>
-      <Image source={require("../../../../assets/svgs/mine-club-flag.svg")} style={styles.clubFlag} />
+      {logoUrl && !failed && (
+        <CachedImage source={{ uri: logoUrl }} style={styles.clubLogo} contentFit="cover" onError={() => setFailed(true)} />
+      )}
       <Text numberOfLines={1} style={styles.muted}>{name}</Text>
     </View>
   );
@@ -235,10 +240,10 @@ const styles = StyleSheet.create({
   sellerRow: { flexDirection: "row", alignItems: "center", minHeight: 56, paddingVertical: 12 },
   multiSellerRow: { backgroundColor: "#F7F7F7", borderRadius: 8, paddingHorizontal: 12, marginTop: 8 },
   clubLine: { flexDirection: "row", alignItems: "center", gap: 2 },
-  clubFlag: { width: 12, height: 12 },
+  clubLogo: { width: 12, height: 12, borderRadius: 2 },
   acceptSellerRow: { minHeight: 56, paddingVertical: 12 },
-  avatar: { width: 32, height: 32, borderRadius: 16, marginRight: 8 },
-  acceptAvatar: { width: 32, height: 32, borderRadius: 16, marginRight: 8 },
+  avatar: { width: 36, height: 36, borderRadius: 18, marginRight: 8 },
+  acceptAvatar: { width: 36, height: 36, borderRadius: 18, marginRight: 8 },
   sellerCopy: { flex: 1, minWidth: 0, gap: 4 },
   sellerName: {
     color: "#111",
