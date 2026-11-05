@@ -75,7 +75,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   authState.accessToken = "token-a";
   authState.user.id = "account-a";
-  apiMock.fetchTeenModeConfig.mockResolvedValue({ lockStartHour: 9, lockEndHour: 23 });
+  apiMock.fetchTeenModeConfig.mockResolvedValue({
+    lockEnabled: true,
+    mode: "same-day",
+    lockStartHour: 9,
+    lockEndHour: 23,
+  });
 });
 
 afterEach(async () => {
@@ -145,7 +150,12 @@ describe("TeenModeScreen 状态恢复与同步", () => {
 
   it("开启成功 toast 展示服务端配置的锁定时段", async () => {
     const { showToast } = await import("@/shared/ui/app-toast");
-    apiMock.fetchTeenModeConfig.mockResolvedValue({ lockStartHour: 22, lockEndHour: 6 });
+    apiMock.fetchTeenModeConfig.mockResolvedValue({
+      lockEnabled: true,
+      mode: "cross-day",
+      lockStartHour: 22,
+      lockEndHour: 6,
+    });
     apiMock.status.mockResolvedValue({
       enabled: false,
       passwordSet: false,
@@ -177,5 +187,37 @@ describe("TeenModeScreen 状态恢复与同步", () => {
     expect(showToast).toHaveBeenCalledWith(
       "青少年模式已开启，每日 22:00-次日6:00 期间限制核心功能",
     );
+  });
+
+  it("服务端未配置锁定时段时开启成功 toast 不展示时段", async () => {
+    const { showToast } = await import("@/shared/ui/app-toast");
+    apiMock.fetchTeenModeConfig.mockResolvedValue({ lockEnabled: false });
+    apiMock.status.mockResolvedValue({
+      enabled: false,
+      passwordSet: false,
+      remainingAttempts: 10,
+      serverTime: 1,
+    });
+    apiMock.open.mockResolvedValue({
+      enabled: true,
+      passwordSet: true,
+      remainingAttempts: 10,
+      serverTime: 2,
+    });
+    await renderScreen();
+
+    const openButton = renderer?.root
+      .findAllByType(PressableHost)
+      .find((node) => node.props.accessibilityLabel === "开启青少年模式");
+    await act(async () => openButton?.props.onPress());
+    const input = renderer?.root.findByType(TextInputHost);
+    await act(async () => input?.props.onChangeText("1234"));
+    await act(async () => input?.props.onChangeText("1234"));
+    const confirmButton = renderer?.root
+      .findAllByType(PressableHost)
+      .find((node) => node.props.accessibilityLabel === "确认");
+    await act(async () => confirmButton?.props.onPress());
+
+    expect(showToast).toHaveBeenCalledWith("青少年模式已开启");
   });
 });
