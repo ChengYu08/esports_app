@@ -1,0 +1,23 @@
+schema_version: 1
+module_path: native_modules
+title: 原生模块集合（Alipay、一键登录、语音房背景、App Toolkit）
+scope:
+    - modules/
+source_files: []
+depends_on: []
+related_to: []
+kk_module_id: f6526569-4c9a-43ef-ad5a-a335894b8150
+kk_ordinal: 3
+kk_cards:
+    architecture_design:
+        id: c61d1b6d-6993-4733-ae9a-f8e75a383d89
+        title: 原生模块集合（Alipay、一键登录、语音房背景、App Toolkit）
+    coding_conventions:
+        id: 61e68219-d3b7-41db-9aab-f9f415148aca
+        title: 原生模块集合（Alipay、一键登录、语音房背景、App Toolkit）
+    overview:
+        id: bf52cbbe-0674-4772-8a5b-47e96086c767
+        title: 原生模块集合（Alipay、一键登录、语音房背景、App Toolkit）
+    tech_stack:
+        id: 820a341d-a08f-4c61-952a-6b20bc26a147
+        title: 原生模块集合（Alipay、一键登录、语音房背景、App Toolkit）

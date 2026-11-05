@@ -1,0 +1,27 @@
+schema_version: 1
+module_path: src_features/mine/profile_account_settings/diamonds_recharge_payment
+title: 钻石余额与充值支付页面
+scope:
+    - src/features/mine/screens/MyDiamondsScreen.tsx
+    - src/features/mine/screens/StarRechargeScreen.tsx
+    - src/features/mine/screens/StarRechargeAndroidScreen.tsx
+source_files: []
+depends_on: []
+related_to:
+    - path: native_modules
+      reason: diamonds_recharge_payment 的 StarRechargeAndroidScreen 通过 native_modules 中的 Alipay 原生模块调用支付宝支付完成钻石充值。
+kk_module_id: 76be487f-ed6c-4f9c-830a-efc8e67439ee
+kk_ordinal: 5
+kk_cards:
+    architecture_design:
+        id: 446e817f-cdac-4d3d-9fe6-2a0c8a26666c
+        title: 钻石余额与充值支付页面
+    coding_conventions:
+        id: 012f504b-bc24-496e-a502-3e418cf73409
+        title: 钻石余额与充值支付页面
+    overview:
+        id: b419ae1e-e4f9-48e5-a039-1b00626b89fd
+        title: 钻石余额与充值支付页面
+    tech_stack:
+        id: 70c6d380-36a2-4e0c-a4a2-55f8bd0797e9
+        title: 钻石余额与充值支付页面

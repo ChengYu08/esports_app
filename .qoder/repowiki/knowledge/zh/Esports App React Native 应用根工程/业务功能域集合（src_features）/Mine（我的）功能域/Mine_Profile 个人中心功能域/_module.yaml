@@ -1,0 +1,20 @@
+schema_version: 1
+module_path: src_features/mine/profile_account_settings
+title: Mine/Profile 个人中心功能域
+scope:
+    - src/features/mine/screens/
+    - src/features/mine/components/
+source_files: []
+depends_on: []
+related_to: []
+kk_module_id: c5bbd8c2-fabb-48dd-8a1e-a6509b29eb5b
+kk_cards:
+    architecture_design:
+        id: 7d4915bf-fd77-42e9-bfc0-751d7f7ba788
+        title: Mine/Profile 个人中心功能域
+    coding_conventions:
+        id: dd8f20e1-58b9-43eb-8ab0-568ac1360715
+        title: Mine/Profile 个人中心功能域
+    overview:
+        id: 4e4cdbe1-967b-44c5-bf81-09e1ea5c3345
+        title: Mine/Profile 个人中心功能域

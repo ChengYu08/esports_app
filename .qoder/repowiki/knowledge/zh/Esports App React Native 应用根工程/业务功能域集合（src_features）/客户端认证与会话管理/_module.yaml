@@ -1,0 +1,24 @@
+schema_version: 1
+module_path: src_features/auth
+title: 客户端认证与会话管理
+scope:
+    - src/features/auth/
+source_files: []
+depends_on: []
+related_to:
+    - path: src_app/account_profile_settings/auth_flows
+      reason: auth_flows 路由层通过 shared_packages 的 SSO SDK 发起底层 HTTP/签名请求完成一键登录。
+kk_module_id: 2c564dea-40cd-4cbe-aeaf-6347139b60a8
+kk_cards:
+    architecture_design:
+        id: 522bfd73-674f-4d27-8836-5aaca53e9719
+        title: 客户端认证与会话管理
+    coding_conventions:
+        id: 2fa8eeed-48e6-41b9-a2a3-d8154f381343
+        title: 客户端认证与会话管理
+    overview:
+        id: 0f0d002f-5e2e-4e88-b7a7-22e64f638800
+        title: 客户端认证与会话管理
+    tech_stack:
+        id: 0a3f1429-d8d1-4ab8-adbf-2c3c09ed9e9d
+        title: 客户端认证与会话管理

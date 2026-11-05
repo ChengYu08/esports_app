@@ -35,6 +35,8 @@ type VoiceRoomToolbarProps = {
   /** 当前用户为房间绑定接待时展示「客服派单」 */
   showServiceDispatch?: boolean;
   showSelectCompanion?: boolean;
+  /** 一键匹配抢单人数；>0 时按钮文案为「选择陪玩(N)」 */
+  selectCompanionGrabCount?: number;
   onToggleDistance: () => void;
   onChangeText: (text: string) => void;
   onSend: () => void;
@@ -60,6 +62,7 @@ export function VoiceRoomToolbar({
   showCallService = false,
   showServiceDispatch = false,
   showSelectCompanion = false,
+  selectCompanionGrabCount = 0,
   onToggleDistance,
   onChangeText,
   onSend,
@@ -72,6 +75,10 @@ export function VoiceRoomToolbar({
 }: VoiceRoomToolbarProps) {
   const { width } = useWindowDimensions();
   const compact = width < 360;
+  const selectCompanionLabel =
+    selectCompanionGrabCount > 0
+      ? `选择陪玩(${selectCompanionGrabCount})`
+      : "选择陪玩";
 
   return (
     <View
@@ -229,7 +236,7 @@ export function VoiceRoomToolbar({
       {showSelectCompanion ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="选择陪玩"
+          accessibilityLabel={selectCompanionLabel}
           disabled={leaving}
           onPress={onSelectCompanion}
           hitSlop={4}
@@ -261,7 +268,7 @@ export function VoiceRoomToolbar({
                 compact && styles.selectCompanionTextCompact,
               ]}
             >
-              选择陪玩
+              {selectCompanionLabel}
             </Text>
           </LinearGradient>
         </Pressable>

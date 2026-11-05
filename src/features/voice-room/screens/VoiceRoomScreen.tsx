@@ -54,6 +54,7 @@ import {
 } from "../member-change-notice";
 import { inviteMember, normalizeMembers } from "../member-normalize";
 import { useCustomerServiceCall } from "../use-customer-service-call";
+import { useSelectCompanionGrabCount } from "../use-select-companion-grab-count";
 import { useVoiceRoomMessages } from "../use-voice-room-messages";
 import { useVoiceRoomMembersReconcile } from "../use-voice-room-members-reconcile";
 import { useVoiceRoomReception } from "../use-voice-room-reception";
@@ -385,6 +386,17 @@ export default function VoiceRoomScreen() {
       matchActiveForQuickMatchCreated === true) ||
     (isOwner && Boolean(activityRequest));
   const showCallService = isOwner && !hasService && !showSelectCompanion;
+  /** 与 openSelectCompanion 一致：活动 > 客服代发 > 试音自发 */
+  const selectCompanionRequestNo =
+    activityRequest?.requestNo ||
+    (matchActiveForQuickMatchCreated === true && quickMatchCreatedRequestNo
+      ? quickMatchCreatedRequestNo
+      : undefined) ||
+    auditionRequestNo;
+  const selectCompanionGrabCount = useSelectCompanionGrabCount(
+    selectCompanionRequestNo,
+    showSelectCompanion,
+  );
 
   const minimize = useCallback(() => {
     if (router.canGoBack()) router.back();
@@ -1175,6 +1187,7 @@ export default function VoiceRoomScreen() {
           showCallService={showCallService}
           showServiceDispatch={canServiceDispatch}
           showSelectCompanion={showSelectCompanion}
+          selectCompanionGrabCount={selectCompanionGrabCount}
           onToggleDistance={() => setDistanceEnabled((prev) => !prev)}
           onChangeText={setInput}
           onSend={() => void sendMessage()}
