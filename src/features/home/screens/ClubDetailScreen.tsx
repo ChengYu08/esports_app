@@ -83,7 +83,7 @@ const COLORS = {
   chipBg: "#F0F1F2",
   pillBg: "#F7F7F7",
   pillSelectedBg: "#FFF5F5",
-  redAccent: "#E01B28",
+  redAccent: "#FE1F4C",
   railBg: "#F5F6F7",
   borderLight: "#EBEBEB",
 } as const;
@@ -462,6 +462,14 @@ export default function ClubDetailScreen() {
     setSelectedMode(undefined);
     setSelectedLevel(undefined);
   }
+  // 是否存在生效中的筛选项：筛选按钮据此显示红色/深色（与面板是否展开无关）
+  const hasActiveFilters =
+    priceSort !== "DEFAULT" ||
+    selectedSex !== undefined ||
+    selectedStatus !== undefined ||
+    selectedMode !== undefined ||
+    selectedLevel !== undefined ||
+    selectedTag !== undefined;
   // 聚合筛选面板各分区选项（选中立即生效，列表在面板背后实时重查；选项量小，不做 memo）
   const modeOptions: FilterPillOption[] = [
     {
@@ -717,9 +725,7 @@ export default function ClubDetailScreen() {
           >
             <Image
               accessibilityIgnoresInvertColors
-              source={
-                isFilterSheetVisible ? filterListIcon : filterListDefaultIcon
-              }
+              source={hasActiveFilters ? filterListIcon : filterListDefaultIcon}
               style={styles.filterExpandIcon}
             />
           </Pressable>

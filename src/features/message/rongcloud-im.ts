@@ -124,7 +124,16 @@ async function hydrateConversation(conversation: RongConversation) {
   }
   try {
     const profile = await getClientAuthApi().getUserProfile(businessToken, conversation.id);
-    return { ...conversation, title: profile.nickname || conversation.title, avatar: profile.headImage || undefined };
+    return {
+      ...conversation,
+      title: profile.nickname || conversation.title,
+      avatar: profile.headImage || undefined,
+      // 后端不下发该字段时保持 undefined（mergeConversations 保留本地标记）；
+      // 下发 "0" 时显式置 false，让客服身份始终以服务端为准（客服被移除后标签能退掉）
+      ...(profile.customerService === undefined
+        ? {}
+        : { isCustomerService: profile.customerService === "1" }),
+    };
   } catch {
     return conversation;
   }

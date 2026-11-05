@@ -7,6 +7,7 @@ import { AppState, FlatList, Pressable, StyleSheet, Text, View } from "react-nat
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { showToast } from "@/shared/ui/app-toast";
+import { stripCustomerServiceTitlePrefix } from "../customer-service.api";
 import { MessageHeader } from "../components/MessageHeader";
 import { MessageListItem } from "../components/MessageListItem";
 import {
@@ -83,7 +84,11 @@ export default function MessageScreen() {
         .filter((item) => isVisibleMessageConversation(item, userId, blacklistedUserIds))
         .map((item) => {
           const id = normalizeSystemConversationId(item.id);
-          const title = getConversationDisplayTitle(id, item.title, item.note);
+          // 客服会话打标后标题只展示昵称；入口写入的【官方客服】前缀去掉避免重复
+          const baseTitle = getConversationDisplayTitle(id, item.title, item.note);
+          const title = item.isCustomerService
+            ? stripCustomerServiceTitlePrefix(baseTitle)
+            : baseTitle;
           const avatar = resolveConversationAvatar(
             item.avatar,
             isSystemConversationId(id)

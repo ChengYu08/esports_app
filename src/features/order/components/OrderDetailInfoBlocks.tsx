@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
   acceptSellerName: { color: "#0A0A0A", fontSize: 14, fontWeight: "500", lineHeight: 22 },
   muted: { flexShrink: 1, color: "#999", fontFamily: SYSTEM_FONT, fontSize: 11, lineHeight: 14 },
   chatButton: {
-    backgroundColor: "#FF2850",
+    backgroundColor: "#FE1F4C",
     borderRadius: 20,
     paddingHorizontal: 12,
     height: 26,

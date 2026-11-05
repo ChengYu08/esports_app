@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
     width: 11,
     height: 11,
     borderRadius: 6,
-    backgroundColor: "#FF3150",
+    backgroundColor: "#FE1F4C",
   },
   flowNumber: { color: "#FFF", fontSize: 14, fontWeight: "600" },
   flowLabel: {

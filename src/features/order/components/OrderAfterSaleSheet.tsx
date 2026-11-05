@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     height: 34,
     borderRadius: 17,
-    backgroundColor: "#ff3158",
+    backgroundColor: "#FE1F4C",
     justifyContent: "center",
   },
   contactText: { color: "#fff", fontWeight: "600" },

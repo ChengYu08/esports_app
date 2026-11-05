@@ -287,7 +287,7 @@ export default function HomeScreen() {
                       banners.isRefetching
                     }
                     onRefresh={refreshHome}
-                    tintColor="#ff214b"
+                    tintColor="#FE1F4C"
                   />
                 }
                 onEndReached={loadMoreClubs}

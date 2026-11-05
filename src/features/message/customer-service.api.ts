@@ -13,6 +13,7 @@ export type CustomerServiceSession = {
 type ApiEnvelope<T> = { code?: string; info?: string; data?: T | null };
 
 export const CUSTOMER_SERVICE_BUSY_TEXT = "客服繁忙，请稍后再试";
+export const CUSTOMER_SERVICE_TITLE_PREFIX = "【官方客服】";
 const BUSY_CODES = new Set([
   "CS_NO_AGENT_ONLINE",
   "CS_AGENT_NOT_FOUND",
@@ -75,9 +76,16 @@ export function createCustomerServiceChatParams(
   return {
     id,
     title:
-      session.agentBadge === false || nickname.startsWith("【官方客服】")
+      session.agentBadge === false || nickname.startsWith(CUSTOMER_SERVICE_TITLE_PREFIX)
         ? nickname
-        : `【官方客服】${nickname}`,
+        : `${CUSTOMER_SERVICE_TITLE_PREFIX}${nickname}`,
     customerService: "1",
   };
+}
+
+/** 列表打标后昵称只展示一次：去掉客服入口写入标题的【官方客服】前缀 */
+export function stripCustomerServiceTitlePrefix(title: string) {
+  return title.startsWith(CUSTOMER_SERVICE_TITLE_PREFIX)
+    ? title.slice(CUSTOMER_SERVICE_TITLE_PREFIX.length)
+    : title;
 }

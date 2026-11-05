@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#E01B28",
+    backgroundColor: "#FE1F4C",
   },
   checkboxLabel: {
     color: "#808080",
