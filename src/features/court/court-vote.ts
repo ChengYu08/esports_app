@@ -96,3 +96,12 @@ export function applyVoteToCases(
     };
   });
 }
+
+// 保留两侧的文字和可点击区域，零票时两侧平分。
+export function getVoteProportions(plaintiff: number, defendant: number) {
+  const left = Number.isFinite(plaintiff) ? Math.max(0, plaintiff) : 0;
+  const right = Number.isFinite(defendant) ? Math.max(0, defendant) : 0;
+  const total = left + right;
+  const ratio = total > 0 ? Math.max(0.3, Math.min(0.7, left / total)) : 0.5;
+  return { plaintiff: ratio, defendant: 1 - ratio };
+}

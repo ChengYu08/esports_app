@@ -1,6 +1,6 @@
 import { CourtAvatar } from "@/features/court/components/CourtAvatar";
 import { CourtVoteButton } from "@/features/court/components/CourtVoteButton";
-import { courtVoteUnavailableReason } from "@/features/court/court-vote";
+import { courtVoteUnavailableReason, getVoteProportions } from "@/features/court/court-vote";
 import {
   formatCount,
   formatTime,
@@ -33,6 +33,7 @@ export const CourtCard = memo(function CourtCard({
   onFavorite,
   pendingAction,
 }: Props) {
+  const proportions = getVoteProportions(item.voteSummary?.plaintiff ?? 0, item.voteSummary?.defendant ?? 0);
   const busy = pendingAction !== null;
   const stage = mapCaseStage(item);
   const voting = item.stage === "VOTING";
@@ -47,6 +48,8 @@ export const CourtCard = memo(function CourtCard({
     : defeated
       ? COURT_COLORS.defendant
       : COURT_COLORS.plaintiff;
+
+  const dividerColor = voting ? "#B6EBF0" : defeated ? "#FFC2CE" : "#C2E2FF";
 
   return (
     <View style={styles.card}>
@@ -67,7 +70,7 @@ export const CourtCard = memo(function CourtCard({
               {stage.level}
             </Text>
             <View
-              style={[styles.stageDivider, { backgroundColor: stageColor }]}
+              style={[styles.stageDivider, { backgroundColor: dividerColor }]}
             />
             <Text style={[styles.stageText, { color: stageColor }]}>
               {stage.stage}
@@ -95,6 +98,7 @@ export const CourtCard = memo(function CourtCard({
       <View style={styles.voteRow}>
         <CourtVoteButton
           side="plaintiff"
+          proportion={proportions.plaintiff}
           selected={item.myVoteResult === "PLAINTIFF_WIN"}
           muted={muted}
           disabled={disabled}
@@ -104,6 +108,7 @@ export const CourtCard = memo(function CourtCard({
         />
         <CourtVoteButton
           side="defendant"
+          proportion={proportions.defendant}
           selected={item.myVoteResult === "DEFENDANT_WIN"}
           muted={muted}
           disabled={disabled}
@@ -200,7 +205,7 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     lineHeight: 16,
   },
-  stageDivider: { height: 6, width: 0.5 },
+  stageDivider: { height: 6, width: 1 },
   time: {
     color: COURT_COLORS.muted,
     fontFamily: COURT_FONT_FAMILY,

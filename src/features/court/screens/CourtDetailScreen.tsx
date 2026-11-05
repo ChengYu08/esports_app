@@ -4,7 +4,7 @@ import { CourtProcessTimeline } from "@/features/court/components/CourtProcessTi
 import { CourtAvatar } from "@/features/court/components/CourtAvatar";
 import { CourtJudgmentResult } from "@/features/court/components/CourtJudgmentResult";
 import { CourtReviewerPromptModal } from "@/features/court/components/CourtReviewerPromptModal";
-import { courtVoteUnavailableReason, submitCourtVote } from "@/features/court/court-vote";
+import { courtVoteUnavailableReason, getVoteProportions, submitCourtVote } from "@/features/court/court-vote";
 import { CourtVoteButton } from "@/features/court/components/CourtVoteButton";
 import {
   courtApi,
@@ -290,6 +290,7 @@ export default function CourtDetailScreen() {
             <View style={styles.voteActions}>
               <CourtVoteButton
                 side="plaintiff"
+                proportion={getVoteProportions(item.voteSummary?.plaintiff ?? 0, item.voteSummary?.defendant ?? 0).plaintiff}
                 selected={item.myVoteResult === "PLAINTIFF_WIN"}
                 disabled={busy}
                 onPress={() => castVote("PLAINTIFF_WIN")}
@@ -299,6 +300,7 @@ export default function CourtDetailScreen() {
               />
               <CourtVoteButton
                 side="defendant"
+                proportion={getVoteProportions(item.voteSummary?.plaintiff ?? 0, item.voteSummary?.defendant ?? 0).defendant}
                 selected={item.myVoteResult === "DEFENDANT_WIN"}
                 disabled={busy}
                 onPress={() => castVote("DEFENDANT_WIN")}
