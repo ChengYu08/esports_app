@@ -1,4 +1,5 @@
 import ATAuthSDK
+import CoreText
 import ExpoModulesCore
 import UIKit
 
@@ -66,8 +67,27 @@ public class PzOneClickModule: Module {
           return
         }
 
-        let model = self.makeAuthPageModel()
         var didFinish = false
+        // 返回键、「暂不登录，先去逛逛」是 customViewBlock 自绘控件，不在 SDK 控件体系内，
+        // 点击时直接按对应取消语义结束本次授权请求（与 SDK 取消码 700000/700001 的分叉一致）。
+        let model = self.makeAuthPageModel(
+          onUserExit: {
+            guard !didFinish else { return }
+            didFinish = true
+            NSLog("\(quickLoginTag) iOS authorization cancelled via custom exit entry")
+            self.sendEvent("onStateChange", ["state": "cancelled"])
+            self.authHandler.cancelLoginVC(animated: true, complete: nil)
+            promise.reject("USER_EXITED", "一键登录失败，请使用其他登录方式")
+          },
+          onUserSwitch: {
+            guard !didFinish else { return }
+            didFinish = true
+            NSLog("\(quickLoginTag) iOS authorization cancelled via verification-code entry")
+            self.sendEvent("onStateChange", ["state": "cancelled"])
+            self.authHandler.cancelLoginVC(animated: true, complete: nil)
+            promise.reject("USER_SWITCHED", "一键登录失败，请使用其他登录方式")
+          }
+        )
         // 只有明确的终止码才结束流程：成功、用户取消，或已知失败码段。
         // 其余回调（含未来 SDK 新增的中间码）只记日志，绝不提前关页/reject。
         // 取消路径分两类，JS 侧要据此决定露出什么：
@@ -130,12 +150,40 @@ public class PzOneClickModule: Module {
     return result?["resultCode"] as? String ?? "unknown"
   }
 
-  private func makeAuthPageModel() -> TXCustomModel {
+  /// Figma 授权页设计稿（375x812 基准）的内容纵坐标，均相对导航栏底部：
+  /// 顶部背景图 208pt 高（卡片上叠 12pt），卡片内 padding-top 64，
+  /// slogan → 间距 12 → 号码 → 间距 56 → 登录按钮（高 42）。
+  private static let sloganTopY: CGFloat = 260
+  private static let numberTopY: CGFloat = 294
+  private static let loginTopY: CGFloat = 388
+
+  /// 自绘控件的 tag，customViewLayoutBlock 里按 tag 取回设置 frame
+  private static let topBgTag = 901
+  private static let skipBtnTag = 902
+  private static let otherWayTag = 903
+
+  /// MiSans Bold（Figma 号码栏字体，Fontmin 子集只含号码所需字符），注册一次进程内复用
+  private static let miSansNumberFont: UIFont? = {
+    guard let url = Bundle.main.url(forResource: "pz_misans_bold", ofType: "ttf") else {
+      NSLog("\(quickLoginTag) MiSans font resource not found in main bundle")
+      return nil
+    }
+    var error: CFError?
+    // process 域重复注册会返回 false，忽略后直接取字体即可
+    CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error)
+    return UIFont(name: "MiSans-Bold", size: 32)
+  }()
+
+  private func makeAuthPageModel(onUserExit: @escaping () -> Void, onUserSwitch: @escaping () -> Void) -> TXCustomModel {
     // Figma 设计稿颜色常量
     let brandPrimary = UIColor(red: 254.0 / 255, green: 31.0 / 255, blue: 76.0 / 255, alpha: 1) // #FE1F4C
     let gray1 = UIColor(red: 26.0 / 255, green: 26.0 / 255, blue: 26.0 / 255, alpha: 1)         // #1A1A1A
-    let gray9 = UIColor(red: 128.0 / 255, green: 128.0 / 255, blue: 128.0 / 255, alpha: 1)      // #808080
-    let linkBlue = UIColor(red: 27.0 / 255, green: 106.0 / 255, blue: 224.0 / 255, alpha: 1)    // #1B6AE0
+    let gray3 = UIColor(red: 153.0 / 255, green: 153.0 / 255, blue: 153.0 / 255, alpha: 1)     // #999999
+    let gray9 = UIColor(red: 128.0 / 255, green: 128.0 / 255, blue: 128.0 / 255, alpha: 1)     // #808080
+    let gray10 = UIColor(red: 102.0 / 255, green: 102.0 / 255, blue: 102.0 / 255, alpha: 1)    // #666666
+    let gray11 = UIColor(red: 51.0 / 255, green: 51.0 / 255, blue: 51.0 / 255, alpha: 1)       // #333333
+    let grayBorder = UIColor(red: 235.0 / 255, green: 235.0 / 255, blue: 235.0 / 255, alpha: 1) // #EBEBEB
+    let linkBlue = UIColor(red: 27.0 / 255, green: 106.0 / 255, blue: 224.0 / 255, alpha: 1)   // #1B6AE0
 
     let model = TXCustomModel()
     // 授权页进出不做动画：退出时 RN 侧会立即盖一层全屏加载遮罩，
@@ -143,21 +191,38 @@ public class PzOneClickModule: Module {
     model.animationDuration = 0
     model.navIsHidden = false
     model.prefersStatusBarHidden = false
-    // 与二级页面 AppBar 一致：白底 + 深色返回箭头 + 黑色标题「一键登录」
+    // 状态栏由系统绘制不干预；导航栏白底，与顶部背景图顶部白色自然衔接
     model.navColor = .white
     model.navBackImage = Self.makeBackArrowImage(color: gray1)
-    model.navTitle = NSAttributedString(
-      string: "一键登录",
-      attributes: [
-        .foregroundColor: gray1,
-        .font: UIFont.systemFont(ofSize: 18, weight: .semibold),
-      ]
-    )
+    // Figma 导航栏无标题（返回箭头 + 空白）
+    model.navTitle = NSAttributedString(string: "")
     model.backgroundColor = .white
     model.logoIsHidden = true
+
+    // slogan：「中国xx提供认证服务」，按当前 SIM 运营商生成文案
+    let carrier = TXCommonUtils.getCurrentCarrierName() ?? ""
+    let centered = NSMutableParagraphStyle()
+    centered.alignment = .center
+    model.sloganText = NSAttributedString(
+      string: carrier.isEmpty ? "运营商提供认证服务" : "\(carrier)提供认证服务",
+      attributes: [
+        .foregroundColor: gray9,
+        .font: UIFont.systemFont(ofSize: 14),
+        .paragraphStyle: centered,
+      ]
+    )
+    model.sloganFrameBlock = { _, _, frame in
+      CGRect(x: frame.minX, y: Self.sloganTopY, width: frame.width, height: frame.height)
+    }
+
+    // 号码：MiSans Bold 32pt，加载失败退回系统字体
     model.numberColor = gray1
-    model.numberFont = .systemFont(ofSize: 32, weight: .semibold)
-    // slogan 不自定义文案，让 SDK 按当前 SIM 卡显示「中国xx提供认证服务」
+    model.numberFont = Self.miSansNumberFont ?? .systemFont(ofSize: 32, weight: .semibold)
+    model.numberFrameBlock = { _, _, frame in
+      CGRect(x: frame.minX, y: Self.numberTopY, width: frame.width, height: frame.height)
+    }
+
+    // 登录按钮：高 42、圆角 8、左右边距 32
     model.loginBtnText = NSAttributedString(
       string: "一键登录",
       attributes: [
@@ -165,66 +230,190 @@ public class PzOneClickModule: Module {
         .font: UIFont.systemFont(ofSize: 14, weight: .semibold),
       ]
     )
-    // Figma 按钮：高 42、圆角 8、红 #FE1F4C，左右边距 15pt
-    let buttonImage = UIGraphicsImageRenderer(size: CGSize(width: 16, height: 42)).image { context in
+    let buttonImage = UIGraphicsImageRenderer(size: CGSize(width: 16, height: 42)).image { _ in
       let path = UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: 16, height: 42), cornerRadius: 8)
       brandPrimary.setFill()
       path.fill()
-      _ = context
     }.resizableImage(withCapInsets: UIEdgeInsets(top: 0, left: 8, bottom: 0, right: 8), resizingMode: .stretch)
     model.loginBtnBgImgs = [buttonImage, buttonImage, buttonImage]
-    // 左右边距 15pt
-    model.loginBtnFrameBlock = { screenSize, superViewSize, frame in
-      let margin = CGFloat(15)
-      let x = margin
-      let width = UIScreen.main.bounds.width - margin * 2
-      return CGRect(x: x, y: frame.origin.y, width: width, height: frame.size.height)
+    model.loginBtnFrameBlock = { screenSize, _, _ in
+      CGRect(x: 32, y: Self.loginTopY, width: screenSize.width - 64, height: 42)
     }
+
+    // 自绘控件：顶部背景图、「暂不登录，先去逛逛」、底部「验证码」切换入口。
+    // frame 在 customViewLayoutBlock 里参照 SDK 给出的 loginFrame/privacyFrame 定位。
+    final class CustomViewBox {
+      weak var topBg: UIView?
+      weak var skipBtn: UIControl?
+      weak var otherWay: UIControl?
+    }
+    let box = CustomViewBox()
+    model.customViewBlock = { superView in
+      let topBg = UIImageView(image: UIImage(named: "pz_login_top_bg"))
+      topBg.tag = Self.topBgTag
+      topBg.contentMode = .scaleAspectFill
+      topBg.clipsToBounds = true
+      superView.addSubview(topBg)
+      box.topBg = topBg
+
+      let skipBtn = UIButton(type: .system)
+      skipBtn.tag = Self.skipBtnTag
+      skipBtn.setTitle("暂不登录，先去逛逛", for: .normal)
+      skipBtn.setTitleColor(gray3, for: .normal)
+      skipBtn.titleLabel?.font = .systemFont(ofSize: 12)
+      skipBtn.addAction(UIAction(handler: { _ in onUserExit() }), for: .touchUpInside)
+      superView.addSubview(skipBtn)
+      box.skipBtn = skipBtn
+
+      var config = UIButton.Configuration.plain()
+      config.image = UIImage(named: "pz_login_other_way")
+      config.imagePlacement = .top
+      config.imagePadding = 8
+      config.baseForegroundColor = gray9
+      var title = AttributedString("验证码")
+      title.font = .systemFont(ofSize: 12)
+      config.attributedTitle = title
+      config.contentInsets = .zero
+      let otherWay = UIButton(configuration: config)
+      otherWay.tag = Self.otherWayTag
+      otherWay.addAction(UIAction(handler: { _ in onUserSwitch() }), for: .touchUpInside)
+      superView.addSubview(otherWay)
+      box.otherWay = otherWay
+    }
+    model.customViewLayoutBlock = { screenSize, _, _, _, _, _, _, loginFrame, _, privacyFrame in
+      let bgHeight = screenSize.width * 208.0 / 375.0
+      box.topBg?.frame = CGRect(x: 0, y: 0, width: screenSize.width, height: bgHeight)
+      box.skipBtn?.frame = CGRect(x: 0, y: loginFrame.maxY + 16, width: screenSize.width, height: 20)
+      // 「验证码」入口：图标 40 + 间距 8 + 文字 16，整组在协议区上方 40pt
+      let otherWaySize = CGSize(width: 64, height: 64)
+      box.otherWay?.frame = CGRect(
+        x: (screenSize.width - otherWaySize.width) / 2,
+        y: privacyFrame.minY - 40 - otherWaySize.height,
+        width: otherWaySize.width,
+        height: otherWaySize.height
+      )
+    }
+
+    // 协议：checkbox 16pt 默认未勾选，文案带「未注册用户在登录成功后自动创建账号」后缀
     model.privacyPreText = "已阅读并同意"
+    model.privacySufText = "，未注册用户在登录成功后自动创建账号"
     // 运营商协议走 SDK 内置占位符（点击跳到对应运营商官方页面），
     // 不要占用 privacyOne/Two/Three —— 那些槽位塞运营商协议会被 SDK 用自家 URL 覆盖，导致点击不生效
     model.privacyOperatorPreText = "《运营商协议》"
     model.privacyOperatorSufText = ""
     model.privacyOperatorColor = linkBlue
-    // 我们自己的协议
     model.privacyOne = ["《用户协议》", userAgreementURL]
     model.privacyTwo = ["《隐私政策》", privacyPolicyURL]
     model.privacyColors = [gray9, linkBlue]
-    // 原生授权页保留协议勾选 checkbox：默认未勾选（合规要求用户主动同意），
-    // 未勾选时点击「一键登录」按钮，SDK 会弹内置 privacyAlert 弹窗提示。
+    model.privacyFont = .systemFont(ofSize: 12)
     model.checkBoxIsChecked = false
     model.checkBoxIsHidden = false
-    // 启用 SDK 内置弹窗：点击「同意协议并登录」后自动勾选并继续登录
+    // checkBoxWH 默认 0，SDK 头文件要求"必须大于0"，不设置会渲染成零尺寸导致勾选框不可见
+    model.checkBoxWH = 16
+    model.checkBoxImages = [Self.makeCheckboxImage(checked: false), Self.makeCheckboxImage(checked: true)]
+    // 协议区距底部 56pt、左右 32pt
+    model.privacyFrameBlock = { _, superViewSize, frame in
+      CGRect(x: 32, y: superViewSize.height - 56 - frame.height, width: superViewSize.width - 64, height: frame.height)
+    }
+
+    // 二次协议弹窗（Figma：白底 12pt 圆角，标题 16 #333，正文 14 #666，
+    // 双按钮「不同意」白描边 /「同意协议并继续」红底，高 36 圆角 8，蒙层 60%）
     model.privacyAlertIsNeedShow = true
     model.privacyAlertIsNeedAutoLogin = true
     model.privacyAlertTitleContent = "阅读并同意以下协议"
-    model.privacyAlertTitleFont = .systemFont(ofSize: 18, weight: .semibold)
-    model.privacyAlertTitleColor = gray1
+    model.privacyAlertTitleFont = .systemFont(ofSize: 16, weight: .semibold)
+    model.privacyAlertTitleColor = gray11
     model.privacyAlertContentFont = .systemFont(ofSize: 14)
     // contentColors: [正文基础色, 运营商协议, 协议1, 协议2]（与 privacyOperator + privacyOne + privacyTwo 顺序对应）
-    model.privacyAlertContentColors = [gray9, linkBlue, linkBlue, linkBlue]
+    model.privacyAlertContentColors = [gray10, linkBlue, linkBlue, linkBlue]
+    model.privacyAlertContentAlignment = .left
     model.privacyAlertPreText = "已阅读并同意"
     model.privacyAlertSufText = "，未注册用户在登录成功后自动创建账号"
-    model.privacyAlertBtnContent = "同意协议并登录"
+    // SDK 自带单个确认按钮，把它定位到右半边充当「同意协议并继续」，
+    // 左半边的「不同意」用 customViewBlock 自绘，点击只关弹窗不继续登录
+    model.privacyAlertBtnContent = "同意协议并继续"
     model.privacyAlertButtonFont = .systemFont(ofSize: 14, weight: .semibold)
     // buttonTextColors 需要 [normal, highlighted]，单个会被 SDK 越界读取
     model.privacyAlertButtonTextColors = [UIColor.white, UIColor.white]
-    model.privacyAlertBtnBackgroundImages = [buttonImage, buttonImage, buttonImage]
+    let alertBtnImage = UIGraphicsImageRenderer(size: CGSize(width: 16, height: 36)).image { _ in
+      let path = UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: 16, height: 36), cornerRadius: 8)
+      brandPrimary.setFill()
+      path.fill()
+    }.resizableImage(withCapInsets: UIEdgeInsets(top: 8, left: 8, bottom: 8, right: 8), resizingMode: .stretch)
+    model.privacyAlertBtnBackgroundImages = [alertBtnImage, alertBtnImage, alertBtnImage]
     model.privacyAlertBtnCornerRadius = 8
-    // 弹窗四角圆角 [左上, 右上, 左下, 右下]
-    model.privacyAlertCornerRadiusArray = [NSNumber(value: 16), NSNumber(value: 16), NSNumber(value: 16), NSNumber(value: 16)]
+    // 按钮行：距弹窗底 16、高 36、左右边距 16、两按钮间距 12 → 右按钮 x = W/2+6
+    model.privacyAlertButtonFrameBlock = { _, superViewSize, _ in
+      let width = superViewSize.width / 2 - 22
+      return CGRect(x: superViewSize.width / 2 + 6, y: superViewSize.height - 52, width: width, height: 36)
+    }
+    // 弹窗四角圆角 [左上, 左下, 右下, 右上]
+    model.privacyAlertCornerRadiusArray = [NSNumber(value: 12), NSNumber(value: 12), NSNumber(value: 12), NSNumber(value: 12)]
+    model.privacyAlertCloseButtonIsNeedShow = false
     model.tapPrivacyAlertMaskCloseAlert = true
-    model.privacyAlertMaskAlpha = 0.5
-    // SDK 内置 privacyAlert 在 frame block 自定义下会拉伸到全屏（已验证），
-    // 默认窄卡片又会被标题文字撑爆。先保持默认，长期方案是关掉这个弹窗走 RN 自定义。
+    model.privacyAlertMaskAlpha = 0.6
+    final class AlertViewBox {
+      weak var disagree: UIControl?
+    }
+    let alertBox = AlertViewBox()
+    model.privacyAlertCustomViewBlock = { superAlertView in
+      let disagree = UIButton(type: .system)
+      disagree.setTitle("不同意", for: .normal)
+      disagree.setTitleColor(gray11, for: .normal)
+      disagree.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
+      disagree.layer.borderColor = grayBorder.cgColor
+      disagree.layer.borderWidth = 1
+      disagree.layer.cornerRadius = 8
+      disagree.addAction(
+        UIAction(handler: { _ in TXCommonHandler.sharedInstance().closePrivactAlertView() }),
+        for: .touchUpInside
+      )
+      superAlertView.addSubview(disagree)
+      alertBox.disagree = disagree
+    }
+    model.privacyAlertCustomViewLayoutBlock = { _, _, _, buttonFrame, _ in
+      // 左按钮与 SDK 右按钮同高同宽，左边距 16
+      alertBox.disagree?.frame = CGRect(x: 16, y: buttonFrame.minY, width: buttonFrame.width, height: buttonFrame.height)
+    }
+
     // 协议 WebView 的安全区：白底 + 深色返回箭头 + 黑色标题，与一键登录页保持一致
     model.privacyNavColor = .white
     model.privacyNavTitleColor = gray1
     model.privacyNavTitleFont = .systemFont(ofSize: 18, weight: .semibold)
     model.privacyNavBackImage = Self.makeBackArrowImage(color: gray1)
-    // SDK 仅一个切换入口，已用于「暂不登录」，隐藏的 changeBtn 不再重复暴露
+    // SDK 仅一个切换入口，已改用自绘「验证码」入口，隐藏内置 changeBtn
     model.changeBtnIsHidden = true
     return model
+  }
+
+  /// 勾选框图片：16pt 圆形，未勾选灰描边，勾选品牌红底 + 白色对勾（与 Figma Checkbox/Small-16 一致）。
+  private static func makeCheckboxImage(checked: Bool) -> UIImage {
+    let brandPrimary = UIColor(red: 254.0 / 255, green: 31.0 / 255, blue: 76.0 / 255, alpha: 1)
+    let uncheckedBorder = UIColor(red: 204.0 / 255, green: 204.0 / 255, blue: 204.0 / 255, alpha: 1) // #CCCCCC
+    let size = CGSize(width: 16, height: 16)
+    let renderer = UIGraphicsImageRenderer(size: size)
+    return renderer.image { _ in
+      let rect = CGRect(x: 1, y: 1, width: 14, height: 14)
+      let circle = UIBezierPath(ovalIn: rect)
+      if checked {
+        brandPrimary.setFill()
+        circle.fill()
+        let check = UIBezierPath()
+        // 对勾（16 视口坐标）
+        check.move(to: CGPoint(x: 4.5, y: 8.5))
+        check.addLine(to: CGPoint(x: 7, y: 11))
+        check.addLine(to: CGPoint(x: 11.8, y: 5.2))
+        check.lineWidth = 1.6
+        check.lineCapStyle = .round
+        check.lineJoinStyle = .round
+        UIColor.white.setStroke()
+        check.stroke()
+      } else {
+        circle.lineWidth = 1
+        uncheckedBorder.setStroke()
+        circle.stroke()
+      }
+    }
   }
 
   /// 24×24 左箭头（ChevronLeft），与二级页面 `@fluentui/react-native-icons` 的 ChevronLeft24Regular 视觉一致。
