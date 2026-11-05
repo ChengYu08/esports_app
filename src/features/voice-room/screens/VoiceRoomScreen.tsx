@@ -859,7 +859,17 @@ export default function VoiceRoomScreen() {
     };
     setMessages((items) => [...items, local].slice(-80));
     if (chatroomId)
-      await sendVoiceChatMessage(chatroomId, text).catch(() => {
+      await sendVoiceChatMessage(
+        chatroomId,
+        text,
+        currentUser?.id
+          ? {
+              userId: String(currentUser.id),
+              nickname: currentUser.nickname,
+              headImage: currentUser.headImage,
+            }
+          : undefined,
+      ).catch(() => {
         void useAppConfirm.getState().confirm({
           title: "发送失败",
           message: "请稍后重试",
