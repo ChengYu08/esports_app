@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
   },
   tabText: { color: "#666", fontSize: 14, lineHeight: 22 },
   tabTextActive: { color: "#333", fontSize: 16, fontWeight: "600" },
-  tabIndicator: { position: "absolute", bottom: 9, width: 12, height: 3, borderRadius: 2, backgroundColor: "#E01B28" },
+  tabIndicator: { position: "absolute", bottom: 9, width: 12, height: 3, borderRadius: 2, backgroundColor: "#FE1F4C" },
   content: { flex: 1, backgroundColor: "#E6E6E6" },
   contentContainer: { minHeight: "100%", alignItems: "center" },
   priceImage: { width: "100%", backgroundColor: "#E6E6E6" },
@@ -115,5 +115,5 @@ const styles = StyleSheet.create({
     justifyContent: "center", paddingTop: 100,
   },
   stateText: { padding: 32, color: "rgba(0,0,0,.35)", fontSize: 14, textAlign: "center" },
-  retryText: { color: "#E01B28", fontSize: 14 },
+  retryText: { color: "#FE1F4C", fontSize: 14 },
 });

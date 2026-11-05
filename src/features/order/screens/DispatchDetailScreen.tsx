@@ -14,7 +14,7 @@ import { fetchDispatchDetail, isActivityDispatchRequest } from "../dispatch.api"
 
 const DEFAULT_AVATAR = require("../../../../assets/svgs/order-seller-avatar.svg");
 const GAME_FALLBACK = require("../../../../assets/svgs/game.svg");
-const ACTION_GRADIENT = ["#FF2145", "#FF3158"] as const;
+const ACTION_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
 
 type GrabStatus = "GRABBED" | "SUCCESS" | "FAILED";
 
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF",
   },
   muted: { color: "#999", fontSize: 14 },
-  retry: { color: "#FF3158", fontSize: 14 },
+  retry: { color: "#FE1F4C", fontSize: 14 },
   // 外层只管总高（minHeight 88，含 paddingTop insets.top）与内容贴底（paddingBottom 12 + flex-end）；
   // 内部 ScreenHeader 传 height 28（原返回键文本 lineHeight），总高 = max(88, insets.top + 40) 与迁移前一致
   header: {
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   statusTitle: {
-    color: "#F02A45",
+    color: "#FE1F4C",
     fontSize: 22,
     fontWeight: "700",
   },
@@ -382,10 +382,10 @@ const styles = StyleSheet.create({
   gameIcon: { width: 20, height: 20 },
   gameName: { flex: 1, color: "#222", fontSize: 13 },
   activityCard: { gap: 6, padding: 12, borderRadius: 8, backgroundColor: "#FFF5F6" },
-  activityCardTitle: { color: "#F02A45", fontSize: 13, fontWeight: "600" },
+  activityCardTitle: { color: "#FE1F4C", fontSize: 13, fontWeight: "600" },
   activityRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
   activityLabel: { width: 70, color: "#B98A90", fontSize: 12, lineHeight: 20 },
-  activityValue: { flex: 1, color: "#F02A45", fontSize: 12, lineHeight: 20, textAlign: "right" },
+  activityValue: { flex: 1, color: "#FE1F4C", fontSize: 12, lineHeight: 20, textAlign: "right" },
   infoRow: {
     minHeight: 34,
     flexDirection: "row",
@@ -419,8 +419,8 @@ const styles = StyleSheet.create({
     borderTopColor: "#EEE",
   },
   totalLabel: { color: "#555", fontSize: 12 },
-  totalValue: { color: "#F02A45", fontSize: 20, fontWeight: "700" },
-  totalUnit: { color: "#F02A45", fontSize: 12 },
+  totalValue: { color: "#FE1F4C", fontSize: 20, fontWeight: "700" },
+  totalUnit: { color: "#FE1F4C", fontSize: 12 },
   bottom: {
     paddingHorizontal: 16,
     paddingTop: 12,

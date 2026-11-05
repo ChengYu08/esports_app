@@ -16,10 +16,11 @@ type MessageHeaderProps = {
 export function MessageHeader({ onClear, onSearch }: MessageHeaderProps) {
   return (
     <View style={styles.header}>
-      <Text accessibilityRole="header" style={styles.title}>
-        消息
-      </Text>
-      <View style={styles.spacer} />
+      <View pointerEvents="none" style={styles.titleWrap}>
+        <Text accessibilityRole="header" style={styles.title}>
+          消息
+        </Text>
+      </View>
       <IconButton
         accessibilityLabel="清除所有未读消息"
         icon={<Image source={icons.clear} style={styles.icon} />}
@@ -63,16 +64,27 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     flexDirection: "row",
     alignItems: "center",
-    paddingLeft: 16,
+    justifyContent: "flex-end",
     paddingRight: 6,
+  },
+  // 标题绝对居中，左右两侧宽度不对称也不影响居中；pointerEvents="none" 不遮挡右侧按钮点击
+  titleWrap: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 88,
   },
   title: {
     color: "#333333",
     fontSize: 20,
     lineHeight: 28,
     fontWeight: "600",
+    textAlign: "center",
   },
-  spacer: { flex: 1 },
   button: {
     width: 44,
     height: 44,

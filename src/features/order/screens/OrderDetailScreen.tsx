@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
     gap: 12,
     backgroundColor: "#FFF",
   },
-  retry: { color: "#FF3158", fontSize: 15 },
+  retry: { color: "#FE1F4C", fontSize: 15 },
   header: {
     backgroundColor: "#FFF",
     flexDirection: "row",
