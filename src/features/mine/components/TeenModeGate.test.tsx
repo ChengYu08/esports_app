@@ -80,7 +80,12 @@ beforeEach(() => {
   appStateMock.activeHandler = null;
   storageMock.get.mockResolvedValue("false");
   storageMock.set.mockResolvedValue(undefined);
-  apiMock.fetchTeenModeConfig.mockResolvedValue({ lockStartHour: 9, lockEndHour: 23 });
+  apiMock.fetchTeenModeConfig.mockResolvedValue({
+    lockEnabled: true,
+    mode: "same-day",
+    lockStartHour: 9,
+    lockEndHour: 23,
+  });
 });
 
 afterEach(async () => {
@@ -255,16 +260,60 @@ describe("TeenModeGate 独立设置页状态同步", () => {
     expect(renderer?.root.findAllByType(promoHost).length).toBe(1);
   });
 
-  it("锁定窗口跟随服务端配置：配置到达后按配置时段判定并重排边界定时器", async () => {
-    vi.spyOn(performance, "now").mockReturnValue(1_000);
-    const timeoutSpy = vi.spyOn(globalThis, "setTimeout");
-    let resolveConfig!: (config: { lockStartHour: number; lockEndHour: number }) => void;
+  it("服务端配置到达后按配置时段重判：配置外解除锁定", async () => {
+    let resolveConfig!: (config: {
+      lockEnabled: boolean;
+      mode?: "same-day" | "cross-day";
+      lockStartHour?: number;
+      lockEndHour?: number;
+    }) => void;
     apiMock.fetchTeenModeConfig.mockImplementation(
       () => new Promise((resolve) => {
         resolveConfig = resolve;
       }),
     );
-    // 12:00 在默认窗口 22:00-次日6:00 之外不锁定，服务端配置 9:00-23:00 到达后应锁定
+    // 23:30 在服务端配置窗口 9:00-23:00 之外；配置未到达前 fail-closed 先锁定
+    apiMock.status.mockResolvedValue({
+      enabled: true,
+      passwordSet: true,
+      remainingAttempts: 10,
+      serverTime: Date.parse("2026-11-03T23:30:00+08:00"),
+    } satisfies TeenModeStatus);
+
+    await act(async () => {
+      renderer = create(<TeenModeGate />);
+    });
+    expect(lockedScreenCount()).toBe(1);
+
+    await act(async () => {
+      resolveConfig({
+        lockEnabled: true,
+        mode: "same-day",
+        lockStartHour: 9,
+        lockEndHour: 23,
+      });
+    });
+    expect(lockedScreenCount()).toBe(0);
+  });
+
+  it("服务端明确返回未配置时段（lockEnabled=false）时解除锁定", async () => {
+    apiMock.fetchTeenModeConfig.mockResolvedValue({ lockEnabled: false });
+    apiMock.status.mockResolvedValue({
+      enabled: true,
+      passwordSet: true,
+      remainingAttempts: 10,
+      // 任意时刻都不应锁定
+      serverTime: Date.parse("2026-11-03T12:00:00+08:00"),
+    } satisfies TeenModeStatus);
+
+    await act(async () => {
+      renderer = create(<TeenModeGate />);
+    });
+    expect(lockedScreenCount()).toBe(0);
+  });
+
+  it("配置请求失败时已开启账号保持 fail-closed", async () => {
+    apiMock.fetchTeenModeConfig.mockRejectedValue(new Error("网络异常"));
     apiMock.status.mockResolvedValue({
       enabled: true,
       passwordSet: true,
@@ -275,13 +324,6 @@ describe("TeenModeGate 独立设置页状态同步", () => {
     await act(async () => {
       renderer = create(<TeenModeGate />);
     });
-    expect(lockedScreenCount()).toBe(0);
-
-    await act(async () => {
-      resolveConfig({ lockStartHour: 9, lockEndHour: 23 });
-    });
     expect(lockedScreenCount()).toBe(1);
-    // 配置到达后边界定时器按 9:00-23:00 重排：12:00 距 23:00 还有 11 小时
-    expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Function), 11 * 60 * 60 * 1000);
   });
 });

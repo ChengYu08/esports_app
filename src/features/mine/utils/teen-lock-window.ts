@@ -1,25 +1,35 @@
 /**
  * 青少年模式启动锁定页的生效时间窗：
- * 锁定时段起止小时跟随服务端配置（/youth/config，Nacos 动态下发），
- * 须同时支持两种形态：start < end 同日锁定（如 9:00-23:00）、
- * start > end 跨午夜锁定（当前口径 22:00-次日 6:00，白天 6:00-22:00 不锁定）；start == end 视为全天锁定。
- * 拉取配置失败时回退默认 22:00-次日 6:00（与服务端默认值一致）。
+ * 时段只以服务端配置（/youth/config，Nacos 下发）为准，客户端不设任何兜底时段。
+ * 形态由服务端 mode 显式声明：same-day 本日锁定（start < end）、cross-day 跨日锁定（start > end）。
+ * 服务端返回 lockEnabled=false 或配置非法时锁定解除（disabled）；请求失败保持 unknown（fail-closed）。
  *
  * 判定输入为 epoch 毫秒（由调用方用服务端时间校准后的「当前时间」传入），
  * 时区固定按 UTC+8 换算，不使用设备时区——防止改设备时区绕过；口径与后端
- * YouthModeLockWindow（Asia/Shanghai）保持一致。
+ * YouthModeLockWindow / YouthModeSchedule（Asia/Shanghai）保持一致。
  */
-export const TEEN_DEFAULT_LOCK_START_HOUR = 22;
-export const TEEN_DEFAULT_LOCK_END_HOUR = 6;
+export type TeenLockMode = "same-day" | "cross-day";
 
 export type TeenLockWindow = {
+  mode: TeenLockMode;
   startHour: number;
   endHour: number;
 };
 
-export const DEFAULT_TEEN_LOCK_WINDOW: TeenLockWindow = {
-  startHour: TEEN_DEFAULT_LOCK_START_HOUR,
-  endHour: TEEN_DEFAULT_LOCK_END_HOUR,
+/**
+ * 锁定配置状态：
+ * - unknown：尚未取得可信配置（请求中/失败），已开启账号按 fail-closed 锁定；
+ * - disabled：服务端明确未配置或配置非法，锁定解除；
+ * - TeenLockWindow：有效时段。
+ */
+export type TeenLockConfigState = "unknown" | "disabled" | TeenLockWindow;
+
+/** 服务端 /youth/config 结构（lockEnabled 缺失视为未配置） */
+export type TeenLockConfigResponse = {
+  lockEnabled?: boolean;
+  mode?: string;
+  lockStartHour?: number;
+  lockEndHour?: number;
 };
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -31,19 +41,40 @@ function beijingMsIntoDay(nowMs: number): number {
   return ((nowMs + BEIJING_OFFSET_MS) % DAY_MS + DAY_MS) % DAY_MS;
 }
 
-export function isTeenLockWindow(
-  nowMs: number,
-  startHour: number = TEEN_DEFAULT_LOCK_START_HOUR,
-  endHour: number = TEEN_DEFAULT_LOCK_END_HOUR,
-): boolean {
+/** 把服务端配置解析成锁定状态：未生效或非法一律 disabled，与服务端口径一致 */
+export function resolveTeenLockConfig(
+  config: TeenLockConfigResponse | null | undefined,
+): TeenLockConfigState {
+  if (!config || config.lockEnabled !== true) {
+    return "disabled";
+  }
+  const mode = config.mode;
+  const startHour = Number(config.lockStartHour);
+  const endHour = Number(config.lockEndHour);
+  if (mode !== "same-day" && mode !== "cross-day") {
+    return "disabled";
+  }
+  if (
+    !Number.isInteger(startHour) || startHour < 0 || startHour > 23
+    || !Number.isInteger(endHour) || endHour < 0 || endHour > 23
+  ) {
+    return "disabled";
+  }
+  if (mode === "same-day" && startHour >= endHour) {
+    return "disabled";
+  }
+  if (mode === "cross-day" && startHour <= endHour) {
+    return "disabled";
+  }
+  return { mode, startHour, endHour };
+}
+
+export function isTeenLockWindow(nowMs: number, window: TeenLockWindow): boolean {
   const hour = Math.floor(beijingMsIntoDay(nowMs) / HOUR_MS);
-  if (startHour === endHour) {
-    return true;
+  if (window.mode === "cross-day") {
+    return hour >= window.startHour || hour < window.endHour;
   }
-  if (startHour < endHour) {
-    return hour >= startHour && hour < endHour;
-  }
-  return hour >= startHour || hour < endHour;
+  return hour >= window.startHour && hour < window.endHour;
 }
 
 export type TeenServerClock = {
@@ -66,24 +97,33 @@ export function readTeenServerClock(
   return clock.serverTime + monotonicTime - clock.monotonicTime;
 }
 
-/** 已开启但没有可信时间时必须 fail-closed，不能退化成设备时间。 */
+/**
+ * 锁定判定：
+ * - 未开启或服务端明确未配置时段 → 不锁；
+ * - 配置未知（请求中/失败）→ fail-closed，已开启账号锁定，防止断网或屏蔽配置接口绕过；
+ * - 配置有效但没有可信时间 → fail-closed，不退回设备时间。
+ */
 export function shouldLockTeenMode(
   enabled: boolean,
   calibratedNow: number | null,
-  window: TeenLockWindow = DEFAULT_TEEN_LOCK_WINDOW,
+  config: TeenLockConfigState,
 ): boolean {
-  return enabled
-    && (calibratedNow === null || isTeenLockWindow(calibratedNow, window.startHour, window.endHour));
+  if (!enabled || config === "disabled") {
+    return false;
+  }
+  if (config === "unknown") {
+    return true;
+  }
+  return calibratedNow === null || isTeenLockWindow(calibratedNow, config);
 }
 
 /** 距下一个时间窗边界的毫秒数，用于 App 长时间停留时跨边界重新判定。 */
 export function msUntilTeenLockBoundary(
-  nowMs: number = Date.now(),
-  startHour: number = TEEN_DEFAULT_LOCK_START_HOUR,
-  endHour: number = TEEN_DEFAULT_LOCK_END_HOUR,
+  nowMs: number,
+  window: TeenLockWindow,
 ): number {
   const intoDay = beijingMsIntoDay(nowMs);
-  const boundaries = [startHour * HOUR_MS, endHour * HOUR_MS];
+  const boundaries = [window.startHour * HOUR_MS, window.endHour * HOUR_MS];
   let next = Infinity;
   for (const boundary of boundaries) {
     if (boundary - intoDay > 0 && boundary - intoDay < next) {
@@ -96,13 +136,10 @@ export function msUntilTeenLockBoundary(
   return DAY_MS - intoDay + Math.min(...boundaries);
 }
 
-/** 锁定时段展示文案（如 "9:00-23:00"、"22:00-次日6:00"），开启成功 toast 与说明页共用。 */
-export function teenLockWindowLabel(
-  startHour: number = TEEN_DEFAULT_LOCK_START_HOUR,
-  endHour: number = TEEN_DEFAULT_LOCK_END_HOUR,
-): string {
-  if (startHour > endHour) {
-    return `${startHour}:00-次日${endHour}:00`;
+/** 锁定时段展示文案（如 "9:00-18:00"、"22:00-次日6:00"），开启成功 toast 与说明页共用。 */
+export function teenLockWindowLabel(window: TeenLockWindow): string {
+  if (window.mode === "cross-day") {
+    return `${window.startHour}:00-次日${window.endHour}:00`;
   }
-  return `${startHour}:00-${endHour}:00`;
+  return `${window.startHour}:00-${window.endHour}:00`;
 }
