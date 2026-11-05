@@ -6,6 +6,7 @@ import { WebView } from "react-native-webview";
 import { colors } from "@/shared/theme/tokens";
 import { APP_LINKS } from "@/core/config/links";
 import { savePrivacyConsent } from "@/features/privacy/privacy-consent";
+import { WEBVIEW_COMPAT_SCRIPT } from "@/shared/navigation/webview-compat-script";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 type PrivacyConsentGateProps = {
@@ -157,6 +158,7 @@ export function PrivacyConsentGate({ onAccepted }: PrivacyConsentGateProps) {
             <WebView
               source={{ uri: protocol.url }}
               style={styles.webView}
+              injectedJavaScriptBeforeContentLoaded={WEBVIEW_COMPAT_SCRIPT}
               startInLoadingState
               renderLoading={() => (
                 <View style={styles.protocolLoading}>

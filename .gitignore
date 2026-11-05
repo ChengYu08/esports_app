@@ -75,6 +75,5 @@ modules/*/android/.gradle/
 # react-native-update
 .pushy
 
-.qoder
 *.sql
 pzds_ali_h5_one_key.sql

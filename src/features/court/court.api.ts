@@ -1,4 +1,5 @@
-import { uploadCompanionMediaObject } from "@/features/mine/companion-upload";
+import { clientAuthApi, type ClientOssSts } from "@/features/auth/client-auth.api";
+import { uploadClientObject } from "@/features/auth/oss-upload";
 import { apiClient } from "@/core/network/api-client";
 import { useAuthStore } from "@esports/auth";
 
@@ -401,8 +402,34 @@ export const courtApi = {
     }
     const suffix = name.split(".").pop()?.toLowerCase();
     const mimeType = suffix === "png" ? "image/png" : suffix === "webp" ? "image/webp" : "image/jpeg";
-    const result = await uploadCompanionMediaObject(token, { uri, fileName: name, mimeType }, "image");
-    return result.objectKey;
+    // 与 Web 端一致：专用接口登记证据归属，旧服务回退证据业务类型。
+    const getSts = async () => {
+      try {
+        return await postRequireData<ClientOssSts>("/client/v1/court/evidence/sts", {
+          action: { objectNames: [name] },
+        });
+      } catch {
+        return clientAuthApi.getOssSts(token, "111", [name]);
+      }
+    };
+    let sts = await getSts();
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const objectKey = sts.objectList?.[0];
+      if (!objectKey) {
+        throw new Error("上传凭证缺少文件路径，请重试");
+      }
+      try {
+        await uploadClientObject(sts, objectKey, { uri, mimeType });
+        return objectKey;
+      } catch (error) {
+        if (attempt === 1) {
+          throw error;
+        }
+        // 上传失败后重新申请凭证，使用新凭证对应的文件路径重试。
+        sts = await getSts();
+      }
+    }
+    throw new Error("证据上传失败，请重试");
   },
   async supplementEvidence(
     caseId: string | number,

@@ -3,17 +3,15 @@ import { StyleSheet, Text, View } from "react-native";
 import { formatCountdown } from "@/features/order/order-detail-format";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
 
-/** 订单状态头：大标题 + 提示语（抢单倒计时替换展示） */
+/** 订单状态头：显示状态及抢单倒计时。 */
 export function OrderDetailStatusBar({
   scope,
   statusTitle,
-  statusHint,
   showDispatchCountdown,
   dispatchCountdown,
 }: {
   scope: "accept" | "place";
   statusTitle: string;
-  statusHint: string;
   showDispatchCountdown: boolean;
   dispatchCountdown?: number;
 }) {
@@ -32,15 +30,14 @@ export function OrderDetailStatusBar({
       >
         {statusTitle}
       </Text>
-      {statusHint || showDispatchCountdown ? (
+      {showDispatchCountdown ? (
         <Text
           style={[
             styles.statusHint,
             scope === "accept" && styles.acceptStatusHint,
           ]}
         >
-          {showDispatchCountdown ? (
-            dispatchCountdown === 0 ? (
+          {dispatchCountdown === 0 ? (
               "抢单已截止"
             ) : (
               <>
@@ -50,10 +47,7 @@ export function OrderDetailStatusBar({
                 </Text>{" "}
                 停止抢单
               </>
-            )
-          ) : (
-            statusHint
-          )}
+            )}
         </Text>
       ) : null}
     </View>

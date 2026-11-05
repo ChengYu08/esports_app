@@ -1,0 +1,28 @@
+schema_version: 1
+module_path: src_features/mine/profile_account_settings/companion_dashboard
+title: 陪玩中心仪表盘与编辑页面
+scope:
+    - src/features/mine/screens/CompanionDashboardScreen.tsx
+    - src/features/mine/screens/CompanionIntroScreen.tsx
+    - src/features/mine/screens/CompanionGalleryScreen.tsx
+    - src/features/mine/screens/CompanionIncomeScreen.tsx
+source_files: []
+depends_on: []
+related_to:
+    - path: src_app/account_profile_settings/companion_pages
+      reason: companion_pages 路由适配层将伴播主站 URL 映射到 features/mine/profile_account_settings/companion_dashboard 的仪表盘与编辑页面。
+kk_module_id: ca6e8a9e-4ef2-49be-a685-bfb692578b32
+kk_ordinal: 4
+kk_cards:
+    architecture_design:
+        id: 9b32d94b-0d23-41cc-a365-4b73dd875f59
+        title: 陪玩中心仪表盘与编辑页面
+    coding_conventions:
+        id: 63b079a4-7316-4f32-90d6-db65e8a51ed3
+        title: 陪玩中心仪表盘与编辑页面
+    overview:
+        id: 588e4532-0d5b-4e44-8ea1-266a60d558d1
+        title: 陪玩中心仪表盘与编辑页面
+    tech_stack:
+        id: fb21e136-4fd6-44c6-b88a-8dee8f8e4025
+        title: 陪玩中心仪表盘与编辑页面

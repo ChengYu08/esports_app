@@ -213,3 +213,21 @@ it("免单后以详情替换列表缓存，部分免单留在已完成，不会�
   expect(queryClient.getQueryData<typeof cached>(progressKey)?.pages[0].items).toEqual([]);
   expect(queryClient.getQueryData(otherAccountKey)).toEqual(cached);
 });
+
+it("订单详情保留主陪玩以外的参与陪玩及其聊天资料", () => {
+  const order = mapOrder({
+    id: 42,
+    receiverUserId: 10,
+    receiverNickname: "主陪玩",
+    multiCompanionList: [
+      { userId: 10, nickname: "主陪玩", headImage: "main.png" },
+      { userId: 11, nickname: "参与陪玩", headImage: "other.png" },
+      { userId: 12, nickname: "另一位陪玩" },
+    ],
+  });
+  expect(order.receiverUserId).toBe("10");
+  expect(order.companions).toEqual([
+    { userId: "11", nickname: "参与陪玩", headImage: "other.png" },
+    { userId: "12", nickname: "另一位陪玩", headImage: undefined },
+  ]);
+});

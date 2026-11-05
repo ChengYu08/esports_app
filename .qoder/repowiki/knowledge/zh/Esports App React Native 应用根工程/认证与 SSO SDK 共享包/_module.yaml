@@ -1,0 +1,27 @@
+schema_version: 1
+module_path: shared_packages
+title: 认证与 SSO SDK 共享包
+scope:
+    - packages/
+source_files: []
+depends_on: []
+related_to:
+    - path: src_app/account_profile_settings/auth_flows
+      reason: auth_flows 路由层封装 @esports/auth 提供的 SSO 登录、短信验证码等认证流程，将 URL 映射到 features/auth 的认证页面。
+    - path: src_features/activity
+      reason: activity 秒杀活动页面消费 shared_packages 提供的认证与会话能力以发起派单请求。
+kk_module_id: 3cf113e1-d0f2-4d67-b17d-96b8c1abdd53
+kk_ordinal: 4
+kk_cards:
+    architecture_design:
+        id: 3c65d5b8-8006-4b99-bbb8-cecca5c6af10
+        title: 认证与 SSO SDK 共享包
+    coding_conventions:
+        id: 9192bbb1-3328-4f83-9c4b-174e522c60b5
+        title: 认证与 SSO SDK 共享包
+    overview:
+        id: 8d46773e-e27d-483c-bec6-7d366a917a38
+        title: 认证与 SSO SDK 共享包
+    tech_stack:
+        id: 31cc9ae2-f0c4-4256-b785-a81fa942ca14
+        title: 认证与 SSO SDK 共享包

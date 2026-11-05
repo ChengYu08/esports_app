@@ -1,0 +1,25 @@
+schema_version: 1
+module_path: src_features/mine/profile_account_settings/teen_mode
+title: 青少年模式（Teen Mode）功能入口与设置页
+scope:
+    - src/features/mine/screens/TeenModeScreen.tsx
+    - src/features/mine/components/TeenModeGate.tsx
+    - src/features/mine/components/TeenModePromoDialog.tsx
+source_files: []
+depends_on: []
+related_to: []
+kk_module_id: efadea45-e172-496e-8c85-da2ef260920a
+kk_ordinal: 3
+kk_cards:
+    architecture_design:
+        id: 63d09f7f-c3f8-49f9-b96a-a044df38667e
+        title: 青少年模式（Teen Mode）功能入口与设置页
+    coding_conventions:
+        id: 5ea7cfa8-0ced-4e5a-85d3-0e83cda138d2
+        title: 青少年模式（Teen Mode）功能入口与设置页
+    overview:
+        id: ec248707-4d5a-4865-a425-78ea64c7ea3a
+        title: 青少年模式（Teen Mode）功能入口与设置页
+    tech_stack:
+        id: 1b08ad04-b4dc-47f0-a398-6b1b13c67e18
+        title: 青少年模式（Teen Mode）功能入口与设置页

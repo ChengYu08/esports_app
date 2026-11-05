@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { CachedImage } from "@/shared/ui/CachedImage";
-import type { OrderItemModel } from "@/features/order/order.types";
+import type { MultiCompanionCandidateModel, OrderItemModel } from "@/features/order/order.types";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
 import { computeOrderPayableStars, formatOrderFreeSummary, formatStar } from "@/features/order/free-amount";
 import { OrderDetailInfoRow } from "@/features/order/components/OrderDetailInfoRow";
@@ -25,7 +25,7 @@ export function OrderDetailInfoBlocks({
   clubName?: string;
   orderNumber: string;
   onCopy: () => void;
-  onChat: () => void;
+  onChat: (companion?: MultiCompanionCandidateModel) => void;
 }) {
   const freeSummary = formatOrderFreeSummary(order);
   const amountLabel = scope === "accept" ? "合计" : "实付款";
@@ -59,7 +59,7 @@ export function OrderDetailInfoBlocks({
           </View>
           <Pressable
             accessibilityRole="button"
-            onPress={onChat}
+            onPress={() => onChat()}
             style={[
               styles.chatButton,
               scope === "accept" && styles.acceptChatButton,
@@ -75,6 +75,28 @@ export function OrderDetailInfoBlocks({
             </Text>
           </Pressable>
         </View>
+        {scope === "place" && order.companions?.map((companion, index) => (
+          <View key={`${companion.userId}-${index}`} style={styles.sellerRow}>
+            <CachedImage
+              contentFit="cover"
+              source={companion.headImage ? { uri: companion.headImage } : require("../../../../assets/images/avatar_default.webp")}
+              style={styles.avatar}
+            />
+            <View style={styles.sellerCopy}>
+              <Text numberOfLines={1} style={styles.sellerName}>
+                {companion.nickname || "陪玩师"}
+              </Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`联系${companion.nickname || "陪玩师"}`}
+              onPress={() => onChat(companion)}
+              style={styles.chatButton}
+            >
+              <Text style={styles.chatText}>聊一聊</Text>
+            </Pressable>
+          </View>
+        ))}
         <View style={[styles.divider, scope === "accept" && styles.acceptDivider]} />
         <View style={scope === "accept" && styles.acceptRows}>
           <OrderDetailInfoRow

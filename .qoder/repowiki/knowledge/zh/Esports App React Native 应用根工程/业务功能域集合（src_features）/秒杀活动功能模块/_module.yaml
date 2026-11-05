@@ -1,0 +1,23 @@
+schema_version: 1
+module_path: src_features/activity
+title: 秒杀活动功能模块
+scope:
+    - src/features/activity/
+source_files: []
+depends_on: []
+related_to: []
+kk_module_id: abed3acf-5c51-47ff-9420-46c720a124f4
+kk_ordinal: 7
+kk_cards:
+    architecture_design:
+        id: b809516d-4fa9-4102-bb6c-46890b4ebb38
+        title: 秒杀活动功能模块
+    coding_conventions:
+        id: 50702543-4ebb-4281-bc21-fdda900ff1f7
+        title: 秒杀活动功能模块
+    overview:
+        id: 221d81e9-dc72-46c5-b7a2-84196287efee
+        title: 秒杀活动功能模块
+    tech_stack:
+        id: cb309a8b-cae9-4be2-a119-91094f5078ea
+        title: 秒杀活动功能模块

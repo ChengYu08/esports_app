@@ -49,6 +49,20 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Mode = "court" | "ticket" | "evidence" | "appeal";
 
+const MODE_TITLES: Record<Mode, string> = {
+  court: "发起评审",
+  ticket: "发起投诉",
+  evidence: "补充举证",
+  appeal: "发起申诉",
+};
+
+function getTitle(mode: Mode, caseId?: string) {
+  if (mode === "court" && caseId) {
+    return "重新提交评审";
+  }
+  return MODE_TITLES[mode];
+}
+
 function validMode(value?: string): Mode {
   return value === "ticket" || value === "evidence" || value === "appeal"
     ? value
@@ -201,16 +215,7 @@ export default function CourtComplaintScreen() {
       : mode === "ticket"
         ? !ticketDraftError(ticketDraft)
         : Boolean(params.caseId));
-  const title =
-    mode === "court"
-      ? params.caseId
-        ? "重新提交评审"
-        : "发起投诉"
-      : mode === "ticket"
-        ? "发起投诉"
-        : mode === "evidence"
-          ? "补充举证"
-          : "发起申诉";
+  const title = getTitle(mode, params.caseId);
 
   function checkAccount() {
     if (!mountedRef.current) {
