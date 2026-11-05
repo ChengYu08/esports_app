@@ -84,11 +84,11 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
     await refetch();
   };
 
-  const handleChat = () => {
+  const handleChat = (companion?: { userId: string; nickname?: string; headImage?: string }) => {
     if (!order) return;
     if (!requireLogin()) return;
     const chatUserId =
-      scope === "accept" ? order.buyerUserId : order.receiverUserId;
+      scope === "accept" ? order.buyerUserId : companion?.userId ?? order.receiverUserId;
     if (!chatUserId || chatUserId === "0") {
       setPrompt({
         title: "暂时无法聊天",
@@ -100,9 +100,9 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
       pathname: "/chat/[id]",
       params: {
         id: chatUserId,
-        title: order.sellerName,
-        avatar: imageSourceUri(order.sellerAvatar),
-        clubId: order.clubId ? String(order.clubId) : "",
+        title: companion ? companion.nickname || "陪玩师" : order.sellerName,
+        avatar: companion ? companion.headImage || "" : imageSourceUri(order.sellerAvatar),
+        clubId: !companion && order.clubId ? String(order.clubId) : "",
       },
     });
   };

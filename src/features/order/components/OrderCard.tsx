@@ -221,7 +221,7 @@ export const OrderCard = memo(function OrderCard({
               </Text>
             </View>
             <View style={styles.totalValue}>
-              <Text style={styles.totalLabel}>
+              <Text style={[styles.totalLabel, styles.totalCaption]}>
                 {freeSummary ? "免单后" : "合计"}
               </Text>
               {freeSummary ? (
@@ -544,6 +544,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 4,
   },
+  totalCaption: { color: "#999999" },
   totalLabel: {
     fontFamily: SYSTEM_FONT,
     color: "#0A0A0A",

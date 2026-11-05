@@ -1,3 +1,4 @@
+import { calculateAge } from "@/features/mine/profile-utils";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
@@ -35,6 +36,7 @@ const avatar = require("../../../../assets/mine/mine-avatar.png");
 const heroBackground = require("../../../../assets/mine/mine-hero-bg.webp");
 const menuClubIcon = require("../../../../assets/svgs/mine-menu-club.svg");
 const settingsIcon = require("../../../../assets/svgs/mine-settings.svg");
+const clubFlag = require("../../../../assets/svgs/mine-club-flag.svg");
 const maleIcon = require("../../../../assets/svgs/male.svg");
 const femaleIcon = require("../../../../assets/svgs/mine-female.svg");
 const companionEntryQrCode = require("../../../../assets/coms/qrcode-pws.webp");
@@ -95,7 +97,7 @@ export default function MineScreen() {
               signature: profile.signature ?? state.user.signature,
               isRealName: profile.isRealName ?? state.user.isRealName,
               realName: profile.realName ?? state.user.realName,
-              clubInfo: profile.clubInfo ?? state.user.clubInfo,
+              clubInfo: profile.clubInfo === undefined ? state.user.clubInfo : profile.clubInfo,
               positions: profile.positions ?? state.user.positions,
               sidebarMenus: profile.sidebarMenus ?? state.user.sidebarMenus,
             };
@@ -181,6 +183,7 @@ export default function MineScreen() {
     router.push("/profile");
   };
 
+  const age = user?.birth ? calculateAge(user.birth) : "";
   const genderIcon =
     user?.gender === 1 ? maleIcon : user?.gender === 2 ? femaleIcon : null;
 
@@ -311,19 +314,25 @@ export default function MineScreen() {
                   >
                     {displayName}
                   </Text>
-                  {genderIcon ? (
+                  {genderIcon || age ? (
                     <View style={styles.badge}>
-                      <Image source={genderIcon} style={styles.genderIcon} />
+                      {genderIcon && <Image source={genderIcon} style={styles.genderIcon} />}
+                      {!!age && <Text style={[styles.ageText, user?.gender === 2 && styles.femaleAgeText]}>{age}</Text>}
                     </View>
                   ) : null}
                 </View>
-                <Text
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                  style={styles.signatureText}
-                >
-                  {user?.signature || "保持一点神秘感..."}
-                </Text>
+                {user?.clubInfo?.clubName ? (
+                  <View style={styles.clubLine}>
+                    <Image source={clubFlag} style={styles.clubFlag} />
+                    <Text numberOfLines={1} ellipsizeMode="tail" style={styles.signatureText}>
+                      {user.clubInfo.clubName}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text numberOfLines={1} ellipsizeMode="tail" style={styles.signatureText}>
+                    {user?.signature || "保持一点神秘感..."}
+                  </Text>
+                )}
               </View>
             </Pressable>
             <Pressable
@@ -607,6 +616,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   genderIcon: { width: 12, height: 12 },
+  ageText: { color: "#3DA5FF", fontSize: 10, lineHeight: 14 },
+  femaleAgeText: { color: "#FE4267" },
+  clubLine: { flexDirection: "row", alignItems: "center", gap: 2 },
+  clubFlag: { width: 12, height: 12 },
   signatureText: {
     flexShrink: 1,
     color: "#979799",

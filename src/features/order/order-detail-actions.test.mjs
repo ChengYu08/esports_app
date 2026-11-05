@@ -25,3 +25,7 @@ test("uses cancel for in-progress orders with a cancel card action", () => {
 test("hides the detail action when the card has no actions", () => {
   assert.equal(getOrderDetailAction([]), null);
 });
+
+ test("待支付订单优先展示支付操作", () => {
+  assert.equal(getOrderDetailAction([{ key: "cancel" }, { key: "pay" }]), "pay");
+});
