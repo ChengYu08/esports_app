@@ -23,19 +23,20 @@ import {
   todayString,
 } from "@/features/mine/utils/teen-popup";
 import {
-  DEFAULT_TEEN_LOCK_WINDOW,
   createTeenServerClock,
   msUntilTeenLockBoundary,
+  resolveTeenLockConfig,
   readTeenServerClock,
   shouldLockTeenMode,
-  type TeenLockWindow,
+  type TeenLockConfigState,
   type TeenServerClock,
 } from "@/features/mine/utils/teen-lock-window";
 
 /**
  * 青少年模式启动门：
- * - 联网状态用 serverTime + 单调时钟判定锁定时段（窗口随 /youth/config 服务端配置下发，默认 22:00-次日6:00），
+ * - 联网状态用 serverTime + 单调时钟判定锁定时段（窗口只认 /youth/config 服务端配置，客户端不设兜底时段），
  *   改设备时间不影响结果；
+ * - 服务端明确返回 lockEnabled=false 才解除锁定；配置请求失败保持 fail-closed，防止断网绕过；
  * - 已开启账号离线或尚未取得可信时间时直接锁定，不退回设备时间；
  * - 缓存、状态请求和锁定页回调均校验登录会话，换号后旧结果不能落地。
  */
@@ -64,7 +65,7 @@ function TeenModeGateSession({
   const [cacheReady, setCacheReady] = useState(!token);
   const [promoVisible, setPromoVisible] = useState(false);
   const [serverNow, setServerNow] = useState<number | null>(null);
-  const [lockWindow, setLockWindow] = useState<TeenLockWindow>(DEFAULT_TEEN_LOCK_WINDOW);
+  const [lockConfig, setLockConfig] = useState<TeenLockConfigState>("unknown");
   const serverClockRef = useRef<TeenServerClock | null>(null);
   const requestGuardRef = useRef(createTeenRequestGuard());
   const statusSyncedRef = useRef(false);
@@ -131,23 +132,17 @@ function TeenModeGateSession({
       applyStatus(next, session, targetUserId);
     });
 
-    // 锁定窗口跟随服务端配置（/youth/config，Nacos 动态下发）；失败回退默认 22:00-次日6:00
+    // 锁定窗口只认服务端配置（/youth/config，Nacos 下发），客户端不设兜底时段；
+    // 服务端明确 disabled 才解除，拉取失败保持 unknown（fail-closed）
     void (async () => {
       try {
         const config = await fetchTeenModeConfig(targetToken);
-        const startHour = Number(config?.lockStartHour);
-        const endHour = Number(config?.lockEndHour);
         if (!guard.isSessionCurrent(session)) {
           return;
         }
-        if (
-          Number.isInteger(startHour) && startHour >= 0 && startHour <= 23
-          && Number.isInteger(endHour) && endHour >= 0 && endHour <= 23
-        ) {
-          setLockWindow({ startHour, endHour });
-        }
+        setLockConfig(resolveTeenLockConfig(config));
       } catch {
-        // 配置拉取失败保持默认窗口：与服务端默认配置一致，服务端兜底拦截仍生效
+        // 配置拉取失败保持 unknown：已开启账号继续锁定，防止断网或屏蔽配置接口绕过
       }
     })();
 
@@ -228,11 +223,15 @@ function TeenModeGateSession({
       }
       const now = calibratedNow();
       setServerNow(now);
+      // 未取得有效时段（unknown/disabled）时无需边界定时器，配置或状态回调会触发重判
+      if (lockConfig === "unknown" || lockConfig === "disabled") {
+        return;
+      }
       timer = setTimeout(
         evaluate,
         now === null
           ? 60_000
-          : msUntilTeenLockBoundary(now, lockWindow.startHour, lockWindow.endHour),
+          : msUntilTeenLockBoundary(now, lockConfig),
       );
     };
     reevaluateClockRef.current = evaluate;
@@ -254,7 +253,7 @@ function TeenModeGateSession({
       }
       subscription.remove();
     };
-  }, [token, userId, lockWindow]);
+  }, [token, userId, lockConfig]);
 
   const handleStatusChanged = (next: TeenModeStatus) => {
     const session = requestGuardRef.current.snapshot().session;
@@ -279,7 +278,7 @@ function TeenModeGateSession({
   }
 
   const effectiveEnabled = status?.enabled ?? cachedEnabled;
-  if (shouldLockTeenMode(effectiveEnabled, serverNow, lockWindow)) {
+  if (shouldLockTeenMode(effectiveEnabled, serverNow, lockConfig)) {
     return (
       <View style={StyleSheet.absoluteFill}>
         <TeenModeScreen

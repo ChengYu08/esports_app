@@ -92,12 +92,14 @@ describe("createTeenModeApi", () => {
   it("config：GET /client/v1/youth/config，返回锁定时段配置", async () => {
     const fake = createFakeRequester({
       code: 0,
-      data: { lockStartHour: 9, lockEndHour: 23 },
+      data: { lockEnabled: true, mode: "same-day", lockStartHour: 9, lockEndHour: 18 },
     });
     const api = createTeenModeApi(fake.requester);
     await expect(api.config(TOKEN)).resolves.toEqual({
+      lockEnabled: true,
+      mode: "same-day",
       lockStartHour: 9,
-      lockEndHour: 23,
+      lockEndHour: 18,
     });
     expect(fake.calls).toHaveBeenCalledWith(
       "/client/v1/youth/config",

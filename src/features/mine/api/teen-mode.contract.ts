@@ -9,10 +9,14 @@ export type TeenModeStatus = {
 
 /** 青少年模式锁定时段配置（服务端 YouthModeConfigVO，Nacos 动态下发）。 */
 export type TeenModeConfig = {
-  /** 锁定时段起始小时（含），北京时间 0-23 */
-  lockStartHour: number;
-  /** 锁定时段结束小时（不含），北京时间 0-23；小于起始小时表示跨午夜时段 */
-  lockEndHour: number;
+  /** 锁定是否生效：false 表示时段未配置/非法，锁定解除；客户端不得自行兜底时段 */
+  lockEnabled: boolean;
+  /** 锁定形态：same-day 本日 / cross-day 跨日；lockEnabled=false 时为空 */
+  mode?: "same-day" | "cross-day";
+  /** 锁定时段起始小时（含），北京时间 0-23；lockEnabled=false 时为空 */
+  lockStartHour?: number;
+  /** 锁定时段结束小时（不含），北京时间 0-23；lockEnabled=false 时为空 */
+  lockEndHour?: number;
 };
 
 /** 后端 R 包络（这组接口为数字 code 形态；失败文案字段实测为 info，msg 做容错兼容）。 */
