@@ -7,6 +7,7 @@ import {
 } from "@/features/match/api/match.types";
 import { useQuickMatchEndSignals } from "@/features/match/quick-match-end-signals";
 import { ClubQuickMatchSheet } from "@/features/match/components/ClubQuickMatchSheet";
+import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { messageStore } from "@/features/message/message-store";
 import { useAuthStore } from "@esports/auth";
 import {
@@ -44,6 +45,13 @@ import { VoiceRoomMemberSheet } from "../components/VoiceRoomMemberSheet";
 import { VoiceRoomSpeakingWaves } from "../components/VoiceRoomSpeakingWaves";
 import { VoiceRoomToolbar } from "../components/VoiceRoomToolbar";
 import { exitVoiceRoom } from "../exit-voice-room";
+import {
+  buildMemberChangeMessage,
+  memberChangeNoticeKey,
+  resolveMemberChangeNickname,
+  shouldSkipMemberChangeNotice,
+  type MemberChangeAction,
+} from "../member-change-notice";
 import { inviteMember, normalizeMembers } from "../member-normalize";
 import { useCustomerServiceCall } from "../use-customer-service-call";
 import { useVoiceRoomMessages } from "../use-voice-room-messages";
@@ -61,6 +69,7 @@ import type {
   VoiceRoomDetail,
   VoiceRoomMember,
   VoiceRoomMemberRole,
+  VoiceRoomMessage,
 } from "../voice-room.types";
 
 /** 麦位槽位高度（含昵称），对齐 Figma Component 7 */
@@ -178,6 +187,8 @@ export default function VoiceRoomScreen() {
   const [members, setMembers] = useState<VoiceRoomMember[]>(() =>
     normalizeMembers(undefined, currentUser || undefined),
   );
+  const membersRef = useRef(members);
+  membersRef.current = members;
   const [input, setInput] = useState("");
   // 键盘可见性来自 keyboard-controller 原生事件，顶起由 KeyboardAvoidingView 处理
   const keyboardOpen = useKeyboardState((state) => state.isVisible);
@@ -782,6 +793,63 @@ export default function VoiceRoomScreen() {
       });
       // 成员变更时校准 serviceUserId（接待离开后清空）
       void refreshServiceUserId();
+
+      const selfId = currentUser?.id ? String(currentUser.id) : "";
+      const version =
+        roomRef.current?.roomVersion ?? invitedRoomVersion ?? "1";
+      const tips: VoiceRoomMessage[] = [];
+      const placeholderTips: { messageId: string; userId: string }[] = [];
+      if (roomId) {
+        for (const action of actions) {
+          const userId = action.userId == null ? "" : String(action.userId);
+          if (!userId || userId === "invite" || userId === selfId) continue;
+          const changeAction: MemberChangeAction | null =
+            action.actionType === 1
+              ? "join"
+              : action.actionType === 2
+                ? "leave"
+                : null;
+          if (!changeAction) continue;
+          const noticeKey = memberChangeNoticeKey(roomId, version, userId);
+          if (shouldSkipMemberChangeNotice(noticeKey, changeAction)) continue;
+          const { nickname, isPlaceholder } = resolveMemberChangeNickname({
+            userId,
+            members: membersRef.current,
+            currentUser,
+          });
+          const tip = buildMemberChangeMessage({
+            roomId,
+            roomVersion: version,
+            userId,
+            nickname,
+            action: changeAction,
+          });
+          tips.push(tip);
+          if (isPlaceholder) {
+            placeholderTips.push({ messageId: tip.id, userId });
+          }
+        }
+      }
+      if (tips.length > 0) {
+        setMessages((items) => [...items, ...tips].slice(-80));
+      }
+      for (const tip of placeholderTips) {
+        if (!accessToken) continue;
+        void clientAuthApi
+          .getUserProfile(accessToken, tip.userId)
+          .then((profile) => {
+            if (!profile.nickname) return;
+            setMessages((items) =>
+              items.map((item) =>
+                item.id === tip.messageId
+                  ? { ...item, nickname: profile.nickname }
+                  : item,
+              ),
+            );
+          })
+          .catch(() => undefined);
+      }
+
       setMembers((items) =>
         actions.reduce<VoiceRoomMember[]>((next, action) => {
           const userId = action.userId == null ? "" : String(action.userId);
@@ -819,11 +887,14 @@ export default function VoiceRoomScreen() {
   }, [
     accessToken,
     chatroomId,
-    currentUser?.id,
+    currentUser,
     hydrateMemberProfile,
+    invitedRoomVersion,
     refreshServiceUserId,
     room?.creatorUserId,
     room?.serviceUserId,
+    roomId,
+    roomRef,
     serviceCalling,
     setMessages,
   ]);
