@@ -948,30 +948,32 @@ export default function VoiceRoomScreen() {
     return `https://djpc.jlgkj.top/chat?type=chat-room&id=${encodeURIComponent(roomId)}&v=${encodeURIComponent(String(room.roomVersion ?? "1"))}`;
   };
 
-  const sendInviteLink = async (peerId: string) => {
+  /** @returns 是否发送成功；成功 Toast 由 ConversationsSheet 在关闭后再展示，避免随 Modal 卸载闪退 */
+  const sendInviteLink = async (peerId: string): Promise<boolean> => {
     const inviteLink = getInviteLink();
-    if (!inviteLink) return;
+    if (!inviteLink) return false;
     if (!accessToken) {
       showToast("请先登录");
-      return;
+      return false;
     }
     try {
       await messageStore.getState().initialize(accessToken);
       const state = messageStore.getState();
       if (state.connectionState !== "ready") {
         showToast("消息服务未连接，请稍后再试");
-        return;
+        return false;
       }
       await state.sendText(peerId, inviteLink);
       // sendText 内部 catch 错误后通过 set() 更新 store，必须重新 getState() 才能读到最新 lastError
       const failed = messageStore.getState().lastError;
       if (failed) {
         showToast(failed);
-        return;
+        return false;
       }
-      showToast("邀请已发送");
+      return true;
     } catch {
       showToast("邀请发送失败，请稍后再试");
+      return false;
     }
   };
 
