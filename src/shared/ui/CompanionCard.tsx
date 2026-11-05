@@ -1,5 +1,6 @@
 import { Image } from "expo-image";
-import { memo } from "react";
+import { BlurTargetView, BlurView } from "expo-blur";
+import { memo, useRef } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
@@ -62,6 +63,7 @@ export const CompanionCard = memo(function CompanionCard({
   onToggleVoice,
   onPress,
 }: CompanionCardProps) {
+  const blurTargetRef = useRef<View>(null);
   const online = onlineStatus === 1;
   const busy = gameStatus === 1;
   // 第三行文案：模式 / 等级 / 服务 斜杠分割纯文本，接口未配置时兜底个性签名
@@ -76,13 +78,21 @@ export const CompanionCard = memo(function CompanionCard({
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
     >
       <View style={styles.cardLeft}>
-        <Image
-          source={avatar ? { uri: avatar } : emptyAvatar}
-          style={styles.avatar}
-          contentFit="cover"
-        />
+        <BlurTargetView ref={blurTargetRef} style={styles.avatar}>
+          <Image
+            source={avatar ? { uri: avatar } : emptyAvatar}
+            style={styles.avatar}
+            contentFit="cover"
+          />
+        </BlurTargetView>
         {voiceUrl ? (
-          <View style={styles.voicePill}>
+          <BlurView
+            blurTarget={blurTargetRef}
+            blurMethod="dimezisBlurViewSdk31Plus"
+            intensity={35}
+            tint="light"
+            style={styles.voicePill}
+          >
             <VoicePlayButton
               url={voiceUrl}
               duration={voiceDurationSeconds}
@@ -90,7 +100,7 @@ export const CompanionCard = memo(function CompanionCard({
               playingUrl={voicePlayingUrl}
               onToggleVoice={onToggleVoice}
             />
-          </View>
+          </BlurView>
         ) : null}
       </View>
       <View style={styles.cardRight}>
@@ -199,14 +209,14 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 6,
     bottom: 6,
-    backgroundColor: "rgba(255,255,255,0.75)",
-    borderWidth: StyleSheet.hairlineWidth,
+    backgroundColor: "rgba(255,255,255,0.35)",
+    overflow: "hidden",
+    borderWidth: 0.5,
     borderColor: "#FFF",
     borderRadius: 99,
-    paddingTop: 3,
-    paddingRight: 2,
-    paddingBottom: 3,
-    paddingLeft: 2,
+    paddingVertical: 3,
+    paddingLeft: 4,
+    paddingRight: 6,
   },
   cardRight: {
     flex: 1,

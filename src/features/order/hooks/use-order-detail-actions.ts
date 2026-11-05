@@ -84,7 +84,7 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
     await refetch();
   };
 
-  const handleChat = (companion?: { userId: string; nickname?: string; headImage?: string }) => {
+  const handleChat = (companion?: { userId: string; nickname?: string; headImage?: string; clubId?: number }) => {
     if (!order) return;
     if (!requireLogin()) return;
     const chatUserId =
@@ -102,7 +102,7 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
         id: chatUserId,
         title: companion ? companion.nickname || "陪玩师" : order.sellerName,
         avatar: companion ? companion.headImage || "" : imageSourceUri(order.sellerAvatar),
-        clubId: !companion && order.clubId ? String(order.clubId) : "",
+        clubId: companion?.clubId ? String(companion.clubId) : !companion && order.clubId ? String(order.clubId) : "",
       },
     });
   };
