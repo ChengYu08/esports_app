@@ -118,7 +118,7 @@ export default function CourtTicketDetailScreen() {
       </View>
       {loading && !ticket ? (
         <View style={styles.center}>
-          <ActivityIndicator color="#ff3158" />
+          <ActivityIndicator color="#FE1F4C" />
         </View>
       ) : !ticket ? (
         <View style={styles.center}>

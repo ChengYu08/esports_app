@@ -179,7 +179,7 @@ export default function CourtDetailScreen() {
   if (loading && !item)
     return (
       <View style={styles.loading}>
-        <ActivityIndicator color="#ff3158" />
+        <ActivityIndicator color="#FE1F4C" />
       </View>
     );
   if (!item || !stage)
@@ -207,7 +207,7 @@ export default function CourtDetailScreen() {
           <RefreshControl
             refreshing={loading}
             onRefresh={load}
-            tintColor="#ff3158"
+            tintColor="#FE1F4C"
           />
         }
         contentContainerStyle={styles.content}
@@ -602,16 +602,16 @@ const styles = StyleSheet.create({
   favoriteText: { color: "#0D0D0F", fontFamily: COURT_FONT_FAMILY, fontSize: 14, fontWeight: "500", lineHeight: 22 },
   secondaryAction: {
     alignItems: "center",
-    borderColor: "#ff3158",
+    borderColor: "#FE1F4C",
     borderRadius: 6,
     borderWidth: 1,
     flex: 1,
     paddingVertical: 10,
   },
-  secondaryText: { color: "#ff3158", fontFamily: COURT_FONT_FAMILY, fontSize: 13 },
+  secondaryText: { color: "#FE1F4C", fontFamily: COURT_FONT_FAMILY, fontSize: 13 },
   primaryAction: {
     alignItems: "center",
-    backgroundColor: "#ff3158",
+    backgroundColor: "#FE1F4C",
     borderRadius: 6,
     flex: 1,
     paddingVertical: 10,
@@ -629,5 +629,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   muted: { color: "#979799", fontFamily: COURT_FONT_FAMILY, fontSize: 12 },
-  link: { color: "#ff3158", marginTop: 10 },
+  link: { color: "#FE1F4C", marginTop: 10 },
 });

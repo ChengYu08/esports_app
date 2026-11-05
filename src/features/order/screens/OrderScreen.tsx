@@ -552,7 +552,7 @@ export default function OrderScreen() {
           <RefreshControl
             refreshing={orders.isRefetching}
             onRefresh={() => void orders.refetch()}
-            tintColor="#ff214b"
+            tintColor="#FE1F4C"
           />
         }
         showsVerticalScrollIndicator={false}
@@ -899,7 +899,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FF3158",
+    backgroundColor: "#FE1F4C",
   },
   paymentConfirmText: { color: "#fff", fontWeight: "600" },
 });

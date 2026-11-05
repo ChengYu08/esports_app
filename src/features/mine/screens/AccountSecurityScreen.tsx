@@ -56,7 +56,9 @@ export default function AccountSecurityScreen() {
                 ? `已认证（${user.realName || "本人"}）`
                 : "未认证"}
             </Text>
-            <Image source={arrowIcon} style={styles.arrow} />
+            {user?.isRealName !== 1 ? (
+              <Image source={arrowIcon} style={styles.arrow} />
+            ) : null}
           </View>
         </Pressable>
         <View style={styles.divider} />
@@ -146,7 +148,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   cancellationText: {
-    color: "#FF1F4C",
+    color: "#FE1F4C",
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "600",

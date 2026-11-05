@@ -291,7 +291,7 @@ export const complaintStyles = StyleSheet.create({
     justifyContent: "center",
     width: 14,
   },
-  checkboxChecked: { backgroundColor: "#ff3158", borderColor: "#ff3158" },
+  checkboxChecked: { backgroundColor: "#FE1F4C", borderColor: "#FE1F4C" },
   check: { color: "#fff", fontSize: 10, lineHeight: 12 },
   agreementText: {
     color: "#999999",

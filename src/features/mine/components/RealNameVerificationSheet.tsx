@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   inputShellFocused: {
-    borderColor: "#FF1F4C",
+    borderColor: "#FE1F4C",
     backgroundColor: "#FFF7F8",
   },
   inputIconWrap: {
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FF1F4C",
+    backgroundColor: "#FE1F4C",
   },
   confirmText: { color: "#FFF", fontSize: 15 },
 });

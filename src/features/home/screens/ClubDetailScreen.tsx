@@ -82,7 +82,7 @@ const COLORS = {
   chipBg: "#F0F1F2",
   pillBg: "#F7F7F7",
   pillSelectedBg: "#FFF5F5",
-  redAccent: "#E01B28",
+  redAccent: "#FE1F4C",
   railBg: "#F5F6F7",
   borderLight: "#EBEBEB",
 } as const;

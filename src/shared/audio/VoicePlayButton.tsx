@@ -1,4 +1,6 @@
-import { BlurView } from "expo-blur";
+// 热更新兼容：老安装包没有 expo-blur 原生模块，require 会导致 JS 崩溃，
+// 暂以 pillTint 半透明白底兜底；CI 包带上原生模块后恢复引用
+// import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
 import type { RefObject } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -52,14 +54,14 @@ export function VoicePlayButton({
     >
       {pill ? (
         <>
-          <BlurView
+          {/* <BlurView
             blurMethod="dimezisBlurView"
             blurTarget={blurTarget}
             intensity={20}
             pointerEvents="none"
             style={styles.pillBlur}
             tint="light"
-          />
+          /> */}
           <View pointerEvents="none" style={styles.pillTint} />
         </>
       ) : null}
@@ -136,7 +138,7 @@ const styles = StyleSheet.create({
     paddingLeft: 3,
     gap: 3,
   },
-  inlineButton: { backgroundColor: "#FF3158" },
+  inlineButton: { backgroundColor: "#FE1F4C" },
   overlayButton: {
     position: "absolute",
     left: 6,
@@ -194,7 +196,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FE4267",
   },
   playIcon: {
-    color: "#FF3158",
+    color: "#FE1F4C",
     fontSize: 10,
     lineHeight: 11,
     marginLeft: 1,
@@ -210,7 +212,7 @@ const styles = StyleSheet.create({
     width: 3,
     height: 10,
     borderRadius: 1.5,
-    backgroundColor: "#FF3158",
+    backgroundColor: "#FE1F4C",
   },
   compactPauseBar: { width: 2, height: 8, borderRadius: 1 },
   pillPauseBar: { width: 2, height: 7, backgroundColor: "#FFF" },

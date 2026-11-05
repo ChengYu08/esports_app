@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
   },
-  list: { marginTop: 32, paddingVertical: 8, backgroundColor: "#FFF" },
+  list: { marginTop: 32, backgroundColor: "#FFF" },
   row: {
     minHeight: 54,
     paddingLeft: 16,

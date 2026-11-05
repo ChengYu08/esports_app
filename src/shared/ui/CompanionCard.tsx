@@ -1,4 +1,5 @@
-import { BlurTargetView } from "expo-blur";
+// 热更新兼容：老安装包没有 expo-blur 原生模块，require 会导致 JS 崩溃，暂用普通 View 承载头像
+// import { BlurTargetView } from "expo-blur";
 import { Image } from "expo-image";
 import { memo, useRef } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -79,13 +80,15 @@ export const CompanionCard = memo(function CompanionCard({
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
     >
       <View style={styles.cardLeft}>
-        <BlurTargetView ref={avatarBlurTargetRef} style={styles.avatarTarget}>
+        {/* <BlurTargetView ref={avatarBlurTargetRef} style={styles.avatarTarget}> */}
+        <View ref={avatarBlurTargetRef} style={styles.avatarTarget}>
           <Image
             source={avatar ? { uri: avatar } : emptyAvatar}
             style={styles.avatar}
             contentFit="cover"
           />
-        </BlurTargetView>
+        </View>
+        {/* </BlurTargetView> */}
         {voiceUrl ? (
           <VoicePlayButton
             url={voiceUrl}
