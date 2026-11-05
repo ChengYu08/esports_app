@@ -39,9 +39,12 @@ import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAppConfirm } from "@/shared/ui/app-confirm";
+import { getConversationAvatarUri } from "@/features/message/message-avatar";
+import type { MessageListItemModel } from "@/features/message/message.types";
 
 import { VoiceRoomBackground, VOICE_ROOM_BG_BASE } from "../components/VoiceRoomBackground";
 import { VoiceRoomCommentPanel } from "../components/VoiceRoomCommentPanel";
+import { ChatSheet, type ChatSheetConversation } from "../components/ChatSheet";
 import { VoiceRoomConversationsSheet } from "../components/VoiceRoomConversationsSheet";
 import { VoiceRoomExitDialog } from "../components/VoiceRoomExitDialog";
 import { VoiceRoomMemberSheet } from "../components/VoiceRoomMemberSheet";
@@ -213,6 +216,60 @@ export default function VoiceRoomScreen() {
   const [conversationsSheetMode, setConversationsSheetMode] = useState<
     "chat" | "invite"
   >("chat");
+  // 消息列表弹窗里点开的私聊会话，非 null 时拉起聊天弹窗
+  const [activeChatConversation, setActiveChatConversation] =
+    useState<ChatSheetConversation | null>(null);
+  // 跳原生页面前收起聊天弹窗，返回后凭它重新拉起
+  const activeChatConversationRef = useRef<ChatSheetConversation | null>(null);
+  // 跳原生路由（主页/订单/图片预览/选图）时置 true，重新聚焦语聊房后恢复弹窗；切房为 false
+  const pendingChatRestoreRef = useRef(false);
+  // 消息列表里点开会话：登记 ref + 拉起聊天弹窗
+  const openChatConversation = useCallback((item: MessageListItemModel) => {
+    const conversation: ChatSheetConversation = {
+      id: item.id,
+      title: item.title,
+      avatar: getConversationAvatarUri(item.avatar),
+      clubId: item.clubId || undefined,
+    };
+    activeChatConversationRef.current = conversation;
+    setActiveChatConversation(conversation);
+  }, []);
+  // 聊天弹窗头部返回：只收聊天层，回消息列表弹窗
+  const closeChatToRoom = useCallback(() => {
+    activeChatConversationRef.current = null;
+    setActiveChatConversation(null);
+  }, []);
+  // 头部 ×：两层弹窗整体关闭回语聊房
+  const closeAllChatLayers = useCallback(() => {
+    activeChatConversationRef.current = null;
+    setActiveChatConversation(null);
+    setConversationsSheetVisible(false);
+  }, []);
+  // 跳原生页面前收起两层弹窗；不清 ref，返回后按 restorable 标记恢复
+  const hideChatLayersForNavigate = useCallback((restorable: boolean) => {
+    pendingChatRestoreRef.current = restorable;
+    setActiveChatConversation(null);
+    setConversationsSheetVisible(false);
+  }, []);
+  // 恢复被收起的聊天弹窗（选图结束 / 重新聚焦共用）
+  const restoreChatLayers = useCallback(() => {
+    pendingChatRestoreRef.current = false;
+    const conversation = activeChatConversationRef.current;
+    if (!conversation) return;
+    setActiveChatConversation(conversation);
+    setConversationsSheetVisible(true);
+  }, []);
+  // 相册选图（无论选没选）结束后恢复聊天弹窗
+  const restoreChatAfterPick = useCallback(() => {
+    restoreChatLayers();
+  }, [restoreChatLayers]);
+  // 从主页/订单/图片预览返回语聊房时恢复被收起的聊天弹窗
+  useFocusEffect(
+    useCallback(() => {
+      if (!pendingChatRestoreRef.current) return;
+      restoreChatLayers();
+    }, [restoreChatLayers]),
+  );
   const [exitDialogVisible, setExitDialogVisible] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [exitError, setExitError] = useState<string | null>(null);
@@ -798,6 +855,9 @@ export default function VoiceRoomScreen() {
       setExitDialogVisible(false);
       setMemberSheetVisible(false);
       setConversationsSheetVisible(false);
+      setActiveChatConversation(null);
+      activeChatConversationRef.current = null;
+      pendingChatRestoreRef.current = false;
       setRtcReadyRoomId(null);
       setMicState(null);
       Keyboard.dismiss();
@@ -1272,6 +1332,16 @@ export default function VoiceRoomScreen() {
         sendTextTo={
           conversationsSheetMode === "invite" ? sendInviteLink : undefined
         }
+        onOpenConversation={
+          conversationsSheetMode === "invite" ? undefined : openChatConversation
+        }
+      />
+      <ChatSheet
+        conversation={activeChatConversation}
+        onBack={closeChatToRoom}
+        onClose={closeAllChatLayers}
+        onBeforeNavigate={hideChatLayersForNavigate}
+        onAfterPickImages={restoreChatAfterPick}
       />
       {receptionClub ? (
         <ClubQuickMatchSheet

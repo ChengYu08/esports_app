@@ -199,9 +199,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 20,
   },
-  radioSelected: { borderColor: "#FF3158" },
+  radioSelected: { borderColor: "#FE1F4C" },
   radioDot: {
-    backgroundColor: "#FF3158",
+    backgroundColor: "#FE1F4C",
     borderRadius: 5,
     height: 10,
     width: 10,
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   required: {
-    color: "#FF3158",
+    color: "#FE1F4C",
     fontSize: 12,
     marginLeft: 6,
   },
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     alignItems: "center",
-    backgroundColor: "#FF3158",
+    backgroundColor: "#FE1F4C",
     borderRadius: 8,
     height: 48,
     justifyContent: "center",

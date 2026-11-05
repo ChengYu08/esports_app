@@ -377,7 +377,7 @@ export default function GodListScreen({ active = true }: { active?: boolean }) {
             <RefreshControl
               refreshing={godList.isRefetching && !godList.isFetchingNextPage}
               onRefresh={() => void godList.refetch()}
-              tintColor="#ff214b"
+              tintColor="#FE1F4C"
             />
           }
           onEndReached={() => {
