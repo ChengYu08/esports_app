@@ -1,0 +1,29 @@
+schema_version: 1
+module_path: src_features/mine/profile_account_settings/account_security_settings
+title: 账号安全与注销设置页面集
+scope:
+    - src/features/mine/screens/AccountSecurityScreen.tsx
+    - src/features/mine/screens/AccountCancellationScreen.tsx
+    - src/features/mine/screens/BlacklistScreen.tsx
+source_files: []
+depends_on: []
+related_to:
+    - path: src_features/mine/mine_shell_and_menu
+      reason: mine_shell_and_menu 的黑名单本地镜像与 account_security_settings 中的 BlacklistScreen 共享同一黑名单数据，提供增删 UI。
+    - path: src_app/account_profile_settings/account_settings
+      reason: account_settings 路由门面同时暴露账号安全与黑名单设置，对应 account_security_settings 屏幕集。
+kk_module_id: 780da1d3-4b85-4398-9e54-c4948de76427
+kk_ordinal: 1
+kk_cards:
+    architecture_design:
+        id: c2e693dc-85f3-43ec-a741-2a7ff206a9ec
+        title: 账号安全与注销设置页面集
+    coding_conventions:
+        id: 36a5ce74-1d9d-430b-b979-0afb24ba5e0d
+        title: 账号安全与注销设置页面集
+    overview:
+        id: 8a56d9e8-19ee-4ff6-9612-ff8152fd21fa
+        title: 账号安全与注销设置页面集
+    tech_stack:
+        id: 5941cf53-7ddb-4676-80d8-a26b1fb6ec83
+        title: 账号安全与注销设置页面集

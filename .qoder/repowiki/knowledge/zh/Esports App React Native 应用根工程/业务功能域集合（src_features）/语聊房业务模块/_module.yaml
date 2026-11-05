@@ -1,0 +1,23 @@
+schema_version: 1
+module_path: src_features/voice_room
+title: 语聊房业务模块
+scope:
+    - src/features/voice-room/
+source_files: []
+depends_on: []
+related_to: []
+kk_module_id: 96a24d2b-5765-4501-99bf-94d3643d5e86
+kk_ordinal: 11
+kk_cards:
+    architecture_design:
+        id: 32db9a05-3531-4021-9177-5140e259c970
+        title: 语聊房业务模块
+    coding_conventions:
+        id: 262a1932-6446-4f8c-b5de-d2b6c621b763
+        title: 语聊房业务模块
+    overview:
+        id: bdd816b7-0244-481c-90bf-2078d71ac086
+        title: 语聊房业务模块
+    tech_stack:
+        id: 0148c3c4-4113-42dc-aeaa-f2405f38f3f4
+        title: 语聊房业务模块

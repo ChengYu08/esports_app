@@ -1,0 +1,23 @@
+schema_version: 1
+module_path: src_features/match
+title: 快速匹配（Match）业务模块
+scope:
+    - src/features/match/
+source_files: []
+depends_on: []
+related_to: []
+kk_module_id: fe12b37a-ba87-4440-838e-d035c5efc4d8
+kk_ordinal: 4
+kk_cards:
+    architecture_design:
+        id: 2956a4a3-c09b-45bb-b011-1d2a337598d7
+        title: 快速匹配（Match）业务模块
+    coding_conventions:
+        id: e3389d8b-b865-4462-81f1-d0316a588c51
+        title: 快速匹配（Match）业务模块
+    overview:
+        id: 46c6c1dd-2559-4fac-9964-be0dceb2db1a
+        title: 快速匹配（Match）业务模块
+    tech_stack:
+        id: f53f531b-f98f-4b04-9106-42c4e1483c33
+        title: 快速匹配（Match）业务模块

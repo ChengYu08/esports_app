@@ -1,0 +1,20 @@
+schema_version: 1
+module_path: src_features/mine
+title: Mine（我的）功能域
+scope:
+    - src/features/mine/
+source_files: []
+depends_on: []
+related_to: []
+kk_module_id: adfd1eb7-27cf-4f93-bc5f-8d3d7371d5ae
+kk_ordinal: 10
+kk_cards:
+    architecture_design:
+        id: bfca33b7-91a5-41d3-979d-48ec852f4d73
+        title: Mine（我的）功能域
+    coding_conventions:
+        id: 03e7bdc1-58aa-481a-976b-80d18ca3f34c
+        title: Mine（我的）功能域
+    overview:
+        id: 61b83fc1-426d-4833-83da-a3ca0cc54e63
+        title: Mine（我的）功能域

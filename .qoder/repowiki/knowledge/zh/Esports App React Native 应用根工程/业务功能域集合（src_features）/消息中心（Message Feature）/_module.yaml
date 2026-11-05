@@ -1,0 +1,23 @@
+schema_version: 1
+module_path: src_features/message
+title: 消息中心（Message Feature）
+scope:
+    - src/features/message/
+source_files: []
+depends_on: []
+related_to: []
+kk_module_id: 0abc0814-f8bb-4166-b7f3-8c4645325c29
+kk_ordinal: 9
+kk_cards:
+    architecture_design:
+        id: 1185e893-129f-4223-ae57-7dc4894da2f2
+        title: 消息中心（Message Feature）
+    coding_conventions:
+        id: d996ee4e-a149-4436-a24d-10c4ebb1da18
+        title: 消息中心（Message Feature）
+    overview:
+        id: 7ab70737-afce-456f-8291-c37633311e0c
+        title: 消息中心（Message Feature）
+    tech_stack:
+        id: 58864cf7-22da-4db5-ad57-0056fc6b2241
+        title: 消息中心（Message Feature）

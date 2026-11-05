@@ -1,0 +1,25 @@
+schema_version: 1
+module_path: src_features/message/action_command_dispatch
+title: 操作型命令信令分发与处理
+scope:
+    - src/features/message/action-command/
+source_files: []
+depends_on: []
+related_to:
+    - path: src_features/match
+      reason: message 模块的 action_command_dispatch 注册 QUICK_MATCH_NOTICE/QUICK_MATCH_EXPIRED/CANCELLED 等命令，与 features/match 的快速匹配抢单流程协作。
+kk_module_id: b4f508bb-a76c-46d1-a0f9-f966ba311ef6
+kk_ordinal: 1
+kk_cards:
+    architecture_design:
+        id: 521ec36d-e694-4de3-8892-034df03a687e
+        title: 操作型命令信令分发与处理
+    coding_conventions:
+        id: 234238da-4cb7-435c-8209-4760b6bca862
+        title: 操作型命令信令分发与处理
+    overview:
+        id: 1475befd-9bf2-4210-9672-3491a3e42c1d
+        title: 操作型命令信令分发与处理
+    tech_stack:
+        id: 30545265-697a-4182-9b24-e539487dff1b
+        title: 操作型命令信令分发与处理

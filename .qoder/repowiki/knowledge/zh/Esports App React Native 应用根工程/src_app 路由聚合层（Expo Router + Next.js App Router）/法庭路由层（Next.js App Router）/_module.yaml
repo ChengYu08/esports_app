@@ -1,0 +1,26 @@
+schema_version: 1
+module_path: src_app/court
+title: 法庭路由层（Next.js App Router）
+scope:
+    - src/app/court/
+source_files: []
+depends_on: []
+related_to: []
+version_of:
+    - path: src_app/account_profile_settings/activity_club_court/court_management
+      reason: src_app/court 与 src_app/account_profile_settings/activity_club_court/court_management 均为球场管理路由入口，后者是前者的演进/迁移版本。
+kk_module_id: d21a7f5b-5760-4f7e-8376-e0e4e4cfd97a
+kk_ordinal: 1
+kk_cards:
+    architecture_design:
+        id: 85b7090e-79f9-408a-80af-e9c82dce332a
+        title: 法庭路由层（Next.js App Router）
+    coding_conventions:
+        id: 445ea459-c189-4cbc-8595-c1b841d9c90d
+        title: 法庭路由层（Next.js App Router）
+    overview:
+        id: 8f636461-0ce4-4ddb-8b73-5dc88445f2bf
+        title: 法庭路由层（Next.js App Router）
+    tech_stack:
+        id: 8d8f0059-ae34-4f4e-bdfb-8222b2702bfa
+        title: 法庭路由层（Next.js App Router）
