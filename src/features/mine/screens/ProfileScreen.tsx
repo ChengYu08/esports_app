@@ -17,6 +17,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ComponentProps,
   type ReactElement,
 } from "react";
 import {
@@ -77,9 +78,8 @@ import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 
 const fallbackAvatar = require("../../../../assets/mine/mine-avatar.png");
-const background = require("../../../../assets/mine/profile-bg.webp");
-const maleIcon = require("../../../../assets/svgs/male.svg");
-const femaleIcon = require("../../../../assets/svgs/mine-female.svg");
+const maleIcon = require("../../../../assets/svgs/gender-male.svg");
+const femaleIcon = require("../../../../assets/svgs/gender-female.svg");
 const backIcon = require("../../../../assets/svgs/icon-back.svg");
 const clubIcon = require("../../../../assets/svgs/profile-club-flag.svg");
 const arrowDownIcon = require("../../../../assets/svgs/intro-toggle.svg");
@@ -245,7 +245,11 @@ export default function ProfileScreen() {
 
   const gameDetail = gameDetailQuery.data;
   const games = useMemo(() => detail?.games ?? [], [detail]);
-  const coverImageUrl = gameDetail?.backgroundUrl?.trim();
+  // 头部封面直接使用本人头像；source 引用稳定，避免列表项重建
+  const coverImageSource = useMemo(
+    () => (profile.headImage ? { uri: profile.headImage } : fallbackAvatar),
+    [profile.headImage],
+  );
   const voicePlayer = useVoicePlayer();
   const stopVoice = voicePlayer.stop;
   const toggleVoice = voicePlayer.toggle;
@@ -389,7 +393,7 @@ export default function ProfileScreen() {
           <ProfileCover
             topInset={insets.top}
             profile={profile}
-            coverImageUrl={coverImageUrl}
+            coverImageSource={coverImageSource}
             isMine={isMine}
             isBlacklisted={
               !isMine &&
@@ -566,7 +570,7 @@ export default function ProfileScreen() {
   }, [
     insets.top,
     profile,
-    coverImageUrl,
+    coverImageSource,
     isMine,
     blacklistStatus,
     openProfileRelation,
@@ -646,8 +650,9 @@ export default function ProfileScreen() {
           ]}
         >
           <Image
-            source={coverImageUrl ? { uri: coverImageUrl } : background}
+            source={coverImageSource}
             contentFit="cover"
+            contentPosition="top"
             style={StyleSheet.absoluteFill}
           />
           <LinearGradient
@@ -928,7 +933,7 @@ const ProfileTabs = memo(function ProfileTabs({
 const ProfileCover = memo(function ProfileCover({
   topInset,
   profile,
-  coverImageUrl,
+  coverImageSource,
   isMine,
   isBlacklisted,
   onSelectRelation,
@@ -936,7 +941,7 @@ const ProfileCover = memo(function ProfileCover({
 }: {
   topInset: number;
   profile: ProfileDetail;
-  coverImageUrl?: string;
+  coverImageSource: ComponentProps<typeof Image>["source"];
   isMine: boolean;
   isBlacklisted: boolean;
   onSelectRelation: (type: "following" | "fans") => void;
@@ -957,7 +962,7 @@ const ProfileCover = memo(function ProfileCover({
     >
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
         <Image
-          source={coverImageUrl ? { uri: coverImageUrl } : background}
+          source={coverImageSource}
           contentFit="cover"
           style={StyleSheet.absoluteFill}
         />

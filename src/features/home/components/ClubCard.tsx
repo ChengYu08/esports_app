@@ -73,19 +73,21 @@ export const ClubCard = memo(function ClubCard({
         )}
       </View>
       <View style={styles.body}>
-        <View style={styles.titleRow}>
-          {club.isSelfOperated && <Text style={styles.self}>自营</Text>}
-          <Text numberOfLines={1} style={styles.name}>
-            {club.name}
-          </Text>
-          <View style={styles.online}>
-            <View style={styles.onlineDot} />
-            <Text style={styles.onlineText}>{onlineCount ?? "--"}人</Text>
+        <View style={styles.bodyTop}>
+          <View style={styles.titleRow}>
+            {club.isSelfOperated && <Text style={styles.self}>自营</Text>}
+            <Text numberOfLines={1} style={styles.name}>
+              {club.name}
+            </Text>
+            <View style={styles.online}>
+              <View style={styles.onlineDot} />
+              <Text style={styles.onlineText}>{onlineCount ?? "--"}人</Text>
+            </View>
           </View>
+          <Text numberOfLines={2} style={styles.desc}>
+            {club.description}
+          </Text>
         </View>
-        <Text numberOfLines={1} style={styles.desc}>
-          {club.description}
-        </Text>
         <View style={styles.metaRow}>
           <View style={styles.meta}>
             <Image source={icons.user} style={styles.metaIcon} />
@@ -161,7 +163,9 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
     color: colors.surface,
   },
-  body: { flex: 1 },
+  // 设计稿：右侧上下两块（标题+介绍 / 底部信息行）块间距 8，块内 4
+  body: { flex: 1, gap: 8 },
+  bodyTop: { gap: 4 },
   titleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -208,7 +212,6 @@ const styles = StyleSheet.create({
     color: "#979799",
     fontSize: 11,
     lineHeight: 16,
-    marginTop: 4,
   },
   gameIcons: {
     marginLeft: "auto",
@@ -226,7 +229,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    marginTop: 4,
   },
   meta: { flexDirection: "row", alignItems: "center", gap: 4 },
   metaText: {
