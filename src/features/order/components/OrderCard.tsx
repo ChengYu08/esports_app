@@ -521,7 +521,7 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     alignItems: "center",
     justifyContent: "flex-end",
-    gap: 4,
+    gap: 6,
   },
   originalTotal: {
     fontFamily: SYSTEM_FONT,

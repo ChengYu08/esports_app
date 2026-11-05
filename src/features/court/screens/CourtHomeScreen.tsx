@@ -653,7 +653,7 @@ const styles = StyleSheet.create({
   feedRow: {
     flexDirection: "row",
     alignItems: "center",
-    minHeight: 36,
+    paddingTop: 12,
     marginBottom: 8,
   },
   feedTabs: { alignItems: "center", flexDirection: "row", gap: 12 },

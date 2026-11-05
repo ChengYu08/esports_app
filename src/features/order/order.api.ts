@@ -502,7 +502,7 @@ export async function fetchOrderDetail(
     : response.data;
 }
 
-export type OrderClubBrief = { id: number; name: string };
+export type OrderClubBrief = { id: number; name: string; logoUrl?: string };
 
 /** 订单接口只回 companionClubId，俱乐部名称需另查俱乐部公开详情。 */
 export async function fetchOrderClub(
@@ -510,7 +510,7 @@ export async function fetchOrderClub(
   signal?: AbortSignal,
 ): Promise<OrderClubBrief | null> {
   const response = await apiClient<
-    ApiEnvelope<{ id?: number | string; clubName?: string }>
+    ApiEnvelope<{ id?: number | string; clubName?: string; logoUrl?: string | null }>
   >(`/client/v1/club/public/detail?id=${encodeURIComponent(clubId)}`, {
     method: "GET",
     signal,
@@ -520,7 +520,7 @@ export async function fetchOrderClub(
   }
   const data = response.data;
   if (!data?.id) return null;
-  return { id: Number(data.id), name: data.clubName || "未命名俱乐部" };
+  return { id: Number(data.id), name: data.clubName || "未命名俱乐部", logoUrl: data.logoUrl || undefined };
 }
 
 export async function fetchOrderPage(
