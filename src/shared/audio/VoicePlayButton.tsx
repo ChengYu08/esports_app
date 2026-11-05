@@ -1,6 +1,4 @@
-// 热更新兼容：老安装包没有 expo-blur 原生模块，require 会导致 JS 崩溃，
-// 暂以 pillTint 半透明白底兜底；CI 包带上原生模块后恢复引用
-// import { BlurView } from "expo-blur";
+import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
 import type { RefObject } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -54,14 +52,14 @@ export function VoicePlayButton({
     >
       {pill ? (
         <>
-          {/* <BlurView
+          <BlurView
             blurMethod="dimezisBlurView"
             blurTarget={blurTarget}
             intensity={20}
             pointerEvents="none"
             style={styles.pillBlur}
             tint="light"
-          /> */}
+          />
           <View pointerEvents="none" style={styles.pillTint} />
         </>
       ) : null}

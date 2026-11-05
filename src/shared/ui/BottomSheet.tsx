@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
-  Dimensions,
   Easing,
   Keyboard,
   KeyboardAvoidingView,
@@ -10,7 +9,6 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
   View,
   useWindowDimensions,
   type StyleProp,
@@ -18,10 +16,7 @@ import {
 } from "react-native";
 import type { ReactNode } from "react";
 import { RootSiblingParent } from "react-native-root-siblings";
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type BottomSheetProps = {
   visible: boolean;
@@ -56,37 +51,59 @@ export function BottomSheet({
   const [mounted, setMounted] = useState(visible);
   const [backdropOpacity] = useState(() => new Animated.Value(0));
   const [sheetTranslateY] = useState(() => new Animated.Value(windowHeight));
-  // Android 的 Modal 是独立 Dialog 窗口，键盘避让有两个坐标系陷阱：
-  // 1. 键盘事件的 screenY 来自 Activity 窗口，比 Dialog 里的键盘顶边高一截；
-  // 2. Dialog 内容区（statusBarTranslucent 只豁免了顶部 inset）底边被导航栏 inset 抬高，
-  //    距屏幕底边差一段导航栏高度，所以键盘事件给的 height（按整屏算）直接用也会多顶起这一段。
-  // 实测修正：避让高度 = 键盘高度 + Dialog 内容区高度 − 屏幕高度，正好把底边差值修掉，
-  // 弹层底边精确落在键盘顶边；内容区若已被系统缩放（差值为负）则不再额外避让
-  const dialogHeightRef = useRef(0);
+  // Android 的 Modal 是独立 Dialog 窗口，键盘避让没有可靠的静态公式：
+  // 键盘弹出后系统把 Dialog 窗口原生缩小（底边上移），但 JS 布局树的 onLayout /
+  // Dimensions 全部停留在旧值，任何用「布局高度」推 pad 的公式都会失真。
+  // 实测（调试浮层）：键盘事件 screenY（eY）是准确的键盘顶边；
+  // measureInWindow 走原生窗口坐标，返回的是真实的可视底边。
+  // 所以用反馈收敛：初始 pad = 键盘高度，之后每轮 pad += (sheet 实测底边 − eY)，
+  // 底边贴住键盘顶边后差值为 0 自然停止；未缩窗的设备上 pad = eH 即稳定。
   const keyboardHeightRef = useRef(0);
+  const keyboardTopRef = useRef<number | null>(null);
+  const sheetRef = useRef<View>(null);
+  // padding 的镜像 ref：measureInWindow 异步回调里读最新值，state 读到的是旧闭包
+  const keyboardPaddingRef = useRef(0);
   const [androidKeyboardPadding, setAndroidKeyboardPadding] = useState(0);
-  // —— 临时键盘调试：把设备上的真实数值显示出来，定位后删除 ——
-  const [debugLastEvent, setDebugLastEvent] = useState<{
-    eY: number;
-    eH: number;
-  } | null>(null);
-  const [debugDialogH, setDebugDialogH] = useState(0);
-  const [debugModalBottom, setDebugModalBottom] = useState<number | null>(null);
-  const showKbDebug = __DEV__ && keyboardAvoiding && Platform.OS === "android";
+  // 收敛尝试上限：测量异常时防止 rAF 反馈环不停空转
+  const alignAttemptsRef = useRef(0);
 
-  const syncAndroidKeyboardPadding = useCallback(() => {
-    const keyboardHeight = keyboardHeightRef.current;
-    if (keyboardHeight <= 0) {
-      setAndroidKeyboardPadding(0);
+  const applyKeyboardPadding = useCallback((next: number) => {
+    keyboardPaddingRef.current = next;
+    setAndroidKeyboardPadding(next);
+  }, []);
+
+  const alignSheetToKeyboard = useCallback(() => {
+    if (keyboardTopRef.current == null || alignAttemptsRef.current >= 8) {
       return;
     }
-    const screenHeight = Dimensions.get("screen").height;
-    const nextPadding = Math.min(
-      Math.max(keyboardHeight + dialogHeightRef.current - screenHeight, 0),
-      keyboardHeight,
-    );
-    setAndroidKeyboardPadding(nextPadding);
-  }, []);
+    alignAttemptsRef.current += 1;
+    // 等一帧再测：让上一轮 padding 变化先完成布局提交
+    requestAnimationFrame(() => {
+      if (keyboardTopRef.current == null) {
+        return;
+      }
+      sheetRef.current?.measureInWindow((_x, y, _width, height) => {
+        const keyboardTop = keyboardTopRef.current;
+        if (keyboardTop == null) {
+          return;
+        }
+        const visualBottom = y + height;
+        const delta = visualBottom - keyboardTop;
+        if (Math.abs(delta) <= 1) {
+          return;
+        }
+        const next = Math.min(
+          Math.max(keyboardPaddingRef.current + delta, 0),
+          keyboardHeightRef.current,
+        );
+        if (Math.abs(next - keyboardPaddingRef.current) <= 1) {
+          return;
+        }
+        applyKeyboardPadding(next);
+        alignSheetToKeyboard();
+      });
+    });
+  }, [applyKeyboardPadding]);
 
   useEffect(() => {
     if (!keyboardAvoiding || Platform.OS !== "android") {
@@ -96,24 +113,21 @@ export function BottomSheet({
       "keyboardDidShow",
       (event) => {
         keyboardHeightRef.current = event.endCoordinates.height;
-        syncAndroidKeyboardPadding();
-        if (showKbDebug) {
-          setDebugLastEvent({
-            eY: event.endCoordinates.screenY,
-            eH: event.endCoordinates.height,
-          });
-        }
+        keyboardTopRef.current = event.endCoordinates.screenY;
+        alignAttemptsRef.current = 0;
+        applyKeyboardPadding(event.endCoordinates.height);
+        alignSheetToKeyboard();
       },
     );
     const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
-      keyboardHeightRef.current = 0;
-      syncAndroidKeyboardPadding();
+      keyboardTopRef.current = null;
+      applyKeyboardPadding(0);
     });
     return () => {
       showSubscription.remove();
       hideSubscription.remove();
     };
-  }, [keyboardAvoiding, syncAndroidKeyboardPadding, showKbDebug]);
+  }, [keyboardAvoiding, applyKeyboardPadding, alignSheetToKeyboard]);
 
   useEffect(() => {
     if (visible) {
@@ -184,6 +198,7 @@ export function BottomSheet({
         style={StyleSheet.absoluteFill}
       />
       <Animated.View
+        ref={sheetRef}
         style={[
           styles.sheet,
           contentStyle,
@@ -219,14 +234,6 @@ export function BottomSheet({
         {keyboardAvoiding ? (
           Platform.OS === "android" ? (
             <View
-              onLayout={(event) => {
-                // Dialog 内容区高度（避让修正公式需要）；键盘弹出后重算一次
-                dialogHeightRef.current = event.nativeEvent.layout.height;
-                if (showKbDebug) {
-                  setDebugDialogH(event.nativeEvent.layout.height);
-                }
-                syncAndroidKeyboardPadding();
-              }}
               style={[
                 styles.keyboardAvoiding,
                 { paddingBottom: androidKeyboardPadding },
@@ -245,37 +252,9 @@ export function BottomSheet({
         ) : (
           backdrop
         )}
-        {showKbDebug ? (
-          <>
-            {/* Modal 是独立窗口，嵌套 provider 读的是 Dialog 窗口自身的 inset */}
-            <View style={styles.kbDebugScope}>
-              <SafeAreaProvider>
-                <ModalBottomInsetProbe onValue={setDebugModalBottom} />
-              </SafeAreaProvider>
-            </View>
-            <View style={styles.kbDebugOverlay} pointerEvents="none">
-              <Text style={styles.kbDebugText}>
-                {`kb eY=${debugLastEvent?.eY ?? "-"} eH=${debugLastEvent?.eH ?? "-"} | H=${debugDialogH} pad=${Math.round(androidKeyboardPadding)}\nscr=${Dimensions.get("screen").height} win=${Dimensions.get("window").height} insT=${Math.round(insets.top)} insB=${Math.round(insets.bottom)} mB=${debugModalBottom ?? "-"}`}
-              </Text>
-            </View>
-          </>
-        ) : null}
       </RootSiblingParent>
     </Modal>
   );
-}
-
-/** 临时调试：读取 Modal（Dialog 窗口）自身的底部 safe-area inset，用于定位键盘避让差值 */
-function ModalBottomInsetProbe({
-  onValue,
-}: {
-  onValue: (bottom: number) => void;
-}) {
-  const insets = useSafeAreaInsets();
-  useEffect(() => {
-    onValue(insets.bottom);
-  }, [insets.bottom, onValue]);
-  return null;
 }
 
 const styles = StyleSheet.create({
@@ -287,20 +266,4 @@ const styles = StyleSheet.create({
   keyboardAvoiding: { flex: 1 },
   sheet: { maxHeight: "100%", flexShrink: 1, backgroundColor: "#FFF" },
   scroll: { flexGrow: 0, flexShrink: 1 },
-  kbDebugScope: { position: "absolute", width: 0, height: 0, overflow: "hidden" },
-  kbDebugOverlay: {
-    position: "absolute",
-    top: 48,
-    left: 4,
-    right: 4,
-    backgroundColor: "rgba(255,235,59,.95)",
-    borderRadius: 6,
-    padding: 4,
-  },
-  kbDebugText: {
-    color: "#000000",
-    fontSize: 11,
-    lineHeight: 15,
-    fontWeight: "600",
-  },
 });
