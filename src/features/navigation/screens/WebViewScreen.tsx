@@ -40,7 +40,7 @@ export default function WebViewScreen() {
         />
         {loading ? (
           <View style={styles.loadingMask} pointerEvents="none">
-            <ActivityIndicator color="#FF1F4C" />
+            <ActivityIndicator color="#FE1F4C" />
           </View>
         ) : null}
       </View>

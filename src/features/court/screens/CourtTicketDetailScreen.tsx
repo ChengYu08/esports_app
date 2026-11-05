@@ -118,7 +118,7 @@ export default function CourtTicketDetailScreen() {
       </View>
       {loading && !ticket ? (
         <View style={styles.center}>
-          <ActivityIndicator color="#ff3158" />
+          <ActivityIndicator color="#FE1F4C" />
         </View>
       ) : !ticket ? (
         <View style={styles.center}>
@@ -279,6 +279,7 @@ export default function CourtTicketDetailScreen() {
                 placeholderTextColor="#aaa"
                 style={styles.replyInput}
                 multiline
+                cursorColor="#FE1F4C"
               />
               <Pressable
                 accessibilityRole="button"

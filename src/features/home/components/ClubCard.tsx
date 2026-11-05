@@ -38,11 +38,12 @@ export const ClubCard = memo(function ClubCard({
   };
 
   // 优先使用服务端批量返回的人数排序；旧数据缺人数时沿用接口顺序，避免逐卡查询。
+  // 超过 3 个按设计稿重叠展示（最多 8 个），不要提前截断成 3 个。
   const games = [...(club.games ?? [])]
     .filter((game) => game.iconUrl)
-    .sort((a, b) => (b.companionCount ?? -1) - (a.companionCount ?? -1))
-    .slice(0, 3);
+    .sort((a, b) => (b.companionCount ?? -1) - (a.companionCount ?? -1));
   const gamesLayout = computeGameIconLayout(games.length);
+  const shownGames = games.slice(0, gamesLayout.shown);
 
   return (
     <Pressable
@@ -89,9 +90,9 @@ export const ClubCard = memo(function ClubCard({
             <Text style={styles.metaText}>{club.clubCode}</Text>
           </View>
 
-          {games.length > 0 ? (
+          {shownGames.length > 0 ? (
             <View style={[styles.gameIcons, { width: gamesLayout.totalWidth }]}>
-              {games.map((game, index) => (
+              {shownGames.map((game, index) => (
                 <Image
                   key={`${game.iconUrl}-${index}`}
                   source={{ uri: game.iconUrl }}

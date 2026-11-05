@@ -48,5 +48,5 @@ const styles = StyleSheet.create({
   },
   label: { color: "#999999", fontSize: 14, lineHeight: 20 },
   selectedLabel: { color: "#0A0A0A", fontWeight: "600" },
-  indicator: { position: "absolute", bottom: 4, width: 16, height: 3, borderRadius: 2, backgroundColor: "#E01B28" },
+  indicator: { position: "absolute", bottom: 4, width: 16, height: 3, borderRadius: 2, backgroundColor: "#FE1F4C" },
 });

@@ -555,6 +555,7 @@ export default function CourtComplaintScreen() {
             placeholderTextColor="#CCCCCC"
             style={[styles.input, styles.textArea]}
             textAlignVertical="top"
+            cursorColor="#FE1F4C"
           />
           <Text style={styles.counter}>{content.length}/{contentLimit}</Text>
         </FormField>

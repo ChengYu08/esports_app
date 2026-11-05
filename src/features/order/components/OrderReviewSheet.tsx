@@ -202,6 +202,7 @@ export function OrderReviewSheet({
                   style={styles.input}
                   textAlignVertical="top"
                   value={content}
+                  cursorColor="#FE1F4C"
                 />
               )}
               {!readonly && (
@@ -338,7 +339,7 @@ const styles = StyleSheet.create({
   headerSpacer: { width: 56 },
   form: { gap: 8, paddingTop: 8, paddingBottom: 8 },
   sectionLabel: { color: "#0A0A0A", fontSize: 14, lineHeight: 22, fontWeight: "500" },
-  required: { color: "#E01B28" },
+  required: { color: "#FE1F4C" },
   ratingSection: { paddingHorizontal: 16, paddingTop: 16, backgroundColor: "#FFFFFF" },
   ratings: {
     flexDirection: "row",

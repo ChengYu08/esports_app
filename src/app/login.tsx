@@ -142,6 +142,9 @@ export default function LoginRoute() {
     if (quickLoginInFlightRef.current) return;
     quickLoginInFlightRef.current = true;
     setQuickLoginLoading(true);
+    // 成功路径不手动关遮罩：router.back()/replace() 只是派发导航，转场动画还有几百毫秒，
+    // 此时立刻撤遮罩会露出底下的密码表单，像跳错了页面。登录页卸载时 Modal 自然消失。
+    let keepOverlayUntilUnmount = false;
     try {
       const token = await adapter.authorizeQuickLogin(quickLoginProvider);
       await completeClientLogin(
@@ -152,6 +155,7 @@ export default function LoginRoute() {
         token.phone,
       );
       backAfterLogin();
+      keepOverlayUntilUnmount = true;
     } catch (error) {
       // 用户在授权页主动退出，授权页盖在登录页之上，关掉后自然露出下面的界面。
       // switch：点了「验证码或密码登录」，露出下面的密码/验证码表单，静默即可；
@@ -176,7 +180,9 @@ export default function LoginRoute() {
       );
     } finally {
       quickLoginInFlightRef.current = false;
-      setQuickLoginLoading(false);
+      if (!keepOverlayUntilUnmount) {
+        setQuickLoginLoading(false);
+      }
     }
   }, [adapter, quickLoginProvider, setSession, setCompanionStatus]);
 

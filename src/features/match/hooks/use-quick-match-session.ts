@@ -1,5 +1,8 @@
 import { useAuthStore } from "@esports/auth";
-import { useQueryClient } from "@tanstack/react-query";
+import {
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { showToast } from "@/shared/ui/app-toast";
@@ -45,6 +48,67 @@ function resolveExpireAtMs(expireTime?: string): number {
   return Date.now() + DEFAULT_COUNTDOWN_SEC * 1000;
 }
 
+/**
+ * 若有进行中需求则 replace 到匹配中页并返回 true（不自动进试音房，对齐 PC）。
+ * 无进行中 / 查询失败返回 false。
+ */
+export async function tryRestoreActiveMatch(
+  token: string,
+  queryClient: QueryClient,
+): Promise<boolean> {
+  try {
+    const active = await fetchActiveQuickMatch(token);
+    if (!active || !isQuickMatchActive(active)) return false;
+
+    let gamePayload: { id: string; name: string; iconUrl?: string } | null =
+      null;
+    try {
+      if (active.gameId) {
+        const games = await queryClient.fetchQuery({
+          queryKey: quickMatchGamesQueryKey(token),
+          queryFn: ({ signal }) => fetchQuickMatchGames(token, signal),
+        });
+        const matched = games.find((g) => g.id === active.gameId);
+        if (matched) {
+          gamePayload = {
+            id: matched.id,
+            name: matched.name,
+            iconUrl: matched.iconUrl,
+          };
+        }
+      }
+    } catch {
+      // 游戏信息缺失不影响进入匹配中
+    }
+    if (!gamePayload && active.gameId && active.gameName) {
+      gamePayload = {
+        id: String(active.gameId),
+        name: active.gameName,
+      };
+    }
+    const matchParams = {
+      requestNo: active.requestNo,
+      ...(active.expireTime ? { expireTime: active.expireTime } : {}),
+      ...(gamePayload
+        ? {
+            gameId: gamePayload.id,
+            gameName: gamePayload.name,
+            ...(gamePayload.iconUrl
+              ? { gameIconUrl: gamePayload.iconUrl }
+              : {}),
+          }
+        : {}),
+    };
+    router.replace({
+      pathname: "/match/matching/[requestNo]",
+      params: matchParams,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** 发布页：若有进行中需求则恢复到抢单中页（不自动进试音房，对齐 PC） */
 export function useRestoreActiveMatch() {
   const token = useAuthStore((state) => state.accessToken);
@@ -59,57 +123,7 @@ export function useRestoreActiveMatch() {
         return;
       }
       try {
-        const active = await fetchActiveQuickMatch(token);
-        if (cancelled) return;
-        if (active && isQuickMatchActive(active)) {
-          let gamePayload: { id: string; name: string; iconUrl?: string } | null =
-            null;
-          try {
-            if (active.gameId) {
-              const games = await queryClient.fetchQuery({
-                queryKey: quickMatchGamesQueryKey(token),
-                queryFn: ({ signal }) => fetchQuickMatchGames(token, signal),
-              });
-              if (cancelled) return;
-              const matched = games.find((g) => g.id === active.gameId);
-              if (matched) {
-                gamePayload = {
-                  id: matched.id,
-                  name: matched.name,
-                  iconUrl: matched.iconUrl,
-                };
-              }
-            }
-          } catch {
-            // 游戏信息缺失不影响进入匹配中
-          }
-          if (!gamePayload && active.gameId && active.gameName) {
-            gamePayload = {
-              id: String(active.gameId),
-              name: active.gameName,
-            };
-          }
-          const matchParams = {
-            requestNo: active.requestNo,
-            ...(active.expireTime ? { expireTime: active.expireTime } : {}),
-            ...(gamePayload
-              ? {
-                  gameId: gamePayload.id,
-                  gameName: gamePayload.name,
-                  ...(gamePayload.iconUrl
-                    ? { gameIconUrl: gamePayload.iconUrl }
-                    : {}),
-                }
-              : {}),
-          };
-          router.replace({
-            pathname: "/match/matching/[requestNo]",
-            params: matchParams,
-          });
-          return;
-        }
-      } catch {
-        // 恢复失败不影响表单
+        await tryRestoreActiveMatch(token, queryClient);
       } finally {
         if (!cancelled) setRestoring(false);
       }

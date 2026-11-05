@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
     paddingLeft: 3,
     gap: 3,
   },
-  inlineButton: { backgroundColor: "#FF3158" },
+  inlineButton: { backgroundColor: "#FE1F4C" },
   overlayButton: {
     position: "absolute",
     left: 6,
@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FE4267",
   },
   playIcon: {
-    color: "#FF3158",
+    color: "#FE1F4C",
     fontSize: 10,
     lineHeight: 11,
     marginLeft: 1,
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
     width: 3,
     height: 10,
     borderRadius: 1.5,
-    backgroundColor: "#FF3158",
+    backgroundColor: "#FE1F4C",
   },
   compactPauseBar: { width: 2, height: 8, borderRadius: 1 },
   lightPauseBar: { width: 2, height: 7, backgroundColor: "#FFF" },

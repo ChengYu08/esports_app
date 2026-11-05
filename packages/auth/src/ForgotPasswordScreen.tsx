@@ -112,6 +112,13 @@ export function ForgotPasswordScreen({
       ? `重新获取(${countdown}s)`
       : "获取验证码";
 
+  // 设计稿：表单未填完整时保存按钮呈禁用态（粉红 #FF708D）
+  const formIncomplete =
+    phone.length === 0 ||
+    code.length === 0 ||
+    password.length === 0 ||
+    confirmation.length === 0;
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
@@ -119,6 +126,7 @@ export function ForgotPasswordScreen({
         style={styles.keyboardAvoiding}
       >
         <ScrollView
+          style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -131,9 +139,7 @@ export function ForgotPasswordScreen({
               onPress={onBack}
               style={styles.backButton}
             >
-              <View style={styles.backIcon}>
-                <ChevronLeft24Regular color="#333333" width={18} height={18} />
-              </View>
+              <ChevronLeft24Regular color="#0A0A0A" width={24} height={24} />
             </Pressable>
             <Text accessibilityRole="header" style={styles.title}>
               {title}
@@ -144,6 +150,7 @@ export function ForgotPasswordScreen({
           <View style={styles.form}>
             <View style={styles.field}>
               <Text style={styles.prefix}>+86</Text>
+              <View style={styles.divider} />
               <TextInput
                 accessibilityLabel="手机号"
                 value={phone}
@@ -155,7 +162,7 @@ export function ForgotPasswordScreen({
                 maxLength={11}
                 placeholder="请输入手机号"
                 placeholderTextColor="#ccc"
-                selectionColor="#e01b28"
+                selectionColor="#FE1F4C"
                 style={styles.input}
               />
             </View>
@@ -173,7 +180,7 @@ export function ForgotPasswordScreen({
                 maxLength={6}
                 placeholder="请输入验证码"
                 placeholderTextColor="#ccc"
-                selectionColor="#e01b28"
+                selectionColor="#FE1F4C"
                 style={styles.input}
               />
               <View style={styles.divider} />
@@ -184,7 +191,12 @@ export function ForgotPasswordScreen({
                 disabled={sending || countdown > 0}
                 onPress={() => void handleSendCode()}
               >
-                <Text style={styles.sendCode}>
+                <Text
+                  style={[
+                    styles.sendCode,
+                    countdown > 0 && styles.sendCodeActive,
+                  ]}
+                >
                   {sendLabel}
                 </Text>
               </Pressable>
@@ -203,7 +215,7 @@ export function ForgotPasswordScreen({
                 maxLength={16}
                 placeholder="请输入新密码"
                 placeholderTextColor="#ccc"
-                selectionColor="#e01b28"
+                selectionColor="#FE1F4C"
                 secureTextEntry={!passwordVisible}
                 style={styles.input}
               />
@@ -232,7 +244,7 @@ export function ForgotPasswordScreen({
                 maxLength={16}
                 placeholder="请再次输入新密码"
                 placeholderTextColor="#ccc"
-                selectionColor="#e01b28"
+                selectionColor="#FE1F4C"
                 secureTextEntry={!confirmationVisible}
                 style={styles.input}
               />
@@ -260,21 +272,23 @@ export function ForgotPasswordScreen({
                 {validationMessage}
               </Text>
             ) : null}
-
-            <Pressable
-              accessibilityLabel="保存新密码"
-              accessibilityRole="button"
-              accessibilityState={{ disabled: submitting }}
-              disabled={submitting}
-              onPress={() => void handleSubmit()}
-              style={[styles.submit, submitting && styles.submitDisabled]}
-            >
-              <Text style={styles.submitText}>
-                {submitting ? "保存中..." : "保存"}
-              </Text>
-            </Pressable>
           </View>
         </ScrollView>
+
+        <View style={styles.footer}>
+          <Pressable
+            accessibilityLabel="保存新密码"
+            accessibilityRole="button"
+            accessibilityState={{ disabled: submitting || formIncomplete }}
+            disabled={submitting || formIncomplete}
+            onPress={() => void handleSubmit()}
+            style={[styles.submit, (submitting || formIncomplete) && styles.submitDisabled]}
+          >
+            <Text style={styles.submitText}>
+              {submitting ? "保存中..." : "保存"}
+            </Text>
+          </Pressable>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -283,30 +297,27 @@ export function ForgotPasswordScreen({
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#fff" },
   keyboardAvoiding: { flex: 1 },
-  scrollContent: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 32 },
+  scroll: { flex: 1 },
+  scrollContent: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 16 },
   header: {
-    height: 56,
+    height: 44,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  backButton: { width: 40, height: 40, justifyContent: "center" },
-  backIcon: {
-    width: 24,
-    height: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  backButton: { width: 32, height: 44, justifyContent: "center" },
   title: {
-    color: "#222",
-    fontSize: 18,
-    fontWeight: "600",
+    color: "#0A0A0A",
+    fontSize: 16,
+    fontWeight: "500",
+    lineHeight: 24,
   },
-  headerSpacer: { width: 40 },
-  form: { paddingTop: 44, gap: 12 },
+  headerSpacer: { width: 32 },
+  form: { paddingTop: 12, gap: 16 },
   field: {
-    minHeight: 48,
+    minHeight: 46,
     paddingHorizontal: 12,
+    paddingVertical: 12,
     borderRadius: 8,
     backgroundColor: "#f7f7f7",
     flexDirection: "row",
@@ -314,50 +325,56 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   prefix: {
-    paddingRight: 12,
-    borderRightWidth: 1,
-    borderRightColor: "#ddd",
-    color: "#333",
+    color: "#0A0A0A",
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "500",
+    lineHeight: 22,
   },
   input: {
     flex: 1,
-    minHeight: 48,
+    minHeight: 22,
     padding: 0,
-    color: "#333",
+    color: "#0A0A0A",
     fontSize: 14,
+    fontWeight: "500",
+    lineHeight: 22,
     textAlignVertical: "center",
   },
-  divider: { width: 1, height: 16, backgroundColor: "#ddd" },
+  divider: { width: 1, height: 16, backgroundColor: "#E0E0E0" },
   sendCode: {
-    color: "#FE1F4C",
+    color: "#0A0A0A",
     fontSize: 14,
     fontWeight: "400",
     lineHeight: 22,
   },
+  sendCodeActive: { color: "#FE1F4C" },
   passwordHint: {
     color: "#999",
     fontSize: 12,
     lineHeight: 18,
   },
   validationMessage: {
-    color: "#e01b28",
+    color: "#FE1F4C",
     fontSize: 12,
     lineHeight: 18,
   },
+  footer: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
   submit: {
-    height: 44,
-    marginTop: 24,
+    height: 42,
     borderRadius: 8,
     backgroundColor: "#FE1F4C",
     alignItems: "center",
     justifyContent: "center",
   },
-  submitDisabled: { opacity: 0.55 },
+  submitDisabled: { backgroundColor: "#FF708D" },
   submitText: {
     color: "#fff",
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "500",
+    lineHeight: 22,
   },
 });

@@ -4,6 +4,7 @@ import {
 } from "@/features/home/components/ClubDetailSkeleton";
 import { fetchClubGameLevels } from "@/features/match/api/match.api";
 import { ClubQuickMatchSheet } from "@/features/match/components/ClubQuickMatchSheet";
+import { tryRestoreActiveMatch } from "@/features/match/hooks/use-quick-match-session";
 import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
 import { useCustomerDispatch } from "@/features/voice-room/use-customer-dispatch";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
@@ -17,7 +18,7 @@ import {
   ChevronLeft24Regular,
   Search24Regular,
 } from "@fluentui/react-native-icons";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useIsFocused, useLocalSearchParams } from "expo-router";
@@ -82,7 +83,7 @@ const COLORS = {
   chipBg: "#F0F1F2",
   pillBg: "#F7F7F7",
   pillSelectedBg: "#FFF5F5",
-  redAccent: "#E01B28",
+  redAccent: "#FE1F4C",
   railBg: "#F5F6F7",
   borderLight: "#EBEBEB",
 } as const;
@@ -220,9 +221,27 @@ export default function ClubDetailScreen() {
   const [showPriceEmptyModal, setShowPriceEmptyModal] = useState(false);
   const [quickMatchVisible, setQuickMatchVisible] = useState(false);
   const accessToken = useAuthStore((state) => state.accessToken);
+  const queryClient = useQueryClient();
+  const checkingActiveRef = useRef(false);
   const { openCustomerService } = useCustomerServiceEntry();
   // 俱乐部「接待派单」流程（创建/切换语聊房并自动呼叫接待）
   const { dispatch: dispatchReception } = useCustomerDispatch();
+
+  /** 有进行中派单则恢复匹配中页；返回 true 表示已跳转 */
+  const restoreActiveOrContinue = useCallback(async (): Promise<boolean> => {
+    if (!accessToken) {
+      showToast("请先登录");
+      return true;
+    }
+    if (checkingActiveRef.current) return true;
+    checkingActiveRef.current = true;
+    try {
+      return await tryRestoreActiveMatch(accessToken, queryClient);
+    } finally {
+      checkingActiveRef.current = false;
+    }
+  }, [accessToken, queryClient]);
+
   const [priceSort, setPriceSort] =
     useState<CompanionFilters["priceSort"]>("DEFAULT");
   const [selectedSex, setSelectedSex] = useState<CompanionFilters["sex"]>();
@@ -233,6 +252,18 @@ export default function ClubDetailScreen() {
   const [selectedTag, setSelectedTag] = useState<number>();
   const clubQuery = useClubDetail(id);
   const club = clubQuery.data;
+
+  const handleReceptionPress = useCallback(async () => {
+    const restored = await restoreActiveOrContinue();
+    if (restored) return;
+    void dispatchReception({ clubId: club?.id });
+  }, [club?.id, dispatchReception, restoreActiveOrContinue]);
+
+  const handleQuickMatchPress = useCallback(async () => {
+    const restored = await restoreActiveOrContinue();
+    if (restored) return;
+    setQuickMatchVisible(true);
+  }, [restoreActiveOrContinue]);
   const tagsQuery = useQuery({
     queryKey: ["companion-tags", club?.id],
     queryFn: ({ signal }) => fetchCompanionTags(club!.id, signal),
@@ -431,6 +462,14 @@ export default function ClubDetailScreen() {
     setSelectedMode(undefined);
     setSelectedLevel(undefined);
   }
+  // 是否存在生效中的筛选项：筛选按钮据此显示红色/深色（与面板是否展开无关）
+  const hasActiveFilters =
+    priceSort !== "DEFAULT" ||
+    selectedSex !== undefined ||
+    selectedStatus !== undefined ||
+    selectedMode !== undefined ||
+    selectedLevel !== undefined ||
+    selectedTag !== undefined;
   // 聚合筛选面板各分区选项（选中立即生效，列表在面板背后实时重查；选项量小，不做 memo）
   const modeOptions: FilterPillOption[] = [
     {
@@ -686,9 +725,7 @@ export default function ClubDetailScreen() {
           >
             <Image
               accessibilityIgnoresInvertColors
-              source={
-                isFilterSheetVisible ? filterListIcon : filterListDefaultIcon
-              }
+              source={hasActiveFilters ? filterListIcon : filterListDefaultIcon}
               style={styles.filterExpandIcon}
             />
           </Pressable>
@@ -1118,7 +1155,7 @@ export default function ClubDetailScreen() {
         <Pressable
           style={styles.matchButton}
           onPress={() => {
-            void dispatchReception({ clubId: club?.id });
+            void handleReceptionPress();
           }}
         >
           <Text style={styles.matchButtonText}>接待派单</Text>
@@ -1126,11 +1163,7 @@ export default function ClubDetailScreen() {
         <Pressable
           style={styles.matchButton}
           onPress={() => {
-            if (!accessToken) {
-              showToast("请先登录");
-              return;
-            }
-            setQuickMatchVisible(true);
+            void handleQuickMatchPress();
           }}
         >
           <Text style={styles.matchButtonText}>一键匹配</Text>

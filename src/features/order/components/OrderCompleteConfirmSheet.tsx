@@ -194,6 +194,7 @@ export function OrderCompleteConfirmSheet({
                   selectionColor="#FE1F4C"
                   style={styles.freeInput}
                   value={freeHoursText}
+                  cursorColor="#FE1F4C"
                 />
                 {freeHoursText ? (
                   <Pressable

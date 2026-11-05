@@ -1,11 +1,9 @@
 import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import { router, useIsFocused } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   StyleSheet,
-  Text,
   View,
   useWindowDimensions,
   type LayoutChangeEvent,
@@ -21,13 +19,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getProtectedNavigationAction } from "@/shared/navigation/tab-access";
 
-const controllerImage = require("../../../../assets/images/quick-order-controller.png");
-const glowImage = require("../../../../assets/svgs/quick-order-glow.svg");
-const shadowImage = require("../../../../assets/svgs/quick-order-shadow.svg");
+const fabImage = require("../../../../assets/images/ic_quick_match_order.png");
 
-/** Figma 1184:152732 快速下单 66×60 */
-const FAB_WIDTH = 66;
-const FAB_HEIGHT = 60;
+/** 快速下单整图 78×71 */
+const FAB_WIDTH = 78;
+const FAB_HEIGHT = 71;
 const EDGE_MARGIN = 8;
 /** 与 AppTabBar 一致：内容区 58 + 底部安全区 */
 const TAB_CONTENT_HEIGHT = 58;
@@ -39,18 +35,6 @@ const TAB_CONTENT_HEIGHT = 58;
 const FIGMA_FAB_BOTTOM_FROM_SCREEN = 128;
 const MIN_GAP_ABOVE_TAB = 8;
 const DRAG_THRESHOLD = 6;
-
-const RED_GRADIENT = {
-  colors: ["#FF1F2E", "#FF1F69"] as const,
-  start: { x: 0.05, y: 0.2 },
-  end: { x: 0.95, y: 0.9 },
-};
-
-const BLUE_GLOW_GRADIENT = {
-  colors: ["#4589FF", "#49C8FF"] as const,
-  start: { x: 0.2, y: 0.3 },
-  end: { x: 0.9, y: 0.8 },
-};
 
 type HostLayout = {
   width: number;
@@ -250,45 +234,11 @@ export function MatchQuickOrderFab() {
             onAccessibilityTap={openMatch}
             style={[styles.fab, { left: defaultX, top: defaultY }, positionStyle]}
           >
-            <View style={styles.blueGlowWrap} pointerEvents="none">
-              <LinearGradient
-                colors={[...BLUE_GLOW_GRADIENT.colors]}
-                start={BLUE_GLOW_GRADIENT.start}
-                end={BLUE_GLOW_GRADIENT.end}
-                style={styles.blueGlow}
-              />
-            </View>
             <Image
-              source={shadowImage}
+              source={fabImage}
               contentFit="contain"
-              style={styles.shadow}
+              style={styles.fabImage}
             />
-            <Image
-              source={glowImage}
-              contentFit="contain"
-              style={styles.controllerGlow}
-            />
-            <Image
-              source={controllerImage}
-              contentFit="contain"
-              style={styles.controller}
-            />
-            <View style={styles.pillWrap} pointerEvents="none">
-              <LinearGradient
-                colors={[...RED_GRADIENT.colors]}
-                start={RED_GRADIENT.start}
-                end={RED_GRADIENT.end}
-                style={styles.pill}
-              >
-                <Text
-                  allowFontScaling={false}
-                  numberOfLines={1}
-                  style={styles.pillText}
-                >
-                  快速下单
-                </Text>
-              </LinearGradient>
-            </View>
           </Animated.View>
         </GestureDetector>
       ) : null}
@@ -305,77 +255,9 @@ const styles = StyleSheet.create({
     position: "absolute",
     width: FAB_WIDTH,
     height: FAB_HEIGHT,
-    elevation: 8,
-    shadowColor: "#D22727",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
   },
-  blueGlowWrap: {
-    position: "absolute",
-    left: -3,
-    bottom: 4,
-    width: 70,
-    height: 43,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  blueGlow: {
-    width: 66,
-    height: 22,
-    borderRadius: 999,
-    transform: [{ rotate: "-20deg" }],
-    opacity: 0.9,
-  },
-  shadow: {
-    position: "absolute",
-    left: 22,
-    top: 20,
-    width: 24,
-    height: 14,
-    transform: [{ rotate: "-22deg" }],
-  },
-  controllerGlow: {
-    position: "absolute",
-    left: 8,
-    top: 28,
-    width: 28,
-    height: 18,
-    transform: [{ rotate: "-10deg" }],
-  },
-  controller: {
-    position: "absolute",
-    left: 5,
-    top: -4,
-    width: 56,
-    height: 56,
-  },
-  pillWrap: {
-    position: "absolute",
-    left: -8,
-    right: -8,
-    bottom: 0,
-    alignItems: "center",
-  },
-  pill: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.6)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    minHeight: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pillText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    lineHeight: 14,
-    fontWeight: "700",
-    includeFontPadding: false,
-    textShadowColor: "rgba(146, 17, 19, 0.15)",
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+  fabImage: {
+    width: FAB_WIDTH,
+    height: FAB_HEIGHT,
   },
 });

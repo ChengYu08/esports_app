@@ -467,7 +467,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: "#FFE9EC",
     paddingHorizontal: 4,
-    color: "#F02A45",
+    color: "#FE1F4C",
     fontFamily: SYSTEM_FONT,
     fontSize: 11,
     lineHeight: 18,

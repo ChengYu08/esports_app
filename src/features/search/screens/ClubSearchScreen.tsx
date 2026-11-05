@@ -204,6 +204,7 @@ export default function ClubSearchScreen() {
         <View style={styles.inputBox}>
           <TextInput
             autoFocus
+            cursorColor="#FE1F4C"
             maxLength={MAX_SEARCH_LENGTH}
             onChangeText={handleInputChange}
             onSubmitEditing={handleSubmit}
