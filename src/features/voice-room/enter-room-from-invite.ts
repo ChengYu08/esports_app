@@ -2,12 +2,12 @@
  * 私信语聊房邀请卡进房：始终查 joined/current；同 roomId 直进；其他房确认后 exit 再进。
  */
 import { useAuthStore } from "@esports/auth";
-import { router } from "expo-router";
 
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { showToast } from "@/shared/ui/app-toast";
 
 import { exitVoiceRoom } from "./exit-voice-room";
+import { navigateToVoiceRoom } from "./navigate-voice-room";
 import { useVoiceRoomSessionStore } from "./voice-room-session";
 import { resolveVoiceRoomId, voiceRoomApi } from "./voice-room.api";
 import type { VoiceRoomDetail } from "./voice-room.types";
@@ -87,10 +87,7 @@ async function leaveCurrentForInvite(
 }
 
 function navigateToInviteRoom(roomId: string, roomVersion: string) {
-  router.push({
-    pathname: "/voice-room/[id]",
-    params: { id: roomId, v: roomVersion },
-  });
+  navigateToVoiceRoom({ id: roomId, v: roomVersion });
 }
 
 export async function enterRoomFromInvite(

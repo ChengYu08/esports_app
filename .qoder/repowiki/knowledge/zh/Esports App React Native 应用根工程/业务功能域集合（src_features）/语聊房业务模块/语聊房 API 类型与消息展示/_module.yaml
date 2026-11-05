@@ -1,0 +1,27 @@
+schema_version: 1
+module_path: src_features/voice_room/api_types_and_shared_utils
+title: 语聊房 API 类型与消息展示
+scope:
+    - src/features/voice-room/voice-room.api.ts
+    - src/features/voice-room/voice-room.types.ts
+    - src/features/voice-room/message-display.tsx
+source_files: []
+depends_on: []
+related_to:
+    - path: src_features/voice_room/ui_components_and_screens
+      reason: voice_room 的 api_types_and_shared_utils 定义的业务类型被 ui_components_and_screens 的消费组件引用，用于展示房间信息。
+kk_module_id: 5544510d-0850-4b3a-b844-b53bcb017026
+kk_ordinal: 4
+kk_cards:
+    architecture_design:
+        id: 4d0a73a5-6e6c-44fc-9c12-2178f0667f0f
+        title: 语聊房 API 类型与消息展示
+    coding_conventions:
+        id: 3047f7f3-fe62-41f0-9a1c-43134af9b4ef
+        title: 语聊房 API 类型与消息展示
+    overview:
+        id: 190e99e7-cd77-4e93-8e93-2d633f6b8e00
+        title: 语聊房 API 类型与消息展示
+    tech_stack:
+        id: 80eec525-381a-4cd8-90c8-e5cf54295eb3
+        title: 语聊房 API 类型与消息展示

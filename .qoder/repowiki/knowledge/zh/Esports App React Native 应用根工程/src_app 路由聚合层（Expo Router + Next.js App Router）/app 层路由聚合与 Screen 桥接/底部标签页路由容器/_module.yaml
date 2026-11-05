@@ -1,0 +1,23 @@
+schema_version: 1
+module_path: src_app/account_profile_settings/tab_routers
+title: 底部标签页路由容器
+scope:
+    - src/app/(tabs)/
+source_files: []
+depends_on: []
+related_to: []
+kk_module_id: 762fceb7-a2a0-4954-a606-25c112d7da1c
+kk_ordinal: 5
+kk_cards:
+    architecture_design:
+        id: dde789ff-fbb1-4298-a227-30722f5f41c3
+        title: 底部标签页路由容器
+    coding_conventions:
+        id: 02fc7899-2a30-429f-9b1e-deb45fd81ba9
+        title: 底部标签页路由容器
+    overview:
+        id: c4b2d800-5949-47b9-a1d7-fee1a191b313
+        title: 底部标签页路由容器
+    tech_stack:
+        id: 0c1324e0-d0b2-40a6-a2ab-5f5c2f7951bd
+        title: 底部标签页路由容器

@@ -1,0 +1,24 @@
+schema_version: 1
+module_path: src_features/message/rongcloud_im_integration
+title: 融云 IM 集成与命令分发
+scope:
+    - src/features/message/rong-command-dispatch/
+    - src/features/message/rongcloud-im.ts
+    - src/features/message/rong-history.ts
+source_files: []
+depends_on: []
+related_to: []
+kk_module_id: d0391833-3879-4d34-85fc-157ea9227cfb
+kk_cards:
+    architecture_design:
+        id: 99f86acc-cab2-40b0-b6fc-53eee7221c69
+        title: 融云 IM 集成与命令分发
+    coding_conventions:
+        id: c1304088-310d-497a-87c1-905a94e4e7e7
+        title: 融云 IM 集成与命令分发
+    overview:
+        id: 7eda3728-cd3b-40bb-bcf7-77d91a172904
+        title: 融云 IM 集成与命令分发
+    tech_stack:
+        id: 35be9538-4fd7-4edc-a6f4-b486219832a2
+        title: 融云 IM 集成与命令分发

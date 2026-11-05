@@ -11,7 +11,7 @@ import { searchClubs, searchUsers, type SearchUser } from "../api/search.api";
 import { getSearchHistoryEntry, type SearchHistoryEntry } from "../search-history";
 import { searchTypography } from "../search-typography";
 
-const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
+const defaultAvatar = require("../../../../assets/images/avatar_default.webp");
 
 const HistoryChip = memo(function HistoryChip({
   entry,

@@ -1,0 +1,25 @@
+schema_version: 1
+module_path: src_features/mine/profile_account_settings/mine_shell_profile_relation
+title: Mine/Profile 关系页导航壳
+scope:
+    - src/features/mine/screens/MineScreen.tsx
+    - src/features/mine/screens/ProfileScreen.tsx
+    - src/features/mine/screens/ProfileRelationScreen.tsx
+source_files: []
+depends_on: []
+related_to: []
+kk_module_id: cdc171de-d2b3-4754-9dc9-82966bd80ee8
+kk_ordinal: 6
+kk_cards:
+    architecture_design:
+        id: fe44dfa0-1ba3-437c-8ce6-34ccc42b59bb
+        title: Mine/Profile 关系页导航壳
+    coding_conventions:
+        id: 9b6747a0-6e23-43d2-8ab3-3a74bae820c0
+        title: Mine/Profile 关系页导航壳
+    overview:
+        id: 102e31ab-d3a8-42cc-9887-106824fb915f
+        title: Mine/Profile 关系页导航壳
+    tech_stack:
+        id: 8bf6ebc5-145a-4bf5-bf12-c0b6a3f19772
+        title: Mine/Profile 关系页导航壳

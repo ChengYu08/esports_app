@@ -1,6 +1,6 @@
 import type { OrderItemModel } from "./order.types";
 
-const sellerAvatar = require("../../../assets/order/order-seller-avatar.svg");
+const sellerAvatar = require("../../../assets/svgs/order-seller-avatar.svg");
 
 const sharedOrder = {
   sellerName: "成都-吴彦祖",

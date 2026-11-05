@@ -79,7 +79,7 @@ it("陪玩列表映射标签与模式/等级/服务字段，缺省时兜底空�
 - Create: `src/shared/ui/CompanionCard.tsx`
 
 **Interfaces:**
-- Consumes: `@/shared/audio/VoicePlayButton`（tone="light"）、`@/shared/audio/use-voice-player` 的类型约定（`playingUrl: string | null`、`onToggleVoice: (url: string) => void`）、既有切图资源（`assets/home/club-detail/male.svg`、`assets/mine/figma/mine-female.svg`、`assets/home/club-detail/icon-diamond.svg`、`assets/mine/figma/mine-avatar.png`、`assets/home/club-detail/status-playing.svg`、`assets/home/club-detail/status-idle.svg`，相对路径改为 `../../../assets/...`）。
+- Consumes: `@/shared/audio/VoicePlayButton`（tone="light"）、`@/shared/audio/use-voice-player` 的类型约定（`playingUrl: string | null`、`onToggleVoice: (url: string) => void`）、既有切图资源（`assets/svgs/male.svg`、`assets/svgs/mine-female.svg`、`assets/mine/mine-avatar.png`、`assets/svgs/club-status-playing.svg`、`assets/svgs/club-status-idle.svg`，相对路径改为 `../../../assets/...`）。
 - Produces: `export function CompanionCard(props: CompanionCardProps)`（`memo` 包裹导出），props 类型如下，供 Task 3/4 消费：
 
 ```ts

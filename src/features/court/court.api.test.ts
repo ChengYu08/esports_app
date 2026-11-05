@@ -2,98 +2,24 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { apiClient } from "@/core/network/api-client";
 import { courtApi, courtServiceTypeText } from "./court.api";
-import { getEvidenceUploadFile } from "./court-evidence-image";
-import { uploadClientObject } from "@/features/auth/oss-upload";
+import { uploadCompanionMediaObject } from "@/features/mine/companion-upload";
 
 const session = vi.hoisted(() => ({ accessToken: null as string | null }));
-const getOssSts = vi.hoisted(() => vi.fn());
 
 vi.mock("@esports/auth", () => ({
   useAuthStore: { getState: () => session },
 }));
 vi.mock("@/core/network/api-client", () => ({ apiClient: vi.fn() }));
-vi.mock("@/features/auth/oss-upload", () => ({ uploadClientObject: vi.fn() }));
-vi.mock("@/features/auth/client-auth.api", () => ({ clientAuthApi: { getOssSts } }));
-vi.mock("@/features/court/court-evidence-image", () => ({ getEvidenceUploadFile: vi.fn() }));
+vi.mock("@/features/mine/companion-upload", () => ({ uploadCompanionMediaObject: vi.fn() }));
 
 const request = vi.mocked(apiClient);
 
 describe("evidence image upload", () => {
-  const fullSts = (objectList: string[]) => ({
-    objectList,
-    endpoint: "https://oss-cn-hangzhou.aliyuncs.com",
-    bucketName: "pz-bucket",
-    accessKeyId: "key-id",
-    accessKeySecret: "key-secret",
-    securityToken: "security-token",
-    regionId: "cn-hangzhou",
-    domain: "https://cdn.example.com",
-  });
-
-  beforeEach(() => {
-    request.mockReset();
-    vi.mocked(getEvidenceUploadFile).mockReset();
-    vi.mocked(uploadClientObject).mockReset();
-    getOssSts.mockReset();
+  it("uploads through the same image flow as companion screenshots and returns the object key", async () => {
     session.accessToken = "viewer-token";
-  });
-
-  it("uses the actual image format for both the STS filename and OSS Content-Type", async () => {
-    const image = { uri: "file:///export.heic", name: "IMG_1001.jpg", mimeType: "image/jpeg" };
-    vi.mocked(getEvidenceUploadFile).mockReturnValue(image);
-    const sts = fullSts(["court/evidence/IMG_1001.jpg"]);
-    request.mockResolvedValue({ code: "SUCCESS", data: sts });
-
-    expect(await courtApi.uploadEvidence(image.uri, "IMG_1001.HEIC")).toBe(sts.objectList[0]);
-    expect(request).toHaveBeenCalledWith("/client/v1/court/evidence/sts", {
-      method: "POST", token: "viewer-token", body: { action: { objectNames: ["IMG_1001.jpg"] } },
-    });
-    expect(getOssSts).not.toHaveBeenCalled();
-    expect(uploadClientObject).toHaveBeenCalledWith(sts, sts.objectList[0], { uri: image.uri, mimeType: "image/jpeg" });
-  });
-
-  it("falls back to the generic OSS STS when the court STS omits the security token", async () => {
-    const image = { uri: "file:///photo.jpg", name: "photo.jpg", mimeType: "image/jpeg" };
-    vi.mocked(getEvidenceUploadFile).mockReturnValue(image);
-    request.mockResolvedValue({
-      code: "SUCCESS",
-      // securityToken 为 null：按完整凭证口径视为不可用，走通用 STS 兜底
-      data: { objectList: ["court/evidence/photo.jpg"], endpoint: "https://oss.example.com", bucketName: "pz-bucket", accessKeyId: "key-id", accessKeySecret: "key-secret", securityToken: null },
-    });
-    const fallback = fullSts(["images/photo.jpg"]);
-    getOssSts.mockResolvedValue(fallback);
-
-    expect(await courtApi.uploadEvidence(image.uri, "photo.jpg")).toBe(fallback.objectList[0]);
-    expect(getOssSts).toHaveBeenCalledWith("viewer-token", "111", ["photo.jpg"]);
-    expect(uploadClientObject).toHaveBeenCalledWith(fallback, fallback.objectList[0], { uri: image.uri, mimeType: "image/jpeg" });
-  });
-
-  it("falls back to the generic OSS STS when the court STS request fails", async () => {
-    const image = { uri: "file:///photo.jpg", name: "photo.jpg", mimeType: "image/jpeg" };
-    vi.mocked(getEvidenceUploadFile).mockReturnValue(image);
-    request.mockResolvedValue({ code: "FAIL", info: "专用凭证不可用" });
-    const fallback = fullSts(["images/photo.jpg"]);
-    getOssSts.mockResolvedValue(fallback);
-
-    expect(await courtApi.uploadEvidence(image.uri, "photo.jpg")).toBe(fallback.objectList[0]);
-    expect(getOssSts).toHaveBeenCalledWith("viewer-token", "111", ["photo.jpg"]);
-  });
-
-  it("surfaces the fallback error when both credential endpoints fail", async () => {
-    const image = { uri: "file:///photo.jpg", name: "photo.jpg", mimeType: "image/jpeg" };
-    vi.mocked(getEvidenceUploadFile).mockReturnValue(image);
-    request.mockResolvedValue({ code: "SUCCESS", data: { objectList: ["court/evidence/photo.jpg"] } });
-    getOssSts.mockRejectedValue(new Error("通用凭证获取失败"));
-
-    await expect(courtApi.uploadEvidence(image.uri, "photo.jpg")).rejects.toThrow("通用凭证获取失败");
-    expect(uploadClientObject).not.toHaveBeenCalled();
-  });
-
-  it("rejects unsupported files before requesting credentials or uploading", async () => {
-    vi.mocked(getEvidenceUploadFile).mockImplementation(() => { throw new Error("图片格式暂不支持，请重新选择图片后上传"); });
-    await expect(courtApi.uploadEvidence("file:///original.heic", "photo.jpg")).rejects.toThrow("请重新选择");
-    expect(request).not.toHaveBeenCalled();
-    expect(uploadClientObject).not.toHaveBeenCalled();
+    vi.mocked(uploadCompanionMediaObject).mockResolvedValue({ url: "https://cdn.example/image.png", objectKey: "images/image.png" });
+    await expect(courtApi.uploadEvidence("file:///image.png", "image.png")).resolves.toBe("images/image.png");
+    expect(uploadCompanionMediaObject).toHaveBeenCalledWith("viewer-token", { uri: "file:///image.png", fileName: "image.png", mimeType: "image/png" }, "image");
   });
 });
 
@@ -147,15 +73,6 @@ describe("platform ticket API contract", () => {
   ])("rejects %s when success carries no data", async (_name, action) => {
     request.mockResolvedValue({ code: "SUCCESS", info: "操作成功" });
     await expect(action()).rejects.toThrow();
-  });
-
-  it("rejects evidence upload when the STS success carries no data", async () => {
-    const image = { uri: "file:///export.heic", name: "IMG_1001.jpg", mimeType: "image/jpeg" };
-    vi.mocked(getEvidenceUploadFile).mockReturnValue(image);
-    request.mockResolvedValue({ code: "SUCCESS", info: "操作成功" });
-
-    await expect(courtApi.uploadEvidence(image.uri, "IMG_1001.HEIC")).rejects.toThrow();
-    expect(uploadClientObject).not.toHaveBeenCalled();
   });
 
   it("keeps void POST endpoints lenient when success carries no data", async () => {

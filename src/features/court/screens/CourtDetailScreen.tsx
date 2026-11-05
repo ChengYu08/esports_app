@@ -4,7 +4,7 @@ import { CourtProcessTimeline } from "@/features/court/components/CourtProcessTi
 import { CourtAvatar } from "@/features/court/components/CourtAvatar";
 import { CourtJudgmentResult } from "@/features/court/components/CourtJudgmentResult";
 import { CourtReviewerPromptModal } from "@/features/court/components/CourtReviewerPromptModal";
-import { courtVoteUnavailableReason, submitCourtVote } from "@/features/court/court-vote";
+import { courtVoteUnavailableReason, getVoteProportions, submitCourtVote } from "@/features/court/court-vote";
 import { CourtVoteButton } from "@/features/court/components/CourtVoteButton";
 import {
   courtApi,
@@ -236,7 +236,7 @@ export default function CourtDetailScreen() {
                   avatar={item.plaintiff?.avatar}
                   role="原告"
                 />
-                <CachedImage source={require("../../../../assets/court/versus.svg")} contentFit="contain" style={styles.vs} />
+                <CachedImage source={require("../../../../assets/svgs/versus.svg")} contentFit="contain" style={styles.vs} />
                 <Profile
                   name={item.defendant?.nickname || "未知用户"}
                   avatar={item.defendant?.avatar}
@@ -290,6 +290,7 @@ export default function CourtDetailScreen() {
             <View style={styles.voteActions}>
               <CourtVoteButton
                 side="plaintiff"
+                proportion={getVoteProportions(item.voteSummary?.plaintiff ?? 0, item.voteSummary?.defendant ?? 0).plaintiff}
                 selected={item.myVoteResult === "PLAINTIFF_WIN"}
                 disabled={busy}
                 onPress={() => castVote("PLAINTIFF_WIN")}
@@ -299,6 +300,7 @@ export default function CourtDetailScreen() {
               />
               <CourtVoteButton
                 side="defendant"
+                proportion={getVoteProportions(item.voteSummary?.plaintiff ?? 0, item.voteSummary?.defendant ?? 0).defendant}
                 selected={item.myVoteResult === "DEFENDANT_WIN"}
                 disabled={busy}
                 onPress={() => castVote("DEFENDANT_WIN")}
@@ -310,7 +312,7 @@ export default function CourtDetailScreen() {
           )}
           <View style={styles.stats}>
             <View style={styles.stat}>
-              <CachedImage source={require("../../../../assets/court/eye.svg")} style={styles.statIcon} />
+              <CachedImage source={require("../../../../assets/svgs/eye.svg")} style={styles.statIcon} />
               <Text style={styles.statText}>{formatCount(item.viewCount)}</Text>
             </View>
             <Pressable
@@ -322,7 +324,7 @@ export default function CourtDetailScreen() {
               onPress={favorite}
               style={styles.stat}
             >
-              <CachedImage source={item.favorited ? require("../../../../assets/court/star-filled.svg") : require("../../../../assets/court/star.svg")} style={styles.statIcon} />
+              <CachedImage source={item.favorited ? require("../../../../assets/svgs/star-filled.svg") : require("../../../../assets/svgs/star.svg")} style={styles.statIcon} />
               <Text style={styles.statText}>{formatCount(item.favoriteCount)}</Text>
             </Pressable>
           </View>
@@ -346,7 +348,7 @@ export default function CourtDetailScreen() {
                 >
                   {value}
                 </Text>
-                {tab === value && <CachedImage source={require("../../../../assets/court/tab-indicator.svg")} style={styles.tabLine} />}
+                {tab === value && <CachedImage source={require("../../../../assets/svgs/tab-indicator.svg")} style={styles.tabLine} />}
               </Pressable>
             ),
           )}

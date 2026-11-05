@@ -57,15 +57,15 @@ import {
 // 聊天单次发送图片数量上限（相册多选防刷屏）
 const CHAT_IMAGE_MAX = 10;
 
-const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
-const defaultMyAvatar = require("../../../../assets/mine/figma/mine-avatar.png");
-const chatMore = require("../../../../assets/message/chat-more.svg");
-const chatOnline = require("../../../../assets/message/chat-online.svg");
-const chatOffline = require("../../../../assets/message/chat-offline.svg");
-const chatEmoji = require("../../../../assets/message/chat-emoji.svg");
-const chatPhoto = require("../../../../assets/message/chat-photo.svg");
-const chatSend = require("../../../../assets/message/chat-send.svg");
-const systemNotificationAvatar = require("../../../../assets/message/message-system-notice.svg");
+const defaultAvatar = require("../../../../assets/images/avatar_default.webp");
+const defaultMyAvatar = require("../../../../assets/mine/mine-avatar.png");
+const chatMore = require("../../../../assets/svgs/chat-more.svg");
+const chatOnline = require("../../../../assets/svgs/chat-online.svg");
+const chatOffline = require("../../../../assets/svgs/chat-offline.svg");
+const chatEmoji = require("../../../../assets/svgs/chat-emoji.svg");
+const chatPhoto = require("../../../../assets/svgs/chat-photo.svg");
+const chatSend = require("../../../../assets/svgs/chat-send.svg");
+const systemNotificationAvatar = require("../../../../assets/svgs/message-system-notice.svg");
 const EMPTY_MESSAGES: ManagedMessage[] = [];
 
 type ChatListRow =
@@ -998,7 +998,7 @@ const ChatBubble = memo(function ChatBubble({
           >
             <View style={styles.roomInviteIconWrap}>
               <Image
-                source={require("../../../../assets/message/room-invite.svg")}
+                source={require("../../../../assets/svgs/room-invite.svg")}
                 style={styles.roomInviteIcon}
               />
             </View>

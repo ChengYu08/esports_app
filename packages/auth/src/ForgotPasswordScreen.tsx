@@ -184,7 +184,7 @@ export function ForgotPasswordScreen({
                 disabled={sending || countdown > 0}
                 onPress={() => void handleSendCode()}
               >
-                <Text style={[styles.sendCode, countdown > 0 && styles.muted]}>
+                <Text style={styles.sendCode}>
                   {sendLabel}
                 </Text>
               </Pressable>
@@ -330,8 +330,12 @@ const styles = StyleSheet.create({
     textAlignVertical: "center",
   },
   divider: { width: 1, height: 16, backgroundColor: "#ddd" },
-  sendCode: { color: "#e01b28", fontSize: 14 },
-  muted: { color: "#999" },
+  sendCode: {
+    color: "#FE1F4C",
+    fontSize: 14,
+    fontWeight: "400",
+    lineHeight: 22,
+  },
   passwordHint: {
     color: "#999",
     fontSize: 12,
@@ -346,7 +350,7 @@ const styles = StyleSheet.create({
     height: 44,
     marginTop: 24,
     borderRadius: 8,
-    backgroundColor: "#e01b28",
+    backgroundColor: "#FE1F4C",
     alignItems: "center",
     justifyContent: "center",
   },

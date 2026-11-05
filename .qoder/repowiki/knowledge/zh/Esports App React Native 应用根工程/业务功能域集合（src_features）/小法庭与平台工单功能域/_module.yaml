@@ -1,0 +1,25 @@
+schema_version: 1
+module_path: src_features/court
+title: 小法庭与平台工单功能域
+scope:
+    - src/features/court/
+source_files: []
+depends_on: []
+related_to:
+    - path: src_app/court
+      reason: Next.js App Router 入口 src/app/court 将 URL 路径委派给 features/court 中的小法庭/工单屏幕组件。
+kk_module_id: af204b52-4486-4ec0-98b9-6a64d111acec
+kk_ordinal: 5
+kk_cards:
+    architecture_design:
+        id: 55e14e9a-7649-4c74-8db1-ee9afeed0c12
+        title: 小法庭与平台工单功能域
+    coding_conventions:
+        id: 12dc9890-d373-4cf4-a40a-85831f4e2558
+        title: 小法庭与平台工单功能域
+    overview:
+        id: f8fef719-bc23-4e0b-bd77-f99cb142801a
+        title: 小法庭与平台工单功能域
+    tech_stack:
+        id: b38d97ac-17f1-4533-aee9-58924947ce23
+        title: 小法庭与平台工单功能域

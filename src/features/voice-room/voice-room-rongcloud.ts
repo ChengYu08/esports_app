@@ -11,7 +11,21 @@ import {
 } from '@/features/message/rongcloud-im';
 
 type RongSdk = typeof import('@rongcloud/react-native-im-wrapper');
-type RoomMessage = { id: string; userId?: string; nickname?: string; text: string; imageUrl?: string; sentAt: number };
+type RoomMessage = {
+  id: string;
+  userId?: string;
+  nickname?: string;
+  avatar?: string;
+  text: string;
+  imageUrl?: string;
+  sentAt: number;
+};
+
+type VoiceChatSender = {
+  userId: string;
+  nickname?: string;
+  headImage?: string;
+};
 
 const roomMessageListeners = new Set<(chatroomId: string, message: RoomMessage) => void>();
 const roomMemberListeners = new Set<(targetId: string, actions: { userId?: string; actionType?: number }[]) => void>();
@@ -53,7 +67,8 @@ function normalizeRoomMessage(message: RCIMIWMessage): RoomMessage | null {
   return {
     id: String(message.messageUId || message.messageId || message.sentTime),
     userId: message.senderUserId,
-    nickname: sdkMessage.name,
+    nickname: message.userInfo?.name,
+    avatar: message.userInfo?.portrait,
     text,
     ...(isImage && imageUrl ? { imageUrl } : {}),
     sentAt: message.sentTime || Date.now(),
@@ -118,11 +133,22 @@ export async function getVoiceChatHistory(chatroomId: string) {
   });
 }
 
-export async function sendVoiceChatMessage(chatroomId: string, text: string) {
+export async function sendVoiceChatMessage(
+  chatroomId: string,
+  text: string,
+  sender?: VoiceChatSender,
+) {
   const engine = getRongCloudEngine();
   const sdk = loadSdk();
   if (!engine || !sdk) throw new Error('融云 SDK 不可用');
   const message = await engine.createTextMessage(sdk.RCIMIWConversationType.CHATROOM, chatroomId, '', text);
+  if (sender) {
+    message.userInfo = {
+      userId: sender.userId,
+      name: sender.nickname || `用户${sender.userId}`,
+      portrait: sender.headImage || '',
+    };
+  }
   let sent: RCIMIWMessage | undefined;
   const code = await engine.sendMessage(message, { onMessageSent: (result: number, item?: RCIMIWMessage) => { if (result === 0) sent = item; } });
   if (code !== 0) throw new Error(`发送消息失败（${code}）`);

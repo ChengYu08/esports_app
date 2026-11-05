@@ -5,7 +5,7 @@ import { spacing } from "@/shared/theme/tokens";
 import { searchTypography } from "../search-typography";
 import type { SearchCategory } from "../search.types";
 
-const indicator = require("../../../../assets/court/tab-indicator.svg");
+const indicator = require("../../../../assets/svgs/tab-indicator.svg");
 const categories: { value: SearchCategory; label: string }[] = [
   { value: "club", label: "俱乐部" },
   { value: "user", label: "陪玩师" },

@@ -2,7 +2,7 @@ import { CachedImage } from "@/shared/ui/CachedImage";
 import { useState } from "react";
 import { StyleSheet } from "react-native";
 
-const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
+const defaultAvatar = require("../../../../assets/images/avatar_default.webp");
 
 export function CourtAvatar({ uri, size = 30 }: { uri?: string; size?: number }) {
   const [failedUri, setFailedUri] = useState<string>();

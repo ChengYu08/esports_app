@@ -1,0 +1,26 @@
+schema_version: 1
+module_path: src_app/account_profile_settings/auth_flows
+title: 账户认证与隐私相关路由
+scope:
+    - src/app/login.tsx
+    - src/app/forgot-password.tsx
+    - src/app/change-password.tsx
+    - src/app/real-name-verification.tsx
+    - src/app/account-cancellation.tsx
+source_files: []
+depends_on: []
+related_to: []
+kk_module_id: 779992e4-a121-468e-9523-d85b45fff8a4
+kk_cards:
+    architecture_design:
+        id: e7904513-edec-4123-a4b0-372ff1cfd05e
+        title: 账户认证与隐私相关路由
+    coding_conventions:
+        id: 5717610a-2e4f-4a9b-b168-a938d41193bc
+        title: 账户认证与隐私相关路由
+    overview:
+        id: 47e9abd5-1b44-4f26-9f5f-80d7196bcf16
+        title: 账户认证与隐私相关路由
+    tech_stack:
+        id: 4fe6f98e-1d12-4841-a94c-78e80cbbcefe
+        title: 账户认证与隐私相关路由

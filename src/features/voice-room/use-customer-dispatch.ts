@@ -5,13 +5,13 @@
  * 2. 已在语聊房 → 二次确认后退出/解散当前房间，再创建语聊房并自动呼叫接待。
  */
 import { useAuthStore } from "@esports/auth";
-import { router } from "expo-router";
 import { useCallback, useRef } from "react";
 import { showToast } from "@/shared/ui/app-toast";
 
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 
 import { exitVoiceRoom } from "./exit-voice-room";
+import { navigateToVoiceRoom } from "./navigate-voice-room";
 import { resolveVoiceRoomId, voiceRoomApi } from "./voice-room.api";
 import { useVoiceRoomSessionStore } from "./voice-room-session";
 
@@ -55,13 +55,10 @@ export function useCustomerDispatch() {
       const roomId = resolveVoiceRoomId(room);
       if (!roomId) throw new Error("创建语聊房失败，请稍后重试");
 
-      router.push({
-        pathname: "/voice-room/[id]",
-        params: {
-          id: roomId,
-          ...(room.roomVersion != null ? { v: String(room.roomVersion) } : {}),
-          callService: "1",
-        },
+      navigateToVoiceRoom({
+        id: roomId,
+        ...(room.roomVersion != null ? { v: String(room.roomVersion) } : {}),
+        callService: "1",
       });
     } catch (error) {
       showToast(

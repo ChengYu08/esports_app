@@ -8,10 +8,11 @@ import Animated, { clamp, useAnimatedStyle, useSharedValue } from 'react-native-
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { VoiceWaveform } from '@/shared/audio/VoiceWaveform';
+import { navigateToVoiceRoom } from '../navigate-voice-room';
 import { useVoiceRoomSessionStore } from '../voice-room-session';
 
-const fallbackAvatar = require('../../../../assets/voice-room/floating-avatar.png');
-const recordingIcon = require('../../../../assets/voice-room/floating-recording.svg');
+const fallbackAvatar = require('../../../../assets/images/avatar_default.webp');
+const recordingIcon = require('../../../../assets/svgs/floating-recording.svg');
 const PLAYER_WIDTH = 50;
 const PLAYER_HEIGHT = 48;
 const DRAG_THRESHOLD = 6;
@@ -55,36 +56,34 @@ export function VoiceRoomMiniPlayer() {
 
   const openRoom = useCallback(() => {
     if (!room) return;
-    // 选人页压在语聊房上时用 back，避免 navigate 再叠一层语聊房
+    // 选人页是房内临时页：直接 back 回到压在下面的语聊房实例，不叠层
     if (pathname.startsWith('/match/matching') && router.canGoBack()) {
       router.back();
       return;
     }
-    router.navigate({
-      pathname: '/voice-room/[id]',
-      params: {
-        id: room.roomId,
-        v: room.roomVersion,
-        // 试音场景靠路由回填；quickMatchCreated 仅依赖 session，进房后由 VoiceRoomScreen 读 session
-        ...(room.scene === 'audition' && room.matchRequestNo
-          ? {
-              scene: 'audition',
-              requestNo: room.matchRequestNo,
-              ...(room.matchExpireTime
-                ? { expireTime: room.matchExpireTime }
-                : {}),
-              ...(room.matchGameId && room.matchGameName
-                ? {
-                    gameId: room.matchGameId,
-                    gameName: room.matchGameName,
-                    ...(room.matchGameIconUrl
-                      ? { gameIconUrl: room.matchGameIconUrl }
-                      : {}),
-                  }
-                : {}),
-            }
-          : {}),
-      },
+    // 单实例导航：房内切房原地换 params，其他页面进入 push 保留中间路由
+    navigateToVoiceRoom({
+      id: room.roomId,
+      v: room.roomVersion,
+      // 试音场景靠路由回填；quickMatchCreated 仅依赖 session，进房后由 VoiceRoomScreen 读 session
+      ...(room.scene === 'audition' && room.matchRequestNo
+        ? {
+            scene: 'audition',
+            requestNo: room.matchRequestNo,
+            ...(room.matchExpireTime
+              ? { expireTime: room.matchExpireTime }
+              : {}),
+            ...(room.matchGameId && room.matchGameName
+              ? {
+                  gameId: room.matchGameId,
+                  gameName: room.matchGameName,
+                  ...(room.matchGameIconUrl
+                    ? { gameIconUrl: room.matchGameIconUrl }
+                    : {}),
+                }
+              : {}),
+          }
+        : {}),
     });
   }, [pathname, room]);
 

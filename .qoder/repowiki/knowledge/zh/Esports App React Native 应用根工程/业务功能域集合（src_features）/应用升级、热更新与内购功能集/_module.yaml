@@ -1,0 +1,27 @@
+schema_version: 1
+module_path: src_features/app_upgrade_ota_iap
+title: 应用升级、热更新与内购功能集
+scope:
+    - src/features/app-upgrade/
+    - src/features/ota/
+    - src/features/iap/
+source_files: []
+depends_on: []
+related_to:
+    - path: native_modules
+      reason: app_upgrade_ota_iap 的整包升级与内购能力依赖 native_modules 中的 App Toolkit/Alipay 原生模块完成安装与支付。
+kk_module_id: 934f02d2-0efd-4164-8cc5-06354ce8b460
+kk_ordinal: 8
+kk_cards:
+    architecture_design:
+        id: c3f5e196-9acc-46a7-bb20-b017318f72a2
+        title: 应用升级、热更新与内购功能集
+    coding_conventions:
+        id: 7dfe75f2-7413-4c21-bd98-f9f50788561b
+        title: 应用升级、热更新与内购功能集
+    overview:
+        id: ea7e471b-f1ee-4834-81e3-8b8d79556412
+        title: 应用升级、热更新与内购功能集
+    tech_stack:
+        id: 3a1d6da5-ae67-49dd-985e-034d703faa9d
+        title: 应用升级、热更新与内购功能集

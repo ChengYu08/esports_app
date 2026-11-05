@@ -28,14 +28,17 @@ import {
   saveLastTeenEnabled,
 } from "@/features/mine/teen-mode-store";
 import { createTeenRequestGuard } from "@/features/mine/teen-request-guard";
-import { teenLockWindowLabel } from "@/features/mine/utils/teen-lock-window";
+import {
+  resolveTeenLockConfig,
+  teenLockWindowLabel,
+} from "@/features/mine/utils/teen-lock-window";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { colors } from "@/shared/theme/tokens";
 
-const backIcon = require("../../../../assets/home/club-detail/icon-back.svg");
-const closedIllustration = require("../../../../assets/mine/figma/teen-mode-closed.svg");
-const openIllustration = require("../../../../assets/mine/figma/teen-mode-open.svg");
-const starIcon = require("../../../../assets/mine/figma/teen-mode-star.svg");
+const backIcon = require("../../../../assets/svgs/icon-back.svg");
+const closedIllustration = require("../../../../assets/svgs/teen-mode-closed.svg");
+const openIllustration = require("../../../../assets/svgs/teen-mode-open.svg");
+const starIcon = require("../../../../assets/svgs/teen-mode-star.svg");
 
 type Phase =
   | "overview"
@@ -84,7 +87,8 @@ function TeenModeScreenSession({
   const [code, setCode] = useState("");
   const [firstPassword, setFirstPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [lockRangeLabel, setLockRangeLabel] = useState(teenLockWindowLabel());
+  // 时段只认服务端配置；lockEnabled=false 或拉取失败时为 null，文案不展示具体时段
+  const [lockRangeLabel, setLockRangeLabel] = useState<string | null>(null);
   const requestGuardRef = useRef(createTeenRequestGuard());
 
   const enabled = status?.enabled === true;
@@ -113,23 +117,18 @@ function TeenModeScreenSession({
       return;
     }
     const snapshot = guard.snapshot();
-    // 锁定时段文案跟随服务端配置（/youth/config）；失败回退默认 22:00-次日6:00（与服务端默认一致）
+    // 锁定时段文案只认服务端配置（/youth/config），客户端不设兜底时段
     void (async () => {
       try {
-        const config = await fetchTeenModeConfig(token);
-        const startHour = Number(config?.lockStartHour);
-        const endHour = Number(config?.lockEndHour);
+        const lockConfig = resolveTeenLockConfig(await fetchTeenModeConfig(token));
         if (!guard.isSessionCurrent(session)) {
           return;
         }
-        if (
-          Number.isInteger(startHour) && startHour >= 0 && startHour <= 23
-          && Number.isInteger(endHour) && endHour >= 0 && endHour <= 23
-        ) {
-          setLockRangeLabel(teenLockWindowLabel(startHour, endHour));
-        }
+        setLockRangeLabel(
+          typeof lockConfig === "object" ? teenLockWindowLabel(lockConfig) : null,
+        );
       } catch {
-        // 配置拉取失败保持默认窗口文案
+        // 配置拉取失败不展示具体时段，避免展示与生效口径不一致的文案
       }
     })();
     void (async () => {
@@ -196,7 +195,11 @@ function TeenModeScreenSession({
           }
           // 开启成功不停留说明页：直接返回上一页，限制时段文案跟随服务端配置
           router.back();
-          showToast(`青少年模式已开启，每日 ${lockRangeLabel} 期间限制核心功能`);
+          showToast(
+            lockRangeLabel
+              ? `青少年模式已开启，每日 ${lockRangeLabel} 期间限制核心功能`
+              : "青少年模式已开启",
+          );
           return;
         }
         if (
@@ -216,7 +219,11 @@ function TeenModeScreenSession({
           }
           // 与首设密码路径一致：开启成功直接返回上一页并提示，不停留说明页
           router.back();
-          showToast(`青少年模式已开启，每日 ${lockRangeLabel} 期间限制核心功能`);
+          showToast(
+            lockRangeLabel
+              ? `青少年模式已开启，每日 ${lockRangeLabel} 期间限制核心功能`
+              : "青少年模式已开启",
+          );
           return;
         }
         if (phase === "disable") {
@@ -276,7 +283,9 @@ function TeenModeScreenSession({
               <View style={styles.bulletRow}>
                 <Image source={starIcon} style={styles.bulletIcon} />
                 <Text style={styles.bulletText}>
-                  {`为保障未成年人的充足休息与健康作息，开启未成年人模式后，每日${lockRangeLabel}期间无法访问盼之社区`}
+                  {lockRangeLabel
+                    ? `为保障未成年人的充足休息与健康作息，开启未成年人模式后，每日${lockRangeLabel}期间无法访问盼之社区`
+                    : "为保障未成年人的充足休息与健康作息，开启未成年人模式后将限制访问盼之社区"}
                 </Text>
               </View>
             </>

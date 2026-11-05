@@ -1,0 +1,25 @@
+schema_version: 1
+module_path: src_features/mine/mine_shell_and_menu
+title: 我的页菜单与本地状态管理
+scope:
+    - src/features/mine/mine-menu.ts
+    - src/features/mine/blacklist.ts
+    - src/features/mine/notification-settings.ts
+source_files: []
+depends_on: []
+related_to: []
+kk_module_id: 80f634a0-119d-4941-9f8e-3c085e9664be
+kk_ordinal: 4
+kk_cards:
+    architecture_design:
+        id: 933404a4-4c9f-4678-8263-fdab88ec9f23
+        title: 我的页菜单与本地状态管理
+    coding_conventions:
+        id: 5fa6eccf-d386-4dec-85a0-ef49561ec5ca
+        title: 我的页菜单与本地状态管理
+    overview:
+        id: d76c3ce8-359c-4290-94f0-cbac302c7d75
+        title: 我的页菜单与本地状态管理
+    tech_stack:
+        id: 367f1505-8256-4e86-9115-a6ce57e130b7
+        title: 我的页菜单与本地状态管理

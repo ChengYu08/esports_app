@@ -19,7 +19,7 @@ import {
 } from "@fluentui/react-native-icons";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useIsFocused, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -46,16 +46,16 @@ import {
 } from "../hooks/use-home-data";
 
 // 切图资源（新设计稿：俱乐部主页 455-68151 / 490-84520 / 557-88105）
-const bgClubImage = require("../../../../assets/home/club-detail/bg-club.webp");
+const bgClubImage = require("../../../../assets/home/bg-club.webp");
 // 设计稿导航栏内容行高度 44（不含状态栏，状态栏高度由安全区 insets 提供）
 const NAV_BAR_CONTENT_HEIGHT = 44;
-const tabCornerLeftIcon = require("../../../../assets/home/club-detail/tab-corner-left.svg");
-const tabCornerRightIcon = require("../../../../assets/home/club-detail/tab-corner.svg");
-const arrowDownIcon = require("../../../../assets/home/club-detail/arrow-fill-down-new.svg");
-const arrowUpRedIcon = require("../../../../assets/home/club-detail/arrow-fill-up-red.svg");
-const introToggleIcon = require("../../../../assets/home/club-detail/intro-toggle.svg");
-const emptyStateIllustration = require("../../../../assets/coms/empty-state-illustration.svg");
-const customerIcon = require("../../../../assets/coms/customer.svg");
+const tabCornerLeftIcon = require("../../../../assets/svgs/tab-corner-left.svg");
+const tabCornerRightIcon = require("../../../../assets/svgs/tab-corner.svg");
+const arrowDownIcon = require("../../../../assets/svgs/arrow-fill-down-new.svg");
+const arrowUpRedIcon = require("../../../../assets/svgs/arrow-fill-up-red.svg");
+const introToggleIcon = require("../../../../assets/svgs/intro-toggle.svg");
+const emptyStateIllustration = require("../../../../assets/svgs/empty-state-illustration.svg");
+const customerIcon = require("../../../../assets/svgs/customer.svg");
 
 // 设计稿色板
 const COLORS = {
@@ -259,6 +259,15 @@ export default function ClubDetailScreen() {
     [companionsQuery.data],
   );
   const voicePlayer = useVoicePlayer();
+  const focused = useIsFocused();
+  const stopVoice = voicePlayer.stop;
+  // 从详情页 push 进入成员主页/下单等页面时本页不卸载，需失焦主动停语音，
+  // 避免与新页面的语音播放器叠音。口径同 GodListScreen/ProfileScreen。
+  useEffect(() => {
+    if (!focused) {
+      stopVoice();
+    }
+  }, [focused, stopVoice]);
   const clubId = club?.id ?? "";
   const quickMatchClub = useMemo(
     () => (club ? { id: club.id, name: club.name } : { id: "", name: "" }),

@@ -30,8 +30,8 @@ import { SYSTEM_FONT } from "@/shared/theme/typography";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { CachedImage } from "@/shared/ui/CachedImage";
 
-const diamondIcon = require("../../../../assets/mine/figma/star-recharge-diamond-3f6fcf.png");
-const fallbackAvatar = require("../../../../assets/coms/avatar_default.webp");
+const diamondIcon = require("../../../../assets/mine/star-recharge-diamond-3f6fcf.png");
+const fallbackAvatar = require("../../../../assets/images/avatar_default.webp");
 
 type Props = {
   visible: boolean;

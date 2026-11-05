@@ -1,0 +1,25 @@
+schema_version: 1
+module_path: expo_plugins
+title: Expo Prebuild 自定义插件集
+scope:
+    - plugins/
+source_files: []
+depends_on: []
+related_to:
+    - path: src_features/app_upgrade_ota_iap
+      reason: app_upgrade_ota_iap 集成 Pushy 热更新门禁，由 expo_plugins 在 prebuild 阶段注入融云推送与启动图配置，二者协作实现 OTA 能力。
+kk_module_id: 5f00da4b-152f-4008-b5da-bea53e5134b4
+kk_ordinal: 5
+kk_cards:
+    architecture_design:
+        id: 92628f66-f355-48ab-88d3-a58d5818ea2d
+        title: Expo Prebuild 自定义插件集
+    coding_conventions:
+        id: bb9bce3b-f284-48e3-8916-2de11ea0cdcd
+        title: Expo Prebuild 自定义插件集
+    overview:
+        id: 886ff26c-44e9-44d7-9038-8382d6cf6ed5
+        title: Expo Prebuild 自定义插件集
+    tech_stack:
+        id: 7638c156-f5f7-40c4-a605-933f92680c6f
+        title: Expo Prebuild 自定义插件集

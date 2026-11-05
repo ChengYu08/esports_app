@@ -1,0 +1,16 @@
+schema_version: 1
+module_path: src_app
+title: src/app 路由聚合层（Expo Router + Next.js App Router）
+scope:
+    - src/app/
+source_files: []
+depends_on: []
+related_to: []
+kk_module_id: cdd59a54-fd22-4c14-ac70-d25648b4bc34
+kk_cards:
+    architecture_design:
+        id: fbde73df-c494-489a-843f-ffed350d2e24
+        title: src/app 路由聚合层（Expo Router + Next.js App Router）
+    overview:
+        id: a87dac63-ddb2-47de-93d2-a5d95e75078f
+        title: src/app 路由聚合层（Expo Router + Next.js App Router）

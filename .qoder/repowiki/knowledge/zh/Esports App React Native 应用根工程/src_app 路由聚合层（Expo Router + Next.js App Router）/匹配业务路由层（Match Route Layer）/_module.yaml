@@ -1,0 +1,25 @@
+schema_version: 1
+module_path: src_app/match
+title: 匹配业务路由层（Match Route Layer）
+scope:
+    - src/app/match/
+source_files: []
+depends_on: []
+related_to:
+    - path: src_features/match
+      reason: 路由层 src/app/match 将 /match 与 /match/matching/[requestNo] 映射到 features/match 的 Screen，构成 expo-router 路由→业务模块的对应关系。
+kk_module_id: 37f74edb-3ad5-4e32-b7cd-bcd44ba1d22e
+kk_ordinal: 2
+kk_cards:
+    architecture_design:
+        id: d635a51d-9b51-40e4-a608-3cdd191064af
+        title: 匹配业务路由层（Match Route Layer）
+    coding_conventions:
+        id: 3e5bde7b-32e5-4ba1-9392-662466e56a4a
+        title: 匹配业务路由层（Match Route Layer）
+    overview:
+        id: 67ea60de-a58e-43e4-a9b9-eb7d2fd407b9
+        title: 匹配业务路由层（Match Route Layer）
+    tech_stack:
+        id: d574a5c1-ea93-4a3d-93a4-2de7d807ddd9
+        title: 匹配业务路由层（Match Route Layer）

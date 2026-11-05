@@ -238,7 +238,7 @@ function Requirement({ title, description, badge, satisfied, disabled, onPress }
       </View>
       {satisfied ? (
         <CachedImage
-          source={require("../../../../assets/court/requirement-satisfied.svg")}
+          source={require("../../../../assets/svgs/requirement-satisfied.svg")}
           accessible
           accessibilityLabel={`${title}：已满足`}
           style={styles.requirementSatisfied}

@@ -1,0 +1,25 @@
+schema_version: 1
+module_path: src_shared
+title: 跨平台共享能力层（Shared Capabilities）
+scope:
+    - src/shared/
+source_files: []
+depends_on: []
+related_to:
+    - path: src_features/message/action_command_dispatch
+      reason: action_command_dispatch 将平台推送的操作型命令转换为全局 ActionNotice（src/shared 提供），驱动订单通知与抢单提示。
+kk_module_id: 298e7c3f-a249-4426-a53b-7ab065c468a4
+kk_ordinal: 2
+kk_cards:
+    architecture_design:
+        id: 6de75a1f-3db0-4d5f-b155-e0cd870bca33
+        title: 跨平台共享能力层（Shared Capabilities）
+    coding_conventions:
+        id: cd5c39c3-e91b-477e-b8c8-20234cb5516a
+        title: 跨平台共享能力层（Shared Capabilities）
+    overview:
+        id: 2fb66821-c5bd-464e-b01b-6ad072ae85cb
+        title: 跨平台共享能力层（Shared Capabilities）
+    tech_stack:
+        id: 1d1c4eaa-923f-4c96-83f7-065905a8303e
+        title: 跨平台共享能力层（Shared Capabilities）

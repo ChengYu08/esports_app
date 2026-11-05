@@ -29,7 +29,17 @@ type VoiceRoomSessionState = {
   joiningRoom: ActiveVoiceRoom | null;
   lastKickedRoom: ActiveVoiceRoom | null;
   microphoneMuted: boolean;
+  /** 语聊房屏当前是否处于聚焦（栈顶可见）状态（单实例导航判断用，见 navigate-voice-room.ts） */
+  screenFocused: boolean;
+  /**
+   * 当前持有聚焦权的语聊房屏实例 id（React useId，每次 mount 唯一）。
+   * 非聚焦页进房（如聊天页点邀请卡）会叠出同房第二个屏实例，此时旧实例仍在栈里；
+   * 旧实例重新聚焦时若聚焦权不在自己手上，由焦点守卫自动弹出（见 VoiceRoomScreen）。
+   */
+  screenFocusOwnerId: string | null;
   setMicrophoneMuted: (muted: boolean) => void;
+  setScreenFocused: (focused: boolean) => void;
+  setScreenFocusOwner: (id: string) => void;
   setActiveRoom: (room: ActiveVoiceRoom) => void;
   beginRoomJoin: (room: ActiveVoiceRoom) => void;
   completeRoomJoin: (room: ActiveVoiceRoom) => boolean;
@@ -54,7 +64,11 @@ export const useVoiceRoomSessionStore = create<VoiceRoomSessionState>((set, get)
   joiningRoom: null,
   lastKickedRoom: null,
   microphoneMuted: true,
+  screenFocused: false,
+  screenFocusOwnerId: null,
   setMicrophoneMuted: (microphoneMuted) => set({ microphoneMuted }),
+  setScreenFocused: (screenFocused) => set({ screenFocused }),
+  setScreenFocusOwner: (screenFocusOwnerId) => set({ screenFocusOwnerId }),
   setActiveRoom: (activeRoom) => set({ activeRoom }),
   beginRoomJoin: (joiningRoom) => set({ joiningRoom }),
   completeRoomJoin: (room) => {

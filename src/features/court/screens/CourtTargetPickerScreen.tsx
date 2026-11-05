@@ -1,4 +1,4 @@
-import { ChevronLeft24Regular, Search24Regular } from "@fluentui/react-native-icons";
+import { ChevronLeft24Regular, DismissCircle16Filled, Search24Regular } from "@fluentui/react-native-icons";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
@@ -123,9 +123,19 @@ export default function CourtTargetPickerScreen() {
             autoCorrect={false}
             autoCapitalize="none"
             editable={validSession}
-            clearButtonMode="while-editing"
             style={styles.searchInput}
           />
+          {!!keyword && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="清除搜索内容"
+              hitSlop={8}
+              onPress={() => changeKeyword("")}
+              style={styles.clearSearch}
+            >
+              <DismissCircle16Filled color="#BFBFBF" width={16} height={16} />
+            </Pressable>
+          )}
         </View>
       </View>
       {!validSession ? (
@@ -187,8 +197,8 @@ export default function CourtTargetPickerScreen() {
               <CachedImage
                 source={
                   item.id === selected?.id
-                    ? require("../../../../assets/court/ticket-radio-on.svg")
-                    : require("../../../../assets/court/ticket-radio-off.svg")
+                    ? require("../../../../assets/svgs/ticket-radio-on.svg")
+                    : require("../../../../assets/svgs/ticket-radio-off.svg")
                 }
                 style={styles.radio}
               />
@@ -197,7 +207,7 @@ export default function CourtTargetPickerScreen() {
                   source={
                     item.headImage
                       ? { uri: item.headImage }
-                      : require("../../../../assets/coms/avatar_default.webp")
+                      : require("../../../../assets/images/avatar_default.webp")
                   }
                   style={styles.avatar}
                   contentFit="cover"
@@ -212,7 +222,7 @@ export default function CourtTargetPickerScreen() {
                   {showIds && (
                     <View style={styles.idRow}>
                       <CachedImage
-                        source={require("../../../../assets/court/ticket-id.svg")}
+                        source={require("../../../../assets/svgs/ticket-id.svg")}
                         style={styles.idIcon}
                       />
                       <Text numberOfLines={1} style={styles.userId}>
@@ -237,11 +247,11 @@ export default function CourtTargetPickerScreen() {
               illustration={
                 <View style={styles.searchIllustration}>
                   <CachedImage
-                    source={require("../../../../assets/court/ticket-search-mirror.svg")}
+                    source={require("../../../../assets/svgs/ticket-search-mirror.svg")}
                     style={styles.searchMirror}
                   />
                   <CachedImage
-                    source={require("../../../../assets/court/ticket-search-panda.svg")}
+                    source={require("../../../../assets/svgs/ticket-search-panda.svg")}
                     style={styles.searchPanda}
                   />
                 </View>
@@ -309,6 +319,7 @@ const styles = StyleSheet.create({
   searchBox: {
     flexDirection: "row",
     alignItems: "center",
+    height: 36,
     gap: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
@@ -317,14 +328,16 @@ const styles = StyleSheet.create({
   searchIcon: { width: 20, height: 20 },
   searchInput: {
     flex: 1,
-    minHeight: 36,
-    paddingVertical: 7,
+    height: 36,
+    paddingVertical: 0,
     paddingHorizontal: 0,
+    includeFontPadding: false,
+    textAlignVertical: "center",
     fontFamily: COURT_FONT_FAMILY,
     color: C.text,
     fontSize: 14,
-    lineHeight: 22,
   },
+  clearSearch: { width: 20, height: 36, alignItems: "center", justifyContent: "center" },
   list: { flexGrow: 1, paddingTop: 8 },
   emptyList: { backgroundColor: C.surface, paddingTop: 0 },
   emptyArea: {

@@ -1,0 +1,28 @@
+schema_version: 1
+module_path: src_app/account_profile_settings/companion_pages
+title: Companion 伴播主页面路由入口
+scope:
+    - src/app/companion-dashboard.tsx
+    - src/app/companion-intro.tsx
+    - src/app/companion-gallery.tsx
+    - src/app/companion-income.tsx
+    - src/app/my-diamonds.tsx
+    - src/app/star-recharge.tsx
+source_files: []
+depends_on: []
+related_to: []
+kk_module_id: f1cbd6af-63d2-46aa-b510-bad7bad9f074
+kk_ordinal: 3
+kk_cards:
+    architecture_design:
+        id: e834d441-a1bf-4f97-9e62-ed1b3d851138
+        title: Companion 伴播主页面路由入口
+    coding_conventions:
+        id: 6d5d6ac9-a1f0-4910-b4b2-9e1dc4f1ed86
+        title: Companion 伴播主页面路由入口
+    overview:
+        id: d58865ec-5d61-44ce-8312-6d331dd8eb9b
+        title: Companion 伴播主页面路由入口
+    tech_stack:
+        id: ed00f4b6-d420-4dc0-8b27-093e7c4877eb
+        title: Companion 伴播主页面路由入口
