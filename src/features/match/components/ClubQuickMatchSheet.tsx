@@ -380,13 +380,35 @@ export function ClubQuickMatchSheet({
   ]);
 
   const handlePublish = useCallback(async () => {
+    // 先完成表单必填校验，再查语聊房，避免未选配置就弹退房提示
+    if (!form.token) {
+      showToast("请先登录");
+      return;
+    }
+    if (!form.club?.id) {
+      showToast("请先选择俱乐部");
+      return;
+    }
+    if (!form.gameId || !form.modeId || !form.levelId || !form.serviceId) {
+      showToast("请完整选择服务模式");
+      return;
+    }
+    if (form.showCompanionPreference && !form.companionPreference) {
+      showToast("请选择单陪或双陪");
+      return;
+    }
+    if (form.remarkOverLimit) {
+      showToast(`备注最多${MATCH_REMARK_MAX}字`);
+      return;
+    }
+    if (isReception && !buyerUserId) {
+      showToast("未识别到下单老板，请重试");
+      return;
+    }
+
     if (isReception || form.voice !== "需试音") {
       joinedRoomRef.current = null;
       void runPublish();
-      return;
-    }
-    if (!form.token) {
-      showToast("请先登录");
       return;
     }
     if (checkingJoinedRoomRef.current || submitting) return;
@@ -409,7 +431,7 @@ export function ClubQuickMatchSheet({
     } finally {
       checkingJoinedRoomRef.current = false;
     }
-  }, [form.token, form.voice, isReception, runPublish, submitting]);
+  }, [buyerUserId, form, isReception, runPublish, submitting]);
 
   const clubDisplayName = form.club?.name || lockedClub.name;
 
