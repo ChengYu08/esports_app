@@ -19,7 +19,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { publishQuickMatch } from "@/features/match/api/match.api";
+import {
+  fetchActiveQuickMatch,
+  publishQuickMatch,
+} from "@/features/match/api/match.api";
+import { isQuickMatchActive } from "@/features/match/api/match.types";
 import { ClubSelectSheet } from "@/features/match/components/ClubSelectSheet";
 import { FieldLabel } from "@/features/match/components/FieldLabel";
 import { MatchClubSelectChip } from "@/features/match/components/MatchClubSelectChip";
@@ -47,6 +51,7 @@ import { AppPrompt } from "@/shared/ui/AppPrompt";
 
 const diamondIcon = require("../../../../assets/mine/star-recharge-diamond-3f6fcf.png");
 const bgPublishDark = require("../../../../assets/images/bg_publish_dark.webp");
+const EXISTING_DISPATCH_HINT = "已有派单";
 
 const PUBLISH_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
 const FOOTER_CONTENT_BOTTOM = 22;
@@ -224,7 +229,39 @@ export default function MatchPublishScreen() {
         goMatching(result.requestNo, result.expireTime, selectedGame ?? null);
       }
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "发布失败，请重试");
+      const message =
+        error instanceof Error ? error.message : "发布失败，请重试";
+      // 已有未过期派单：查 active → ensure 进试音房；进房失败再回退匹配中页。
+      if (message.includes(EXISTING_DISPATCH_HINT)) {
+        try {
+          const active = await fetchActiveQuickMatch(form.token);
+          if (active && isQuickMatchActive(active)) {
+            const activeGame =
+              active.gameId && active.gameName
+                ? { id: active.gameId, name: active.gameName }
+                : null;
+            if (active.needVoice === false) {
+              goMatching(active.requestNo, active.expireTime, activeGame);
+              return;
+            }
+            const entered = await openAuditionRoom(
+              active.requestNo,
+              form.token,
+              {
+                expireTime: active.expireTime,
+                game: activeGame,
+              },
+            );
+            if (!entered) {
+              goMatching(active.requestNo, active.expireTime, activeGame);
+            }
+            return;
+          }
+        } catch {
+          // 恢复查询失败则落回原错误文案
+        }
+      }
+      showToast(message);
     } finally {
       setSubmitting(false);
     }
