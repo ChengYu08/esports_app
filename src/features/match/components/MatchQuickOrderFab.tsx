@@ -21,9 +21,9 @@ import { getProtectedNavigationAction } from "@/shared/navigation/tab-access";
 
 const fabImage = require("../../../../assets/images/ic_quick_match_order.png");
 
-/** 快速下单整图 66×60 */
-const FAB_WIDTH = 66;
-const FAB_HEIGHT = 60;
+/** 快速下单整图 78×71 */
+const FAB_WIDTH = 78;
+const FAB_HEIGHT = 71;
 const EDGE_MARGIN = 8;
 /** 与 AppTabBar 一致：内容区 58 + 底部安全区 */
 const TAB_CONTENT_HEIGHT = 58;
