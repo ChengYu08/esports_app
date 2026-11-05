@@ -83,7 +83,7 @@ function CourtSourcePickerScreen({ step }: { step: "orders" | "reviews" }) {
       isReview
         ? String(source.reviewId) === session?.reviewId
         : String(source.orderId) === session?.orderId,
-    ) ?? rows[0];
+    );
 
   useFocusEffect(
     useCallback(() => {

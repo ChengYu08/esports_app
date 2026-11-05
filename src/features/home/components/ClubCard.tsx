@@ -110,13 +110,12 @@ export const ClubCard = memo(function ClubCard({
           ) : null}
         </View>
       </View>
-      <View style={styles.divider} />
     </Pressable>
   );
 });
 
 const styles = StyleSheet.create({
-  // 设计稿：卡片全宽白底，pad 16/12/16/12，内容 gap 12，底部细分割线
+  // 设计稿：卡片全宽白底，pad 16/12/16/12，内容 gap 12
   club: {
     minHeight: 104,
     flexDirection: "row",
@@ -235,13 +234,5 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   metaIcon: { width: 16, height: 16 },
-  divider: {
-    // 绝对定位：不参与行布局（行内分割线的 margin 会挤窄内容区，右侧出现大空白）
-    position: "absolute",
-    bottom: 0,
-    left: 16,
-    right: 16,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: "#EBEBEB",
-  },
+
 });

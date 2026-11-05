@@ -14,6 +14,7 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
+const allGamesIcon = require("../../../../assets/svgs/god-all-games.svg");
 const searchIcon = require("../../../../assets/svgs/h_search.svg");
 const tabLeftCorner = require("../../../../assets/svgs/h_tab_left.svg");
 const tabRightCorner = require("../../../../assets/svgs/h_tab_right.svg");
@@ -71,6 +72,7 @@ export function HomeHeader({
               onPress={() => onGameChange("")}
               style={[styles.gameTab, game === "" && styles.gameTabSelected]}
             >
+              <Image source={allGamesIcon} style={styles.allGamesIcon} contentFit="contain" />
               <Text style={[styles.gameLabel, game === "" && styles.gameLabelSelected]}>全部</Text>
               {game === "" && (
                 <>
@@ -221,9 +223,9 @@ const styles = StyleSheet.create({
   },
   actions: { alignItems: "center", flexDirection: "row", gap: 10, height: "100%", paddingRight: 12 },
   search: { alignItems: "center", height: 44, justifyContent: "center", width: 40 },
-  searchIcon: { width: 48, height: 48 },
+  searchIcon: { width: 18, height: 18 },
   gameTabs: {
-    height: 38,
+    height: 42,
   },
   gameTabsContent: {
     paddingHorizontal: 16,
@@ -233,7 +235,7 @@ const styles = StyleSheet.create({
   },
   gameTab: {
     flexShrink: 0,
-    height: 38,
+    height: 42,
     paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
@@ -245,6 +247,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
   },
+  allGamesIcon: { width: 20, height: 20 },
   gameLogo: {
     width: 16,
     height: 16,
@@ -263,10 +266,10 @@ const styles = StyleSheet.create({
     color: "#999",
     fontSize: 12,
     lineHeight: 18,
-    fontWeight: "500",
+    fontWeight: "400",
     flexShrink: 0,
   },
-  gameLabelSelected: { color: "#0A0A0A" },
+  gameLabelSelected: { color: "#0A0A0A", fontWeight: "500" },
   filterRetry: { alignSelf: "flex-start", paddingHorizontal: 16, paddingVertical: 8 },
   filterRetryText: { fontFamily: SYSTEM_FONT, fontSize: 12, lineHeight: 18, color: "#979799" },
   gameIndicator: {

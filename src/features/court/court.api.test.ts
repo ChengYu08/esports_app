@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { apiClient } from "@/core/network/api-client";
 import { courtApi, courtServiceTypeText } from "./court.api";
-import { uploadCompanionMediaObject } from "@/features/mine/companion-upload";
+import { clientAuthApi } from "@/features/auth/client-auth.api";
+import { uploadClientObject } from "@/features/auth/oss-upload";
 
 const session = vi.hoisted(() => ({ accessToken: null as string | null }));
 
@@ -10,16 +11,47 @@ vi.mock("@esports/auth", () => ({
   useAuthStore: { getState: () => session },
 }));
 vi.mock("@/core/network/api-client", () => ({ apiClient: vi.fn() }));
-vi.mock("@/features/mine/companion-upload", () => ({ uploadCompanionMediaObject: vi.fn() }));
+vi.mock("@/features/auth/client-auth.api", () => ({ clientAuthApi: { getOssSts: vi.fn() } }));
+vi.mock("@/features/auth/oss-upload", () => ({ uploadClientObject: vi.fn() }));
 
 const request = vi.mocked(apiClient);
 
 describe("evidence image upload", () => {
-  it("uploads through the same image flow as companion screenshots and returns the object key", async () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
     session.accessToken = "viewer-token";
-    vi.mocked(uploadCompanionMediaObject).mockResolvedValue({ url: "https://cdn.example/image.png", objectKey: "images/image.png" });
-    await expect(courtApi.uploadEvidence("file:///image.png", "image.png")).resolves.toBe("images/image.png");
-    expect(uploadCompanionMediaObject).toHaveBeenCalledWith("viewer-token", { uri: "file:///image.png", fileName: "image.png", mimeType: "image/png" }, "image");
+  });
+
+  it("registers evidence ownership before uploading and returns the authorized key", async () => {
+    const sts = { objectList: ["court/image.png"] };
+    request.mockResolvedValue({ code: "SUCCESS", data: sts });
+    await expect(courtApi.uploadEvidence("file:///image.png", "image.png")).resolves.toBe("court/image.png");
+    expect(request).toHaveBeenCalledWith("/client/v1/court/evidence/sts", {
+      method: "POST", token: "viewer-token", body: { action: { objectNames: ["image.png"] } },
+    });
+    expect(uploadClientObject).toHaveBeenCalledWith(sts, "court/image.png", { uri: "file:///image.png", mimeType: "image/png" });
+    expect(clientAuthApi.getOssSts).not.toHaveBeenCalled();
+  });
+
+  it("uses the Web evidence business type for the legacy fallback", async () => {
+    request.mockRejectedValue(new Error("unavailable"));
+    vi.mocked(clientAuthApi.getOssSts).mockResolvedValue({ objectList: ["court/fallback.png"] } as Awaited<ReturnType<typeof clientAuthApi.getOssSts>>);
+    await expect(courtApi.uploadEvidence("file:///image.png", "image.png")).resolves.toBe("court/fallback.png");
+    expect(clientAuthApi.getOssSts).toHaveBeenCalledWith("viewer-token", "111", ["image.png"]);
+  });
+
+  it("refreshes credentials and returns the new key after a failed upload", async () => {
+    request.mockResolvedValueOnce({ code: "SUCCESS", data: { objectList: ["old.png"] } })
+      .mockResolvedValueOnce({ code: "SUCCESS", data: { objectList: ["new.png"] } });
+    vi.mocked(uploadClientObject).mockRejectedValueOnce(new Error("expired")).mockResolvedValueOnce("url");
+    await expect(courtApi.uploadEvidence("file:///image.png", "image.png")).resolves.toBe("new.png");
+    expect(uploadClientObject).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not upload without an authorized object key", async () => {
+    request.mockResolvedValue({ code: "SUCCESS", data: {} });
+    await expect(courtApi.uploadEvidence("file:///image.png", "image.png")).rejects.toThrow("上传凭证缺少文件路径");
+    expect(uploadClientObject).not.toHaveBeenCalled();
   });
 });
 

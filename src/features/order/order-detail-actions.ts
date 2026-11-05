@@ -1,10 +1,13 @@
 import type { OrderAction, OrderActionKey } from "./order.types";
 
-export type OrderDetailActionKey = Extract<OrderActionKey, "cancel" | "afterSales" | "complete">;
+export type OrderDetailActionKey = Extract<OrderActionKey, "cancel" | "afterSales" | "complete" | "pay">;
 
 export function getOrderDetailAction(
   actions: readonly Pick<OrderAction, "key">[],
 ): OrderDetailActionKey | null {
+  if (actions.some((action) => action.key === "pay")) {
+    return "pay";
+  }
   if (actions.some((action) => action.key === "afterSales")) {
     return "afterSales";
   }
