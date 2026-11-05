@@ -619,6 +619,7 @@ export function ClubQuickMatchSheet({
                 placeholderTextColor="#CACACC"
                 style={styles.remarkInput}
                 maxLength={MATCH_REMARK_MAX + 1}
+                cursorColor="#FE1F4C"
               />
             </View>
           </View>

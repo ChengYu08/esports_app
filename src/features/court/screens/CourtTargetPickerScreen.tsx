@@ -124,6 +124,7 @@ export default function CourtTargetPickerScreen() {
             autoCapitalize="none"
             editable={validSession}
             style={styles.searchInput}
+            cursorColor="#FE1F4C"
           />
           {!!keyword && (
             <Pressable

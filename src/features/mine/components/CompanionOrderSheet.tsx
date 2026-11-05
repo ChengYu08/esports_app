@@ -410,6 +410,7 @@ export function CompanionOrderSheet({
                   value={remark}
                   onChangeText={setRemark}
                   style={styles.remarkInput}
+                  cursorColor="#FE1F4C"
                 />
               </OrderFieldRow>
 

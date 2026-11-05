@@ -132,6 +132,7 @@ export function OrderMultiCompanionSheet({
             autoCorrect={false}
             autoCapitalize="none"
             editable={!submitting}
+            cursorColor="#FE1F4C"
           />
         </View>
         <FlatList

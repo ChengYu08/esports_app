@@ -178,6 +178,7 @@ export function CourtCaseFormSection({
           placeholder="请输入个人诉求"
           placeholderTextColor="#CCCCCC"
           style={styles.input}
+          cursorColor="#FE1F4C"
         />
         <Text style={styles.counter}>{claim.length}/40</Text>
       </FormField>

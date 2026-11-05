@@ -527,6 +527,7 @@ export default function MatchPublishScreen() {
                       onBlur={() => {
                         remarkFocusedRef.current = false;
                       }}
+                      cursorColor="#FE1F4C"
                     />
                   </View>
                 </View>

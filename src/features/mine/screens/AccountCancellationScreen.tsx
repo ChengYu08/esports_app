@@ -273,6 +273,7 @@ export default function AccountCancellationScreen() {
               placeholder="请输入验证码"
               placeholderTextColor="#CCCCCC"
               style={styles.codeInput}
+              cursorColor="#FE1F4C"
             />
             <View style={styles.codeSeparator} />
             <Pressable

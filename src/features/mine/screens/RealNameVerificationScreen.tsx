@@ -101,6 +101,7 @@ export function RealNameVerificationScreen() {
                 placeholder="请输入真实姓名"
                 placeholderTextColor="#CCCCCC"
                 style={styles.input}
+                cursorColor="#FE1F4C"
               />
             </View>
             <View style={styles.divider} />
@@ -119,6 +120,7 @@ export function RealNameVerificationScreen() {
                 maxLength={18}
                 autoCapitalize="characters"
                 autoCorrect={false}
+                cursorColor="#FE1F4C"
               />
             </View>
           </View>
