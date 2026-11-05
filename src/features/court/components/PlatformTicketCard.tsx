@@ -33,7 +33,7 @@ export const PlatformTicketCard = memo(function PlatformTicketCard({
       <View style={styles.header}>
         <View style={[styles.typeTag, orderDispute && styles.orderTag]}>
           <Text style={[styles.typeText, { color: typeColor }]}>类型</Text>
-          <View style={[styles.typeDivider, { backgroundColor: typeColor }]} />
+          <View style={[styles.typeDivider, { backgroundColor: orderDispute ? "#FFDDC2" : "#FFC2CE" }]} />
           <Text style={[styles.typeText, { color: typeColor }]}>
             {typeLabel}
           </Text>
@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     lineHeight: 16,
   },
-  typeDivider: { height: 6, width: 0.5 },
+  typeDivider: { height: 6, width: 1 },
   time: {
     color: COURT_COLORS.muted,
     flex: 1,

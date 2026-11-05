@@ -9,5 +9,8 @@ export function showToast(message: string, options?: ToastOptions) {
     duration: Toast.durations.SHORT,
     position: Toast.positions.CENTER,
     ...options,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    opacity: 1,
+    shadow: false,
   });
 }

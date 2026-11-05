@@ -12,10 +12,7 @@ import type { useManagedGame } from "./use-companion-management";
 
 function showUploadMessage(message: string) {
   showToast(message, {
-    backgroundColor: "#000",
     textColor: "#FFF",
-    opacity: 0.8,
-    shadow: false,
     keyboardAvoiding: false,
     containerStyle: {
       width: 200,

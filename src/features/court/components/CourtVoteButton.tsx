@@ -9,6 +9,7 @@ type Props = {
   muted: boolean;
   disabled: boolean;
   count: number;
+  proportion: number;
   loading?: boolean;
   onPress: () => void;
 };
@@ -32,6 +33,7 @@ export function CourtVoteButton({
   muted,
   disabled,
   count,
+  proportion,
   loading = false,
   onPress,
 }: Props) {
@@ -49,7 +51,7 @@ export function CourtVoteButton({
       accessibilityState={{ disabled, selected, busy: loading }}
       disabled={disabled}
       onPress={onPress}
-      style={[styles.button, !isPlaintiff && styles.defendantButton]}
+      style={[styles.button, { flex: proportion }, !isPlaintiff && styles.defendantButton]}
     >
       <CachedImage
         accessible={false}
@@ -70,7 +72,7 @@ export function CourtVoteButton({
 }
 
 const styles = StyleSheet.create({
-  button: { flex: 1, height: 32, minWidth: 0, justifyContent: "center" },
+  button: { height: 32, minWidth: 0, justifyContent: "center" },
   // Figma overlaps the button frames by 4; the SVG corners form the diagonal gap.
   defendantButton: { marginLeft: -4 },
   background: { position: "absolute", top: 0, bottom: 0 },

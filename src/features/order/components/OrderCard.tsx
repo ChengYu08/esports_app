@@ -4,7 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { memo, useEffect, useState, type ReactNode } from "react";
 import type { ImageSource } from "expo-image";
 import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 
 import {
   computeOrderPayableStars,
@@ -75,9 +75,9 @@ export const OrderCard = memo(function OrderCard({
     const orderNo = item.orderNo ?? item.id;
     try {
       await Clipboard.setStringAsync(orderNo);
-      Toast.show("订单编号已复制", { duration: Toast.durations.SHORT });
+      showToast("订单编号已复制");
     } catch {
-      Toast.show("复制失败，请稍后重试", { duration: Toast.durations.SHORT });
+      showToast("复制失败，请稍后重试");
     }
   };
   return (
