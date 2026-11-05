@@ -19,6 +19,7 @@ import {
 } from "@fluentui/react-native-icons";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { router, useIsFocused, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -51,8 +52,10 @@ const bgClubImage = require("../../../../assets/home/bg-club.webp");
 const NAV_BAR_CONTENT_HEIGHT = 44;
 const tabCornerLeftIcon = require("../../../../assets/svgs/tab-corner-left.svg");
 const tabCornerRightIcon = require("../../../../assets/svgs/tab-corner.svg");
-const arrowDownIcon = require("../../../../assets/svgs/arrow-fill-down-new.svg");
-const arrowUpRedIcon = require("../../../../assets/svgs/arrow-fill-up-red.svg");
+const filterListIcon = require("../../../../assets/svgs/icon-filter-list.svg");
+const filterListDefaultIcon = require("../../../../assets/svgs/icon-filter-list-default.svg");
+const filterExpandArrowIcon = require("../../../../assets/svgs/filter-expand-arrow.svg");
+const sheetCloseIcon = require("../../../../assets/svgs/icon-close.svg");
 const introToggleIcon = require("../../../../assets/svgs/intro-toggle.svg");
 const emptyStateIllustration = require("../../../../assets/svgs/empty-state-illustration.svg");
 const customerIcon = require("../../../../assets/svgs/customer.svg");
@@ -74,25 +77,43 @@ const COLORS = {
   greenBg: "#E6FAEF",
   greenText: "#14A357",
   border: "#E9E9EB",
+  // 筛选栏/筛选弹窗新样式色板（设计稿 98-62854 / 581-63648）
+  gold: "#FCD769",
+  chipBg: "#F0F1F2",
+  pillBg: "#F7F7F7",
+  pillSelectedBg: "#FFF5F5",
+  redAccent: "#E01B28",
+  railBg: "#F5F6F7",
+  borderLight: "#EBEBEB",
 } as const;
 
-type FilterKey =
-  | "mode"
-  | "level"
-  | "gender"
-  | "advanced"
-  | "status"
-  | "price"
-  | "tag";
-
-/** 设计稿筛选栏 4 维度：模式 / 等级 / 性别 / 筛选（筛选聚合状态+价格） */
-const filterDefinitions: { key: FilterKey; label: string }[] = [
+/** 聚合筛选面板左侧分类栏（顺序对齐设计稿 581-63648） */
+const FILTER_RAIL_SECTIONS = [
+  { key: "gender", label: "性别" },
+  { key: "status", label: "状态" },
+  { key: "price", label: "价格" },
   { key: "mode", label: "模式" },
   { key: "level", label: "等级" },
-  { key: "gender", label: "性别" },
-  { key: "advanced", label: "筛选" },
   { key: "tag", label: "标签" },
-];
+] as const;
+
+/** 确定按钮品牌渐变（设计稿 155deg，用 start/end 点近似） */
+const FILTER_CONFIRM_GRADIENT = ["#FE1F4C", "#FF1F69"] as const;
+const FILTER_CONFIRM_GRADIENT_START = { x: 0, y: 0 } as const;
+const FILTER_CONFIRM_GRADIENT_END = { x: 0.42, y: 0.91 } as const;
+
+/** pill 选项折叠阈值：超过 2 行（每行 3 个）时默认收起，点「展开收起」展开 */
+const FILTER_PILL_COLLAPSED_COUNT = 6;
+
+/** 折叠分区里已选项落在折叠范围（第 7 项及以后）时需要自动展开 */
+function needsExpandForSelection(options: FilterPillOption[]): boolean {
+  if (options.length <= FILTER_PILL_COLLAPSED_COUNT) {
+    return false;
+  }
+  return options
+    .slice(FILTER_PILL_COLLAPSED_COUNT)
+    .some((option) => option.selected);
+}
 
 const memberKeyExtractor = (member: Companion) => String(member.profileId);
 
@@ -187,7 +208,14 @@ export default function ClubDetailScreen() {
   const [introExpanded, setIntroExpanded] = useState(false);
   // 简介真实行数（由隐藏测量层回报）：不超过两行时不展示展开/收起按钮
   const [introLineCount, setIntroLineCount] = useState(0);
-  const [openFilter, setOpenFilter] = useState<FilterKey | null>(null);
+  // 聚合筛选面板：左侧分类栏高亮项 + 各分区 y 坐标（点击左栏滚动定位）+ 模式/等级/标签折叠状态
+  const [activeFilterSection, setActiveFilterSection] =
+    useState<string>("gender");
+  const [expandedSections, setExpandedSections] = useState<
+    Record<string, boolean>
+  >({});
+  const filterSectionLayouts = useRef<Record<string, number>>({});
+  const filterSectionsScrollRef = useRef<ScrollView | null>(null);
   const [isFilterSheetVisible, setFilterSheetVisible] = useState(false);
   const [showPriceEmptyModal, setShowPriceEmptyModal] = useState(false);
   const [quickMatchVisible, setQuickMatchVisible] = useState(false);
@@ -286,6 +314,11 @@ export default function ClubDetailScreen() {
     }
     filterBackdropOpacity.setValue(0);
     filterSheetTranslateY.setValue(windowHeight);
+    // iOS 下 Modal 关闭后子树仍挂载，重开面板时需把右侧选项区滚回顶部
+    // （Android 因 Modal 卸载子树自动复位，scrollTo 空滚无害）
+    requestAnimationFrame(() => {
+      filterSectionsScrollRef.current?.scrollTo({ y: 0, animated: false });
+    });
     const animation = Animated.parallel([
       Animated.timing(filterBackdropOpacity, {
         toValue: 1,
@@ -338,13 +371,18 @@ export default function ClubDetailScreen() {
       companionsQuery.fetchNextPage();
     }
   }, [companionsQuery]);
-  // 性别/状态/价格筛选的当前值，统一映射到接口参数
-  function openFilterSheet(filter: FilterKey) {
+  function openFilterSheet() {
     if (isFilterSheetVisible) {
       return;
     }
     isFilterSheetClosing.current = false;
-    setOpenFilter(filter);
+    setActiveFilterSection(FILTER_RAIL_SECTIONS[0].key);
+    // 折叠分区里已选项超出折叠范围时自动展开，否则选中项被藏起来没有任何提示
+    setExpandedSections({
+      mode: needsExpandForSelection(modeOptions),
+      level: needsExpandForSelection(levelOptions),
+      tag: needsExpandForSelection(tagOptions),
+    });
     setFilterSheetVisible(true);
   }
 
@@ -368,12 +406,23 @@ export default function ClubDetailScreen() {
       }),
     ]).start(({ finished }) => {
       if (!finished) {
+        // 关闭动画被打断（如窗口尺寸变化触发打开 useEffect 停掉动画）时复位标记，
+        // 否则 isFilterSheetClosing 永远为 true，面板关不掉
+        isFilterSheetClosing.current = false;
         return;
       }
       setFilterSheetVisible(false);
-      setOpenFilter(null);
       isFilterSheetClosing.current = false;
     });
+  }
+
+  function handleResetFilters() {
+    setPriceSort("DEFAULT");
+    setSelectedSex(undefined);
+    setSelectedStatus(undefined);
+    setSelectedMode(undefined);
+    setSelectedLevel(undefined);
+    setSelectedTag(undefined);
   }
 
   function handleSelectGame(nextGameId: string) {
@@ -382,6 +431,59 @@ export default function ClubDetailScreen() {
     setSelectedMode(undefined);
     setSelectedLevel(undefined);
   }
+  // 聚合筛选面板各分区选项（选中立即生效，列表在面板背后实时重查；选项量小，不做 memo）
+  const modeOptions: FilterPillOption[] = [
+    {
+      key: "all",
+      label: "不限",
+      selected: selectedMode === undefined,
+      onPress: () => {
+        setSelectedMode(undefined);
+        setSelectedLevel(undefined);
+      },
+    },
+    ...(modesQuery.data ?? []).map((mode) => ({
+      key: String(mode.id),
+      label: mode.modeName,
+      selected: selectedMode === mode.id,
+      onPress: () => {
+        setSelectedMode(mode.id);
+        // 模式变化后等级需重新选择
+        setSelectedLevel(undefined);
+      },
+    })),
+  ];
+  const levelOptions: FilterPillOption[] =
+    !selectedMode || !accessToken
+      ? []
+      : [
+          {
+            key: "all",
+            label: "不限",
+            selected: selectedLevel === undefined,
+            onPress: () => setSelectedLevel(undefined),
+          },
+          ...(levelsQuery.data ?? []).map((level) => ({
+            key: String(level.id),
+            label: level.name,
+            selected: selectedLevel === Number(level.id),
+            onPress: () => setSelectedLevel(Number(level.id)),
+          })),
+        ];
+  const tagOptions: FilterPillOption[] = [
+    {
+      key: "all",
+      label: "不限",
+      selected: selectedTag === undefined,
+      onPress: () => setSelectedTag(undefined),
+    },
+    ...(tagsQuery.data ?? []).map((tag) => ({
+      key: String(tag.id),
+      label: tag.name,
+      selected: selectedTag === tag.id,
+      onPress: () => setSelectedTag(tag.id),
+    })),
+  ];
 
   if (clubQuery.isLoading) {
     return (
@@ -422,6 +524,7 @@ export default function ClubDetailScreen() {
           <Pressable
             accessibilityLabel="搜索"
             hitSlop={10}
+            style={styles.navActionButton}
             onPress={() => {
               // 搜索页已在栈内时弹回它，避免 搜索/俱乐部/个人主页 反复跳转无限套娃
               if (fromSearchPage) {
@@ -442,7 +545,7 @@ export default function ClubDetailScreen() {
           <Pressable
             accessibilityLabel="在线客服"
             hitSlop={10}
-            style={styles.navActionCustomer}
+            style={[styles.navActionButton, styles.navActionCustomer]}
             onPress={openCustomerService}
           >
             <Image source={customerIcon} style={{ width: 24, height: 24 }} />
@@ -538,8 +641,58 @@ export default function ClubDetailScreen() {
           ))}
         </ScrollView>
       </View>
-      {/* 成员列表（白色圆角面板：筛选栏 + 卡片） */}
+      {/* 成员列表面板（白色圆角容器：固定筛选栏 + 卡片列表，筛选栏不随列表滚动） */}
       <View style={styles.listWrap}>
+        <View style={styles.filterBar}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.filterTagScroll}
+            contentContainerStyle={styles.filterTagRow}
+          >
+            {tagsQuery.data?.map((tag) => {
+              const selected = selectedTag === tag.id;
+              return (
+                <Pressable
+                  key={tag.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={tag.name}
+                  accessibilityState={{ selected }}
+                  style={[
+                    styles.filterTagChip,
+                    selected && styles.filterTagChipSelected,
+                  ]}
+                  onPress={() => setSelectedTag(selected ? undefined : tag.id)}
+                >
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.filterTagText,
+                      selected && styles.filterTagTextSelected,
+                    ]}
+                  >
+                    {tag.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="展开筛选"
+            hitSlop={6}
+            style={styles.filterExpandButton}
+            onPress={openFilterSheet}
+          >
+            <Image
+              accessibilityIgnoresInvertColors
+              source={
+                isFilterSheetVisible ? filterListIcon : filterListDefaultIcon
+              }
+              style={styles.filterExpandIcon}
+            />
+          </Pressable>
+        </View>
         <FlatList
           data={members}
           keyExtractor={memberKeyExtractor}
@@ -556,92 +709,6 @@ export default function ClubDetailScreen() {
             { paddingBottom: 92 + insets.bottom },
           ]}
           style={styles.listScroll}
-          ListHeaderComponent={
-            <View style={styles.filterBar}>
-              {filterDefinitions
-                .filter(
-                  ({ key }) =>
-                    key !== "tag" || (tagsQuery.data?.length ?? 0) > 0,
-                )
-                .map(({ key, label }) => {
-                  // 已选值文案：对齐大神首页筛选栏的「标签·值」展示
-                  let selectedText: string | undefined;
-                  if (key === "gender") {
-                    selectedText =
-                      selectedSex === 1
-                        ? "男"
-                        : selectedSex === 2
-                          ? "女"
-                          : undefined;
-                  } else if (key === "mode") {
-                    selectedText = modesQuery.data?.find(
-                      (mode) => mode.id === selectedMode,
-                    )?.modeName;
-                  } else if (key === "level") {
-                    selectedText = levelsQuery.data?.find(
-                      (level) => Number(level.id) === selectedLevel,
-                    )?.name;
-                  } else if (key === "tag") {
-                    selectedText = tagsQuery.data?.find(
-                      (tag) => tag.id === selectedTag,
-                    )?.name;
-                  } else if (key === "advanced") {
-                    const statusText =
-                      selectedStatus === 0
-                        ? "空闲中"
-                        : selectedStatus === 1
-                          ? "游戏中"
-                          : undefined;
-                    const priceText =
-                      priceSort === "ASC"
-                        ? "从低到高"
-                        : priceSort === "DESC"
-                          ? "从高到低"
-                          : undefined;
-                    selectedText = [statusText, priceText]
-                      .filter(Boolean)
-                      .join("/");
-                  }
-                  const hasSelection =
-                    (key === "gender" && selectedSex !== undefined) ||
-                    (key === "mode" && selectedMode !== undefined) ||
-                    (key === "level" && selectedLevel !== undefined) ||
-                    (key === "tag" && selectedTag !== undefined) ||
-                    (key === "advanced" &&
-                      (selectedStatus !== undefined ||
-                        priceSort !== "DEFAULT"));
-                  const selecting = openFilter === key;
-                  return (
-                    <Pressable
-                      key={key}
-                      accessibilityLabel={
-                        hasSelection && selectedText
-                          ? `筛选${label}，已选${selectedText}`
-                          : `筛选${label}`
-                      }
-                      accessibilityState={{ selected: hasSelection }}
-                      style={styles.filterOption}
-                      onPress={() => openFilterSheet(key)}
-                    >
-                      <Text
-                        numberOfLines={1}
-                        style={[
-                          styles.filterOptionText,
-                          hasSelection && styles.filterOptionTextSelected,
-                          selecting && styles.filterOptionTextSelecting,
-                        ]}
-                      >
-                        {hasSelection && selectedText ? selectedText : label}
-                      </Text>
-                      <Image
-                        source={selecting ? arrowUpRedIcon : arrowDownIcon}
-                        style={styles.filterArrowIcon}
-                      />
-                    </Pressable>
-                  );
-                })}
-            </View>
-          }
           ListEmptyComponent={
             companionsQuery.isLoading ? (
               <ClubDetailMemberSkeletonList />
@@ -656,7 +723,7 @@ export default function ClubDetailScreen() {
           }
         />
       </View>
-      {/* 筛选底部弹窗（原始实现） */}
+      {/* 筛选底部弹窗（聚合面板：左分类栏 + 右选项区 + 重置/确定） */}
       <Modal
         transparent
         visible={isFilterSheetVisible}
@@ -680,182 +747,300 @@ export default function ClubDetailScreen() {
             ]}
           >
             <View style={styles.filterSheetHeader}>
-              <Text style={styles.filterSheetTitle}>
-                {
-                  filterDefinitions.find((item) => item.key === openFilter)
-                    ?.label
-                }
-              </Text>
-              <Pressable accessibilityLabel="关闭" onPress={closeFilterSheet}>
-                <Text style={styles.filterClose}>×</Text>
+              <Text style={styles.filterSheetTitle}>筛选</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="关闭"
+                hitSlop={8}
+                style={styles.filterSheetClose}
+                onPress={closeFilterSheet}
+              >
+                <Image
+                  accessibilityIgnoresInvertColors
+                  source={sheetCloseIcon}
+                  style={styles.filterSheetCloseIcon}
+                />
               </Pressable>
             </View>
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              style={styles.filterSheetBody}
-            >
-              {openFilter === "tag" && (
-                <>
-                  <FilterOption
-                    label="不限"
-                    selected={selectedTag === undefined}
-                    onPress={() => {
-                      setSelectedTag(undefined);
-                      closeFilterSheet();
-                    }}
-                  />
-                  {tagsQuery.data?.map((tag) => (
-                    <FilterOption
-                      key={tag.id}
-                      label={tag.name}
-                      selected={selectedTag === tag.id}
+            <View style={styles.filterSheetBody}>
+              <View style={styles.filterRail}>
+                {FILTER_RAIL_SECTIONS.map(({ key, label }) => {
+                  const active = activeFilterSection === key;
+                  return (
+                    <Pressable
+                      key={key}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected: active }}
+                      style={[
+                        styles.filterRailItem,
+                        active && styles.filterRailItemActive,
+                      ]}
                       onPress={() => {
-                        setSelectedTag(tag.id);
-                        closeFilterSheet();
+                        setActiveFilterSection(key);
+                        const y = filterSectionLayouts.current[key];
+                        if (y !== undefined) {
+                          filterSectionsScrollRef.current?.scrollTo({
+                            y: Math.max(y - 8, 0),
+                            animated: true,
+                          });
+                        }
                       }}
-                    />
-                  ))}
-                </>
-              )}
-              {openFilter === "gender" && (
-                <>
-                  <FilterOption
-                    label="不限"
-                    selected={!selectedSex}
-                    onPress={() => {
-                      setSelectedSex(undefined);
-                      closeFilterSheet();
-                    }}
+                    >
+                      <Text
+                        style={[
+                          styles.filterRailText,
+                          active && styles.filterRailTextActive,
+                        ]}
+                      >
+                        {label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <ScrollView
+                ref={filterSectionsScrollRef}
+                showsVerticalScrollIndicator={false}
+                style={styles.filterSheetSections}
+                contentContainerStyle={styles.filterSheetSectionsContent}
+                scrollEventThrottle={16}
+                onScroll={(event) => {
+                  // 滚动时同步左侧分类栏高亮：取最后一个起始位置越过当前视口顶部的分区
+                  const { contentOffset, contentSize, layoutMeasurement } =
+                    event.nativeEvent;
+                  // 滚到底部时强制高亮最后一个分区：短内容下最大偏移量够不到「标签」的 y，否则永远高亮不到
+                  const isAtBottom =
+                    contentSize.height - layoutMeasurement.height - contentOffset.y < 24;
+                  let current: string =
+                    FILTER_RAIL_SECTIONS[FILTER_RAIL_SECTIONS.length - 1].key;
+                  if (!isAtBottom) {
+                    current = FILTER_RAIL_SECTIONS[0].key;
+                    for (const { key } of FILTER_RAIL_SECTIONS) {
+                      const y = filterSectionLayouts.current[key];
+                      if (y !== undefined && y <= contentOffset.y + 24) {
+                        current = key;
+                      }
+                    }
+                  }
+                  setActiveFilterSection(current);
+                }}
+              >
+                <View
+                  style={styles.filterSection}
+                  onLayout={(event) => {
+                    filterSectionLayouts.current.gender =
+                      event.nativeEvent.layout.y;
+                  }}
+                >
+                  <Text style={styles.filterSectionTitle}>性别</Text>
+                  <FilterPillRow
+                    options={[
+                      {
+                        key: "all",
+                        label: "不限",
+                        selected: selectedSex === undefined,
+                        onPress: () => setSelectedSex(undefined),
+                      },
+                      {
+                        key: "male",
+                        label: "男",
+                        selected: selectedSex === 1,
+                        onPress: () => setSelectedSex(1),
+                      },
+                      {
+                        key: "female",
+                        label: "女",
+                        selected: selectedSex === 2,
+                        onPress: () => setSelectedSex(2),
+                      },
+                    ]}
                   />
-                  <FilterOption
-                    label="男"
-                    selected={selectedSex === 1}
-                    onPress={() => {
-                      setSelectedSex(1);
-                      closeFilterSheet();
-                    }}
-                  />
-                  <FilterOption
-                    label="女"
-                    selected={selectedSex === 2}
-                    onPress={() => {
-                      setSelectedSex(2);
-                      closeFilterSheet();
-                    }}
-                  />
-                </>
-              )}
-              {openFilter === "mode" && (
-                <>
-                  <FilterOption
-                    label="不限"
-                    selected={!selectedMode}
-                    onPress={() => {
-                      setSelectedMode(undefined);
-                      setSelectedLevel(undefined);
-                      closeFilterSheet();
-                    }}
-                  />
-                  {modesQuery.data?.map((mode) => (
-                    <FilterOption
-                      key={mode.id}
-                      label={mode.modeName}
-                      selected={selectedMode === mode.id}
-                      onPress={() => {
-                        setSelectedMode(mode.id);
-                        // 模式变化后等级需重新选择
-                        setSelectedLevel(undefined);
-                        closeFilterSheet();
-                      }}
-                    />
-                  ))}
-                </>
-              )}
-              {openFilter === "level" &&
-                (!selectedMode ? (
-                  <Text style={styles.filterSheetHint}>
-                    请先选择「模式」后再选择等级
-                  </Text>
-                ) : !accessToken ? (
-                  <Text style={styles.filterSheetHint}>登录后可选择等级</Text>
-                ) : (
-                  <>
-                    <FilterOption
-                      label="不限"
-                      selected={!selectedLevel}
-                      onPress={() => {
-                        setSelectedLevel(undefined);
-                        closeFilterSheet();
-                      }}
-                    />
-                    {levelsQuery.data?.map((level) => (
-                      <FilterOption
-                        key={level.id}
-                        label={level.name}
-                        selected={selectedLevel === Number(level.id)}
-                        onPress={() => {
-                          setSelectedLevel(Number(level.id));
-                          closeFilterSheet();
-                        }}
-                      />
-                    ))}
-                  </>
-                ))}
-              {openFilter === "advanced" && (
-                <>
+                </View>
+                <View
+                  style={styles.filterSection}
+                  onLayout={(event) => {
+                    filterSectionLayouts.current.status =
+                      event.nativeEvent.layout.y;
+                  }}
+                >
                   <Text style={styles.filterSectionTitle}>状态</Text>
-                  <FilterOption
-                    label="不限"
-                    selected={selectedStatus === undefined}
-                    onPress={() => {
-                      setSelectedStatus(undefined);
-                      closeFilterSheet();
-                    }}
+                  <FilterPillRow
+                    options={[
+                      {
+                        key: "all",
+                        label: "不限",
+                        selected: selectedStatus === undefined,
+                        onPress: () => setSelectedStatus(undefined),
+                      },
+                      {
+                        key: "idle",
+                        label: "空闲中",
+                        selected: selectedStatus === 0,
+                        onPress: () => setSelectedStatus(0),
+                      },
+                      {
+                        key: "playing",
+                        label: "游戏中",
+                        selected: selectedStatus === 1,
+                        onPress: () => setSelectedStatus(1),
+                      },
+                    ]}
                   />
-                  <FilterOption
-                    label="空闲中"
-                    selected={selectedStatus === 0}
-                    onPress={() => {
-                      setSelectedStatus(0);
-                      closeFilterSheet();
-                    }}
-                  />
-                  <FilterOption
-                    label="游戏中"
-                    selected={selectedStatus === 1}
-                    onPress={() => {
-                      setSelectedStatus(1);
-                      closeFilterSheet();
-                    }}
-                  />
+                </View>
+                <View
+                  style={styles.filterSection}
+                  onLayout={(event) => {
+                    filterSectionLayouts.current.price =
+                      event.nativeEvent.layout.y;
+                  }}
+                >
                   <Text style={styles.filterSectionTitle}>价格</Text>
-                  <FilterOption
-                    label="默认排序"
-                    selected={priceSort === "DEFAULT"}
-                    onPress={() => {
-                      setPriceSort("DEFAULT");
-                      closeFilterSheet();
-                    }}
+                  <FilterPillRow
+                    options={[
+                      {
+                        key: "default",
+                        label: "默认排序",
+                        selected: priceSort === "DEFAULT",
+                        onPress: () => setPriceSort("DEFAULT"),
+                      },
+                      {
+                        key: "asc",
+                        label: "从低到高",
+                        selected: priceSort === "ASC",
+                        onPress: () => setPriceSort("ASC"),
+                      },
+                      {
+                        key: "desc",
+                        label: "从高到低",
+                        selected: priceSort === "DESC",
+                        onPress: () => setPriceSort("DESC"),
+                      },
+                    ]}
                   />
-                  <FilterOption
-                    label="从低到高"
-                    selected={priceSort === "ASC"}
-                    onPress={() => {
-                      setPriceSort("ASC");
-                      closeFilterSheet();
-                    }}
+                </View>
+                <View
+                  style={styles.filterSection}
+                  onLayout={(event) => {
+                    filterSectionLayouts.current.mode =
+                      event.nativeEvent.layout.y;
+                  }}
+                >
+                  <Text style={styles.filterSectionTitle}>模式</Text>
+                  <FilterPillRow
+                    options={modeOptions}
+                    collapsed={
+                      modeOptions.length > FILTER_PILL_COLLAPSED_COUNT &&
+                      !expandedSections.mode
+                    }
                   />
-                  <FilterOption
-                    label="从高到低"
-                    selected={priceSort === "DESC"}
-                    onPress={() => {
-                      setPriceSort("DESC");
-                      closeFilterSheet();
-                    }}
+                  {modeOptions.length > FILTER_PILL_COLLAPSED_COUNT ? (
+                    <FilterExpandToggle
+                      expanded={Boolean(expandedSections.mode)}
+                      onToggle={() => {
+                        setExpandedSections((previous) => ({
+                          ...previous,
+                          mode: !previous.mode,
+                        }));
+                      }}
+                    />
+                  ) : null}
+                </View>
+                <View
+                  style={styles.filterSection}
+                  onLayout={(event) => {
+                    filterSectionLayouts.current.level =
+                      event.nativeEvent.layout.y;
+                  }}
+                >
+                  <Text style={styles.filterSectionTitle}>等级</Text>
+                  {!selectedMode ? (
+                    <Text style={styles.filterSheetHint}>
+                      请先选择「模式」后再选择等级
+                    </Text>
+                  ) : !accessToken ? (
+                    <Text style={styles.filterSheetHint}>
+                      登录后可选择等级
+                    </Text>
+                  ) : (
+                    <>
+                      <FilterPillRow
+                        options={levelOptions}
+                        collapsed={
+                          levelOptions.length > FILTER_PILL_COLLAPSED_COUNT &&
+                          !expandedSections.level
+                        }
+                      />
+                      {levelOptions.length > FILTER_PILL_COLLAPSED_COUNT ? (
+                        <FilterExpandToggle
+                          expanded={Boolean(expandedSections.level)}
+                          onToggle={() => {
+                            setExpandedSections((previous) => ({
+                              ...previous,
+                              level: !previous.level,
+                            }));
+                          }}
+                        />
+                      ) : null}
+                    </>
+                  )}
+                </View>
+                <View
+                  style={styles.filterSection}
+                  onLayout={(event) => {
+                    filterSectionLayouts.current.tag =
+                      event.nativeEvent.layout.y;
+                  }}
+                >
+                  <Text style={styles.filterSectionTitle}>标签</Text>
+                  <FilterPillRow
+                    options={tagOptions}
+                    collapsed={
+                      tagOptions.length > FILTER_PILL_COLLAPSED_COUNT &&
+                      !expandedSections.tag
+                    }
                   />
-                </>
-              )}
-            </ScrollView>
+                  {tagOptions.length > FILTER_PILL_COLLAPSED_COUNT ? (
+                    <FilterExpandToggle
+                      expanded={Boolean(expandedSections.tag)}
+                      onToggle={() => {
+                        setExpandedSections((previous) => ({
+                          ...previous,
+                          tag: !previous.tag,
+                        }));
+                      }}
+                    />
+                  ) : null}
+                </View>
+              </ScrollView>
+            </View>
+            <View style={styles.filterSheetFooter}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="重置筛选"
+                style={({ pressed }) => [
+                  styles.filterResetButton,
+                  pressed && styles.filterResetButtonPressed,
+                ]}
+                onPress={handleResetFilters}
+              >
+                <Text style={styles.filterResetButtonText}>重置</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="确定"
+                style={styles.filterConfirmButton}
+                onPress={closeFilterSheet}
+              >
+                <LinearGradient
+                  colors={FILTER_CONFIRM_GRADIENT}
+                  start={FILTER_CONFIRM_GRADIENT_START}
+                  end={FILTER_CONFIRM_GRADIENT_END}
+                  style={styles.filterConfirmGradient}
+                >
+                  <Text style={styles.filterConfirmButtonText}>确定</Text>
+                </LinearGradient>
+              </Pressable>
+            </View>
           </Animated.View>
         </Animated.View>
       </Modal>
@@ -1020,32 +1205,91 @@ function GameTab({
   );
 }
 
-/** 筛选弹窗内整行选项：文字 + 右侧选中✓ */
-function FilterOption({
-  label,
-  selected,
-  onPress,
-}: {
+type FilterPillOption = {
+  key: string;
   label: string;
   selected: boolean;
   onPress: () => void;
+};
+
+/** pill 选项按每行 3 个切行（设计稿右侧选项区为 3 列等分） */
+function chunkFilterOptions(options: FilterPillOption[]): FilterPillOption[][] {
+  const rows: FilterPillOption[][] = [];
+  for (let i = 0; i < options.length; i += 3) {
+    rows.push(options.slice(i, i + 3));
+  }
+  return rows;
+}
+
+/** 聚合筛选面板右侧选项 pill 行：3 列等分，选中红字浅红底；collapsed 时只展示前两行 */
+function FilterPillRow({
+  options,
+  collapsed,
+}: {
+  options: FilterPillOption[];
+  collapsed?: boolean;
+}) {
+  const visibleOptions = collapsed
+    ? options.slice(0, FILTER_PILL_COLLAPSED_COUNT)
+    : options;
+  return (
+    <>
+      {chunkFilterOptions(visibleOptions).map((row, rowIndex) => (
+        <View key={rowIndex} style={styles.filterPillRow}>
+          {row.map((option) => (
+            <Pressable
+              key={option.key}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: option.selected }}
+              style={[
+                styles.filterPill,
+                option.selected && styles.filterPillSelected,
+              ]}
+              onPress={option.onPress}
+            >
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.filterPillText,
+                  option.selected && styles.filterPillTextSelected,
+                ]}
+              >
+                {option.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ))}
+    </>
+  );
+}
+
+/** 模式/等级/标签选项过多时的「展开收起」按钮（箭头随展开状态旋转） */
+function FilterExpandToggle({
+  expanded,
+  onToggle,
+}: {
+  expanded: boolean;
+  onToggle: () => void;
 }) {
   return (
     <Pressable
-      accessibilityRole="radio"
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={styles.filterSheetOption}
+      accessibilityRole="button"
+      accessibilityLabel={expanded ? "收起" : "展开"}
+      style={styles.filterExpandToggle}
+      onPress={onToggle}
     >
-      <Text
-        style={[
-          styles.filterSheetOptionText,
-          selected && styles.filterSheetOptionTextSelected,
-        ]}
-      >
-        {label}
+      <Text style={styles.filterExpandToggleText}>
+        {expanded ? "收起" : "展开"}
       </Text>
-      {selected && <Text style={styles.filterSheetCheck}>✓</Text>}
+      <Image
+        accessibilityIgnoresInvertColors
+        source={filterExpandArrowIcon}
+        style={[
+          styles.filterExpandToggleIcon,
+          expanded && styles.filterExpandToggleIconUp,
+        ]}
+      />
     </Pressable>
   );
 }
@@ -1077,6 +1321,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+  },
+  // 右上角图标按钮占位框 32×24（图标本身仍 24×24 居中）
+  navActionButton: {
+    width: 32,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
   },
   // 客服图标相对搜索图标视觉下移 1pt，对齐设计稿
   navActionCustomer: {
@@ -1266,125 +1517,218 @@ const styles = StyleSheet.create({
   gameTabCornerRight: {
     right: -12,
   },
-  // 成员列表面板
-  listWrap: { flex: 1 },
-  listScroll: { flex: 1 },
-  listContent: {
+  // 成员列表面板（白色圆角容器，筛选栏固定在面板顶部不随列表滚动）
+  listWrap: {
+    flex: 1,
     backgroundColor: COLORS.white,
     borderTopRightRadius: 12,
     paddingTop: 6,
-    minHeight: "100%",
+    overflow: "hidden",
   },
-  // 筛选栏（三态：默认 / 选择中红色 / 已选深色）
+  listScroll: { flex: 1 },
+  listContent: { minHeight: "100%" },
+  // 固定筛选栏：左侧俱乐部标签 chips 横向滚动 + 右侧筛选展开按钮（设计稿 98-62854）
   filterBar: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 12,
   },
-  filterOption: {
-    // 筛选项等分屏幕宽度，防止某项文案过长挤压其他选项；超长文案由 numberOfLines 截断
-    flex: 1,
-    flexDirection: "row",
+  filterTagScroll: { flex: 1 },
+  filterTagRow: {
+    alignItems: "center",
+    gap: 8,
+  },
+  filterTagChip: {
+    height: 24,
+    paddingHorizontal: 8,
     alignItems: "center",
     justifyContent: "center",
-    gap: 2,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    minWidth: 0,
+    borderRadius: 6,
+    backgroundColor: COLORS.chipBg,
   },
-  filterOptionText: {
-    flexShrink: 1,
-    color: COLORS.textSecondary,
+  filterTagChipSelected: { backgroundColor: COLORS.gold },
+  filterTagText: {
+    color: COLORS.textDark,
     fontFamily: SYSTEM_FONT,
     fontSize: 12,
-    lineHeight: 18,
+    lineHeight: 17,
     fontWeight: "400",
   },
-  filterOptionTextSelected: {
-    color: COLORS.textDark,
-    fontWeight: "500",
+  filterTagTextSelected: { fontWeight: "500" },
+  filterExpandButton: {
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  filterOptionTextSelecting: {
-    color: COLORS.brand,
-    fontWeight: "500",
-  },
-  filterArrowIcon: {
-    width: 12,
-    height: 12,
-  },
-  // 筛选底部弹窗
+  filterExpandIcon: { width: 20, height: 20 },
+  // 筛选底部弹窗（聚合面板，设计稿 581-63648）
   filterBackdrop: {
     flex: 1,
     justifyContent: "flex-end",
     backgroundColor: "rgba(0,0,0,.35)",
   },
   filterSheet: {
-    maxHeight: "65%",
+    height: "80%",
     backgroundColor: COLORS.white,
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
+    overflow: "hidden",
   },
   filterSheetHeader: {
-    height: 52,
+    height: 56,
     paddingHorizontal: 16,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.border,
   },
   filterSheetTitle: {
     color: COLORS.textDark,
     fontFamily: SYSTEM_FONT,
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "500",
   },
-  filterClose: {
+  filterSheetClose: {
     width: 32,
-    color: COLORS.textSecondary,
-    fontSize: 26,
-    lineHeight: 32,
-    textAlign: "center",
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
   },
+  filterSheetCloseIcon: { width: 32, height: 32 },
   filterSheetBody: {
-    flexGrow: 0,
+    flex: 1,
+    flexDirection: "row",
   },
-  filterSheetHint: {
-    paddingVertical: 24,
-    textAlign: "center",
-    color: COLORS.textTertiary,
+  // 左侧分类栏
+  filterRail: {
+    width: 80,
+    backgroundColor: COLORS.railBg,
+  },
+  filterRailItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  filterRailItemActive: { backgroundColor: COLORS.white },
+  filterRailText: {
+    color: "#666666",
+    fontFamily: SYSTEM_FONT,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "400",
+  },
+  filterRailTextActive: {
+    color: COLORS.redAccent,
+    fontWeight: "500",
+  },
+  // 右侧分区列表
+  filterSheetSections: { flex: 1 },
+  filterSheetSectionsContent: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+    gap: 16,
+  },
+  filterSection: { gap: 8 },
+  filterSectionTitle: {
+    color: COLORS.textDark,
     fontFamily: SYSTEM_FONT,
     fontSize: 14,
+    fontWeight: "500",
+    lineHeight: 20,
   },
-  filterSheetOption: {
-    height: 48,
-    paddingHorizontal: 20,
+  filterPillRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  filterPill: {
+    flex: 1,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 4,
+    backgroundColor: COLORS.pillBg,
+    paddingHorizontal: 4,
+  },
+  filterPillSelected: { backgroundColor: COLORS.pillSelectedBg },
+  filterPillText: {
+    color: COLORS.textDark,
+    fontFamily: SYSTEM_FONT,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "400",
+    textAlign: "center",
+  },
+  filterPillTextSelected: {
+    color: COLORS.redAccent,
+    fontWeight: "500",
+  },
+  filterExpandToggle: {
+    alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: 4,
+    paddingVertical: 4,
   },
-  filterSheetOptionText: {
-    color: "#333",
+  filterExpandToggleText: {
+    color: "#999999",
     fontFamily: SYSTEM_FONT,
-    fontSize: 14,
+    fontSize: 12,
+    lineHeight: 17,
   },
-  filterSheetOptionTextSelected: {
-    color: COLORS.brand,
-    fontWeight: "600",
-  },
-  filterSheetCheck: {
-    color: COLORS.brand,
-    fontSize: 17,
-    fontWeight: "700",
-  },
-  filterSectionTitle: {
-    marginTop: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 6,
+  filterExpandToggleIcon: { width: 16, height: 16 },
+  filterExpandToggleIconUp: { transform: [{ rotate: "180deg" }] },
+  filterSheetHint: {
+    paddingVertical: 8,
     color: COLORS.textTertiary,
     fontFamily: SYSTEM_FONT,
     fontSize: 12,
     lineHeight: 18,
+  },
+  // 底部操作区：重置（白底描边）+ 确定（品牌渐变撑满）
+  filterSheetFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  filterResetButton: {
+    height: 42,
+    paddingHorizontal: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+    backgroundColor: COLORS.white,
+  },
+  filterResetButtonPressed: { opacity: 0.82 },
+  filterResetButtonText: {
+    color: COLORS.textDark,
+    fontFamily: SYSTEM_FONT,
+    fontSize: 14,
+    fontWeight: "500",
+    lineHeight: 22,
+  },
+  filterConfirmButton: {
+    flex: 1,
+    height: 42,
+    borderRadius: 8,
+    overflow: "hidden",
+  },
+  filterConfirmGradient: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterConfirmButtonText: {
+    color: COLORS.white,
+    fontFamily: SYSTEM_FONT,
+    fontSize: 14,
+    fontWeight: "500",
+    lineHeight: 22,
   },
   memberEmpty: { alignSelf: "center", marginTop: 24 },
   memberLoadMore: { paddingVertical: 16 },

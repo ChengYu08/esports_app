@@ -6,8 +6,8 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { getDDinProStyle } from "@/shared/theme/typography";
 
-const maleIcon = require("../../../assets/svgs/male.svg");
-const femaleIcon = require("../../../assets/svgs/mine-female.svg");
+const maleIcon = require("../../../assets/svgs/gender-male.svg");
+const femaleIcon = require("../../../assets/svgs/gender-female.svg");
 const diamondIcon = require("../../../assets/message/order-assistant-coin-3f6fcf.webp");
 const emptyAvatar = require("../../../assets/mine/mine-avatar.png");
 const statusPlayingIcon = require("../../../assets/svgs/club-status-playing.svg");

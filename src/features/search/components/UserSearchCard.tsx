@@ -12,8 +12,8 @@ import { getSearchUserStatus } from "../search-user-status";
 import { searchTypography } from "../search-typography";
 import { HighlightedSearchText, SearchResultId } from "./SearchResultText";
 
-const maleIcon = require("../../../../assets/svgs/male.svg");
-const femaleIcon = require("../../../../assets/svgs/mine-female.svg");
+const maleIcon = require("../../../../assets/svgs/gender-male.svg");
+const femaleIcon = require("../../../../assets/svgs/gender-female.svg");
 const idleIcon = require("../../../../assets/svgs/search-status-idle.svg");
 const playingIcon = require("../../../../assets/svgs/search-status-playing.svg");
 

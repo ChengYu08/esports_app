@@ -32,7 +32,8 @@ import { DEFAULT_RANKING_FILTERS, getRankingBoard } from "../ranking.config";
 const godLabel = require("../../../../assets/svgs/ranking-title-god.svg");
 const orderLabel = require("../../../../assets/svgs/ranking-title-order.svg");
 const turnoverLabel = require("../../../../assets/svgs/ranking-title-turnover.svg");
-const trophy = require("../../../../assets/svgs/ranking-trophy.svg");
+// 原 svg 内嵌 2048x2048 位图且依赖 pattern/mask，iOS 的 SVGKit 不支持，改用抽取后的 PNG
+const trophy = require("../../../../assets/images/ranking-trophy.png");
 const emptyRows: RankingItem[] = [];
 const TAB_BAR_HEIGHT = 58;
 
