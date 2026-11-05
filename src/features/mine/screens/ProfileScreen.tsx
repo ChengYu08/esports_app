@@ -650,7 +650,7 @@ export default function ProfileScreen() {
           <Image
             source={coverImageUrl ? { uri: coverImageUrl } : background}
             contentFit="cover"
-            style={styles.navbarBgImage}
+            style={StyleSheet.absoluteFill}
           />
           <LinearGradient
             pointerEvents="none"
@@ -1638,10 +1638,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     overflow: "hidden",
-  },
-  navbarBgImage: {
-    width: "100%",
-    aspectRatio: 1,
+    // 与默认封面底色一致：背景图未就绪或带透明通道时也不透出下方滚动内容
+    backgroundColor: "#617181",
   },
   navbarBgOverlay: {
     position: "absolute",
