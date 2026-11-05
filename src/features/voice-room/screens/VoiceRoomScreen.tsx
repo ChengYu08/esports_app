@@ -16,7 +16,7 @@ import {
 import { Image } from "expo-image";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -41,7 +41,6 @@ import { VoiceRoomBackground, VOICE_ROOM_BG_BASE } from "../components/VoiceRoom
 import { VoiceRoomConversationsSheet } from "../components/VoiceRoomConversationsSheet";
 import { VoiceRoomExitDialog } from "../components/VoiceRoomExitDialog";
 import { VoiceRoomMemberSheet } from "../components/VoiceRoomMemberSheet";
-import { VoiceRoomMicBadge } from "../components/VoiceRoomMicrophone";
 import { VoiceRoomSpeakingWaves } from "../components/VoiceRoomSpeakingWaves";
 import { VoiceRoomToolbar } from "../components/VoiceRoomToolbar";
 import { exitVoiceRoom } from "../exit-voice-room";
@@ -79,7 +78,7 @@ const SEAT_AREA_MAX_HEIGHT =
 const closeIcon = require("../../../../assets/svgs/navbar-exit.svg");
 const inviteIcon = require("../../../../assets/svgs/toolbar-invite.svg");
 const invitePlaceholderIcon = require("../../../../assets/svgs/game.svg");
-const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
+const defaultAvatar = require("../../../../assets/images/avatar_default.webp");
 
 function avatarSource(member: VoiceRoomMember) {
   const avatar = member.avatar?.trim();
@@ -89,18 +88,16 @@ function avatarSource(member: VoiceRoomMember) {
 }
 
 // 成员槽位独立 memo 组件：消息到达/输入框打字等父组件重渲染时麦位不参与重渲，
-// 仅 speaking/micOpen 变化的槽位更新。
+// 仅 speaking 变化的槽位更新。头像不做开麦/闭麦角标，也不展示房主标签。
 const MemberSlot = memo(function MemberSlot({
   member,
   columns,
-  micOpen,
   speaking,
   inviteLabel,
   onPress,
 }: {
   member: VoiceRoomMember;
   columns: number;
-  micOpen: boolean;
   speaking: boolean;
   inviteLabel: string;
   onPress: (member: VoiceRoomMember) => void;
@@ -113,7 +110,7 @@ const MemberSlot = memo(function MemberSlot({
       accessibilityLabel={
         invite
           ? inviteLabel
-          : `查看${member.nickname}的资料，${micOpen ? "已开麦" : "已闭麦"}${speaking ? "，正在说话" : ""}`
+          : `查看${member.nickname}的资料${speaking ? "，正在说话" : ""}`
       }
       style={[styles.memberSlot, { width: `${100 / columns}%` }]}
       onPress={() => onPress(member)}
@@ -132,9 +129,6 @@ const MemberSlot = memo(function MemberSlot({
           <Image source={avatarSource(member)} style={styles.avatar} />
         )}
         {!invite ? <VoiceRoomSpeakingWaves active={speaking} /> : null}
-        {!invite ? (
-          <VoiceRoomMicBadge muted={!micOpen} speaking={speaking} />
-        ) : null}
         {isService ? (
           <View style={styles.serviceBadge}>
             <Text style={styles.serviceBadgeText}>接待</Text>
@@ -201,6 +195,18 @@ export default function VoiceRoomScreen() {
   const exitInFlight = useRef(false);
   const kickedRef = useRef(false);
   const focusedRef = useRef(false);
+  /** 是否已发生过首次聚焦：守卫只在「重新聚焦」时生效，避开首次进房 session 尚未建立的时序 */
+  const everFocusedRef = useRef(false);
+  /** 本屏实例标识（React useId，每次 mount 唯一），写入 session.screenFocusOwnerId 作为聚焦权归属 */
+  const roomScreenId = useId();
+  // 守卫经 ref 读最新 roomId，不进 useFocusEffect deps：房内 dismissTo 切房
+  // 只变 params 不产生真实 blur→focus，若进 deps 会触发 cleanup→重跑，
+  // 此时旧房已 exit（activeRoom 为空）、新房 beginRoomJoin 尚未执行，守卫会误判空壳并弹出新房。
+  // 本 effect 声明在守卫之前，聚焦守卫执行时 ref 已同步完成。
+  const roomIdRef = useRef(roomId);
+  useEffect(() => {
+    roomIdRef.current = roomId;
+  }, [roomId]);
   const [micChanging, setMicChanging] = useState(false);
   const [distanceEnabled, setDistanceEnabled] = useState(false);
   /**
@@ -544,12 +550,34 @@ export default function VoiceRoomScreen() {
   useFocusEffect(
     useCallback(() => {
       focusedRef.current = true;
+      // 聚焦标记：navigateToVoiceRoom 据此区分「房内原地切房（dismissTo）」
+      // 与「其他页面进入（push 保留中间路由）」
+      useVoiceRoomSessionStore.getState().setScreenFocused(true);
       // A private chat can cover this screen while the global listener exits it.
       if (kickedRef.current) minimize();
+      // 旧实例兜底：非聚焦页进房（如聊天页点邀请卡）会叠出同房第二个屏实例，
+      // 栈里历史遗留的旧房实例、session 已清空的场景同理。只有最后聚焦过的
+      // 实例是当前房屏：重新聚焦时聚焦权不在自己手上、或 session 已切走/清空，
+      // 则自动弹出自己，保证返回路径不再出现重复/失效的房屏。
+      // 只在真实 blur→focus 时执行；roomId 经 ref 读取（见 roomIdRef 注释）。
+      if (everFocusedRef.current && roomIdRef.current) {
+        const { activeRoom, joiningRoom, screenFocusOwnerId } =
+          useVoiceRoomSessionStore.getState();
+        const sessionMismatch =
+          !joiningRoom &&
+          (!activeRoom || activeRoom.roomId !== roomIdRef.current);
+        if (sessionMismatch || screenFocusOwnerId !== roomScreenId) {
+          minimize();
+          return;
+        }
+      }
+      everFocusedRef.current = true;
+      useVoiceRoomSessionStore.getState().setScreenFocusOwner(roomScreenId);
       return () => {
         focusedRef.current = false;
+        useVoiceRoomSessionStore.getState().setScreenFocused(false);
       };
-    }, [minimize]),
+    }, [minimize, roomScreenId]),
   );
 
   /** 场景 A：试音自发 — fetchActiveQuickMatch 校验 */
@@ -948,20 +976,13 @@ export default function VoiceRoomScreen() {
   };
 
   const seatSlots = members.map((member, index) => {
-    const micOpen =
-      rtcReady &&
-      (member.userId === String(currentUser?.id)
-        ? !muted
-        : Boolean(member.micOpen));
-    // speaking 来自独立的 speakingUserIds（声网音量回调高频更新的原子 state），
-    // 能说话即代表已开麦，不再用可能滞后的 micOpen 二次短路
+    // speaking 来自独立的 speakingUserIds（声网音量回调高频更新的原子 state）
     const speaking = rtcReady && speakingUserIds.includes(member.userId);
     return (
       <MemberSlot
         key={`${member.userId}-${index}`}
         member={member}
         columns={memberColumns}
-        micOpen={micOpen}
         speaking={speaking}
         inviteLabel={inviteSlotLabel}
         onPress={handleSlotPress}

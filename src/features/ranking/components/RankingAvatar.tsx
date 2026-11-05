@@ -1,7 +1,7 @@
 import { Image } from "expo-image";
 import { useState } from "react";
 
-const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
+const defaultAvatar = require("../../../../assets/images/avatar_default.webp");
 
 export function RankingAvatar({
   uri,

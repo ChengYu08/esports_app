@@ -15,6 +15,8 @@ const sendIcon = require("../../../../assets/svgs/toolbar-send.svg");
 const messageIcon = require("../../../../assets/svgs/toolbar-message.svg");
 const inviteIcon = require("../../../../assets/svgs/toolbar-invite.svg");
 const selectCompanionIcon = require("../../../../assets/svgs/toolbar-select-companion.svg");
+/** Figma 542:121702 / 542:121821：接待派单左侧耳机图标 */
+const dispatchIcon = require("../../../../assets/svgs/toolbar-dispatch.svg");
 
 type VoiceRoomToolbarProps = {
   bottomInset: number;
@@ -28,7 +30,7 @@ type VoiceRoomToolbarProps = {
   leaving: boolean;
   serviceCalling: boolean;
   distanceEnabled: boolean;
-  /** 房主且房内尚无接待时展示「呼叫接待」 */
+  /** 房主且房内尚无接待时展示「接待派单」 */
   showCallService?: boolean;
   /** 当前用户为房间绑定接待时展示「客服派单」 */
   showServiceDispatch?: boolean;
@@ -147,36 +149,45 @@ export function VoiceRoomToolbar({
       {showCallService ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={serviceCalling ? "呼叫中" : "呼叫接待"}
+          accessibilityLabel={serviceCalling ? "邀请中" : "接待派单"}
           accessibilityState={{ disabled: serviceCalling || leaving, busy: serviceCalling }}
           disabled={serviceCalling || leaving}
           onPress={onCallService}
           hitSlop={4}
           style={({ pressed }) => [
-            styles.actionPillButton,
-            (serviceCalling || leaving) && styles.disabled,
-            pressed && styles.pressed,
+            styles.dispatchButton,
+            leaving && !serviceCalling && styles.disabled,
+            pressed && !serviceCalling && styles.pressed,
           ]}
         >
           <LinearGradient
             colors={["#FF1F2E", "#FF1F69"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
+            start={{ x: 0.12, y: 0 }}
+            end={{ x: 1.08, y: 1 }}
             style={[
-              styles.actionPillContent,
-              compact && styles.actionPillContentCompact,
+              styles.dispatchContent,
+              compact && styles.dispatchContentCompact,
             ]}
           >
+            <Image
+              source={dispatchIcon}
+              style={styles.dispatchIcon}
+              contentFit="contain"
+            />
             <Text
               numberOfLines={1}
               maxFontSizeMultiplier={1.2}
               style={[
-                styles.actionPillText,
-                compact && styles.actionPillTextCompact,
+                styles.dispatchText,
+                compact && styles.dispatchTextCompact,
               ]}
             >
-              {serviceCalling ? "呼叫中…" : "呼叫接待"}
+              {serviceCalling ? "邀请中" : "接待派单"}
             </Text>
+            {/* Figma 542:121821：邀请中态叠加 30% 白蒙层 */}
+            {serviceCalling ? (
+              <View pointerEvents="none" style={styles.dispatchCallingOverlay} />
+            ) : null}
           </LinearGradient>
         </Pressable>
       ) : null}
@@ -341,6 +352,33 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   actionPillTextCompact: { fontSize: 12 },
+  /** Figma 542:121702：接待派单 pill（图标 22 + 文案，pl8/pr12/gap4） */
+  dispatchButton: { flexShrink: 0, borderRadius: 18, overflow: "hidden" },
+  dispatchContent: {
+    height: 36,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingLeft: 8,
+    paddingRight: 12,
+    borderRadius: 18,
+    overflow: "hidden",
+  },
+  dispatchContentCompact: { paddingRight: 8 },
+  dispatchIcon: { width: 22, height: 22 },
+  dispatchText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: "600",
+  },
+  dispatchTextCompact: { fontSize: 12 },
+  dispatchCallingOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(255,255,255,0.3)",
+    borderRadius: 18,
+  },
   selectCompanionButton: { flexShrink: 0, borderRadius: 18 },
   selectCompanionContent: {
     height: 36,

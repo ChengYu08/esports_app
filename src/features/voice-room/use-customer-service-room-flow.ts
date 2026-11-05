@@ -2,12 +2,12 @@
  * 客服接单后的安全切房协调流程（对齐 PC useCustomerServiceRoomFlow）
  */
 import { useAuthStore } from "@esports/auth";
-import { router } from "expo-router";
 import { showToast } from "@/shared/ui/app-toast";
 
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 
 import { exitVoiceRoom } from "./exit-voice-room";
+import { navigateToVoiceRoom } from "./navigate-voice-room";
 import { resolveVoiceRoomId, voiceRoomApi } from "./voice-room.api";
 import type { VoiceRoomDetail } from "./voice-room.types";
 import { useVoiceRoomSessionStore } from "./voice-room-session";
@@ -144,10 +144,7 @@ export async function claimAndEnterCustomerServiceRoom(
 
     try {
       await leaveExpectedRoom(expectedCurrent, { id: targetId, roomVersion: targetVersion }, accessToken);
-      router.push({
-        pathname: "/voice-room/[id]",
-        params: { id: targetId, v: targetVersion },
-      });
+      navigateToVoiceRoom({ id: targetId, v: targetVersion });
       return { status: "entered" };
     } catch (error) {
       return {

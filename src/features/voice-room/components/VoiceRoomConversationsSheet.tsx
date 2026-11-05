@@ -20,7 +20,7 @@ import {
   isSystemConversationId,
 } from "@/features/message/system-conversations";
 
-const defaultConversationAvatar = require("../../../../assets/coms/avatar_default.webp");
+const defaultConversationAvatar = require("../../../../assets/images/avatar_default.webp");
 
 type VoiceRoomConversationsSheetProps = {
   visible: boolean;

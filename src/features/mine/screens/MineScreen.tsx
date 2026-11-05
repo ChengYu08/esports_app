@@ -28,6 +28,7 @@ import {
   resolveVoiceRoomId,
   voiceRoomApi,
 } from "@/features/voice-room/voice-room.api";
+import { navigateToVoiceRoom } from "@/features/voice-room/navigate-voice-room";
 import { requireLogin } from "@/shared/navigation/require-login";
 
 const avatar = require("../../../../assets/mine/mine-avatar.png");
@@ -156,7 +157,7 @@ export default function MineScreen() {
         room = await voiceRoomApi.createRoom("我的语聊房", accessToken);
       const roomId = resolveVoiceRoomId(room);
       if (!roomId) throw new Error("房间信息不完整，请稍后重试");
-      router.push({ pathname: "/voice-room/[id]", params: { id: roomId } });
+      navigateToVoiceRoom({ id: roomId });
     } catch (error) {
       showToast(
         error instanceof Error ? error.message : "进入语聊房失败，请稍后重试",
