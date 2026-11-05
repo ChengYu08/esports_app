@@ -86,7 +86,7 @@ export function VoicePlayButton({
         )}
       </View>
       {light && !playing ? null : (
-        <VoiceWaveform playing={playing} compact={compact} />
+        <VoiceWaveform playing={playing} compact={compact} barOpacity={0.8} />
       )}
       <Text
         style={[
@@ -96,8 +96,7 @@ export function VoicePlayButton({
           pill && styles.pillDuration,
         ]}
       >
-        {duration ?? 0}
-        {light ? "''" : '"'}
+        {duration ?? 0}’’
       </Text>
     </Pressable>
   );
@@ -171,9 +170,10 @@ const styles = StyleSheet.create({
     fontSize: 10,
     lineHeight: 11,
     marginLeft: 1,
-    marginTop: -1,
+    marginTop: -3,
   },
-  compactPlayIcon: { fontSize: 8, lineHeight: 9 },
+  // 紧凑态保持原有视觉位置
+  compactPlayIcon: { fontSize: 8, lineHeight: 9, marginTop: -1 },
   lightPlayTriangle: { width: 11, height: 11, marginLeft: 1 },
   pauseIcon: { flexDirection: "row", gap: 3 },
   compactPauseIcon: { gap: 2 },
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
   duration: {
     color: "#fff",
     fontSize: 12,
-    lineHeight: 22,
+    lineHeight: 14,
     ...getDDinProStyle(700),
   },
   compactDuration: { fontSize: 10, lineHeight: 18 },
