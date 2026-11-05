@@ -320,8 +320,10 @@ trigger:
 ---
 # =============================================================================
 # prod 分支专用流水线：仅 prod 分支（push / custom）触发，
-# 固定使用 .env.production 构建，不上传 dev 下载站。
-# 产物保存在构建工作区 ./apks/，流水线日志会打印文件清单。
+# 固定使用 .env.production 构建，默认一次构建两个包：
+#   arm64 纯 64 位包 + universal（32+64）全兼容包。
+# 上传到 dev 下载站正式包目录 /android/esportsapp/prod/<版本>/（与测试包隔离），
+# 并在流水线末尾打印构建信息与下载地址。
 # =============================================================================
 kind: pipeline
 type: docker
@@ -375,8 +377,10 @@ steps:
 
         # prod 分支固定使用 .env.production
         BUILD_ENV="prod"
-        BUILD_ABI="$${DRONE_ABI:-arm64}"
-        echo "构建环境: $${BUILD_ENV}（.env.production）  ABI: $${BUILD_ABI}"
+        # 默认 all：一次构建 arm64（纯 64 位）+ universal（32+64 全兼容）两个包；
+        # 可用自定义事件变量 DRONE_ABI=arm64|universal 临时只出单包
+        BUILD_ABI="$${DRONE_ABI:-all}"
+        echo "构建环境: $${BUILD_ENV}（.env.production）  ABI: $${BUILD_ABI}（all = arm64 + universal 两个包）"
         echo "=========================================="
 
         mkdir -p "$${ANDROID_HOME}/licenses"
@@ -408,6 +412,155 @@ steps:
 
         echo "构建完成，产物:"
         ls -lh ./apks/ 2>/dev/null || echo "未找到 APK"
+
+        # ---- 生成构建元数据（供 print-build-info 读取） ----
+        version=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' ./app.json | head -1 | tr -d '[:space:]')
+        if [ -z "$version" ]; then
+          for apk_path in ./apks/*.apk; do
+            [ -f "$apk_path" ] || continue
+            fname=$(basename "$apk_path" .apk)
+            version=$(echo "$fname" | sed -E 's/^[^-]+-([0-9]+\.[0-9]+\.[0-9]+)-.*/\1/')
+            [ -n "$version" ] && break
+          done
+        fi
+        echo "解析到版本号: [$version]"
+        {
+          echo "BUILD_ENV=prod"
+          echo "BUILD_ABI=$${BUILD_ABI}"
+          echo "APP_VERSION=$${version}"
+          printf 'BUILD_TIME_UTC=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+          printf 'DRONE_COMMIT_SHORT=%s\n' "$(echo "$DRONE_COMMIT_SHA" | cut -c1-8)"
+          printf 'DRONE_BUILD_START_TS=%s\n' "$DRONE_BUILD_STARTED"
+          printf 'DRONE_BUILD_FINISH_TS=%s\n' "$(date +%s)"
+        } > ./drone-build-info.env
+        echo "构建元数据已生成: ./drone-build-info.env"
+
+  # prod 正式包不进测试包目录，统一放 /android/esportsapp/prod/<版本>/
+  - name: move-to-dev-servers
+    image: nexus.jinliwangluo.com:8082/appleboy/drone-scp-with-tools:latest
+    pull: if-not-exists
+    settings:
+      host: dev.jinliwangluo.com
+      username: root
+      key:
+        from_secret: ssh_rsa
+      port: 22
+      source: ./apks/*.apk
+      strip_components: 1
+      rm: false
+    commands:
+      - |
+        set -e
+        # 该镜像无 node，用 sed 从 app.json 提取 expo.version
+        version=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' ./app.json | head -1)
+        if [ -z "$version" ]; then echo "无法从 app.json 解析 version"; exit 1; fi
+        echo "使用版本: $version"
+        target="/home/apps/data/baota/wwwroot/dev.jinliwangluo.com/android/esportsapp/prod/$version/"
+        echo "目标路径: $target"
+        /bin/drone-scp --target "$target"
+        echo "文件上传成功"
+    environment:
+      SSH_KEY:
+        from_secret: ssh_rsa
+    depends_on:
+      - build-android-prod
+
+  - name: print-build-info
+    image: alpine:3.19
+    pull: if-not-exists
+    commands:
+      - |
+        set -e
+
+        echo " "
+        echo "╔════════════════════════════════════════════════════════════════╗"
+        echo "║          盼之电竞 Android PROD 构建信息汇总                     ║"
+        echo "╚════════════════════════════════════════════════════════════════╝"
+
+        if [ -f ./drone-build-info.env ]; then
+          . ./drone-build-info.env
+        fi
+
+        # ---- Git 提交信息 ----
+        echo " "
+        echo "📌 Git 提交信息"
+        echo "------------------------------------------------"
+        printf "  分支        : %s\n" "$DRONE_BRANCH"
+        printf "  Commit      : %s\n" "$DRONE_COMMIT_SHA"
+        printf "  Commit 短   : %s\n" "$DRONE_COMMIT_SHORT"
+        printf "  提交作者    : %s <%s>\n" "$DRONE_COMMIT_AUTHOR" "$DRONE_COMMIT_AUTHOR_EMAIL"
+        printf "  提交信息    : %s\n" "$DRONE_COMMIT_MESSAGE"
+        printf "  提交链接    : %s\n" "$DRONE_COMMIT_LINK"
+        printf "  构建编号    : #%s\n" "$DRONE_BUILD_NUMBER"
+        printf "  构建链接    : %s\n" "$DRONE_BUILD_LINK"
+
+        # ---- 构建环境信息 ----
+        echo " "
+        echo "🏷️  构建环境"
+        echo "------------------------------------------------"
+        printf "  构建环境    : %s\n" "$BUILD_ENV"
+        printf "  CPU 架构    : %s\n" "$BUILD_ABI"
+        for apk_path in ./apks/*.apk; do
+          [ -f "$apk_path" ] || continue
+          fname_noext=$(basename "$apk_path" .apk)
+          base="$${fname_noext%-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]}"
+          rest="$${base#*-}"
+          rest2="$${rest%-*}"
+          APP_VERSION="$${rest2%-*}"
+          break
+        done
+        printf "  应用版本号  : %s\n" "$APP_VERSION"
+
+        # ---- 时间信息（北京时间）----
+        echo " "
+        echo "🕐 构建时间"
+        echo "------------------------------------------------"
+        printf "  UTC 时间    : %s\n" "$BUILD_TIME_UTC"
+        if [ -n "$DRONE_BUILD_START_TS" ] && [ -n "$TZ_OFFSET_MINUTES" ]; then
+          offset_sec=$(( TZ_OFFSET_MINUTES * 60 ))
+          bj_start=$(( DRONE_BUILD_START_TS + offset_sec ))
+          bj_finish=$(( DRONE_BUILD_FINISH_TS + offset_sec ))
+          if command -v date >/dev/null 2>&1 && date -d "@$bj_start" >/dev/null 2>&1; then
+            printf "  北京时间开始: %s\n" "$(date -d "@$bj_start" '+%Y-%m-%d %H:%M:%S')"
+            printf "  北京时间结束: %s\n" "$(date -d "@$bj_finish" '+%Y-%m-%d %H:%M:%S')"
+          else
+            printf "  东八区开始  : Unix %s (+%s 分钟)\n" "$bj_start" "$TZ_OFFSET_MINUTES"
+            printf "  东八区结束  : Unix %s (+%s 分钟)\n" "$bj_finish" "$TZ_OFFSET_MINUTES"
+          fi
+          duration=$(( DRONE_BUILD_FINISH_TS - DRONE_BUILD_START_TS ))
+          printf "  构建耗时    : %s 秒 (约 %s 分钟)\n" "$duration" "$(( duration / 60 ))"
+        fi
+
+        # ---- APK 下载地址 ----
+        echo " "
+        echo "📦 下载地址"
+        echo "------------------------------------------------"
+        apks_found=0
+        for apk_path in ./apks/*.apk; do
+          [ -f "$apk_path" ] || continue
+          apks_found=$((apks_found + 1))
+          filename=$(basename "$apk_path")
+          size=$(ls -lh "$apk_path" | awk '{print $5}')
+
+          fname_noext="$${filename%.apk}"
+          base="$${fname_noext%-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]}"
+          rest="$${base#*-}"
+          rest2="$${rest%-*}"
+          file_version="$${rest2%-*}"
+
+          url="http://dev.jinliwangluo.com/android/esportsapp/prod/$file_version/$filename"
+          printf "  文件名      : %s\n" "$filename"
+          printf "  大小        : %s\n" "$size"
+          printf "  应用版本号  : %s\n" "$file_version"
+          printf "  下载地址    : %s\n" "$url"
+          echo "  ------------------------------------------------"
+        done
+        if [ "$apks_found" -eq 0 ]; then
+          echo "  ⚠️  未找到 APK 文件"
+        fi
+        echo " "
+    depends_on:
+      - move-to-dev-servers
 
 trigger:
   event:
