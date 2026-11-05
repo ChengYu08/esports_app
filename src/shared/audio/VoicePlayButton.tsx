@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.45)",
   },
   lightButton: {
-    height: 20,
+    height: 16,
     backgroundColor: "transparent",
     borderRadius: 0,
     paddingVertical: 0,
@@ -160,9 +160,9 @@ const styles = StyleSheet.create({
   },
   compactIconCircle: { width: 18, height: 18, borderRadius: 9 },
   lightIconCircle: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     backgroundColor: "#FE4267",
   },
   playIcon: {
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
   },
   // 紧凑态保持原有视觉位置
   compactPlayIcon: { fontSize: 8, lineHeight: 9, marginTop: -1 },
-  lightPlayTriangle: { width: 11, height: 11, marginLeft: 1 },
+  lightPlayTriangle: { width: 12, height: 12, opacity: 0.8 },
   pauseIcon: { flexDirection: "row", gap: 3 },
   compactPauseIcon: { gap: 2 },
   lightPauseIcon: { gap: 2 },
