@@ -205,16 +205,27 @@ export function VoiceRoomCommentPanel({
     return () => subscription.remove();
   }, [closeEmojiToKeyboard, emojiPickerOpen, keyboardVisible, onClose]);
 
+  // 草稿镜像 ref：语聊房整屏很重，草稿更新触发的重渲染可能滞后于下一次点击，
+  // 回调闭包里的 draft 会是过期值，快速连点 emoji 时会把上一次的选择覆盖掉。
+  // 这里用 ref 同步读写最新草稿，点击追加不再依赖渲染快照
+  const draftRef = useRef(draft);
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
+
   const selectEmoji = useCallback(
     (emoji: EmojiType) => {
-      onDraftChange(`${draft}${emoji.emoji}`);
+      const next = `${draftRef.current}${emoji.emoji}`;
+      draftRef.current = next;
+      onDraftChange(next);
     },
-    [draft, onDraftChange],
+    [onDraftChange],
   );
 
   const sendMessage = async () => {
     const text = draft.trim();
     if (!text) return;
+    draftRef.current = "";
     onDraftChange("");
     await onSendText(text);
   };
