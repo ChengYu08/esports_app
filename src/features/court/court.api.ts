@@ -517,7 +517,9 @@ export function mapCaseStage(item: CourtCase) {
   const level =
     item.level === "SECOND" ? "二审" : item.level === "THIRD" ? "三审" : "一审";
   const stage =
-    item.stage === "EVIDENCE"
+    item.stage === "PENDING_RE_SUBMIT"
+      ? "待重新提交"
+      : item.stage === "EVIDENCE"
       ? "举证"
       : item.stage === "VOTING"
         ? "评审投票"

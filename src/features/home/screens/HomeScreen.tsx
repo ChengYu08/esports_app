@@ -13,6 +13,10 @@ import {
 } from "@/features/home/club-list-scroll";
 import { HomeHeader, HomeTopBar } from "@/features/home/components/HomeHeader";
 import { HomeSkeleton } from "@/features/home/components/HomeSkeleton";
+import { HomeHighlights } from "@/features/home/components/HomeHighlights";
+import { useHomeHighlights } from "@/features/home/hooks/use-home-highlights";
+import { DEFAULT_RANKING_FILTERS } from "@/features/ranking/ranking.config";
+import type { RankingFilters } from "@/features/ranking/api/ranking.types";
 import {
   useHomeBanners,
   useHomeClubs,
@@ -20,6 +24,7 @@ import {
   useHomeGames,
 } from "@/features/home/hooks/use-home-data";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
+import { PaginationFooter } from "@/shared/ui/PaginationFooter";
 import { router, useFocusEffect, useIsFocused, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -42,6 +47,10 @@ export default function HomeScreen() {
     ticketSubmitted?: string;
   }>();
   const [topTab, setTopTab] = useState<HomeTab>("home");
+  const [rankingEntry, setRankingEntry] = useState(0);
+  const [refreshingHome, setRefreshingHome] = useState(false);
+  const [rankingInitialFilters, setRankingInitialFilters] = useState<RankingFilters>(DEFAULT_RANKING_FILTERS);
+  const highlights = useHomeHighlights(topTab === "home" && focused);
   // 顶部频道首次选中才挂载，之后保留筛选状态和列表滚动位置。
   const [mountedTabs, setMountedTabs] = useState<Record<HomeTab, boolean>>({
     home: true,
@@ -193,16 +202,30 @@ export default function HomeScreen() {
     setCategory(id);
     setGame("");
   }, []);
+  const openWeeklyRanking = useCallback(() => {
+    setRankingInitialFilters({ boardCode: "ORDER_RECEIVE", rankType: "WEEKLY", gameId: "0" });
+    // 推荐卡每次进入均定位周榜，普通顶部频道切换继续保留原有筛选状态。
+    setRankingEntry((value) => value + 1);
+    selectTopTab("ranking");
+  }, [selectTopTab]);
   const retryFilters = useCallback(async () => {
     await Promise.all([refetchGames(), refetchCategories()]);
   }, [refetchGames, refetchCategories]);
   const refreshHome = async () => {
-    await Promise.all([
-      clubs.refetch(),
-      games.refetch(),
-      categories.refetch(),
-      banners.refetch(),
-    ]);
+    setRefreshingHome(true);
+    try {
+      await Promise.all([
+        clubs.refetch(),
+        games.refetch(),
+        categories.refetch(),
+        banners.refetch(),
+        highlights.broadcasts.refetch(),
+        highlights.ranking.refetch(),
+        highlights.clubs.refetch(),
+      ]);
+    } finally {
+      setRefreshingHome(false);
+    }
   };
   const loadMoreClubs = () => {
     if (!clubs.hasNextPage || clubs.isFetching) {
@@ -234,6 +257,7 @@ export default function HomeScreen() {
           filterError={games.isError || categories.isError}
           onRetryFilters={retryFilters}
           bannerSlots={bannerSlots}
+          highlights={<HomeHighlights state={highlights} paused={carouselPaused} onOpenRanking={openWeeklyRanking} />}
           onTabChange={selectTopTab}
           onGameChange={setGame}
           carouselPaused={carouselPaused}
@@ -253,6 +277,8 @@ export default function HomeScreen() {
       bannerSlots,
       selectTopTab,
       carouselPaused,
+      highlights,
+      openWeeklyRanking,
     ],
   );
   const isHomeLoading = games.isLoading || categories.isLoading;
@@ -289,10 +315,13 @@ export default function HomeScreen() {
                 refreshControl={
                   <RefreshControl
                     refreshing={
+                      refreshingHome ||
                       (clubs.isRefetching && !clubs.isFetchingNextPage) ||
                       games.isRefetching ||
                       categories.isRefetching ||
-                      banners.isRefetching
+                      banners.isRefetching ||
+                      highlights.ranking.isRefetching ||
+                      highlights.clubs.isRefetching
                     }
                     onRefresh={refreshHome}
                     tintColor="#FE1F4C"
@@ -317,6 +346,15 @@ export default function HomeScreen() {
                     <EmptyState message="暂无俱乐部" />
                   )
                 }
+                ListFooterComponent={
+                  clubItems.length > 0 ? (
+                    <PaginationFooter
+                      loading={clubs.isFetchingNextPage}
+                      hasMore={clubs.hasNextPage}
+                      pageCount={clubs.data?.pages.length}
+                    />
+                  ) : null
+                }
               />
             )}
           </View>
@@ -328,7 +366,7 @@ export default function HomeScreen() {
         )}
         {mountedTabs.ranking && (
           <View style={[styles.pane, topTab !== "ranking" && styles.paneHidden]}>
-            <RankingScreen embedded active={topTab === "ranking"} />
+            <RankingScreen key={rankingEntry} embedded active={topTab === "ranking"} initialFilters={rankingInitialFilters} />
           </View>
         )}
         {topTab === "court" && (

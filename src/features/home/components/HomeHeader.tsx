@@ -12,6 +12,7 @@ import { HomeBannerSections } from "./HomeBannerSections";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { Image } from "expo-image";
 import { router } from "expo-router";
+import type { ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 const allGamesIcon = require("../../../../assets/svgs/god-all-games.svg");
@@ -28,6 +29,7 @@ type HomeHeaderProps = {
   filterError?: boolean;
   onRetryFilters: () => void;
   bannerSlots: HomeBannerSlot[];
+  highlights?: ReactNode;
   onTabChange: (tab: HomeTab) => void;
   onGameChange: (game: GameKey) => void;
   /** 外层列表滚动期间暂停轮播自动跳页。 */
@@ -44,6 +46,7 @@ export function HomeHeader({
   filterError,
   onRetryFilters,
   bannerSlots,
+  highlights,
   onTabChange,
   onGameChange,
   carouselPaused = false,
@@ -52,7 +55,9 @@ export function HomeHeader({
     <>
       {tab === "home" && (
         <>
-          <HomeBannerSections slots={bannerSlots} carouselPaused={carouselPaused} />
+          {/* 二、三楼预留位改为真实热门内容，顶部活动轮播继续读取广告配置。 */}
+          <HomeBannerSections slots={highlights ? bannerSlots.filter((slot) => slot.code === "APP_HOME_FLOOR1") : bannerSlots} carouselPaused={carouselPaused} />
+          {highlights}
           <GameCategoryTabs categories={categories} selectedId={category} onChange={onCategoryChange} />
           {filterError && (
             <Pressable accessibilityRole="button" onPress={onRetryFilters} style={styles.filterRetry}>

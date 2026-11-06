@@ -259,9 +259,6 @@ export default function CourtTargetPickerScreen() {
               }
             />
           }
-          ListFooterComponent={
-            rows.length ? <Text style={styles.end}>没有更多啦～</Text> : null
-          }
         />
       )}
       <View
@@ -427,14 +424,6 @@ const styles = StyleSheet.create({
     backgroundColor: C.border,
   },
   highlight: { color: C.brand },
-  end: {
-    paddingVertical: 24,
-    textAlign: "center",
-    fontFamily: COURT_FONT_FAMILY,
-    fontSize: 12,
-    lineHeight: 18,
-    color: C.empty,
-  },
   footer: { backgroundColor: C.surface, paddingHorizontal: 16, paddingTop: 8 },
   confirm: {
     minHeight: 42,

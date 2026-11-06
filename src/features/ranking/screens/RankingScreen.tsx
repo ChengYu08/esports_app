@@ -18,7 +18,7 @@ import {
   getRankingParams,
   getRankingProfileParams,
 } from "../api/ranking.contract";
-import type { RankingBoard, RankingItem } from "../api/ranking.types";
+import type { RankingBoard, RankingFilters, RankingItem } from "../api/ranking.types";
 import { MyRankingCard } from "../components/MyRankingCard";
 import { RankingBackground } from "../components/RankingBackground";
 import { RankingBoardTabs } from "../components/RankingBoardTabs";
@@ -40,14 +40,16 @@ const TAB_BAR_HEIGHT = 58;
 export default function RankingScreen({
   embedded = false,
   active = true,
+  initialFilters = DEFAULT_RANKING_FILTERS,
 }: {
   /** 作为首页顶部 tab 内嵌时，安全区和首页大导航由父页面负责。 */
   embedded?: boolean;
   active?: boolean;
+  initialFilters?: RankingFilters;
 }) {
   const insets = useSafeAreaInsets();
   const focused = useIsFocused();
-  const [filters, setFilters] = useState(DEFAULT_RANKING_FILTERS);
+  const [filters, setFilters] = useState(initialFilters);
   const [rulesVisible, setRulesVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const { top, games, myRank, user, isAuthenticated } = useRankingData(

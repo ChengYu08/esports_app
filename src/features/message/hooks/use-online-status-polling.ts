@@ -58,7 +58,8 @@ export function useOnlineStatusPolling(
       }, delay);
     };
 
-    schedule(ONLINE_STATUS_POLL_INTERVAL_MS);
+    // 进入页面/前台恢复时立即查一次，避免头部在线状态在首个轮询间隔内显示旧值
+    schedule(0);
     return () => {
       cancelled = true;
       if (timer) {

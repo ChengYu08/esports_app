@@ -1,9 +1,10 @@
 import { usePullToRefresh } from "@/shared/hooks/use-pull-to-refresh";
 import { colors, spacing } from "@/shared/theme/tokens";
 import { EmptyState, ErrorState } from "@/shared/ui/AsyncStates";
+import { PaginationFooter } from "@/shared/ui/PaginationFooter";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useIsFocused } from "expo-router";
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { companionManagementApi as api } from "../api/companion-management.api";
 import { walletNextPage } from "../api/companion-management.contract";
@@ -75,10 +76,12 @@ export default function CompanionIncomeScreen() {
                   }
                 }}
               />
-            ) : ledger.isFetchingNextPage ? (
-              <ActivityIndicator color={colors.brand} style={styles.loading} />
-            ) : entries.length > 0 && !ledger.hasNextPage ? (
-              <Text style={styles.end}>没有更多啦～</Text>
+            ) : entries.length > 0 ? (
+              <PaginationFooter
+                loading={ledger.isFetchingNextPage}
+                hasMore={ledger.hasNextPage}
+                pageCount={ledger.data?.pages.length}
+              />
             ) : null
           }
           renderItem={({ item }) => <CompanionIncomeEntry entry={item} />}
@@ -99,13 +102,4 @@ const styles = StyleSheet.create({
   listContent: { padding: spacing.md },
   separator: { height: spacing.sm },
   loading: { paddingVertical: spacing.xl },
-  end: {
-    textAlign: "center",
-    color: "#999",
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: "300",
-    paddingVertical: spacing.md,
-    marginTop: spacing.sm,
-  },
 });

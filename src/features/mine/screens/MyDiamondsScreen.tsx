@@ -12,6 +12,7 @@ import { usePullToRefresh } from "@/shared/hooks/use-pull-to-refresh";
 import { openInAppWebView } from "@/shared/navigation/open-web-view";
 import { spacing } from "@/shared/theme/tokens";
 import { EmptyState, ErrorState } from "@/shared/ui/AsyncStates";
+import { PaginationFooter } from "@/shared/ui/PaginationFooter";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
@@ -156,15 +157,19 @@ export default function MyDiamondsScreen() {
         />
       );
     }
-    if (recordsQuery.isFetchingNextPage) {
-      return <ActivityIndicator color="#FE1F4C" style={styles.loading} />;
+    if (entries.length === 0) {
+      return null;
     }
-    if (entries.length > 0 && !recordsQuery.hasNextPage) {
-      return <Text style={styles.end}>没有更多啦～</Text>;
-    }
-    return null;
+    return (
+      <PaginationFooter
+        loading={recordsQuery.isFetchingNextPage}
+        hasMore={recordsQuery.hasNextPage}
+        pageCount={recordsQuery.data?.pages.length}
+      />
+    );
   }, [
     entries.length,
+    recordsQuery.data,
     recordsQuery.error,
     recordsQuery.fetchNextPage,
     recordsQuery.hasNextPage,
@@ -293,13 +298,4 @@ const styles = StyleSheet.create({
   },
   loading: { paddingVertical: spacing.xl },
   emptyIllustration: { width: 120, height: 120 },
-  end: {
-    textAlign: "center",
-    color: "#999999",
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: "300",
-    paddingVertical: spacing.md,
-    marginTop: spacing.sm,
-  },
 });
