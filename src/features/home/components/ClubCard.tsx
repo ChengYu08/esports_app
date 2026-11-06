@@ -38,7 +38,7 @@ export const ClubCard = memo(function ClubCard({
   };
 
   // 优先使用服务端批量返回的人数排序；旧数据缺人数时沿用接口顺序，避免逐卡查询。
-  // 超过 3 个按设计稿重叠展示（最多 8 个），不要提前截断成 3 个。
+  // 卡片最多展示排序后的前 3 个游戏。
   const games = [...(club.games ?? [])]
     .filter((game) => game.iconUrl)
     .sort((a, b) => (b.companionCount ?? -1) - (a.companionCount ?? -1));
