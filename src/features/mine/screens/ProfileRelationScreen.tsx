@@ -26,7 +26,7 @@ import { CachedImage } from "@/shared/ui/CachedImage";
 import { EmptyState, ErrorState } from "@/shared/ui/AsyncStates";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
-const fallbackAvatar = require("../../../../assets/coms/avatar_default.webp");
+const fallbackAvatar = require("../../../../assets/images/avatar_default.webp");
 
 function isUnavailableUser(user: UserFollowUser) {
   return user.nickname === "账号被封禁" || user.nickname === "账号已注销";
@@ -306,7 +306,7 @@ export default function ProfileRelationScreen() {
         refreshing={query.isRefetching && !query.isFetchingNextPage}
         ListEmptyComponent={
           query.isLoading ? (
-            <ActivityIndicator style={styles.emptyLoading} color="#E62336" />
+            <ActivityIndicator style={styles.emptyLoading} color="#FE1F4C" />
           ) : query.isError ? (
             <ErrorState
               message="列表加载失败"
@@ -321,7 +321,7 @@ export default function ProfileRelationScreen() {
         }
         ListFooterComponent={
           query.isFetchingNextPage ? (
-            <ActivityIndicator style={styles.footer} color="#E62336" />
+            <ActivityIndicator style={styles.footer} color="#FE1F4C" />
           ) : query.isFetchNextPageError ? (
             <Pressable
               onPress={() => void fetchNextRelations()}
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
     width: 16,
     height: 3,
     borderRadius: 2,
-    backgroundColor: "#E62336",
+    backgroundColor: "#FE1F4C",
   },
   listContent: { paddingHorizontal: 16 },
   emptyContent: { flexGrow: 1 },
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
   actionTextDone: { color: "#999999" },
   emptyState: { flex: 1 },
   emptyLoading: { flex: 1, alignSelf: "center" },
-  retryText: { color: "#E62336", fontSize: 13 },
+  retryText: { color: "#FE1F4C", fontSize: 13 },
   footer: { alignItems: "center", paddingVertical: 20 },
   footerText: {
     paddingVertical: 20,

@@ -3,7 +3,6 @@ import { useAuthStore } from "@esports/auth";
 import {
   ChevronLeft24Regular,
   MoreHorizontal24Regular,
-  Search24Regular,
   Star16Filled,
   Star16Regular,
 } from "@fluentui/react-native-icons";
@@ -18,6 +17,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ComponentProps,
   type ReactElement,
 } from "react";
 import {
@@ -44,6 +44,7 @@ import type {
 import {
   addToBlacklist,
   isUserBlacklisted,
+  removeFromBlacklist,
   subscribeBlacklist,
 } from "@/features/mine/blacklist";
 import { CompanionOrderSheet } from "@/features/mine/components/CompanionOrderSheet";
@@ -53,7 +54,6 @@ import {
   ProfileSkeleton,
 } from "@/features/mine/components/ProfileSkeleton";
 import { StarPaymentSheet } from "@/features/mine/components/StarPaymentSheet";
-import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
 import {
   useProfileDetail,
   useProfileGameDetail,
@@ -69,6 +69,7 @@ import {
 import { createProfileAvatarPreviewParams } from "@/features/mine/profile-avatar-preview";
 import { createProfileChatParams } from "@/features/mine/profile-chat";
 import { calculateAge } from "@/features/mine/profile-utils";
+import { afterOrderPaidOpenChat } from "@/features/order/notify-order-paid";
 import { invalidateOrderQueries } from "@/features/order/order-query";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
@@ -78,12 +79,10 @@ import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 
 const fallbackAvatar = require("../../../../assets/mine/mine-avatar.png");
-const background = require("../../../../assets/mine/profile-bg.webp");
-const maleIcon = require("../../../../assets/svgs/male.svg");
-const femaleIcon = require("../../../../assets/svgs/mine-female.svg");
+const maleIcon = require("../../../../assets/svgs/gender-male.svg");
+const femaleIcon = require("../../../../assets/svgs/gender-female.svg");
 const backIcon = require("../../../../assets/svgs/icon-back.svg");
-const customerIcon = require("../../../../assets/svgs/customer.svg");
-const clubIcon = require("../../../../assets/svgs/mine-club-flag.svg");
+const clubIcon = require("../../../../assets/svgs/profile-club-flag.svg");
 const arrowDownIcon = require("../../../../assets/svgs/intro-toggle.svg");
 const diamondIcon = require("../../../../assets/message/order-assistant-coin-3f6fcf.webp");
 const idleStatusIcon = require("../../../../assets/svgs/club-status-idle.svg");
@@ -116,7 +115,6 @@ export default function ProfileScreen() {
     () => getProfileRouteParams({ clubId: routeClubId, userId: routeUserId }),
     [routeClubId, routeUserId],
   );
-  const fromSearchPage = route.fromSearch === "1";
   const isMine = !routeParams || String(user?.id ?? "") === routeParams.userId;
   const [tab, setTab] = useState<ProfileTab>("技能");
   const [coverHeight, setCoverHeight] = useState(0);
@@ -168,8 +166,6 @@ export default function ProfileScreen() {
     isBlacklisted: false,
   });
   const chatCheckPendingRef = useRef(false);
-  const { entering: enteringCS, openCustomerService } =
-    useCustomerServiceEntry();
   const detailQuery = useProfileDetail(routeParams, focused);
   const detail = detailQuery.data;
   const followStateQuery = useUserFollowState(
@@ -250,7 +246,11 @@ export default function ProfileScreen() {
 
   const gameDetail = gameDetailQuery.data;
   const games = useMemo(() => detail?.games ?? [], [detail]);
-  const coverImageUrl = gameDetail?.backgroundUrl?.trim();
+  // 头部封面直接使用本人头像；source 引用稳定，避免列表项重建
+  const coverImageSource = useMemo(
+    () => (profile.headImage ? { uri: profile.headImage } : fallbackAvatar),
+    [profile.headImage],
+  );
   const voicePlayer = useVoicePlayer();
   const stopVoice = voicePlayer.stop;
   const toggleVoice = voicePlayer.toggle;
@@ -394,7 +394,7 @@ export default function ProfileScreen() {
           <ProfileCover
             topInset={insets.top}
             profile={profile}
-            coverImageUrl={coverImageUrl}
+            coverImageSource={coverImageSource}
             isMine={isMine}
             isBlacklisted={
               !isMine &&
@@ -496,11 +496,15 @@ export default function ProfileScreen() {
 
           if (gameDetail.skillCards.length > 0) {
             profileListItems.push(
-              ...gameDetail.skillCards.map((card) => ({
+              ...gameDetail.skillCards.map((card, index) => ({
                 key: `service-${card.companionServiceId}-${card.gameLevelId}`,
                 content: (
                   <View style={styles.scrollBody}>
-                    <ServiceCard card={card} onOrder={openOrder} />
+                    <ServiceCard
+                      card={card}
+                      first={index === 0}
+                      onOrder={openOrder}
+                    />
                   </View>
                 ),
               })),
@@ -567,7 +571,7 @@ export default function ProfileScreen() {
   }, [
     insets.top,
     profile,
-    coverImageUrl,
+    coverImageSource,
     isMine,
     blacklistStatus,
     openProfileRelation,
@@ -647,9 +651,10 @@ export default function ProfileScreen() {
           ]}
         >
           <Image
-            source={coverImageUrl ? { uri: coverImageUrl } : background}
+            source={coverImageSource}
             contentFit="cover"
-            style={styles.navbarBgImage}
+            contentPosition="top"
+            style={StyleSheet.absoluteFill}
           />
           <LinearGradient
             pointerEvents="none"
@@ -688,54 +693,15 @@ export default function ProfileScreen() {
           </Animated.View>
           <View style={styles.navActions}>
             {!isMine ? (
-              <>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="搜索"
-                  hitSlop={12}
-                  onPress={() => {
-                    const searchParams = routeParams?.clubId
-                      ? { type: "user" as const, clubId: routeParams.clubId }
-                      : { type: "user" as const };
-                    // 搜索页已在栈内时弹回它，避免 搜索/俱乐部/个人主页 反复跳转无限套娃
-                    if (fromSearchPage) {
-                      router.dismissTo({ pathname: "/search", params: searchParams });
-                      return;
-                    }
-                    router.push({ pathname: "/search", params: searchParams });
-                  }}
-                  style={styles.navActionButton}
-                >
-                  <Search24Regular color="#fff" width={24} height={24} />
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="在线客服"
-                  accessibilityState={{ busy: enteringCS }}
-                  hitSlop={12}
-                  onPress={openCustomerService}
-                  style={[styles.navActionButton, { marginTop: 1 }]}
-                >
-                  <Image
-                    source={customerIcon}
-                    style={styles.navActionIcon}
-                    contentFit="contain"
-                  />
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="更多操作"
-                  hitSlop={12}
-                  onPress={() => setProfileActionsVisible(true)}
-                  style={styles.navActionButton}
-                >
-                  <MoreHorizontal24Regular
-                    color="#fff"
-                    width={24}
-                    height={24}
-                  />
-                </Pressable>
-              </>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="更多操作"
+                hitSlop={12}
+                onPress={() => setProfileActionsVisible(true)}
+                style={styles.navActionButton}
+              >
+                <MoreHorizontal24Regular color="#fff" width={24} height={24} />
+              </Pressable>
             ) : null}
           </View>
         </View>
@@ -819,7 +785,25 @@ export default function ProfileScreen() {
               },
             })
           }
-          onBlockRequest={() => setBlacklistPromptVisible(true)}
+          onBlockRequest={() => {
+            const currentlyBlacklisted =
+              blacklistStatus.userId === String(profile.userId) &&
+              blacklistStatus.isBlacklisted;
+            if (currentlyBlacklisted) {
+              removeFromBlacklist(
+                String(profile.userId),
+                useAuthStore.getState().accessToken ?? "",
+              )
+                .then(() => {
+                  showToast("已取消拉黑");
+                })
+                .catch((error: unknown) => {
+                  showToast(error instanceof Error ? error.message : "操作失败");
+                });
+            } else {
+              setBlacklistPromptVisible(true);
+            }
+          }}
         />
       ) : null}
       <AppPrompt
@@ -895,13 +879,28 @@ export default function ProfileScreen() {
           }}
           onPaid={() => {
             const paidOrderId = paymentOrder.orderId;
+            const companionUserId = String(profile.userId);
+            const chatParams = createProfileChatParams({
+              userId: profile.userId,
+              nickname: profile.nickname,
+              headImage: profile.headImage,
+              clubId: profile.clubId,
+            });
+            const accessToken = useAuthStore.getState().accessToken;
             setPaymentSheetVisible(false);
             setPaymentOrder(null);
             setPaymentError(null);
             void invalidateOrderQueries(paidOrderId);
-            router.push({
-              pathname: "/order/[id]",
-              params: { id: String(paidOrderId) },
+            void afterOrderPaidOpenChat({
+              companionUserIds: [companionUserId],
+              token: accessToken,
+              chat: {
+                id: chatParams.id,
+                title: chatParams.title,
+                avatar: chatParams.avatar || undefined,
+                clubId: chatParams.clubId,
+                fromProfile: chatParams.fromProfile,
+              },
             });
           }}
           onPaymentFailed={(message) => setPaymentError(message)}
@@ -950,7 +949,7 @@ const ProfileTabs = memo(function ProfileTabs({
 const ProfileCover = memo(function ProfileCover({
   topInset,
   profile,
-  coverImageUrl,
+  coverImageSource,
   isMine,
   isBlacklisted,
   onSelectRelation,
@@ -958,7 +957,7 @@ const ProfileCover = memo(function ProfileCover({
 }: {
   topInset: number;
   profile: ProfileDetail;
-  coverImageUrl?: string;
+  coverImageSource: ComponentProps<typeof Image>["source"];
   isMine: boolean;
   isBlacklisted: boolean;
   onSelectRelation: (type: "following" | "fans") => void;
@@ -979,7 +978,7 @@ const ProfileCover = memo(function ProfileCover({
     >
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
         <Image
-          source={coverImageUrl ? { uri: coverImageUrl } : background}
+          source={coverImageSource}
           contentFit="cover"
           style={StyleSheet.absoluteFill}
         />
@@ -1110,7 +1109,10 @@ function ProfileIdentity({
             <View style={styles.headerPill}>
               <Image
                 source={profile.sex === 1 ? maleIcon : femaleIcon}
-                style={styles.gender}
+                style={[
+                  styles.gender,
+                  { tintColor: profile.sex === 1 ? "#3DA5FF" : "#FF42A1" },
+                ]}
               />
               {age ? (
                 <Text
@@ -1213,7 +1215,7 @@ function GameSelector({
             {game.iconUrl ? (
               <CachedImage
                 source={{ uri: game.iconUrl }}
-                style={styles.gameLogo}
+                style={styles.gameTagIcon}
               />
             ) : null}
             <Text style={[styles.gameText, active && styles.gameTextActive]}>
@@ -1297,13 +1299,15 @@ function ImageGallery({ images }: { images: string[] }) {
 
 const ServiceCard = memo(function ServiceCard({
   card,
+  first,
   onOrder,
 }: {
   card: ProfileSkillCard;
+  first: boolean;
   onOrder: (card: ProfileSkillCard) => void;
 }) {
   return (
-    <View style={styles.serviceCard}>
+    <View style={[styles.serviceCard, first ? styles.serviceCardFirst : null]}>
       <View style={styles.serviceCopy}>
         <Text numberOfLines={1} style={styles.serviceName}>
           {card.modeName}-{card.levelName}
@@ -1522,7 +1526,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     padding: 24,
   },
-  retryText: { color: "#FF3158", fontSize: 14 },
+  retryText: { color: "#FE1F4C", fontSize: 14 },
   cover: {
     overflow: "hidden",
     backgroundColor: "#617181",
@@ -1619,10 +1623,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     overflow: "hidden",
-  },
-  navbarBgImage: {
-    width: "100%",
-    aspectRatio: 1,
+    // 与默认封面底色一致：背景图未就绪或带透明通道时也不透出下方滚动内容
+    backgroundColor: "#617181",
   },
   navbarBgOverlay: {
     position: "absolute",
@@ -1673,7 +1675,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  navActionIcon: { width: 24, height: 24, tintColor: "#FFFFFF" },
   identity: {
     flexDirection: "row",
     alignItems: "center",
@@ -1681,20 +1682,20 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 8,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     borderWidth: 0.5,
     borderColor: "rgba(255,255,255,0.6)",
   },
   avatarButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 8,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     overflow: "hidden",
   },
   identityCopy: { flex: 1, minWidth: 0, gap: 6 },
-  nameRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   name: {
     flexShrink: 1,
     color: "#fff",
@@ -1717,18 +1718,22 @@ const styles = StyleSheet.create({
     lineHeight: 14,
     fontWeight: "500",
   },
-  gender: { width: 15, height: 15 },
+  gender: { width: 12, height: 12 },
   male: {
     flexShrink: 0,
     fontSize: 12,
-    color: "#0095EE",
+    lineHeight: 18,
+    color: "#3DA5FF",
     fontWeight: 500,
+    includeFontPadding: false,
   },
   femaleAge: {
     flexShrink: 0,
-    color: "#FF4770",
+    color: "#FF42A1",
     fontSize: 12,
+    lineHeight: 18,
     fontWeight: 500,
+    includeFontPadding: false,
   },
   online: {
     flexShrink: 0,
@@ -1746,6 +1751,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
     fontWeight: "500",
+    includeFontPadding: false,
   },
   idClubRow: {
     flexDirection: "row",
@@ -1779,7 +1785,7 @@ const styles = StyleSheet.create({
     gap: 4,
     flexShrink: 1,
   },
-  clubIcon: { width: 16, height: 16 },
+  clubIcon: { width: 14, height: 14 },
   clubName: {
     color: "rgba(255,255,255,0.6)",
     fontSize: 12,
@@ -1896,6 +1902,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF5F7",
   },
   gameLogo: { width: 15, height: 12.8, borderRadius: 4 },
+  gameTagIcon: { width: 20, height: 20, borderRadius: 4 },
   gameText: {
     color: "#656566",
     fontSize: 12,
@@ -1978,7 +1985,7 @@ const styles = StyleSheet.create({
     borderRadius: 23,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FF3158",
+    backgroundColor: "#FE1F4C",
   },
   successButtonText: {
     color: "#fff",
@@ -1988,9 +1995,9 @@ const styles = StyleSheet.create({
   serviceTitle: { marginTop: 28 },
   serviceCard: {
     minHeight: 67,
-    marginTop: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    // 卡片之间间距 8；首张与上方「陪玩服务」标题间距 12
+    marginTop: 8,
+    padding: 12,
     borderRadius: 8,
     backgroundColor: "#F7F7F7",
     flexDirection: "row",
@@ -1998,6 +2005,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 8,
   },
+  serviceCardFirst: { marginTop: 12 },
   serviceCopy: { flex: 1, minWidth: 0, gap: 6 },
   serviceName: {
     color: "#0A0A0A",
@@ -2006,12 +2014,12 @@ const styles = StyleSheet.create({
   },
   serviceMeta: { flexDirection: "row", alignItems: "center", gap: 7 },
   price: {
-    color: "#FF1F4C",
+    color: "#FE1F4C",
     fontSize: 18,
     lineHeight: 22,
     fontWeight: "600",
   },
-  diamond: { color: "#FF3158", fontSize: 14 },
+  diamond: { color: "#FE1F4C", fontSize: 14 },
   metaText: {
     color: "#979799",
     fontSize: 11,
@@ -2022,7 +2030,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: "#FF1F4C",
+    backgroundColor: "#FE1F4C",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2106,7 +2114,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 42,
     borderRadius: 7,
-    backgroundColor: "#FF3158",
+    backgroundColor: "#FE1F4C",
     alignItems: "center",
     justifyContent: "center",
   },

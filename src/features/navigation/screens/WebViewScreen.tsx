@@ -4,6 +4,7 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { WebView } from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { WEBVIEW_COMPAT_SCRIPT } from "@/shared/navigation/webview-compat-script";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 export default function WebViewScreen() {
@@ -33,12 +34,13 @@ export default function WebViewScreen() {
         <WebView
           source={{ uri: url }}
           style={styles.webView}
+          injectedJavaScriptBeforeContentLoaded={WEBVIEW_COMPAT_SCRIPT}
           onLoadEnd={() => setLoading(false)}
           startInLoadingState
         />
         {loading ? (
           <View style={styles.loadingMask} pointerEvents="none">
-            <ActivityIndicator color="#FF1F4C" />
+            <ActivityIndicator color="#FE1F4C" />
           </View>
         ) : null}
       </View>

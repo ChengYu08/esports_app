@@ -1,13 +1,15 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Easing,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Pressable,
   Platform,
   ScrollView,
   StyleSheet,
+  View,
   useWindowDimensions,
   type StyleProp,
   type ViewStyle,
@@ -19,6 +21,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 type BottomSheetProps = {
   visible: boolean;
   onClose: () => void;
+  /** 安卓返回键的关闭行为，缺省同 onClose；多层弹窗时内层可传自定义处理 */
+  onRequestClose?: () => void;
   children: ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
   backdropStyle?: StyleProp<ViewStyle>;
@@ -33,6 +37,7 @@ type BottomSheetProps = {
 export function BottomSheet({
   visible,
   onClose,
+  onRequestClose,
   children,
   contentStyle,
   backdropStyle,
@@ -46,6 +51,90 @@ export function BottomSheet({
   const [mounted, setMounted] = useState(visible);
   const [backdropOpacity] = useState(() => new Animated.Value(0));
   const [sheetTranslateY] = useState(() => new Animated.Value(windowHeight));
+  // Android 的 Modal 是独立 Dialog 窗口，键盘避让没有可靠的静态公式：
+  // 键盘弹出后系统把 Dialog 窗口原生缩小（底边上移），但 JS 布局树的 onLayout /
+  // Dimensions 全部停留在旧值，任何用「布局高度」推 pad 的公式都会失真。
+  // 实测（调试浮层）：键盘事件 screenY（eY）是准确的键盘顶边；
+  // measureInWindow 走原生窗口坐标，返回的是真实的可视底边。
+  // 所以用反馈收敛：初始 pad = 键盘高度，之后每轮 pad += (sheet 实测底边 − eY)，
+  // 底边贴住键盘顶边后差值为 0 自然停止；未缩窗的设备上 pad = eH 即稳定。
+  const keyboardHeightRef = useRef(0);
+  const keyboardTopRef = useRef<number | null>(null);
+  const sheetRef = useRef<View>(null);
+  // padding 的镜像 ref：measureInWindow 异步回调里读最新值，state 读到的是旧闭包
+  const keyboardPaddingRef = useRef(0);
+  const [androidKeyboardPadding, setAndroidKeyboardPadding] = useState(0);
+  // 收敛尝试上限：测量异常时防止反馈环不停空转
+  const alignAttemptsRef = useRef(0);
+  // 键盘弹出后主动触发一次对齐（padding 变化会经 effect 链继续收敛）
+  const [alignNonce, setAlignNonce] = useState(0);
+
+  const applyKeyboardPadding = useCallback((next: number) => {
+    keyboardPaddingRef.current = next;
+    setAndroidKeyboardPadding(next);
+  }, []);
+
+  // 对齐收敛环：padding 变化 → effect 重跑 → 实测 sheet 底边 → 修正 padding，
+  // 底边贴住键盘顶边（差值 ≤1）后不再 setState，环自然停止
+  useEffect(() => {
+    if (!keyboardAvoiding || Platform.OS !== "android") {
+      return;
+    }
+    if (keyboardTopRef.current == null || alignAttemptsRef.current >= 8) {
+      return;
+    }
+    alignAttemptsRef.current += 1;
+    // 等一帧再测：让上一轮 padding 变化先完成布局提交
+    const rafId = requestAnimationFrame(() => {
+      const keyboardTop = keyboardTopRef.current;
+      if (keyboardTop == null) {
+        return;
+      }
+      sheetRef.current?.measureInWindow((_x, y, _width, height) => {
+        const top = keyboardTopRef.current;
+        if (top == null) {
+          return;
+        }
+        const delta = y + height - top;
+        if (Math.abs(delta) <= 1) {
+          return;
+        }
+        const next = Math.min(
+          Math.max(keyboardPaddingRef.current + delta, 0),
+          keyboardHeightRef.current,
+        );
+        if (Math.abs(next - keyboardPaddingRef.current) <= 1) {
+          return;
+        }
+        applyKeyboardPadding(next);
+      });
+    });
+    return () => cancelAnimationFrame(rafId);
+  }, [alignNonce, androidKeyboardPadding, applyKeyboardPadding, keyboardAvoiding]);
+
+  useEffect(() => {
+    if (!keyboardAvoiding || Platform.OS !== "android") {
+      return;
+    }
+    const showSubscription = Keyboard.addListener(
+      "keyboardDidShow",
+      (event) => {
+        keyboardHeightRef.current = event.endCoordinates.height;
+        keyboardTopRef.current = event.endCoordinates.screenY;
+        alignAttemptsRef.current = 0;
+        applyKeyboardPadding(event.endCoordinates.height);
+        setAlignNonce((n) => n + 1);
+      },
+    );
+    const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
+      keyboardTopRef.current = null;
+      applyKeyboardPadding(0);
+    });
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [keyboardAvoiding, applyKeyboardPadding]);
 
   useEffect(() => {
     if (visible) {
@@ -116,6 +205,7 @@ export function BottomSheet({
         style={StyleSheet.absoluteFill}
       />
       <Animated.View
+        ref={sheetRef}
         style={[
           styles.sheet,
           contentStyle,
@@ -144,19 +234,28 @@ export function BottomSheet({
       animationType="none"
       statusBarTranslucent
       visible
-      onRequestClose={onClose}
+      onRequestClose={onRequestClose ?? onClose}
     >
       {/* Toast 需挂到 Modal 窗口内，否则会被原生 Modal 挡住 */}
       <RootSiblingParent>
         {keyboardAvoiding ? (
-          <KeyboardAvoidingView
-            // Prefer padding over Android "height": height + adjustResize inside Modal
-            // can reflow the sheet and steal TextInput focus (keyboard flicker).
-            behavior="padding"
-            style={styles.keyboardAvoiding}
-          >
-            {backdrop}
-          </KeyboardAvoidingView>
+          Platform.OS === "android" ? (
+            <View
+              style={[
+                styles.keyboardAvoiding,
+                { paddingBottom: androidKeyboardPadding },
+              ]}
+            >
+              {backdrop}
+            </View>
+          ) : (
+            <KeyboardAvoidingView
+              behavior="padding"
+              style={styles.keyboardAvoiding}
+            >
+              {backdrop}
+            </KeyboardAvoidingView>
+          )
         ) : (
           backdrop
         )}

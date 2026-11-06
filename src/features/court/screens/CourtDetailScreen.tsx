@@ -4,7 +4,7 @@ import { CourtProcessTimeline } from "@/features/court/components/CourtProcessTi
 import { CourtAvatar } from "@/features/court/components/CourtAvatar";
 import { CourtJudgmentResult } from "@/features/court/components/CourtJudgmentResult";
 import { CourtReviewerPromptModal } from "@/features/court/components/CourtReviewerPromptModal";
-import { courtVoteUnavailableReason, submitCourtVote } from "@/features/court/court-vote";
+import { courtVoteUnavailableReason, getVoteProportions, submitCourtVote } from "@/features/court/court-vote";
 import { CourtVoteButton } from "@/features/court/components/CourtVoteButton";
 import {
   courtApi,
@@ -179,7 +179,7 @@ export default function CourtDetailScreen() {
   if (loading && !item)
     return (
       <View style={styles.loading}>
-        <ActivityIndicator color="#ff3158" />
+        <ActivityIndicator color="#FE1F4C" />
       </View>
     );
   if (!item || !stage)
@@ -207,7 +207,7 @@ export default function CourtDetailScreen() {
           <RefreshControl
             refreshing={loading}
             onRefresh={load}
-            tintColor="#ff3158"
+            tintColor="#FE1F4C"
           />
         }
         contentContainerStyle={styles.content}
@@ -290,6 +290,7 @@ export default function CourtDetailScreen() {
             <View style={styles.voteActions}>
               <CourtVoteButton
                 side="plaintiff"
+                proportion={getVoteProportions(item.voteSummary?.plaintiff ?? 0, item.voteSummary?.defendant ?? 0).plaintiff}
                 selected={item.myVoteResult === "PLAINTIFF_WIN"}
                 disabled={busy}
                 onPress={() => castVote("PLAINTIFF_WIN")}
@@ -299,6 +300,7 @@ export default function CourtDetailScreen() {
               />
               <CourtVoteButton
                 side="defendant"
+                proportion={getVoteProportions(item.voteSummary?.plaintiff ?? 0, item.voteSummary?.defendant ?? 0).defendant}
                 selected={item.myVoteResult === "DEFENDANT_WIN"}
                 disabled={busy}
                 onPress={() => castVote("DEFENDANT_WIN")}
@@ -602,16 +604,16 @@ const styles = StyleSheet.create({
   favoriteText: { color: "#0D0D0F", fontFamily: COURT_FONT_FAMILY, fontSize: 14, fontWeight: "500", lineHeight: 22 },
   secondaryAction: {
     alignItems: "center",
-    borderColor: "#ff3158",
+    borderColor: "#FE1F4C",
     borderRadius: 6,
     borderWidth: 1,
     flex: 1,
     paddingVertical: 10,
   },
-  secondaryText: { color: "#ff3158", fontFamily: COURT_FONT_FAMILY, fontSize: 13 },
+  secondaryText: { color: "#FE1F4C", fontFamily: COURT_FONT_FAMILY, fontSize: 13 },
   primaryAction: {
     alignItems: "center",
-    backgroundColor: "#ff3158",
+    backgroundColor: "#FE1F4C",
     borderRadius: 6,
     flex: 1,
     paddingVertical: 10,
@@ -629,5 +631,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   muted: { color: "#979799", fontFamily: COURT_FONT_FAMILY, fontSize: 12 },
-  link: { color: "#ff3158", marginTop: 10 },
+  link: { color: "#FE1F4C", marginTop: 10 },
 });

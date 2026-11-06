@@ -7,6 +7,7 @@ import {
 } from "@/features/match/api/match.types";
 import { useQuickMatchEndSignals } from "@/features/match/quick-match-end-signals";
 import { ClubQuickMatchSheet } from "@/features/match/components/ClubQuickMatchSheet";
+import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { messageStore } from "@/features/message/message-store";
 import { useAuthStore } from "@esports/auth";
 import {
@@ -16,42 +17,57 @@ import {
 import { Image } from "expo-image";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   Keyboard,
+  LayoutAnimation,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  UIManager,
   View,
 } from "react-native";
 import {
   KeyboardAvoidingView,
-  useKeyboardState,
 } from "react-native-keyboard-controller";
 import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAppConfirm } from "@/shared/ui/app-confirm";
+import { getConversationAvatarUri } from "@/features/message/message-avatar";
+import type { MessageListItemModel } from "@/features/message/message.types";
 
 import { VoiceRoomBackground, VOICE_ROOM_BG_BASE } from "../components/VoiceRoomBackground";
+import { VoiceRoomCommentPanel } from "../components/VoiceRoomCommentPanel";
+import { ChatSheet, type ChatSheetConversation } from "../components/ChatSheet";
 import { VoiceRoomConversationsSheet } from "../components/VoiceRoomConversationsSheet";
 import { VoiceRoomExitDialog } from "../components/VoiceRoomExitDialog";
 import { VoiceRoomMemberSheet } from "../components/VoiceRoomMemberSheet";
-import { VoiceRoomMicBadge } from "../components/VoiceRoomMicrophone";
 import { VoiceRoomSpeakingWaves } from "../components/VoiceRoomSpeakingWaves";
 import { VoiceRoomToolbar } from "../components/VoiceRoomToolbar";
 import { exitVoiceRoom } from "../exit-voice-room";
+import {
+  buildMemberChangeMessage,
+  memberChangeNoticeKey,
+  resolveMemberChangeNickname,
+  shouldSkipMemberChangeNotice,
+  type MemberChangeAction,
+} from "../member-change-notice";
 import { inviteMember, normalizeMembers } from "../member-normalize";
 import { useCustomerServiceCall } from "../use-customer-service-call";
+import { useSelectCompanionGrabCount } from "../use-select-companion-grab-count";
 import { useVoiceRoomMessages } from "../use-voice-room-messages";
+import { useVoiceRoomMembersReconcile } from "../use-voice-room-members-reconcile";
 import { useVoiceRoomReception } from "../use-voice-room-reception";
 import { useVoiceRoomRtc } from "../use-voice-room-rtc";
 import { useVoiceRoomSessionStore } from "../voice-room-session";
 import {
+  sendVoiceChatImage,
   sendVoiceChatMessage,
   subscribeVoiceChatMembers,
   subscribeVoiceChatMessages,
@@ -61,6 +77,7 @@ import type {
   VoiceRoomDetail,
   VoiceRoomMember,
   VoiceRoomMemberRole,
+  VoiceRoomMessage,
 } from "../voice-room.types";
 
 /** 麦位槽位高度（含昵称），对齐 Figma Component 7 */
@@ -79,7 +96,15 @@ const SEAT_AREA_MAX_HEIGHT =
 const closeIcon = require("../../../../assets/svgs/navbar-exit.svg");
 const inviteIcon = require("../../../../assets/svgs/toolbar-invite.svg");
 const invitePlaceholderIcon = require("../../../../assets/svgs/game.svg");
-const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
+const defaultAvatar = require("../../../../assets/images/avatar_default.webp");
+
+// Android 需手动开启布局动画，用于评论面板与底部工具栏的平滑切换
+if (
+  Platform.OS === "android" &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 function avatarSource(member: VoiceRoomMember) {
   const avatar = member.avatar?.trim();
@@ -89,18 +114,16 @@ function avatarSource(member: VoiceRoomMember) {
 }
 
 // 成员槽位独立 memo 组件：消息到达/输入框打字等父组件重渲染时麦位不参与重渲，
-// 仅 speaking/micOpen 变化的槽位更新。
+// 仅 speaking 变化的槽位更新。头像不做开麦/闭麦角标，也不展示房主标签。
 const MemberSlot = memo(function MemberSlot({
   member,
   columns,
-  micOpen,
   speaking,
   inviteLabel,
   onPress,
 }: {
   member: VoiceRoomMember;
   columns: number;
-  micOpen: boolean;
   speaking: boolean;
   inviteLabel: string;
   onPress: (member: VoiceRoomMember) => void;
@@ -113,7 +136,7 @@ const MemberSlot = memo(function MemberSlot({
       accessibilityLabel={
         invite
           ? inviteLabel
-          : `查看${member.nickname}的资料，${micOpen ? "已开麦" : "已闭麦"}${speaking ? "，正在说话" : ""}`
+          : `查看${member.nickname}的资料${speaking ? "，正在说话" : ""}`
       }
       style={[styles.memberSlot, { width: `${100 / columns}%` }]}
       onPress={() => onPress(member)}
@@ -132,9 +155,6 @@ const MemberSlot = memo(function MemberSlot({
           <Image source={avatarSource(member)} style={styles.avatar} />
         )}
         {!invite ? <VoiceRoomSpeakingWaves active={speaking} /> : null}
-        {!invite ? (
-          <VoiceRoomMicBadge muted={!micOpen} speaking={speaking} />
-        ) : null}
         {isService ? (
           <View style={styles.serviceBadge}>
             <Text style={styles.serviceBadgeText}>接待</Text>
@@ -183,9 +203,10 @@ export default function VoiceRoomScreen() {
   const [members, setMembers] = useState<VoiceRoomMember[]>(() =>
     normalizeMembers(undefined, currentUser || undefined),
   );
-  const [input, setInput] = useState("");
-  // 键盘可见性来自 keyboard-controller 原生事件，顶起由 KeyboardAvoidingView 处理
-  const keyboardOpen = useKeyboardState((state) => state.isVisible);
+  const membersRef = useRef(members);
+  membersRef.current = members;
+  /** 评论面板（键盘拉起输入态）是否展开：Figma 550:124041 */
+  const [commentOpen, setCommentOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<VoiceRoomMember | null>(
     null,
   );
@@ -195,12 +216,78 @@ export default function VoiceRoomScreen() {
   const [conversationsSheetMode, setConversationsSheetMode] = useState<
     "chat" | "invite"
   >("chat");
+  // 消息列表弹窗里点开的私聊会话，非 null 时拉起聊天弹窗
+  const [activeChatConversation, setActiveChatConversation] =
+    useState<ChatSheetConversation | null>(null);
+  // 跳原生页面前收起聊天弹窗，返回后凭它重新拉起
+  const activeChatConversationRef = useRef<ChatSheetConversation | null>(null);
+  // 跳原生路由（主页/订单/图片预览/选图）时置 true，重新聚焦语聊房后恢复弹窗；切房为 false
+  const pendingChatRestoreRef = useRef(false);
+  // 消息列表里点开会话：登记 ref + 拉起聊天弹窗
+  const openChatConversation = useCallback((item: MessageListItemModel) => {
+    const conversation: ChatSheetConversation = {
+      id: item.id,
+      title: item.title,
+      avatar: getConversationAvatarUri(item.avatar),
+      clubId: item.clubId || undefined,
+    };
+    activeChatConversationRef.current = conversation;
+    setActiveChatConversation(conversation);
+  }, []);
+  // 聊天弹窗头部返回：只收聊天层，回消息列表弹窗
+  const closeChatToRoom = useCallback(() => {
+    activeChatConversationRef.current = null;
+    setActiveChatConversation(null);
+  }, []);
+  // 头部 ×：两层弹窗整体关闭回语聊房
+  const closeAllChatLayers = useCallback(() => {
+    activeChatConversationRef.current = null;
+    setActiveChatConversation(null);
+    setConversationsSheetVisible(false);
+  }, []);
+  // 跳原生页面前收起两层弹窗；不清 ref，返回后按 restorable 标记恢复
+  const hideChatLayersForNavigate = useCallback((restorable: boolean) => {
+    pendingChatRestoreRef.current = restorable;
+    setActiveChatConversation(null);
+    setConversationsSheetVisible(false);
+  }, []);
+  // 恢复被收起的聊天弹窗（选图结束 / 重新聚焦共用）
+  const restoreChatLayers = useCallback(() => {
+    pendingChatRestoreRef.current = false;
+    const conversation = activeChatConversationRef.current;
+    if (!conversation) return;
+    setActiveChatConversation(conversation);
+    setConversationsSheetVisible(true);
+  }, []);
+  // 相册选图（无论选没选）结束后恢复聊天弹窗
+  const restoreChatAfterPick = useCallback(() => {
+    restoreChatLayers();
+  }, [restoreChatLayers]);
+  // 从主页/订单/图片预览返回语聊房时恢复被收起的聊天弹窗
+  useFocusEffect(
+    useCallback(() => {
+      if (!pendingChatRestoreRef.current) return;
+      restoreChatLayers();
+    }, [restoreChatLayers]),
+  );
   const [exitDialogVisible, setExitDialogVisible] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [exitError, setExitError] = useState<string | null>(null);
   const exitInFlight = useRef(false);
   const kickedRef = useRef(false);
   const focusedRef = useRef(false);
+  /** 是否已发生过首次聚焦：守卫只在「重新聚焦」时生效，避开首次进房 session 尚未建立的时序 */
+  const everFocusedRef = useRef(false);
+  /** 本屏实例标识（React useId，每次 mount 唯一），写入 session.screenFocusOwnerId 作为聚焦权归属 */
+  const roomScreenId = useId();
+  // 守卫经 ref 读最新 roomId，不进 useFocusEffect deps：房内 dismissTo 切房
+  // 只变 params 不产生真实 blur→focus，若进 deps 会触发 cleanup→重跑，
+  // 此时旧房已 exit（activeRoom 为空）、新房 beginRoomJoin 尚未执行，守卫会误判空壳并弹出新房。
+  // 本 effect 声明在守卫之前，聚焦守卫执行时 ref 已同步完成。
+  const roomIdRef = useRef(roomId);
+  useEffect(() => {
+    roomIdRef.current = roomId;
+  }, [roomId]);
   const [micChanging, setMicChanging] = useState(false);
   const [distanceEnabled, setDistanceEnabled] = useState(false);
   /**
@@ -236,6 +323,15 @@ export default function VoiceRoomScreen() {
     setMemberSheetVisible(true);
   }, []);
 
+  const openCommentPanel = useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setCommentOpen(true);
+  }, []);
+  const closeCommentPanel = useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setCommentOpen(false);
+  }, []);
+
   const roleByUserId = useCallback(
     (userId?: string): VoiceRoomMemberRole | undefined => {
       if (!userId) return undefined;
@@ -253,7 +349,7 @@ export default function VoiceRoomScreen() {
     handleMessageScroll,
     handleMessageContentSizeChange,
     followLatestMessage,
-  } = useVoiceRoomMessages(roleByUserId);
+  } = useVoiceRoomMessages(roleByUserId, chatroomId);
 
   const isOwner =
     Boolean(currentUser?.id) &&
@@ -303,6 +399,16 @@ export default function VoiceRoomScreen() {
       shouldAutoCallService,
       setRoom,
     });
+
+  useVoiceRoomMembersReconcile({
+    roomId,
+    accessToken,
+    currentUser,
+    roomRef,
+    kickedRef,
+    hydrateMemberProfile,
+    setMembers,
+  });
 
   const {
     receptionVisible,
@@ -357,6 +463,17 @@ export default function VoiceRoomScreen() {
       matchActiveForQuickMatchCreated === true) ||
     (isOwner && Boolean(activityRequest));
   const showCallService = isOwner && !hasService && !showSelectCompanion;
+  /** 与 openSelectCompanion 一致：活动 > 客服代发 > 试音自发 */
+  const selectCompanionRequestNo =
+    activityRequest?.requestNo ||
+    (matchActiveForQuickMatchCreated === true && quickMatchCreatedRequestNo
+      ? quickMatchCreatedRequestNo
+      : undefined) ||
+    auditionRequestNo;
+  const selectCompanionGrabCount = useSelectCompanionGrabCount(
+    selectCompanionRequestNo,
+    showSelectCompanion,
+  );
 
   const minimize = useCallback(() => {
     if (router.canGoBack()) router.back();
@@ -544,12 +661,34 @@ export default function VoiceRoomScreen() {
   useFocusEffect(
     useCallback(() => {
       focusedRef.current = true;
+      // 聚焦标记：navigateToVoiceRoom 据此区分「房内原地切房（dismissTo）」
+      // 与「其他页面进入（push 保留中间路由）」
+      useVoiceRoomSessionStore.getState().setScreenFocused(true);
       // A private chat can cover this screen while the global listener exits it.
       if (kickedRef.current) minimize();
+      // 旧实例兜底：非聚焦页进房（如聊天页点邀请卡）会叠出同房第二个屏实例，
+      // 栈里历史遗留的旧房实例、session 已清空的场景同理。只有最后聚焦过的
+      // 实例是当前房屏：重新聚焦时聚焦权不在自己手上、或 session 已切走/清空，
+      // 则自动弹出自己，保证返回路径不再出现重复/失效的房屏。
+      // 只在真实 blur→focus 时执行；roomId 经 ref 读取（见 roomIdRef 注释）。
+      if (everFocusedRef.current && roomIdRef.current) {
+        const { activeRoom, joiningRoom, screenFocusOwnerId } =
+          useVoiceRoomSessionStore.getState();
+        const sessionMismatch =
+          !joiningRoom &&
+          (!activeRoom || activeRoom.roomId !== roomIdRef.current);
+        if (sessionMismatch || screenFocusOwnerId !== roomScreenId) {
+          minimize();
+          return;
+        }
+      }
+      everFocusedRef.current = true;
+      useVoiceRoomSessionStore.getState().setScreenFocusOwner(roomScreenId);
       return () => {
         focusedRef.current = false;
+        useVoiceRoomSessionStore.getState().setScreenFocused(false);
       };
-    }, [minimize]),
+    }, [minimize, roomScreenId]),
   );
 
   /** 场景 A：试音自发 — fetchActiveQuickMatch 校验 */
@@ -716,6 +855,9 @@ export default function VoiceRoomScreen() {
       setExitDialogVisible(false);
       setMemberSheetVisible(false);
       setConversationsSheetVisible(false);
+      setActiveChatConversation(null);
+      activeChatConversationRef.current = null;
+      pendingChatRestoreRef.current = false;
       setRtcReadyRoomId(null);
       setMicState(null);
       Keyboard.dismiss();
@@ -743,6 +885,63 @@ export default function VoiceRoomScreen() {
       });
       // 成员变更时校准 serviceUserId（接待离开后清空）
       void refreshServiceUserId();
+
+      const selfId = currentUser?.id ? String(currentUser.id) : "";
+      const version =
+        roomRef.current?.roomVersion ?? invitedRoomVersion ?? "1";
+      const tips: VoiceRoomMessage[] = [];
+      const placeholderTips: { messageId: string; userId: string }[] = [];
+      if (roomId) {
+        for (const action of actions) {
+          const userId = action.userId == null ? "" : String(action.userId);
+          if (!userId || userId === "invite" || userId === selfId) continue;
+          const changeAction: MemberChangeAction | null =
+            action.actionType === 1
+              ? "join"
+              : action.actionType === 2
+                ? "leave"
+                : null;
+          if (!changeAction) continue;
+          const noticeKey = memberChangeNoticeKey(roomId, version, userId);
+          if (shouldSkipMemberChangeNotice(noticeKey, changeAction)) continue;
+          const { nickname, isPlaceholder } = resolveMemberChangeNickname({
+            userId,
+            members: membersRef.current,
+            currentUser,
+          });
+          const tip = buildMemberChangeMessage({
+            roomId,
+            roomVersion: version,
+            userId,
+            nickname,
+            action: changeAction,
+          });
+          tips.push(tip);
+          if (isPlaceholder) {
+            placeholderTips.push({ messageId: tip.id, userId });
+          }
+        }
+      }
+      if (tips.length > 0) {
+        setMessages((items) => [...items, ...tips].slice(-80));
+      }
+      for (const tip of placeholderTips) {
+        if (!accessToken) continue;
+        void clientAuthApi
+          .getUserProfile(accessToken, tip.userId)
+          .then((profile) => {
+            if (!profile.nickname) return;
+            setMessages((items) =>
+              items.map((item) =>
+                item.id === tip.messageId
+                  ? { ...item, nickname: profile.nickname }
+                  : item,
+              ),
+            );
+          })
+          .catch(() => undefined);
+      }
+
       setMembers((items) =>
         actions.reduce<VoiceRoomMember[]>((next, action) => {
           const userId = action.userId == null ? "" : String(action.userId);
@@ -780,11 +979,14 @@ export default function VoiceRoomScreen() {
   }, [
     accessToken,
     chatroomId,
-    currentUser?.id,
+    currentUser,
     hydrateMemberProfile,
+    invitedRoomVersion,
     refreshServiceUserId,
     room?.creatorUserId,
     room?.serviceUserId,
+    roomId,
+    roomRef,
     serviceCalling,
     setMessages,
   ]);
@@ -816,27 +1018,60 @@ export default function VoiceRoomScreen() {
     }
   };
 
-  const sendMessage = async () => {
-    const text = input.trim();
-    if (!text) return;
+  const buildChatSender = () => {
+    if (!currentUser?.id) return undefined;
+    return {
+      userId: String(currentUser.id),
+      nickname: currentUser.nickname,
+      headImage: currentUser.headImage,
+    };
+  };
+
+  const sendMessage = async (text: string) => {
+    const value = text.trim();
+    if (!value) return;
     followLatestMessage();
-    setInput("");
     const local = {
       id: `local-${Date.now()}`,
       userId: currentUser?.id ? String(currentUser.id) : undefined,
       nickname: currentUser?.nickname || "我",
-      text,
+      text: value,
       sentAt: Date.now(),
       kind: "chat" as const,
     };
     setMessages((items) => [...items, local].slice(-80));
     if (chatroomId)
-      await sendVoiceChatMessage(chatroomId, text).catch(() => {
-        void useAppConfirm.getState().confirm({
-          title: "发送失败",
-          message: "请稍后重试",
-        });
-      });
+      await sendVoiceChatMessage(chatroomId, value, buildChatSender()).catch(
+        () => {
+          void useAppConfirm.getState().confirm({
+            title: "发送失败",
+            message: "请稍后重试",
+          });
+        },
+      );
+  };
+
+  const sendImage = async (imageUri: string) => {
+    followLatestMessage();
+    const local = {
+      id: `local-${Date.now()}`,
+      userId: currentUser?.id ? String(currentUser.id) : undefined,
+      nickname: currentUser?.nickname || "我",
+      text: "",
+      imageUrl: imageUri,
+      sentAt: Date.now(),
+      kind: "chat" as const,
+    };
+    setMessages((items) => [...items, local].slice(-80));
+    if (chatroomId)
+      await sendVoiceChatImage(chatroomId, imageUri, buildChatSender()).catch(
+        () => {
+          void useAppConfirm.getState().confirm({
+            title: "发送失败",
+            message: "图片发送失败，请稍后重试",
+          });
+        },
+      );
   };
 
   const ensureMicrophonePermission = async () => {
@@ -920,48 +1155,43 @@ export default function VoiceRoomScreen() {
     return `https://djpc.jlgkj.top/chat?type=chat-room&id=${encodeURIComponent(roomId)}&v=${encodeURIComponent(String(room.roomVersion ?? "1"))}`;
   };
 
-  const sendInviteLink = async (peerId: string) => {
+  /** @returns 是否发送成功；成功 Toast 由 ConversationsSheet 在关闭后再展示，避免随 Modal 卸载闪退 */
+  const sendInviteLink = async (peerId: string): Promise<boolean> => {
     const inviteLink = getInviteLink();
-    if (!inviteLink) return;
+    if (!inviteLink) return false;
     if (!accessToken) {
       showToast("请先登录");
-      return;
+      return false;
     }
     try {
       await messageStore.getState().initialize(accessToken);
       const state = messageStore.getState();
       if (state.connectionState !== "ready") {
         showToast("消息服务未连接，请稍后再试");
-        return;
+        return false;
       }
       await state.sendText(peerId, inviteLink);
       // sendText 内部 catch 错误后通过 set() 更新 store，必须重新 getState() 才能读到最新 lastError
       const failed = messageStore.getState().lastError;
       if (failed) {
         showToast(failed);
-        return;
+        return false;
       }
-      showToast("邀请已发送");
+      return true;
     } catch {
       showToast("邀请发送失败，请稍后再试");
+      return false;
     }
   };
 
   const seatSlots = members.map((member, index) => {
-    const micOpen =
-      rtcReady &&
-      (member.userId === String(currentUser?.id)
-        ? !muted
-        : Boolean(member.micOpen));
-    // speaking 来自独立的 speakingUserIds（声网音量回调高频更新的原子 state），
-    // 能说话即代表已开麦，不再用可能滞后的 micOpen 二次短路
+    // speaking 来自独立的 speakingUserIds（声网音量回调高频更新的原子 state）
     const speaking = rtcReady && speakingUserIds.includes(member.userId);
     return (
       <MemberSlot
         key={`${member.userId}-${index}`}
         member={member}
         columns={memberColumns}
-        micOpen={micOpen}
         speaking={speaking}
         inviteLabel={inviteSlotLabel}
         onPress={handleSlotPress}
@@ -1046,38 +1276,45 @@ export default function VoiceRoomScreen() {
           />
         </View>
 
-        <VoiceRoomToolbar
-          bottomInset={insets.bottom}
-          keyboardOpen={keyboardOpen}
-          input={input}
-          muted={muted}
-          rtcReady={rtcReady}
-          connecting={loading}
-          micChanging={micChanging}
-          leaving={leaving}
-          serviceCalling={serviceCalling}
-          distanceEnabled={distanceEnabled}
-          showCallService={showCallService}
-          showServiceDispatch={canServiceDispatch}
-          showSelectCompanion={showSelectCompanion}
-          onToggleDistance={() => setDistanceEnabled((prev) => !prev)}
-          onChangeText={setInput}
-          onSend={() => void sendMessage()}
-          onToggleMute={() => void toggleMute()}
-          onOpenMessages={() => {
-            Keyboard.dismiss();
-            setConversationsSheetMode("chat");
-            setConversationsSheetVisible(true);
-          }}
-          onInvite={() => {
-            Keyboard.dismiss();
-            setConversationsSheetMode("invite");
-            setConversationsSheetVisible(true);
-          }}
-          onCallService={() => void callService()}
-          onServiceDispatch={() => void onServiceDispatch()}
-          onSelectCompanion={openSelectCompanion}
-        />
+        {commentOpen ? (
+          <VoiceRoomCommentPanel
+            bottomInset={insets.bottom}
+            onSendText={(text) => sendMessage(text)}
+            onSendImage={(imageUri) => sendImage(imageUri)}
+            onClose={closeCommentPanel}
+          />
+        ) : (
+          <VoiceRoomToolbar
+            bottomInset={insets.bottom}
+            muted={muted}
+            rtcReady={rtcReady}
+            connecting={loading}
+            micChanging={micChanging}
+            leaving={leaving}
+            serviceCalling={serviceCalling}
+            distanceEnabled={distanceEnabled}
+            showCallService={showCallService}
+            showServiceDispatch={canServiceDispatch}
+            showSelectCompanion={showSelectCompanion}
+            selectCompanionGrabCount={selectCompanionGrabCount}
+            onCommentPress={openCommentPanel}
+            onToggleDistance={() => setDistanceEnabled((prev) => !prev)}
+            onToggleMute={() => void toggleMute()}
+            onOpenMessages={() => {
+              Keyboard.dismiss();
+              setConversationsSheetMode("chat");
+              setConversationsSheetVisible(true);
+            }}
+            onInvite={() => {
+              Keyboard.dismiss();
+              setConversationsSheetMode("invite");
+              setConversationsSheetVisible(true);
+            }}
+            onCallService={() => void callService()}
+            onServiceDispatch={() => void onServiceDispatch()}
+            onSelectCompanion={openSelectCompanion}
+          />
+        )}
       </KeyboardAvoidingView>
       <VoiceRoomExitDialog
         visible={exitDialogVisible}
@@ -1095,6 +1332,16 @@ export default function VoiceRoomScreen() {
         sendTextTo={
           conversationsSheetMode === "invite" ? sendInviteLink : undefined
         }
+        onOpenConversation={
+          conversationsSheetMode === "invite" ? undefined : openChatConversation
+        }
+      />
+      <ChatSheet
+        conversation={activeChatConversation}
+        onBack={closeChatToRoom}
+        onClose={closeAllChatLayers}
+        onBeforeNavigate={hideChatLayersForNavigate}
+        onAfterPickImages={restoreChatAfterPick}
       />
       {receptionClub ? (
         <ClubQuickMatchSheet

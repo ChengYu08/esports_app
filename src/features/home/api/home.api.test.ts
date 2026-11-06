@@ -165,6 +165,17 @@ describe("首页品类筛选与店铺标签", () => {
     expect(result).toMatchObject({ hasMore: true, nextPage: 2 });
   });
 
+  it("优先依据俱乐部性质显示自营标签，旧接口回退名称", async () => {
+    vi.mocked(apiClient).mockResolvedValue({ code: "SUCCESS", data: { records: [
+      { id: 1, clubName: "盼之电竞", clubNature: "SELF_OPERATED" },
+      { id: 2, clubName: "自营字样的普通店", clubNature: "THIRD_PARTY" },
+      { id: 3, clubName: "未知性质" },
+      { id: 4, clubName: "盼之自营俱乐部" },
+    ] } });
+    const result = await fetchClubPage({}, 1);
+    expect(result.items.map((club) => club.isSelfOperated)).toEqual([true, false, false, true]);
+  });
+
   it("接口业务失败进入重试状态，不显示成空列表", async () => {
     vi.mocked(apiClient).mockResolvedValue({ code: "FAILED", info: "服务暂不可用" });
 

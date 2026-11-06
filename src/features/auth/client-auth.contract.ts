@@ -45,7 +45,13 @@ export type ClientOssSts = {
 };
 
 export type ClientImToken = { token: string };
-export type ClientUserProfile = { id: string; nickname: string; headImage: string };
+export type ClientUserProfile = {
+  id: string;
+  nickname: string;
+  headImage: string;
+  /** 官方客服标识："1" 是客服；旧后端可能不下发该字段，缺省视为非客服 */
+  customerService?: string;
+};
 
 export type ClientCancellationStatus = {
   inCooling: boolean;

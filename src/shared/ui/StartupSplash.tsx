@@ -38,7 +38,7 @@ export function StartupSplash({ onFinished }: Props) {
       <View style={styles.screen}>
         <Image
           accessibilityIgnoresInvertColors
-          contentFit="cover"
+          contentFit="fill"
           onDisplay={() => setImageState("displayed")}
           onError={() => setImageState("failed")}
           source={splashImage}
@@ -53,7 +53,9 @@ export function StartupSplash({ onFinished }: Props) {
 const styles = StyleSheet.create({
   // Android edge-to-edge insets are measured from this provider; without it the
   // first frame falls back to a window that excludes the system bars, so the
-  // image renders "cover"-fitted into a smaller area and leaves letterboxes.
+  // image renders "fill"-fitted into a smaller area and leaves letterboxes.
+  // contentFit 用 fill：与原生 windowBackground 的 bitmap gravity fill 几何完全
+  // 一致（拉伸铺满窗口），两层重叠时零位移，避免 cover 裁剪导致的启动图抖动。
   // 透明底：图片解码完成前由原生 windowBackground 的同图透出，避免图→白→图闪烁。
   provider: {
     flex: 1,

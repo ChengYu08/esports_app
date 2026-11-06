@@ -16,6 +16,7 @@ import { refreshDispatchAfterGrabAttempt, refreshDispatchDetail } from "@/featur
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { actionNotice } from "@/shared/ui/action-notice/action-notice-store";
 import { exitVoiceRoom } from "@/features/voice-room/exit-voice-room";
+import { navigateToVoiceRoom } from "@/features/voice-room/navigate-voice-room";
 import { resolveVoiceRoomId, voiceRoomApi } from "@/features/voice-room/voice-room.api";
 import type { VoiceRoomDetail } from "@/features/voice-room/voice-room.types";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
@@ -248,14 +249,14 @@ export async function grabQuickMatchAndEnterAudition(
 
     showToast("抢单成功，正在进入试音房…");
     const room = await switchToAuditionRoom(detail, confirmedCurrent, accessToken);
-    const roomHref = {
-      pathname: "/voice-room/[id]",
-      params: room.roomVersion
-        ? { id: room.id, v: room.roomVersion }
-        : { id: room.id },
-    } satisfies Href;
-    if (options.replaceRoom) router.replace(roomHref);
-    else router.push(roomHref);
+    const roomParams = room.roomVersion
+      ? { id: room.id, v: room.roomVersion }
+      : { id: room.id };
+    if (options.replaceRoom) {
+      router.replace({ pathname: "/voice-room/[id]", params: roomParams } satisfies Href);
+    } else {
+      navigateToVoiceRoom(roomParams);
+    }
     return { status: "entered" };
   } catch (error) {
     if (grabbed) {

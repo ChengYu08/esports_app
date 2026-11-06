@@ -1,4 +1,4 @@
-import { ChevronLeft24Regular, Search24Regular } from "@fluentui/react-native-icons";
+import { ChevronLeft24Regular, DismissCircle16Filled, Search24Regular } from "@fluentui/react-native-icons";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
@@ -58,7 +58,7 @@ export default function CourtTargetPickerScreen() {
     trimmed && !debouncing ? (query.data ?? EMPTY_TARGETS) : EMPTY_TARGETS;
   const loading =
     !!trimmed && (debouncing || query.isPending || query.isFetching);
-  const selected = rows.find((item) => item.id === selectedId) ?? rows[0];
+  const selected = rows.find((item) => item.id === selectedId);
   const disabled = !validSession || !selected || loading || query.isError;
   const showIds = /^\d+$/.test(search);
 
@@ -123,9 +123,20 @@ export default function CourtTargetPickerScreen() {
             autoCorrect={false}
             autoCapitalize="none"
             editable={validSession}
-            clearButtonMode="while-editing"
             style={styles.searchInput}
+            cursorColor="#FE1F4C"
           />
+          {!!keyword && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="清除搜索内容"
+              hitSlop={8}
+              onPress={() => changeKeyword("")}
+              style={styles.clearSearch}
+            >
+              <DismissCircle16Filled color="#BFBFBF" width={16} height={16} />
+            </Pressable>
+          )}
         </View>
       </View>
       {!validSession ? (
@@ -197,7 +208,7 @@ export default function CourtTargetPickerScreen() {
                   source={
                     item.headImage
                       ? { uri: item.headImage }
-                      : require("../../../../assets/coms/avatar_default.webp")
+                      : require("../../../../assets/images/avatar_default.webp")
                   }
                   style={styles.avatar}
                   contentFit="cover"
@@ -309,6 +320,7 @@ const styles = StyleSheet.create({
   searchBox: {
     flexDirection: "row",
     alignItems: "center",
+    height: 36,
     gap: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
@@ -317,14 +329,16 @@ const styles = StyleSheet.create({
   searchIcon: { width: 20, height: 20 },
   searchInput: {
     flex: 1,
-    minHeight: 36,
-    paddingVertical: 7,
+    height: 36,
+    paddingVertical: 0,
     paddingHorizontal: 0,
+    includeFontPadding: false,
+    textAlignVertical: "center",
     fontFamily: COURT_FONT_FAMILY,
     color: C.text,
     fontSize: 14,
-    lineHeight: 22,
   },
+  clearSearch: { width: 20, height: 36, alignItems: "center", justifyContent: "center" },
   list: { flexGrow: 1, paddingTop: 8 },
   emptyList: { backgroundColor: C.surface, paddingTop: 0 },
   emptyArea: {

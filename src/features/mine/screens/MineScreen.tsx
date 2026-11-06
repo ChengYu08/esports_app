@@ -1,3 +1,4 @@
+import { calculateAge } from "@/features/mine/profile-utils";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
@@ -6,10 +7,14 @@ import {
   Dismiss24Regular,
 } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
+import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
+import * as MediaLibrary from "expo-media-library";
 import { router, useFocusEffect } from "expo-router";
 import { type ReactNode, useCallback, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -19,6 +24,7 @@ import {
 import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { logger } from "@/core/logging/logger";
 import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { fetchStarBalance } from "@/features/mine/api/companion-order.api";
 import { resolveMineMenuKeys, type MineMenuKey } from "@/features/mine/mine-menu";
@@ -28,14 +34,16 @@ import {
   resolveVoiceRoomId,
   voiceRoomApi,
 } from "@/features/voice-room/voice-room.api";
+import { navigateToVoiceRoom } from "@/features/voice-room/navigate-voice-room";
 import { requireLogin } from "@/shared/navigation/require-login";
 
 const avatar = require("../../../../assets/mine/mine-avatar.png");
 const heroBackground = require("../../../../assets/mine/mine-hero-bg.webp");
 const menuClubIcon = require("../../../../assets/svgs/mine-menu-club.svg");
 const settingsIcon = require("../../../../assets/svgs/mine-settings.svg");
-const maleIcon = require("../../../../assets/svgs/male.svg");
-const femaleIcon = require("../../../../assets/svgs/mine-female.svg");
+const clubFlag = require("../../../../assets/svgs/mine-club-flag.svg");
+const maleIcon = require("../../../../assets/svgs/gender-male.svg");
+const femaleIcon = require("../../../../assets/svgs/gender-female.svg");
 const companionEntryQrCode = require("../../../../assets/coms/qrcode-pws.webp");
 const clubEntryQrCode = require("../../../../assets/coms/qrcode-jlb.webp");
 const menuRoomIcon = require("../../../../assets/svgs/mine-menu-room.svg");
@@ -94,7 +102,7 @@ export default function MineScreen() {
               signature: profile.signature ?? state.user.signature,
               isRealName: profile.isRealName ?? state.user.isRealName,
               realName: profile.realName ?? state.user.realName,
-              clubInfo: profile.clubInfo ?? state.user.clubInfo,
+              clubInfo: profile.clubInfo === undefined ? state.user.clubInfo : profile.clubInfo,
               positions: profile.positions ?? state.user.positions,
               sidebarMenus: profile.sidebarMenus ?? state.user.sidebarMenus,
             };
@@ -156,7 +164,7 @@ export default function MineScreen() {
         room = await voiceRoomApi.createRoom("我的语聊房", accessToken);
       const roomId = resolveVoiceRoomId(room);
       if (!roomId) throw new Error("房间信息不完整，请稍后重试");
-      router.push({ pathname: "/voice-room/[id]", params: { id: roomId } });
+      navigateToVoiceRoom({ id: roomId });
     } catch (error) {
       showToast(
         error instanceof Error ? error.message : "进入语聊房失败，请稍后重试",
@@ -180,6 +188,7 @@ export default function MineScreen() {
     router.push("/profile");
   };
 
+  const age = user?.birth ? calculateAge(user.birth) : "";
   const genderIcon =
     user?.gender === 1 ? maleIcon : user?.gender === 2 ? femaleIcon : null;
 
@@ -310,19 +319,25 @@ export default function MineScreen() {
                   >
                     {displayName}
                   </Text>
-                  {genderIcon ? (
+                  {genderIcon || age ? (
                     <View style={styles.badge}>
-                      <Image source={genderIcon} style={styles.genderIcon} />
+                      {genderIcon && <Image source={genderIcon} style={styles.genderIcon} />}
+                      {!!age && <Text style={[styles.ageText, user?.gender === 2 && styles.femaleAgeText]}>{age}</Text>}
                     </View>
                   ) : null}
                 </View>
-                <Text
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                  style={styles.signatureText}
-                >
-                  {user?.signature || "保持一点神秘感..."}
-                </Text>
+                {user?.clubInfo?.clubName ? (
+                  <View style={styles.clubLine}>
+                    <Image source={clubFlag} style={styles.clubFlag} />
+                    <Text numberOfLines={1} ellipsizeMode="tail" style={styles.signatureText}>
+                      {user.clubInfo.clubName}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text numberOfLines={1} ellipsizeMode="tail" style={styles.signatureText}>
+                    {user?.signature || "保持一点神秘感..."}
+                  </Text>
+                )}
               </View>
             </Pressable>
             <Pressable
@@ -445,6 +460,38 @@ function CompanionQrModal({
   visible: boolean;
   onClose: () => void;
 }) {
+  const [saving, setSaving] = useState(false);
+
+  // 把二维码原图转成 PNG 写入系统相册：直接从图片资源取像素，不截屏，避免弹层内截图失败或糊图
+  async function saveQrCode() {
+    if (saving) {
+      return;
+    }
+    setSaving(true);
+    try {
+      // Android 10 起写入相册不需要存储权限，只有 iOS 和更老系统要申请
+      if (Platform.OS !== "android" || Number(Platform.Version) < 30) {
+        const permission = await MediaLibrary.requestPermissionsAsync(true);
+        if (!permission.granted) {
+          showToast("请在系统设置中允许盼之电竞访问相册");
+          return;
+        }
+      }
+      const source = await Image.loadAsync(companionEntryQrCode);
+      const rendered = await ImageManipulator.manipulate(source).renderAsync();
+      const { uri } = await rendered.saveAsync({ format: SaveFormat.PNG });
+      await MediaLibrary.Asset.create(uri);
+      showToast("已保存到相册");
+    } catch (error) {
+      logger.warn("save companion qrcode failed", {
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      showToast("保存失败，请稍后重试");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <Modal
       animationType="fade"
@@ -454,31 +501,46 @@ function CompanionQrModal({
     >
       <View style={styles.qrModalBackdrop}>
         <Pressable
-          accessibilityLabel="关闭二维码弹窗"
+          accessibilityLabel="关闭成为陪玩师弹窗"
           onPress={onClose}
           style={StyleSheet.absoluteFill}
         />
-        <View accessibilityViewIsModal style={styles.qrModalCard}>
-          <View style={styles.qrModalHeader}>
-            <Text style={styles.qrModalTitle}>成为陪玩师</Text>
+        {/* 设计稿 571-59485：295 宽白卡，标题+说明+120 二维码+单个保存按钮，无关闭叉号 */}
+        <View accessibilityViewIsModal style={styles.companionQrCard}>
+          <View style={styles.companionQrContent}>
+            <Text style={styles.companionQrTitle}>成为陪玩师</Text>
+            <Text style={styles.companionQrBody}>
+              加入盼之电竞自营俱乐部，赚取丰厚报酬
+            </Text>
+            <View style={styles.companionQrImageWrap}>
+              <Image
+                accessibilityLabel="成为陪玩师二维码"
+                contentFit="contain"
+                source={companionEntryQrCode}
+                style={styles.companionQrCode}
+              />
+            </View>
+          </View>
+          <View style={styles.companionQrActions}>
             <Pressable
-              accessibilityLabel="关闭"
-              hitSlop={10}
-              onPress={onClose}
-              style={styles.qrModalClose}
+              accessibilityRole="button"
+              accessibilityLabel="保存二维码"
+              accessibilityState={{ disabled: saving, busy: saving }}
+              disabled={saving}
+              onPress={saveQrCode}
+              style={({ pressed }) => [
+                styles.companionQrSaveButton,
+                pressed && styles.buttonPressed,
+                saving && styles.companionQrSaveButtonDisabled,
+              ]}
             >
-              <Dismiss24Regular color="#999999" height={20} width={20} />
+              {saving ? (
+                <ActivityIndicator color="#FE1F4C" size="small" />
+              ) : (
+                <Text style={styles.companionQrSaveText}>保存二维码</Text>
+              )}
             </Pressable>
           </View>
-          <Image
-            accessibilityLabel="成为陪玩师二维码"
-            contentFit="contain"
-            source={companionEntryQrCode}
-            style={styles.qrCode}
-          />
-          <Text style={styles.qrModalHint}>
-            扫码联系工作人员，申请成为陪玩师
-          </Text>
         </View>
       </View>
     </Modal>
@@ -606,6 +668,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   genderIcon: { width: 12, height: 12 },
+  ageText: { color: "#3DA5FF", fontSize: 10, lineHeight: 14 },
+  femaleAgeText: { color: "#FE4267" },
+  clubLine: { flexDirection: "row", alignItems: "center", gap: 2 },
+  clubFlag: { width: 12, height: 12 },
   signatureText: {
     flexShrink: 1,
     color: "#979799",
@@ -733,6 +799,62 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     textAlign: "center",
   },
+  // 成为陪玩师弹窗（设计稿 571-59485）：295 宽白卡，内容 16/16/20，按钮区 4/16/16
+  companionQrCard: {
+    width: "100%",
+    maxWidth: 295,
+    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+    overflow: "hidden",
+  },
+  companionQrContent: {
+    paddingTop: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+    gap: 12,
+  },
+  companionQrTitle: {
+    color: "#333333",
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  companionQrBody: {
+    color: "#666666",
+    fontSize: 14,
+    lineHeight: 22,
+    textAlign: "center",
+  },
+  // 二维码容器：纯白底托住圆角图片，居中展示
+  companionQrImageWrap: {
+    width: 120,
+    height: 120,
+    alignSelf: "center",
+    backgroundColor: "#FFFFFF",
+  },
+  companionQrCode: { width: 120, height: 120, borderRadius: 8 },
+  companionQrActions: {
+    paddingTop: 4,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  companionQrSaveButton: {
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#FE1F4C",
+    borderRadius: 8,
+    backgroundColor: "#FFFFFF",
+  },
+  companionQrSaveButtonDisabled: { opacity: 0.6 },
+  companionQrSaveText: {
+    color: "#FE1F4C",
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: "600",
+  },
   clubAdminNoticeText: {
     marginTop: 20,
     color: "#666",
@@ -747,7 +869,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 8,
-    backgroundColor: "#FF1F4C",
+    backgroundColor: "#FE1F4C",
   },
   clubAdminConfirmText: {
     color: "#FFF",

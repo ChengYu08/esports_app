@@ -1,4 +1,4 @@
-import type { RankingBoard, RankingFilters, RankingPeriod } from "./api/ranking.types";
+import type { RankingBoard, RankingFilters, RankingItem, RankingPeriod } from "./api/ranking.types";
 
 export const RANKING_BOARDS = [
   {
@@ -59,4 +59,18 @@ export function formatRankingMetric(value: number, board: RankingBoard): string 
     return String(value);
   }
   return `${(value / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+}
+
+/** 后端未返回距离上一名差值时，用相邻名次的指标差兜底计算。 */
+export function withRankingGap(items: RankingItem[]): RankingItem[] {
+  return items.map((item, index) => {
+    if (item.distanceToPrev != null || index === 0) {
+      return item;
+    }
+    const prev = items[index - 1];
+    return {
+      ...item,
+      distanceToPrev: Math.max(0, prev.metricValue - item.metricValue),
+    };
+  });
 }

@@ -4,6 +4,7 @@ import {
   applyVoteToCases,
   canApplyCourtReviewer,
   courtVoteUnavailableReason,
+  getVoteProportions,
   isCourtReviewerApproved,
   submitCourtVote,
 } from "./court-vote";
@@ -198,5 +199,17 @@ describe("applyVoteToCases", () => {
       plaintiffVoteCount: 4,
     });
     expect(rows[0].voteSummary).toEqual({ plaintiff: 4, defendant: 5 });
+  });
+});
+
+describe("投票按钮宽度", () => {
+  it("无票时平分，票数接近时按比例分配", () => {
+    expect(getVoteProportions(0, 0)).toEqual({ plaintiff: 0.5, defendant: 0.5 });
+    expect(getVoteProportions(6, 4)).toEqual({ plaintiff: 0.6, defendant: 0.4 });
+  });
+
+  it("票数悬殊时为少票一侧保留空间", () => {
+    expect(getVoteProportions(0, 10).plaintiff).toBe(0.3);
+    expect(getVoteProportions(10, 0).plaintiff).toBe(0.7);
   });
 });

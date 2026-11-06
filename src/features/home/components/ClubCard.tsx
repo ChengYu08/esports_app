@@ -25,12 +25,9 @@ const tagGradient = (
 
 export const ClubCard = memo(function ClubCard({
   club,
-  onlineCount = club.onlineCount,
   onSelect,
 }: {
   club: Club;
-  /** 在线陪玩人数，null 表示尚未获取；未传时使用俱乐部自身的统计。 */
-  onlineCount?: number | null;
   onSelect?: (club: Club) => void;
 }) {
   const colors = ["#24354b", "#4a2637", "#2e4650", "#493e2e"];
@@ -41,11 +38,12 @@ export const ClubCard = memo(function ClubCard({
   };
 
   // 优先使用服务端批量返回的人数排序；旧数据缺人数时沿用接口顺序，避免逐卡查询。
+  // 超过 3 个按设计稿重叠展示（最多 8 个），不要提前截断成 3 个。
   const games = [...(club.games ?? [])]
     .filter((game) => game.iconUrl)
-    .sort((a, b) => (b.companionCount ?? -1) - (a.companionCount ?? -1))
-    .slice(0, 3);
+    .sort((a, b) => (b.companionCount ?? -1) - (a.companionCount ?? -1));
   const gamesLayout = computeGameIconLayout(games.length);
+  const shownGames = games.slice(0, gamesLayout.shown);
 
   return (
     <Pressable
@@ -78,12 +76,8 @@ export const ClubCard = memo(function ClubCard({
           <Text numberOfLines={1} style={styles.name}>
             {club.name}
           </Text>
-          <View style={styles.online}>
-            <View style={styles.onlineDot} />
-            <Text style={styles.onlineText}>{onlineCount ?? "--"}人</Text>
-          </View>
         </View>
-        <Text numberOfLines={1} style={styles.desc}>
+        <Text numberOfLines={2} style={styles.desc}>
           {club.description}
         </Text>
         <View style={styles.metaRow}>
@@ -96,9 +90,9 @@ export const ClubCard = memo(function ClubCard({
             <Text style={styles.metaText}>{club.clubCode}</Text>
           </View>
 
-          {games.length > 0 ? (
+          {shownGames.length > 0 ? (
             <View style={[styles.gameIcons, { width: gamesLayout.totalWidth }]}>
-              {games.map((game, index) => (
+              {shownGames.map((game, index) => (
                 <Image
                   key={`${game.iconUrl}-${index}`}
                   source={{ uri: game.iconUrl }}
@@ -110,13 +104,12 @@ export const ClubCard = memo(function ClubCard({
           ) : null}
         </View>
       </View>
-      <View style={styles.divider} />
     </Pressable>
   );
 });
 
 const styles = StyleSheet.create({
-  // 设计稿：卡片全宽白底，pad 16/12/16/12，内容 gap 12，底部细分割线
+  // 设计稿：卡片全宽白底，pad 16/12/16/12，内容 gap 12
   club: {
     minHeight: 104,
     flexDirection: "row",
@@ -187,23 +180,6 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     flexShrink: 1,
   },
-  online: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    flexShrink: 0,
-  },
-  onlineDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: "#2FC273",
-  },
-  onlineText: {
-    color: "#2FC273",
-    fontSize: 12,
-    lineHeight: 17,
-  },
   desc: {
     color: "#979799",
     fontSize: 11,
@@ -226,7 +202,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    marginTop: 4,
+    marginTop: 8,
   },
   meta: { flexDirection: "row", alignItems: "center", gap: 4 },
   metaText: {
@@ -234,14 +210,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
   },
-  metaIcon: { width: 16, height: 16 },
-  divider: {
-    // 绝对定位：不参与行布局（行内分割线的 margin 会挤窄内容区，右侧出现大空白）
-    position: "absolute",
-    bottom: 0,
-    left: 16,
-    right: 16,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: "#EBEBEB",
-  },
+  metaIcon: { width: 12, height: 12 },
+
 });

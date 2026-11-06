@@ -21,7 +21,7 @@ import { calculateAge } from "@/features/mine/profile-utils";
 
 const PUBLISH_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
 const FOOTER_CONTENT_BOTTOM = 22;
-const defaultAvatar = require("../../../../assets/coms/avatar_default.webp");
+const defaultAvatar = require("../../../../assets/images/avatar_default.webp");
 /** Figma 444:57020 / 444:57016 性别图标 12×12 */
 const maleIcon = require("../../../../assets/svgs/gender-male.svg");
 const femaleIcon = require("../../../../assets/svgs/gender-female.svg");

@@ -69,8 +69,12 @@ modules/*/android/.gradle/
 .workbuddy/
 .claude/
 .codex/
+.qoder/
 # Figma 临时渲染产物
 .figma-tmp/
 
 # react-native-update
 .pushy
+
+*.sql
+pzds_ali_h5_one_key.sql

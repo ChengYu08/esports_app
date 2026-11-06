@@ -10,8 +10,24 @@ import {
   subscribeRongConnectionStatus,
 } from '@/features/message/rongcloud-im';
 
+import { appendCachedVoiceChatMessage, clearVoiceChatMessageCache } from './voice-room-message-cache';
+
 type RongSdk = typeof import('@rongcloud/react-native-im-wrapper');
-type RoomMessage = { id: string; userId?: string; nickname?: string; text: string; imageUrl?: string; sentAt: number };
+type RoomMessage = {
+  id: string;
+  userId?: string;
+  nickname?: string;
+  avatar?: string;
+  text: string;
+  imageUrl?: string;
+  sentAt: number;
+};
+
+type VoiceChatSender = {
+  userId: string;
+  nickname?: string;
+  headImage?: string;
+};
 
 const roomMessageListeners = new Set<(chatroomId: string, message: RoomMessage) => void>();
 const roomMemberListeners = new Set<(targetId: string, actions: { userId?: string; actionType?: number }[]) => void>();
@@ -37,7 +53,12 @@ function installRoomListeners() {
   });
   subscribeRongChatRoomMessages((_targetId, message: RCIMIWMessage) => {
     const normalized = normalizeRoomMessage(message);
-    if (normalized) roomMessageListeners.forEach((listener) => listener(_targetId, normalized));
+    if (!normalized) return;
+    // 屏幕最小化期间屏内订阅已断开，这里把消息累积到会话级缓存，重进时可恢复
+    if (joinedChatroomIds.has(_targetId)) {
+      appendCachedVoiceChatMessage(_targetId, { ...normalized, kind: 'chat' });
+    }
+    roomMessageListeners.forEach((listener) => listener(_targetId, normalized));
   });
 }
 
@@ -53,7 +74,8 @@ function normalizeRoomMessage(message: RCIMIWMessage): RoomMessage | null {
   return {
     id: String(message.messageUId || message.messageId || message.sentTime),
     userId: message.senderUserId,
-    nickname: sdkMessage.name,
+    nickname: message.userInfo?.name,
+    avatar: message.userInfo?.portrait,
     text,
     ...(isImage && imageUrl ? { imageUrl } : {}),
     sentAt: message.sentTime || Date.now(),
@@ -85,6 +107,8 @@ export async function leaveVoiceChatRoom(chatroomId: string) {
   // A kicked user may already be absent on the server; always discard the
   // local joined marker so a later permitted join actually reaches the SDK.
   joinedChatroomIds.delete(chatroomId);
+  // 真正退房才清消息缓存；最小化只卸载屏组件、不退房，记录保留供重进恢复
+  clearVoiceChatMessageCache(chatroomId);
   if (engine) await engine.leaveChatRoom(chatroomId);
 }
 
@@ -118,15 +142,46 @@ export async function getVoiceChatHistory(chatroomId: string) {
   });
 }
 
-export async function sendVoiceChatMessage(chatroomId: string, text: string) {
+export async function sendVoiceChatMessage(
+  chatroomId: string,
+  text: string,
+  sender?: VoiceChatSender,
+) {
   const engine = getRongCloudEngine();
   const sdk = loadSdk();
   if (!engine || !sdk) throw new Error('融云 SDK 不可用');
   const message = await engine.createTextMessage(sdk.RCIMIWConversationType.CHATROOM, chatroomId, '', text);
+  if (sender) {
+    message.userInfo = {
+      userId: sender.userId,
+      name: sender.nickname || `用户${sender.userId}`,
+      portrait: sender.headImage || '',
+    };
+  }
   let sent: RCIMIWMessage | undefined;
   const code = await engine.sendMessage(message, { onMessageSent: (result: number, item?: RCIMIWMessage) => { if (result === 0) sent = item; } });
   if (code !== 0) throw new Error(`发送消息失败（${code}）`);
   return sent;
+}
+
+export async function sendVoiceChatImage(
+  chatroomId: string,
+  imagePath: string,
+  sender?: VoiceChatSender,
+) {
+  const engine = getRongCloudEngine();
+  const sdk = loadSdk();
+  if (!engine || !sdk) throw new Error('融云 SDK 不可用');
+  const message = await engine.createImageMessage(sdk.RCIMIWConversationType.CHATROOM, chatroomId, '', imagePath);
+  if (sender) {
+    message.userInfo = {
+      userId: sender.userId,
+      name: sender.nickname || `用户${sender.userId}`,
+      portrait: sender.headImage || '',
+    };
+  }
+  const code = await engine.sendMediaMessage(message, {});
+  if (code !== 0) throw new Error(`发送图片失败（${code}）`);
 }
 
 export function subscribeVoiceChatMessages(listener: (chatroomId: string, message: RoomMessage) => void) {

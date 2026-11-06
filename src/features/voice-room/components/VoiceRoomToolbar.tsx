@@ -4,7 +4,6 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
@@ -15,12 +14,11 @@ const sendIcon = require("../../../../assets/svgs/toolbar-send.svg");
 const messageIcon = require("../../../../assets/svgs/toolbar-message.svg");
 const inviteIcon = require("../../../../assets/svgs/toolbar-invite.svg");
 const selectCompanionIcon = require("../../../../assets/svgs/toolbar-select-companion.svg");
+/** Figma 542:121702 / 542:121821：接待派单左侧耳机图标 */
+const dispatchIcon = require("../../../../assets/svgs/toolbar-dispatch.svg");
 
 type VoiceRoomToolbarProps = {
   bottomInset: number;
-  /** 键盘弹出时去掉底部预留 margin，避免输入框被顶得过高 */
-  keyboardOpen?: boolean;
-  input: string;
   muted: boolean;
   rtcReady: boolean;
   connecting: boolean;
@@ -28,14 +26,16 @@ type VoiceRoomToolbarProps = {
   leaving: boolean;
   serviceCalling: boolean;
   distanceEnabled: boolean;
-  /** 房主且房内尚无接待时展示「呼叫接待」 */
+  /** 房主且房内尚无接待时展示「接待派单」 */
   showCallService?: boolean;
   /** 当前用户为房间绑定接待时展示「客服派单」 */
   showServiceDispatch?: boolean;
   showSelectCompanion?: boolean;
+  /** 一键匹配抢单人数；>0 时按钮文案为「选择陪玩(N)」 */
+  selectCompanionGrabCount?: number;
+  /** 点击「聊聊」假输入胶囊，唤起键盘评论面板 */
+  onCommentPress: () => void;
   onToggleDistance: () => void;
-  onChangeText: (text: string) => void;
-  onSend: () => void;
   onToggleMute: () => void;
   onOpenMessages: () => void;
   onInvite: () => void;
@@ -46,8 +46,6 @@ type VoiceRoomToolbarProps = {
 
 export function VoiceRoomToolbar({
   bottomInset,
-  keyboardOpen = false,
-  input,
   muted,
   rtcReady,
   connecting,
@@ -58,9 +56,9 @@ export function VoiceRoomToolbar({
   showCallService = false,
   showServiceDispatch = false,
   showSelectCompanion = false,
+  selectCompanionGrabCount = 0,
+  onCommentPress,
   onToggleDistance,
-  onChangeText,
-  onSend,
   onToggleMute,
   onOpenMessages,
   onInvite,
@@ -70,42 +68,35 @@ export function VoiceRoomToolbar({
 }: VoiceRoomToolbarProps) {
   const { width } = useWindowDimensions();
   const compact = width < 360;
+  const selectCompanionLabel =
+    selectCompanionGrabCount > 0
+      ? `选择陪玩(${selectCompanionGrabCount})`
+      : "选择陪玩";
 
   return (
     <View
       style={[
         styles.container,
         compact && styles.containerCompact,
-        keyboardOpen && styles.containerKeyboardOpen,
         {
-          paddingBottom: keyboardOpen ? 20 : Math.max(bottomInset, 12),
+          paddingBottom: Math.max(bottomInset, 12),
         },
       ]}
     >
-      <View style={[styles.composer, compact && styles.composerCompact]}>
-        <TextInput
-          accessibilityLabel="语聊房消息"
-          value={input}
-          onChangeText={onChangeText}
-          onSubmitEditing={onSend}
-          multiline
-          maxLength={1000}
-          submitBehavior="submit"
-          returnKeyType="send"
-          placeholder="聊聊"
-          placeholderTextColor="#979799"
-          style={styles.input}
-        />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="发送消息"
-          onPress={onSend}
-          hitSlop={8}
-          style={styles.sendButton}
-        >
-          <Image source={sendIcon} style={styles.icon} contentFit="contain" />
-        </Pressable>
-      </View>
+      {/* Figma 51:15881「底部栏」：假输入胶囊，点击唤起键盘评论面板 */}
+      <Pressable
+        accessibilityLabel="聊聊"
+        accessibilityRole="button"
+        onPress={onCommentPress}
+        style={({ pressed }) => [
+          styles.composer,
+          compact && styles.composerCompact,
+          pressed && styles.pressed,
+        ]}
+      >
+        <Text style={styles.composerPlaceholder}>聊聊</Text>
+        <Image source={sendIcon} style={styles.icon} contentFit="contain" />
+      </Pressable>
       <View style={[styles.tools, compact && styles.toolsCompact]}>
         <VoiceRoomMicControl
           muted={muted}
@@ -147,36 +138,45 @@ export function VoiceRoomToolbar({
       {showCallService ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={serviceCalling ? "呼叫中" : "呼叫接待"}
+          accessibilityLabel={serviceCalling ? "邀请中" : "接待派单"}
           accessibilityState={{ disabled: serviceCalling || leaving, busy: serviceCalling }}
           disabled={serviceCalling || leaving}
           onPress={onCallService}
           hitSlop={4}
           style={({ pressed }) => [
-            styles.actionPillButton,
-            (serviceCalling || leaving) && styles.disabled,
-            pressed && styles.pressed,
+            styles.dispatchButton,
+            leaving && !serviceCalling && styles.disabled,
+            pressed && !serviceCalling && styles.pressed,
           ]}
         >
           <LinearGradient
             colors={["#FF1F2E", "#FF1F69"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
+            start={{ x: 0.12, y: 0 }}
+            end={{ x: 1.08, y: 1 }}
             style={[
-              styles.actionPillContent,
-              compact && styles.actionPillContentCompact,
+              styles.dispatchContent,
+              compact && styles.dispatchContentCompact,
             ]}
           >
+            <Image
+              source={dispatchIcon}
+              style={styles.dispatchIcon}
+              contentFit="contain"
+            />
             <Text
               numberOfLines={1}
               maxFontSizeMultiplier={1.2}
               style={[
-                styles.actionPillText,
-                compact && styles.actionPillTextCompact,
+                styles.dispatchText,
+                compact && styles.dispatchTextCompact,
               ]}
             >
-              {serviceCalling ? "呼叫中…" : "呼叫接待"}
+              {serviceCalling ? "邀请中" : "接待派单"}
             </Text>
+            {/* Figma 542:121821：邀请中态叠加 30% 白蒙层 */}
+            {serviceCalling ? (
+              <View pointerEvents="none" style={styles.dispatchCallingOverlay} />
+            ) : null}
           </LinearGradient>
         </Pressable>
       ) : null}
@@ -218,7 +218,7 @@ export function VoiceRoomToolbar({
       {showSelectCompanion ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="选择陪玩"
+          accessibilityLabel={selectCompanionLabel}
           disabled={leaving}
           onPress={onSelectCompanion}
           hitSlop={4}
@@ -250,7 +250,7 @@ export function VoiceRoomToolbar({
                 compact && styles.selectCompanionTextCompact,
               ]}
             >
-              选择陪玩
+              {selectCompanionLabel}
             </Text>
           </LinearGradient>
         </Pressable>
@@ -268,38 +268,23 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     marginBottom: 40,
   },
-  containerKeyboardOpen: {
-    marginBottom: 0,
-  },
   containerCompact: { gap: 8, paddingHorizontal: 12 },
   composer: {
     flex: 1,
     minWidth: 0,
-    minHeight: 36,
+    height: 36,
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    justifyContent: "space-between",
     paddingHorizontal: 12,
     borderRadius: 18,
     backgroundColor: "rgba(255,255,255,0.08)",
   },
   composerCompact: { paddingHorizontal: 8 },
-  input: {
-    flex: 1,
-    minWidth: 0,
-    minHeight: 36,
-    maxHeight: 180,
-    paddingVertical: 9,
-    paddingHorizontal: 0,
-    textAlignVertical: "center",
-    color: "#FFFFFF",
-    fontSize: 12,
-  },
-  sendButton: {
-    flexShrink: 0,
-    width: 20,
-    height: 36,
-    justifyContent: "center",
+  composerPlaceholder: {
+    color: "#979799",
+    fontSize: 14,
+    lineHeight: 22,
   },
   tools: {
     flexDirection: "row",
@@ -341,6 +326,33 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   actionPillTextCompact: { fontSize: 12 },
+  /** Figma 542:121702：接待派单 pill（图标 22 + 文案，pl8/pr12/gap4） */
+  dispatchButton: { flexShrink: 0, borderRadius: 18, overflow: "hidden" },
+  dispatchContent: {
+    height: 36,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingLeft: 8,
+    paddingRight: 12,
+    borderRadius: 18,
+    overflow: "hidden",
+  },
+  dispatchContentCompact: { paddingRight: 8 },
+  dispatchIcon: { width: 22, height: 22 },
+  dispatchText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: "600",
+  },
+  dispatchTextCompact: { fontSize: 12 },
+  dispatchCallingOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(255,255,255,0.3)",
+    borderRadius: 18,
+  },
   selectCompanionButton: { flexShrink: 0, borderRadius: 18 },
   selectCompanionContent: {
     height: 36,

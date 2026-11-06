@@ -31,11 +31,13 @@ import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { CachedImage } from "@/shared/ui/CachedImage";
 
 const diamondIcon = require("../../../../assets/mine/star-recharge-diamond-3f6fcf.png");
-const fallbackAvatar = require("../../../../assets/coms/avatar_default.webp");
+const fallbackAvatar = require("../../../../assets/images/avatar_default.webp");
 
 type Props = {
   visible: boolean;
   order: OrderItemModel;
+  buyerName?: string;
+  buyerAvatar?: OrderItemModel["receiverAvatar"];
   companionName: string;
   companionAvatar?: OrderItemModel["receiverAvatar"];
   serviceTime: string;
@@ -51,6 +53,8 @@ type Props = {
 export function OrderCompleteConfirmSheet({
   visible,
   order,
+  buyerName,
+  buyerAvatar,
   companionName,
   companionAvatar,
   serviceTime,
@@ -106,7 +110,7 @@ export function OrderCompleteConfirmSheet({
       dismissOnBackdropPress={!loading}
       keyboardAvoiding={freeOrder}
       backdropStyle={styles.backdrop}
-      contentStyle={[styles.frame, { height: windowHeight * 0.68 }]}
+      contentStyle={[styles.frame, { maxHeight: windowHeight * 0.85 }]}
     >
       <View style={styles.sheet}>
         <View style={styles.heading}>
@@ -136,8 +140,8 @@ export function OrderCompleteConfirmSheet({
           <View style={styles.participants}>
             <Participant
               label="点单玩家"
-              name={order.sellerName || "老板"}
-              avatar={order.sellerAvatar}
+              name={buyerName || order.sellerName || "老板"}
+              avatar={buyerAvatar ?? order.sellerAvatar}
             />
             <Participant
               label="接单陪玩"
@@ -190,6 +194,7 @@ export function OrderCompleteConfirmSheet({
                   selectionColor="#FE1F4C"
                   style={styles.freeInput}
                   value={freeHoursText}
+                  cursorColor="#FE1F4C"
                 />
                 {freeHoursText ? (
                   <Pressable
@@ -314,7 +319,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 12,
     overflow: "hidden",
   },
-  sheet: { flex: 1, backgroundColor: "#FFF" },
+  sheet: { flexShrink: 1, backgroundColor: "#FFF" },
   heading: {
     flexShrink: 0,
     gap: 8,
@@ -345,7 +350,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  scroll: { flex: 1 },
+  scroll: { flexGrow: 0, flexShrink: 1 },
   content: { paddingHorizontal: 16, paddingBottom: 12 },
   participants: { flexDirection: "row", gap: 8, marginBottom: 8 },
   participant: {

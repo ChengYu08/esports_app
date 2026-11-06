@@ -7,7 +7,6 @@ import { complaintStyles as styles } from "@/features/court/complaint.styles";
 import {
   CourtCaseFormSection,
   FormField,
-  PublishTypeSection,
   TicketFormSection,
 } from "@/features/court/components/CourtComplaintSections";
 import {
@@ -50,6 +49,20 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Mode = "court" | "ticket" | "evidence" | "appeal";
 
+const MODE_TITLES: Record<Mode, string> = {
+  court: "发起评审",
+  ticket: "发起投诉",
+  evidence: "补充举证",
+  appeal: "发起申诉",
+};
+
+function getTitle(mode: Mode, caseId?: string) {
+  if (mode === "court" && caseId) {
+    return "重新提交评审";
+  }
+  return MODE_TITLES[mode];
+}
+
 function validMode(value?: string): Mode {
   return value === "ticket" || value === "evidence" || value === "appeal"
     ? value
@@ -65,11 +78,10 @@ export default function CourtComplaintScreen() {
     targetUid?: string;
   }>();
   const accessToken = useAuthStore((state) => state.accessToken);
-  const [mode, setMode] = useState<Mode>(() =>
+  const [mode] = useState<Mode>(() =>
     params.ticketId ? "ticket" : validMode(params.mode),
   );
   const [caseType, setCaseType] = useState<CourtCaseType>("DELETE_REVIEW");
-  const [publishTypeExpanded, setPublishTypeExpanded] = useState(true);
   const [ticketReasonExpanded, setTicketReasonExpanded] = useState(true);
   const [ticketReason, setTicketReason] = useState<string>("RULE_VIOLATION");
   const [claim, setClaim] = useState("");
@@ -77,6 +89,7 @@ export default function CourtComplaintScreen() {
   const contentLimit = mode === "appeal" ? 500 : 1000;
   const [footerHeight, setFooterHeight] = useState(0);
   const formScrollRef = useRef<KeyboardAwareScrollViewRef>(null);
+  const focusFrameRef = useRef<number | null>(null);
   const [sourceSessionId] = useState(() => makeIdempotencyKey("court-source"));
   const [targetSessionId] = useState(() => makeIdempotencyKey("ticket-target"));
   const [submitTicket] = useState(createTicketSubmitter);
@@ -95,6 +108,22 @@ export default function CourtComplaintScreen() {
 
   const revealFocusedInput = useCallback(() => {
     formScrollRef.current?.assureFocusedInputVisible();
+  }, []);
+
+  const handleInputFocus = useCallback(() => {
+    if (focusFrameRef.current !== null) {
+      cancelAnimationFrame(focusFrameRef.current);
+    }
+    focusFrameRef.current = requestAnimationFrame(() => {
+      focusFrameRef.current = null;
+      revealFocusedInput();
+    });
+  }, [revealFocusedInput]);
+
+  useEffect(() => () => {
+    if (focusFrameRef.current !== null) {
+      cancelAnimationFrame(focusFrameRef.current);
+    }
   }, []);
 
   useEffect(() => {
@@ -186,16 +215,7 @@ export default function CourtComplaintScreen() {
       : mode === "ticket"
         ? !ticketDraftError(ticketDraft)
         : Boolean(params.caseId));
-  const title =
-    mode === "court"
-      ? params.caseId
-        ? "重新提交评审"
-        : "发起投诉"
-      : mode === "ticket"
-        ? "发起投诉"
-        : mode === "evidence"
-          ? "补充举证"
-          : "发起申诉";
+  const title = getTitle(mode, params.caseId);
 
   function checkAccount() {
     if (!mountedRef.current) {
@@ -419,6 +439,7 @@ export default function CourtComplaintScreen() {
         ref={formScrollRef}
         // 提交栏随键盘上移，输入光标还需避开提交栏并保留少量间距。
         bottomOffset={footerHeight + 12}
+        extraKeyboardSpace={footerHeight + 12}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
@@ -444,15 +465,6 @@ export default function CourtComplaintScreen() {
         )}
         {(mode === "court" || mode === "ticket") && (
           <>
-            {!params.caseId && !params.ticketId && (
-              <PublishTypeSection
-                mode={mode}
-                expanded={publishTypeExpanded}
-                disabled={formDisabled}
-                onToggle={() => setPublishTypeExpanded((expanded) => !expanded)}
-                onSelect={setMode}
-              />
-            )}
             {mode === "court" ? (
               <CourtCaseFormSection
                 caseType={caseType}
@@ -466,7 +478,7 @@ export default function CourtComplaintScreen() {
                 }}
                 onOpenSources={openSources}
                 onChangeClaim={setClaim}
-                onFocusClaim={revealFocusedInput}
+                onFocusClaim={handleInputFocus}
               />
             ) : (
               <TicketFormSection
@@ -525,7 +537,7 @@ export default function CourtComplaintScreen() {
           required
         >
           <TextInput
-            onFocus={revealFocusedInput}
+            onFocus={handleInputFocus}
             value={content}
             onChangeText={setContent}
             multiline
@@ -543,6 +555,7 @@ export default function CourtComplaintScreen() {
             placeholderTextColor="#CCCCCC"
             style={[styles.input, styles.textArea]}
             textAlignVertical="top"
+            cursorColor="#FE1F4C"
           />
           <Text style={styles.counter}>{content.length}/{contentLimit}</Text>
         </FormField>

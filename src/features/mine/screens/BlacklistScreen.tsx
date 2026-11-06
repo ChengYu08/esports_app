@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
     height: 76,
     marginBottom: 1,
     overflow: "hidden",
-    backgroundColor: "#FF3158",
+    backgroundColor: "#FE1F4C",
   },
   row: {
     width: "100%",
@@ -173,9 +173,9 @@ const styles = StyleSheet.create({
     height: 76,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FF3158",
+    backgroundColor: "#FE1F4C",
   },
-  swipeable: { height: 76, backgroundColor: "#FF3158" },
+  swipeable: { height: 76, backgroundColor: "#FE1F4C" },
   removeText: {
     color: "#FFF",
     fontSize: 14,

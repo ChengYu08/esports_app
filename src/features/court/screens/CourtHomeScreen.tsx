@@ -520,7 +520,7 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
         ListHeaderComponent={listHeader}
         ListEmptyComponent={
           loading ? (
-            <ActivityIndicator color="#ff3158" style={styles.loading} />
+            <ActivityIndicator color="#FE1F4C" style={styles.loading} />
           ) : (
             <EmptyState
               style={styles.empty}
@@ -531,7 +531,7 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
         ListFooterComponent={
           <View>
             {loadingMore && (
-              <ActivityIndicator color="#ff3158" style={styles.loading} />
+              <ActivityIndicator color="#FE1F4C" style={styles.loading} />
             )}
             <View
               style={{ height: (data.length === 0 ? 44 : 60) + bottomInset }}
@@ -550,7 +550,7 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
               setRefreshing(true);
               void load();
             }}
-            tintColor="#ff3158"
+            tintColor="#FE1F4C"
           />
         }
         onEndReached={() => {
@@ -653,7 +653,7 @@ const styles = StyleSheet.create({
   feedRow: {
     flexDirection: "row",
     alignItems: "center",
-    minHeight: 36,
+    paddingTop: 12,
     marginBottom: 8,
   },
   feedTabs: { alignItems: "center", flexDirection: "row", gap: 12 },
@@ -711,7 +711,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   judgeArrow: {
-    color: "#ff3158",
+    color: "#FE1F4C",
     fontSize: 23,
     position: "absolute",
     right: 12,

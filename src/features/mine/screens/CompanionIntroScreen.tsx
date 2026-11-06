@@ -93,6 +93,7 @@ export default function CompanionIntroScreen() {
               placeholderTextColor="#CCC"
               textAlignVertical="top"
               style={styles.input}
+              cursorColor="#FE1F4C"
             />
             <Text accessibilityLiveRegion="polite" style={styles.count}>
               <Text
