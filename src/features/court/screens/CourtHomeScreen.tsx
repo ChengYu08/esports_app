@@ -626,7 +626,7 @@ const styles = StyleSheet.create({
   },
   sectionSelected: { color: "#0D0D0F", fontSize: 16, fontWeight: "600" },
   sectionUnderline: {
-    bottom: 8,
+    bottom: 0,
     height: 3,
     left: "50%",
     marginLeft: -6,
