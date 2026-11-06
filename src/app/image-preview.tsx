@@ -5,7 +5,7 @@ import { parseImagePreviewParams } from "@/features/mine/image-preview.params";
 import { ImagePreview } from "@/shared/ui/ImagePreview";
 
 export default function ImagePreviewScreen() {
-  const params = useLocalSearchParams<{ images?: string | string[]; index?: string | string[] }>();
+  const params = useLocalSearchParams<{ images?: string | string[]; index?: string | string[]; mode?: string }>();
   const { images, index } = useMemo(
     () => parseImagePreviewParams({ images: params.images, index: params.index }),
     [params.images, params.index],
@@ -15,5 +15,5 @@ export default function ImagePreviewScreen() {
       router.back();
     }
   }, [images]);
-  return <ImagePreview images={images} index={index} onClose={router.back} />;
+  return <ImagePreview images={images} index={index} onClose={router.back} mode={params.mode === "fit-width" ? "fit-width" : undefined} />;
 }
