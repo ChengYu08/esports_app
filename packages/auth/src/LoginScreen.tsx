@@ -16,6 +16,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Svg, { Path } from "react-native-svg";
 import {
   canSendSmsCode,
   getSmsCodeActionLabel,
@@ -336,15 +337,34 @@ export function LoginScreen({
               onPress={() => setAgreementAccepted((accepted) => !accepted)}
               style={[styles.agreement, compact && styles.compactAgreement]}
             >
-              <View
-                style={[
-                  styles.checkbox,
-                  agreementAccepted && styles.checkboxChecked,
-                ]}
-              >
-                {agreementAccepted ? (
-                  <Text style={styles.checkmark}>✓</Text>
-                ) : null}
+              <View style={styles.checkbox}>
+                {/* 透明占位字撑出与首行相同的文本行高（随系统字体缩放变化，不写死像素），
+                    勾选圆点在该行内居中，任何字号/设备下都与首行垂直居中 */}
+                <Text
+                  accessible={false}
+                  importantForAccessibility="no"
+                  numberOfLines={1}
+                  style={styles.checkboxSpacer}
+                >
+                  .
+                </Text>
+                <View style={styles.checkboxGraphic}>
+                  {agreementAccepted ? (
+                    // 勾选态按 Figma Checkbox/Small-16：16 框内 13px 实心圆 + 白色勾
+                    <Svg height={16} viewBox="0 0 16 16" width={16}>
+                      <Path
+                        d="M14.5 8C14.5 11.5899 11.5899 14.5 8 14.5C4.41015 14.5 1.5 11.5899 1.5 8C1.5 4.41015 4.41015 1.5 8 1.5C11.5899 1.5 14.5 4.41015 14.5 8Z"
+                        fill="#FE1F4C"
+                      />
+                      <Path
+                        d="M4.58394 7.66735C4.79874 7.45266 5.14673 7.4526 5.36148 7.66735L7.16102 9.46688L10.5294 6.09846C10.7442 5.88393 11.0923 5.88376 11.307 6.09846C11.5216 6.31317 11.5215 6.66123 11.307 6.876L7.5491 10.6339C7.33434 10.8486 6.98635 10.8486 6.77155 10.6339C6.76905 10.6314 6.7671 10.6281 6.76465 10.6256L4.58394 8.44489C4.36915 8.23011 4.36915 7.88214 4.58394 7.66735Z"
+                        fill="#FFFFFF"
+                      />
+                    </Svg>
+                  ) : (
+                    <View style={styles.checkboxCircle} />
+                  )}
+                </View>
               </View>
               <Text style={styles.agreementText}>
                 已阅读并同意{" "}
@@ -460,6 +480,9 @@ function LoginMethod({
     </Pressable>
   );
 }
+
+// 勾选框占满首行行高并居中，保证圆点与首行文字垂直居中
+const AGREEMENT_LINE_HEIGHT = 20;
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#fff" },
@@ -602,22 +625,36 @@ const styles = StyleSheet.create({
   compactAgreement: { marginTop: 24 },
   checkbox: {
     width: 16,
-    height: 16,
     marginRight: 4,
-    marginTop: 2,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
+  },
+  // 与协议文案同名文字样式：其行盒高度就是首行实际行高，随系统字体缩放变化
+  checkboxSpacer: {
+    fontSize: 12,
+    lineHeight: AGREEMENT_LINE_HEIGHT,
+    opacity: 0,
+  },
+  // RN 0.86 已移除 StyleSheet.absoluteFillObject，这里显式铺满占位行盒
+  checkboxGraphic: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: "center",
     justifyContent: "center",
   },
-  checkboxChecked: { borderColor: "#e01b28", backgroundColor: "#e01b28" },
-  checkmark: { color: "#fff", fontSize: 11, fontWeight: "700", lineHeight: 14 },
+  checkboxCircle: {
+    width: 13,
+    height: 13,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 6.5,
+  },
   agreementText: {
     flex: 1,
     color: "#999",
     fontSize: 12,
-    lineHeight: 20,
+    lineHeight: AGREEMENT_LINE_HEIGHT,
   },
   link: { color: "#4b8bd8" },
   modalOverlay: {
