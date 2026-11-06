@@ -11,8 +11,6 @@ import {
   markClubListEndReached,
   settleClubListScroll,
 } from "@/features/home/club-list-scroll";
-import { useClubOnlineCounts } from "@/features/home/hooks/use-club-online-counts";
-import { HomeBackground } from "@/features/home/components/HomeBackground";
 import { HomeHeader, HomeTopBar } from "@/features/home/components/HomeHeader";
 import { HomeSkeleton } from "@/features/home/components/HomeSkeleton";
 import {
@@ -29,17 +27,12 @@ import {
   RefreshControl,
   StyleSheet,
   View,
-  type ViewToken,
 } from "react-native";
 import { showToast, toastDurations } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const clubViewabilityConfig = { itemVisiblePercentThreshold: 20 };
-const CLUB_VIEWABILITY_SETTLE_MS = 250;
-
-function sameClubIds(current: string[], next: string[]) {
-  return current.length === next.length && current.every((id, index) => id === next[index]);
-}
+// 排行榜 tab 渐变在安全区之下的高度：顶部导航 44 + 榜单切换 56 + 标题 88，与 RankingScreen 内嵌布局对齐。
+const RANKING_GRADIENT_BODY = 188;
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -189,43 +182,6 @@ export default function HomeScreen() {
     () => clubs.data?.pages.flatMap((page) => page.items) ?? [],
     [clubs.data],
   );
-  const [visibleClubIds, setVisibleClubIds] = useState<string[]>([]);
-  const viewabilityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const onClubViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
-    // 有服务端在线人数的卡片无需逐项查询；滚动稳定后再更新可见项，避免惯性滚动期间重渲染整页。
-    const next = viewableItems
-      .filter(({ item }) => item.onlineCompanionCount == null)
-      .map(({ item }) => item.id as string);
-    if (viewabilityTimer.current !== null) {
-      clearTimeout(viewabilityTimer.current);
-    }
-    viewabilityTimer.current = setTimeout(() => {
-      viewabilityTimer.current = null;
-      setVisibleClubIds((current) => sameClubIds(current, next) ? current : next);
-    }, CLUB_VIEWABILITY_SETTLE_MS);
-  }, []);
-  useEffect(() => {
-    return () => {
-      if (viewabilityTimer.current !== null) {
-        clearTimeout(viewabilityTimer.current);
-      }
-    };
-  }, []);
-  // 精确在线人数需要逐游戏分页查询，只计算屏幕上的卡片。
-  const onlineGameIds = useMemo(
-    () => selectedGame ? [Number(selectedGame)] : selectedCategory ? categoryGames.map((item) => item.id) : undefined,
-    [selectedGame, selectedCategory, categoryGames],
-  );
-  const legacyVisibleClubs = useMemo(
-    () => {
-      const visibleIds = new Set(visibleClubIds);
-      return clubItems.filter((club) =>
-        club.onlineCompanionCount == null && visibleIds.has(club.id),
-      );
-    },
-    [clubItems, visibleClubIds],
-  );
-  const onlineCounts = useClubOnlineCounts(legacyVisibleClubs, onlineGameIds, topTab === "home");
   const selectTopTab = useCallback((tab: HomeTab) => {
     resetListScrollState();
     setTopTab(tab);
@@ -246,7 +202,6 @@ export default function HomeScreen() {
       games.refetch(),
       categories.refetch(),
       banners.refetch(),
-      onlineCounts.refetch(),
     ]);
   };
   const loadMoreClubs = () => {
@@ -262,12 +217,9 @@ export default function HomeScreen() {
   };
   const renderClub = useCallback(
     ({ item }: { item: (typeof clubItems)[number] }) => (
-      <ClubCard
-        club={item}
-        onlineCount={item.onlineCompanionCount ?? onlineCounts.counts[item.id] ?? null}
-      />
+      <ClubCard club={item} />
     ),
-    [onlineCounts.counts],
+    [],
   );
   const header = useMemo(
     () => (
@@ -309,11 +261,13 @@ export default function HomeScreen() {
     <View
       style={[
         styles.screen,
-        topTab === "home" && styles.homeScreen,
         { paddingTop: insets.top },
       ]}
     >
-      {topTab === "ranking" ? <RankingBackground /> : topTab !== "home" && <HomeBackground />}
+      {topTab === "ranking" ? (
+        // 设计稿渐变从屏幕顶端开始，覆盖安全区、顶部 tab、榜单切换和标题，止于白色榜单面板顶部。
+        <RankingBackground height={insets.top + RANKING_GRADIENT_BODY} />
+      ) : null}
       <HomeTopBar tab={topTab} onTabChange={selectTopTab} />
       <View style={styles.paneContainer}>
         {mountedTabs.home && (
@@ -326,11 +280,10 @@ export default function HomeScreen() {
                 data={clubItems}
                 keyExtractor={(item) => item.id}
                 renderItem={renderClub}
-                onViewableItemsChanged={onClubViewableItemsChanged}
-                viewabilityConfig={clubViewabilityConfig}
                 ListHeaderComponent={header}
                 contentContainerStyle={{
                   flexGrow: 1,
+                  backgroundColor: "#fff",
                   paddingBottom: 100 + insets.bottom,
                 }}
                 refreshControl={
@@ -339,8 +292,7 @@ export default function HomeScreen() {
                       (clubs.isRefetching && !clubs.isFetchingNextPage) ||
                       games.isRefetching ||
                       categories.isRefetching ||
-                      banners.isRefetching ||
-                      onlineCounts.isRefetching
+                      banners.isRefetching
                     }
                     onRefresh={refreshHome}
                     tintColor="#FE1F4C"
@@ -392,10 +344,9 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, width: "100%", backgroundColor: "#fff" },
-  homeScreen: { backgroundColor: "#F5F6F7" },
+  screen: { flex: 1, width: "100%", backgroundColor: "#F5F6F7" },
   homeHeader: { backgroundColor: "#F5F6F7" },
-  clubList: { backgroundColor: "#fff" },
+  clubList: { backgroundColor: "#F5F6F7" },
   paneContainer: { flex: 1 },
   pane: { flex: 1 },
   paneHidden: { display: "none" },

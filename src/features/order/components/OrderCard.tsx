@@ -4,7 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { memo, useEffect, useState, type ReactNode } from "react";
 import type { ImageSource } from "expo-image";
 import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
-import Toast from "react-native-root-toast";
+import { showToast } from "@/shared/ui/app-toast";
 
 import {
   computeOrderPayableStars,
@@ -75,9 +75,9 @@ export const OrderCard = memo(function OrderCard({
     const orderNo = item.orderNo ?? item.id;
     try {
       await Clipboard.setStringAsync(orderNo);
-      Toast.show("订单编号已复制", { duration: Toast.durations.SHORT });
+      showToast("订单编号已复制");
     } catch {
-      Toast.show("复制失败，请稍后重试", { duration: Toast.durations.SHORT });
+      showToast("复制失败，请稍后重试");
     }
   };
   return (
@@ -221,7 +221,7 @@ export const OrderCard = memo(function OrderCard({
               </Text>
             </View>
             <View style={styles.totalValue}>
-              <Text style={styles.totalLabel}>
+              <Text style={[styles.totalLabel, styles.totalCaption]}>
                 {freeSummary ? "免单后" : "合计"}
               </Text>
               {freeSummary ? (
@@ -521,7 +521,7 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     alignItems: "center",
     justifyContent: "flex-end",
-    gap: 4,
+    gap: 6,
   },
   originalTotal: {
     fontFamily: SYSTEM_FONT,
@@ -544,6 +544,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 4,
   },
+  totalCaption: { color: "#999999" },
   totalLabel: {
     fontFamily: SYSTEM_FONT,
     color: "#0A0A0A",

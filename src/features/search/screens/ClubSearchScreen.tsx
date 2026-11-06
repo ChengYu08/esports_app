@@ -1,5 +1,5 @@
 import { useAuthStore } from "@esports/auth";
-import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
+import { ChevronLeft24Regular, DismissCircle16Filled } from "@fluentui/react-native-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -201,18 +201,31 @@ export default function ClubSearchScreen() {
         >
           <ChevronLeft24Regular width={24} height={24} color="#0A0A0A" />
         </Pressable>
-        <TextInput
-          autoFocus
-          clearButtonMode="while-editing"
-          maxLength={MAX_SEARCH_LENGTH}
-          onChangeText={handleInputChange}
-          onSubmitEditing={handleSubmit}
-          placeholder={placeholder}
-          placeholderTextColor="#CCCCCC"
-          returnKeyType="search"
-          style={styles.input}
-          value={input}
-        />
+        <View style={styles.inputBox}>
+          <TextInput
+            autoFocus
+            cursorColor="#FE1F4C"
+            maxLength={MAX_SEARCH_LENGTH}
+            onChangeText={handleInputChange}
+            onSubmitEditing={handleSubmit}
+            placeholder={placeholder}
+            placeholderTextColor="#CCCCCC"
+            returnKeyType="search"
+            style={styles.input}
+            value={input}
+          />
+          {!!input && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="清除搜索内容"
+              hitSlop={8}
+              onPress={() => handleInputChange("")}
+              style={styles.clearInput}
+            >
+              <DismissCircle16Filled color="#BFBFBF" width={16} height={16} />
+            </Pressable>
+          )}
+        </View>
         <Pressable
           accessibilityRole="button"
           onPress={handleSubmit}
@@ -286,17 +299,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   back: { width: 56, height: 44, alignItems: "center", justifyContent: "center" },
+  inputBox: {
+    flex: 1,
+    height: 36,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: "#F7F7F7",
+  },
   input: {
     ...searchTypography.regular14,
     flex: 1,
     height: 36,
-    paddingHorizontal: 12,
-    paddingVertical: 0,
-    borderRadius: 8,
-    backgroundColor: "#F7F7F7",
+    padding: 0,
+    lineHeight: undefined,
     color: "#111",
     textAlignVertical: "center",
   },
+  clearInput: { width: 20, height: 36, alignItems: "center", justifyContent: "center" },
   // 不写死宽度：固定 56 减去左右内边距后只剩 28pt，两个 14pt 汉字会被挤成两行
   submit: {
     height: 44,

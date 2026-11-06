@@ -21,7 +21,7 @@ export const RankingCard = memo(function RankingCard({
 }: Props) {
   const canViewProfile = getRankingProfileParams(item) !== null;
   const gapLabel =
-    board === "GOD" && item.distanceToPrev != null
+    item.distanceToPrev != null
       ? `距离上一名差${formatRankingMetric(item.distanceToPrev, board)}`
       : undefined;
 

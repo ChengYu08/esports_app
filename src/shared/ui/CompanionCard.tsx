@@ -1,10 +1,14 @@
-import { BlurTargetView } from "expo-blur";
 import { Image } from "expo-image";
+import { requireOptionalNativeModule } from "expo";
+import { BlurTargetView, BlurView } from "expo-blur";
 import { memo, useRef } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { getDDinProStyle } from "@/shared/theme/typography";
+
+const blurAvailable = requireOptionalNativeModule("ExpoBlur") != null;
+const AvatarTarget = blurAvailable ? BlurTargetView : View;
 
 const maleIcon = require("../../../assets/svgs/gender-male.svg");
 const femaleIcon = require("../../../assets/svgs/gender-female.svg");
@@ -63,8 +67,7 @@ export const CompanionCard = memo(function CompanionCard({
   onToggleVoice,
   onPress,
 }: CompanionCardProps) {
-  // Android 端毛玻璃胶囊需要与头像建立模糊目标关系
-  const avatarBlurTargetRef = useRef<View | null>(null);
+  const blurTargetRef = useRef<View>(null);
   const online = onlineStatus === 1;
   const busy = gameStatus === 1;
   // 第三行文案：模式 / 等级 / 服务 斜杠分割纯文本，接口未配置时兜底个性签名
@@ -79,23 +82,29 @@ export const CompanionCard = memo(function CompanionCard({
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
     >
       <View style={styles.cardLeft}>
-        <BlurTargetView ref={avatarBlurTargetRef} style={styles.avatarTarget}>
+        <AvatarTarget ref={blurTargetRef} style={styles.avatar}>
           <Image
             source={avatar ? { uri: avatar } : emptyAvatar}
             style={styles.avatar}
             contentFit="cover"
           />
-        </BlurTargetView>
-        {voiceUrl ? (
-          <VoicePlayButton
-            url={voiceUrl}
-            duration={voiceDurationSeconds}
-            tone="pill"
-            blurTarget={avatarBlurTargetRef}
-            playingUrl={voicePlayingUrl}
-            onToggleVoice={onToggleVoice}
-          />
-        ) : null}
+        </AvatarTarget>
+        {voiceUrl && (blurAvailable ? (
+          <BlurView
+            blurTarget={blurTargetRef}
+            blurMethod="dimezisBlurViewSdk31Plus"
+            intensity={35}
+            tint="light"
+            style={styles.voicePill}
+          >
+            <VoicePlayButton url={voiceUrl} duration={voiceDurationSeconds} tone="light" playingUrl={voicePlayingUrl} onToggleVoice={onToggleVoice} />
+          </BlurView>
+        ) : (
+          <View style={[styles.voicePill, styles.voicePillFallback]}>
+            <VoicePlayButton url={voiceUrl} duration={voiceDurationSeconds} tone="light" playingUrl={voicePlayingUrl} onToggleVoice={onToggleVoice} />
+          </View>
+        ))}
+
       </View>
       <View style={styles.cardRight}>
         <View style={styles.cardContent}>
@@ -201,14 +210,23 @@ const styles = StyleSheet.create({
   },
   cardPressed: { backgroundColor: "#F7F7F7" },
   cardLeft: { width: 100, height: 100 },
-  // 模糊目标容器：裁圆角由容器负责，头像与播放胶囊共处同一层叠上
-  avatarTarget: {
-    width: 100,
-    height: 100,
-    borderRadius: 8,
+  avatar: { width: 100, height: 100, borderRadius: 8 },
+  voicePill: {
+    position: "absolute",
+    left: 6,
+    bottom: 6,
+    backgroundColor: "rgba(255,255,255,0.75)",
+    minWidth: 49,
+    height: 23,
     overflow: "hidden",
+    borderWidth: 0.5,
+    borderColor: "#FFF",
+    borderRadius: 99,
+    paddingVertical: 3,
+    paddingLeft: 4,
+    paddingRight: 6,
   },
-  avatar: { width: 100, height: 100 },
+  voicePillFallback: { backgroundColor: "rgba(255,255,255,0.75)" },
   cardRight: {
     flex: 1,
     justifyContent: "space-between",
@@ -272,8 +290,6 @@ const styles = StyleSheet.create({
   },
   introRow: {
     flexDirection: "row",
-    // 第二、三行视觉间距原为 6（gap 4 + 行高留白 2），再补 2 至 8
-    marginTop: 2,
     // 标签与右侧文案垂直居中对齐，间距与卡内其他行一致为 4
     alignItems: "center",
     gap: 4,

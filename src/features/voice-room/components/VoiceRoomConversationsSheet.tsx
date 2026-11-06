@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { EmptyState } from "@/shared/ui/AsyncStates";
+import { showToast } from "@/shared/ui/app-toast";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { resolveConversationAvatar } from "@/features/message/message-avatar";
 import { useMessageStore } from "@/features/message/message-store";
@@ -29,11 +30,17 @@ const defaultConversationAvatar = require("../../../../assets/images/avatar_defa
 const systemNotificationAvatar = require("../../../../assets/svgs/message-system-notice.svg");
 const chatClose = require("../../../../assets/svgs/icon-close.svg");
 
+/** BottomSheet 关闭动画约 220ms，成功 Toast 须在 Modal 卸载后再挂到根节点，否则会随 Sheet 一起消失 */
+const TOAST_AFTER_SHEET_MS = 280;
+
 type VoiceRoomConversationsSheetProps = {
   visible: boolean;
   onClose: () => void;
-  /** When set, tapping a conversation sends this text to the peer instead of opening the chat. */
-  sendTextTo?: (peerId: string) => Promise<void>;
+  /**
+   * When set, tapping a conversation sends invite text instead of opening chat.
+   * Resolve `true` when invite is sent; sheet shows success toast after close.
+   */
+  sendTextTo?: (peerId: string) => Promise<boolean>;
   /** 点击会话回调（私聊模式）：由外部拉起聊天弹窗 */
   onOpenConversation?: (item: MessageListItemModel) => void;
 };
@@ -97,8 +104,13 @@ export function VoiceRoomConversationsSheet({
     (item: MessageListItemModel) => {
       if (isSelfConversationId(item.id, userId)) return;
       if (sendTextTo) {
-        void sendTextTo(item.id);
-        onClose();
+        // 先发完再关 Sheet：失败留 Sheet 以免错误 Toast 随 Modal 卸载；成功延后 Toast 到根节点
+        void (async () => {
+          const sent = await sendTextTo(item.id);
+          if (!sent) return;
+          onClose();
+          setTimeout(() => showToast("邀请已发送"), TOAST_AFTER_SHEET_MS);
+        })();
         return;
       }
       if (onOpenConversation) {

@@ -14,6 +14,7 @@ import {
 } from "@/features/auth/cancellation-cooling";
 import { getPasswordLoginErrorMessage } from "@/features/auth/password-login-error";
 import { openInAppWebView } from "@/shared/navigation/open-web-view";
+import { backAfterLogin } from "@/shared/navigation/require-login";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { createAuthSsoAdapter, LoginScreen, useAuthStore } from "@esports/auth";
 import {
@@ -94,11 +95,11 @@ export default function LoginRoute() {
   useFocusEffect(
     useCallback(() => {
       if (Platform.OS !== "android") return;
-      // Tabs replace themselves with login, so the system back action needs a home fallback.
+      // push 进来的场景退回来源页；Tab 等 replace 进来的场景没有可退页面，回首页
       const subscription = BackHandler.addEventListener(
         "hardwareBackPress",
         () => {
-          router.replace("/");
+          backAfterLogin();
           return true;
         },
       );
@@ -141,6 +142,9 @@ export default function LoginRoute() {
     if (quickLoginInFlightRef.current) return;
     quickLoginInFlightRef.current = true;
     setQuickLoginLoading(true);
+    // 成功路径不手动关遮罩：router.back()/replace() 只是派发导航，转场动画还有几百毫秒，
+    // 此时立刻撤遮罩会露出底下的密码表单，像跳错了页面。登录页卸载时 Modal 自然消失。
+    let keepOverlayUntilUnmount = false;
     try {
       const token = await adapter.authorizeQuickLogin(quickLoginProvider);
       await completeClientLogin(
@@ -150,7 +154,8 @@ export default function LoginRoute() {
         setCompanionStatus,
         token.phone,
       );
-      router.replace("/");
+      backAfterLogin();
+      keepOverlayUntilUnmount = true;
     } catch (error) {
       // 用户在授权页主动退出，授权页盖在登录页之上，关掉后自然露出下面的界面。
       // switch：点了「验证码或密码登录」，露出下面的密码/验证码表单，静默即可；
@@ -160,7 +165,7 @@ export default function LoginRoute() {
         // 取消后落到表单态：phase 不再是 ready，回到登录页不会又自动拉起授权页
         setQuickLoginPhase("fallback");
         if (error.reason === "exit") {
-          router.replace("/");
+          backAfterLogin();
         }
         return;
       }
@@ -175,7 +180,9 @@ export default function LoginRoute() {
       );
     } finally {
       quickLoginInFlightRef.current = false;
-      setQuickLoginLoading(false);
+      if (!keepOverlayUntilUnmount) {
+        setQuickLoginLoading(false);
+      }
     }
   }, [adapter, quickLoginProvider, setSession, setCompanionStatus]);
 
@@ -240,8 +247,8 @@ export default function LoginRoute() {
       <LoginScreen
         initialMode={initialMode}
         initialPhone={initialPhone}
-        onBack={() => router.replace("/")}
-        onSkip={() => router.replace("/")}
+        onBack={backAfterLogin}
+        onSkip={backAfterLogin}
         onSendCode={async (phone) => {
           if (!ensureNotCooling()) return;
           if (!adapter) {
@@ -271,7 +278,7 @@ export default function LoginRoute() {
               setCompanionStatus,
               payload.username,
             );
-            router.replace("/");
+            backAfterLogin();
           } catch (error) {
             setPasswordLoginError(getPasswordLoginErrorMessage(error));
           }
@@ -308,7 +315,7 @@ export default function LoginRoute() {
               setCompanionStatus,
               payload.phone,
             );
-            router.replace("/");
+            backAfterLogin();
           } catch (error) {
             showToast(
               `登录失败，${error instanceof Error ? error.message : "请检查手机号和验证码"}`,

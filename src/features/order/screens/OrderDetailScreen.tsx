@@ -1,11 +1,15 @@
+import { StarPaymentPrompt } from "@/features/order/components/StarPaymentPrompt";
+import { getPaymentDeadline } from "@/features/order/payment-countdown";
+import { showToast } from "@/shared/ui/app-toast";
 import { useAuthStore } from "@esports/auth";
 import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { router, useFocusEffect, useIsFocused } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { fetchProfileDetail } from "@/features/mine/api/profile.api";
 import { OrderAfterSaleSheet } from "@/features/order/components/OrderAfterSaleSheet";
 import { OrderCompleteConfirmSheet } from "@/features/order/components/OrderCompleteConfirmSheet";
 import { OrderMultiCompanionSheet } from "@/features/order/components/OrderMultiCompanionSheet";
@@ -14,7 +18,6 @@ import { OrderDetailInfoBlocks } from "@/features/order/components/OrderDetailIn
 import { OrderDetailStatusBar } from "@/features/order/components/OrderDetailStatusBar";
 import { OrderFreeConfirmFlow } from "@/features/order/components/OrderFreeConfirmFlow";
 import { OrderReviewSheet } from "@/features/order/components/OrderReviewSheet";
-import { formatOrderFreeSummary } from "@/features/order/free-amount";
 import { useOrderDetailActions } from "@/features/order/hooks/use-order-detail-actions";
 import { multiCompanionNeedSelect } from "@/features/order/multi-companion";
 import { getOrderDetailAction } from "@/features/order/order-detail-actions";
@@ -89,6 +92,23 @@ export function OrderDetailScreen({
     staleTime: 10 * 60_000,
     retry: 1,
   });
+  const [paymentVisible, setPaymentVisible] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
+  const companionIds = scope === "place"
+    ? [...new Set((detail.data?.companions ?? []).map((companion) => companion.userId).filter((userId) => /^\d+$/.test(userId) && userId !== "0"))]
+    : [];
+  const companionProfiles = useQueries({
+    queries: companionIds.map((userId) => ({
+      queryKey: ["profile-detail", undefined, userId],
+      queryFn: ({ signal }: { signal: AbortSignal }) => fetchProfileDetail({ userId }, signal),
+      staleTime: 10 * 60_000,
+      retry: 1,
+    })),
+  });
+  const companionClubs = Object.fromEntries(companionIds.map((userId, index) => {
+    const profile = companionProfiles[index]?.data;
+    return [userId, profile?.clubId ? { clubId: profile.clubId, clubName: profile.clubName, logoUrl: profile.logoUrl } : undefined];
+  }));
   const [clock, setClock] = useState(() => Date.now());
   const dispatchDeadline = detail.data?.dispatchDeadline;
   useEffect(() => {
@@ -134,11 +154,9 @@ export function OrderDetailScreen({
             ["afterSales", "review", "reorder"].includes(item.key),
           )
         : detailAction
-          ? order.actions.filter((item) => item.key === detailAction)
+          ? order.actions.filter((item) => item.key === detailAction).map((item) => item.key === "pay" ? { ...item, label: "立即支付" } : item)
           : [];
   const isPending = order.status === "pendingPayment";
-  const isCancelled =
-    order.status === "cancelled" || order.status === "refunded";
   const statusTitle =
     scope === "accept"
       ? order.status === "paid"
@@ -166,34 +184,6 @@ export function OrderDetailScreen({
       order.status === "inService") &&
     dispatchCountdown !== undefined;
   const orderNumber = order.orderNo ?? order.id;
-  const freeSummary = formatOrderFreeSummary(order);
-  const statusHint =
-    order.status === "refunded" || order.status === "partiallyRefunded"
-      ? freeSummary
-        ? `已免${freeSummary}`
-        : "退款已完成"
-      : scope === "accept"
-        ? order.status === "paid"
-          ? "老板已支付，请及时处理订单"
-          : order.status === "waitingService"
-            ? "请按约定时间开始服务"
-            : order.status === "inService"
-              ? "服务进行中"
-              : isCompleted
-                ? ""
-                : isCancelled
-                  ? "订单已取消"
-                  : "订单状态已更新"
-        : isPending
-          ? "请在剩余时间内完成支付"
-          : isCompleted
-            ? "感谢你的支持"
-            : isCancelled
-              ? "订单已取消"
-              : order.status === "inService"
-                ? "服务进行中"
-                : "陪玩确认后开始服务";
-
   return (
     <View style={[styles.screen, scope === "accept" && styles.acceptScreen]}>
       <View style={[styles.header, { paddingTop: insets.top }]}>
@@ -224,7 +214,6 @@ export function OrderDetailScreen({
         <OrderDetailStatusBar
           scope={scope}
           statusTitle={statusTitle}
-          statusHint={statusHint}
           showDispatchCountdown={showDispatchCountdown}
           dispatchCountdown={dispatchCountdown}
         />
@@ -232,6 +221,8 @@ export function OrderDetailScreen({
           order={order}
           scope={scope}
           clubName={clubName}
+          clubLogoUrl={clubQuery.data?.logoUrl}
+          companionClubs={companionClubs}
           orderNumber={orderNumber}
           onCopy={actions.copyOrderNumber}
           onChat={actions.handleChat}
@@ -241,7 +232,19 @@ export function OrderDetailScreen({
         scope={scope}
         actions={detailActions}
         pending={actions.actionPending}
-        onAction={actions.handleDetailAction}
+        onAction={(action) => {
+          if (action.key === "pay") {
+            const deadline = getPaymentDeadline(order);
+            if (deadline !== null && Date.now() >= deadline) {
+              showToast("订单支付已超时");
+              detail.refetch();
+              return;
+            }
+            setPaymentVisible(true);
+            return;
+          }
+          actions.handleDetailAction(action);
+        }}
       />
       <AppPrompt
         visible={actions.cancelPromptVisible}
@@ -276,22 +279,27 @@ export function OrderDetailScreen({
         onClose={() => actions.setReviewVisible(false)}
         onSubmit={actions.submitReview}
       />
-      <AppPrompt
-        visible={actions.completePromptVisible && scope !== "accept"}
-        title="提示"
-        message={`确定${scope === "accept" ? "完成服务" : "完成订单"}吗，订单号：${order.orderNo ?? order.id}`}
-        cancelText="取消"
-        confirmText="确认"
-        onCancel={() => actions.setCompletePromptVisible(false)}
-        onConfirm={actions.confirmCompletePlace}
+      <StarPaymentPrompt
+        key={paymentVisible ? order.id : "none"}
+        item={paymentVisible ? order : null}
+        token={token}
+        onClose={() => setPaymentVisible(false)}
+        onPaid={() => {
+          setPaymentVisible(false);
+          detail.refetch();
+        }}
+        onPaymentFailed={setPaymentError}
       />
+      <AppPrompt visible={!!paymentError} title="支付失败" message={paymentError} onConfirm={() => setPaymentError("")} />
       <OrderCompleteConfirmSheet
-        visible={actions.completePromptVisible && scope === "accept"}
+        visible={actions.completePromptVisible}
         order={order}
-        companionName={order.receiverName || currentUser?.nickname || "陪玩师"}
+        buyerName={scope === "place" ? currentUser?.nickname || "老板" : undefined}
+        buyerAvatar={scope === "place" ? (currentUser?.headImage ? { uri: currentUser.headImage } : require("../../../../assets/images/avatar_default.webp")) : undefined}
+        companionName={order.receiverName || (scope === "place" ? order.sellerName : currentUser?.nickname) || "陪玩师"}
         companionAvatar={
           order.receiverAvatar ??
-          (currentUser?.headImage ? { uri: currentUser.headImage } : undefined)
+          (scope === "accept" && currentUser?.headImage ? { uri: currentUser.headImage } : undefined)
         }
         serviceTime={formatOrderTime(
           order.serviceStartTime || order.serviceEndTime || order.createTime,
@@ -321,7 +329,7 @@ export function OrderDetailScreen({
           }
           companionAvatar={
             order.receiverAvatar ??
-            (currentUser?.headImage
+            (scope === "accept" && currentUser?.headImage
               ? { uri: currentUser.headImage }
               : undefined)
           }

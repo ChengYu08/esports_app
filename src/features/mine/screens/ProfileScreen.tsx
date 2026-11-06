@@ -69,6 +69,7 @@ import {
 import { createProfileAvatarPreviewParams } from "@/features/mine/profile-avatar-preview";
 import { createProfileChatParams } from "@/features/mine/profile-chat";
 import { calculateAge } from "@/features/mine/profile-utils";
+import { afterOrderPaidOpenChat } from "@/features/order/notify-order-paid";
 import { invalidateOrderQueries } from "@/features/order/order-query";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
@@ -878,13 +879,28 @@ export default function ProfileScreen() {
           }}
           onPaid={() => {
             const paidOrderId = paymentOrder.orderId;
+            const companionUserId = String(profile.userId);
+            const chatParams = createProfileChatParams({
+              userId: profile.userId,
+              nickname: profile.nickname,
+              headImage: profile.headImage,
+              clubId: profile.clubId,
+            });
+            const accessToken = useAuthStore.getState().accessToken;
             setPaymentSheetVisible(false);
             setPaymentOrder(null);
             setPaymentError(null);
             void invalidateOrderQueries(paidOrderId);
-            router.push({
-              pathname: "/order/[id]",
-              params: { id: String(paidOrderId) },
+            void afterOrderPaidOpenChat({
+              companionUserIds: [companionUserId],
+              token: accessToken,
+              chat: {
+                id: chatParams.id,
+                title: chatParams.title,
+                avatar: chatParams.avatar || undefined,
+                clubId: chatParams.clubId,
+                fromProfile: chatParams.fromProfile,
+              },
             });
           }}
           onPaymentFailed={(message) => setPaymentError(message)}

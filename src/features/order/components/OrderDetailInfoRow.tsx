@@ -1,7 +1,7 @@
 import { Copy16Regular } from "@fluentui/react-native-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { getDDinProStyle, SYSTEM_FONT } from "@/shared/theme/typography";
+import { SYSTEM_FONT } from "@/shared/theme/typography";
 
 /** 订单详情信息行：左侧标签、右侧值，支持复制按钮与陪玩端样式 */
 export function OrderDetailInfoRow({
@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
   },
   acceptRow: { gap: 12, paddingVertical: 6 },
   label: {
-    color: "#808080",
+    color: "#7F7F80",
     fontFamily: SYSTEM_FONT,
     fontSize: 14,
     lineHeight: 22,
@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
   acceptLabel: {
     width: 112,
     flexShrink: 1,
-    color: "#808080",
+    color: "#7F7F80",
     fontSize: 14,
     lineHeight: 22,
   },
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     maxWidth: "70%",
   },
   value: {
-    color: "#161616",
+    color: "#0D0D0F",
     fontFamily: SYSTEM_FONT,
     fontSize: 14,
     lineHeight: 22,
@@ -108,13 +108,13 @@ const styles = StyleSheet.create({
   },
   acceptValue: {
     flexShrink: 1,
-    color: "#0A0A0A",
+    color: "#0D0D0F",
     fontSize: 14,
     lineHeight: 22,
   },
   multilineInfoRow: { alignItems: "flex-start", minHeight: 44 },
   multilineValue: { textAlign: "right" },
-  amount: { color: "#FE1F4C", ...getDDinProStyle(600) },
+  amount: { color: "#FE1F4C", fontFamily: SYSTEM_FONT, fontWeight: "400" },
   acceptAmount: { fontWeight: "400" },
   copy: { width: 16, height: 16 },
 });

@@ -202,6 +202,7 @@ export function OrderReviewSheet({
                   style={styles.input}
                   textAlignVertical="top"
                   value={content}
+                  cursorColor="#FE1F4C"
                 />
               )}
               {!readonly && (

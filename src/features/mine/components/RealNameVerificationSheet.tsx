@@ -124,6 +124,7 @@ export function RealNameVerificationSheet({
             placeholder="请输入真实姓名"
             placeholderTextColor="#B4B7BE"
             style={styles.input}
+            cursorColor="#FE1F4C"
           />
         </View>
         <Text style={styles.fieldLabel}>身份证号</Text>
@@ -156,6 +157,7 @@ export function RealNameVerificationSheet({
             autoCorrect={false}
             returnKeyType="done"
             style={styles.input}
+            cursorColor="#FE1F4C"
           />
           <Text style={styles.inputCount}>{idCard.length}/18</Text>
         </View>

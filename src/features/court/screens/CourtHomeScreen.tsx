@@ -626,7 +626,7 @@ const styles = StyleSheet.create({
   },
   sectionSelected: { color: "#0D0D0F", fontSize: 16, fontWeight: "600" },
   sectionUnderline: {
-    bottom: 8,
+    bottom: 0,
     height: 3,
     left: "50%",
     marginLeft: -6,
@@ -653,7 +653,7 @@ const styles = StyleSheet.create({
   feedRow: {
     flexDirection: "row",
     alignItems: "center",
-    minHeight: 36,
+    paddingTop: 12,
     marginBottom: 8,
   },
   feedTabs: { alignItems: "center", flexDirection: "row", gap: 12 },

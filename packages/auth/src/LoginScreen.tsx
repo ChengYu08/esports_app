@@ -25,7 +25,9 @@ import {
 } from "./password-validation";
 import { PasswordVisibilityIcon } from "./PasswordVisibilityIcon";
 
-const topArt = require("../assets/top-login.svg");
+// iOS 端 expo-image 的 SVG 解析器（SDWebImageSVGCoder）不支持 Figma 导出的
+// pattern + use + base64 image 结构，会渲染空白，改用提取出的位图资源
+const topArt = require("../assets/top-login.jpg");
 const phoneIcon = require("../assets/phone.svg");
 const lockIcon = require("../assets/lock.svg");
 const wechatIcon = require("../assets/wechat.svg");

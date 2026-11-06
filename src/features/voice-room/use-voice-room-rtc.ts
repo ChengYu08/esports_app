@@ -3,6 +3,12 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateA
 
 import { showToast } from "@/shared/ui/app-toast";
 
+import {
+  buildMemberChangeMessage,
+  memberChangeNoticeKey,
+  resolveMemberChangeNickname,
+  shouldSkipMemberChangeNotice,
+} from "./member-change-notice";
 import { inviteMember, normalizeMembers } from "./member-normalize";
 import type { ActiveVoiceRoom } from "./voice-room-session";
 import { useVoiceRoomSessionStore } from "./voice-room-session";
@@ -250,6 +256,30 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
         );
         await joinVoiceChatRoom(accessToken, prepared.rongChatroomId);
         if (!isCurrentJoin()) { await cleanupCancelledJoin(); return; }
+        if (currentUser?.id) {
+          const selfId = String(currentUser.id);
+          const noticeKey = memberChangeNoticeKey(
+            roomId,
+            prepared.roomVersion,
+            selfId,
+          );
+          if (!shouldSkipMemberChangeNotice(noticeKey, "join")) {
+            const { nickname } = resolveMemberChangeNickname({
+              userId: selfId,
+              members: preparedMembers,
+              currentUser,
+            });
+            const selfJoinTip = buildMemberChangeMessage({
+              roomId,
+              roomVersion: prepared.roomVersion,
+              userId: selfId,
+              nickname,
+              action: "join",
+              createdAt: Date.now() + 1,
+            });
+            setMessages((items) => [...items, selfJoinTip].slice(-80));
+          }
+        }
         void getVoiceChatHistory(prepared.rongChatroomId)
           .then((history) => {
             if (!active || history.length === 0) return;

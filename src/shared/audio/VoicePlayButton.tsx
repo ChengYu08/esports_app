@@ -1,12 +1,10 @@
-import { BlurView } from "expo-blur";
 import { Image } from "expo-image";
-import type { RefObject } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { getDDinProStyle } from "../theme/typography";
 import { VoiceWaveform } from "./VoiceWaveform";
 
-const playBadgeIcon = require("../../../assets/svgs/play-badge.svg");
+const playTriangleIcon = require("../../../assets/svgs/play-triangle-white.svg");
 
 type VoicePlayButtonProps = {
   url: string;
@@ -15,10 +13,8 @@ type VoicePlayButtonProps = {
   onToggleVoice: (url: string) => void;
   inline?: boolean;
   compact?: boolean;
-  /** solid：粉底白字胶囊；pill：浅白毛玻璃胶囊（头像左下角试听标签） */
-  tone?: "solid" | "pill";
-  /** Android 端背景高斯模糊目标（头像），由调用方用 BlurTargetView 包裹 */
-  blurTarget?: RefObject<View | null>;
+  /** solid：粉底白字胶囊；light：透明底品牌色图标文字；pill：浅白毛玻璃胶囊（俱乐部详情试听标签） */
+  tone?: "solid" | "light" | "pill";
 };
 
 export function VoicePlayButton({
@@ -29,9 +25,9 @@ export function VoicePlayButton({
   inline = false,
   compact = false,
   tone = "solid",
-  blurTarget,
 }: VoicePlayButtonProps) {
   const playing = playingUrl === url;
+  const light = tone === "light" || tone === "pill";
   const pill = tone === "pill";
 
   return (
@@ -45,29 +41,17 @@ export function VoicePlayButton({
       }}
       style={[
         styles.button,
-        inline ? styles.inlineButton : styles.overlayButton,
+        inline || light ? styles.inlineButton : styles.overlayButton,
         compact && styles.compactButton,
+        light && styles.lightButton,
         pill && styles.pillButton,
       ]}
     >
-      {pill ? (
-        <>
-          <BlurView
-            blurMethod="dimezisBlurView"
-            blurTarget={blurTarget}
-            intensity={20}
-            pointerEvents="none"
-            style={styles.pillBlur}
-            tint="light"
-          />
-          <View pointerEvents="none" style={styles.pillTint} />
-        </>
-      ) : null}
       <View
         style={[
           styles.iconCircle,
           compact && styles.compactIconCircle,
-          pill && styles.pillIconCircle,
+          light && styles.lightIconCircle,
         ]}
       >
         {playing ? (
@@ -75,39 +59,40 @@ export function VoicePlayButton({
             style={[
               styles.pauseIcon,
               compact && styles.compactPauseIcon,
-              pill && styles.pillPauseIcon,
+              light && styles.lightPauseIcon,
             ]}
           >
             <View
               style={[
                 styles.pauseBar,
                 compact && styles.compactPauseBar,
-                pill && styles.pillPauseBar,
+                light && styles.lightPauseBar,
               ]}
             />
             <View
               style={[
                 styles.pauseBar,
                 compact && styles.compactPauseBar,
-                pill && styles.pillPauseBar,
+                light && styles.lightPauseBar,
               ]}
             />
           </View>
-        ) : pill ? (
-          <Image source={playBadgeIcon} style={styles.pillPlayBadge} />
+        ) : light ? (
+          <Image source={playTriangleIcon} style={styles.lightPlayTriangle} />
         ) : (
           <Text style={[styles.playIcon, compact && styles.compactPlayIcon]}>
             ▶
           </Text>
         )}
       </View>
-      {pill && !playing ? null : (
+      {light && !playing ? null : (
         <VoiceWaveform playing={playing} compact={compact} barOpacity={0.8} />
       )}
       <Text
         style={[
           styles.duration,
           compact && styles.compactDuration,
+          light && styles.lightDuration,
           pill && styles.pillDuration,
         ]}
       >
@@ -144,14 +129,18 @@ const styles = StyleSheet.create({
     zIndex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.45)",
   },
-  // 头像左下角试听胶囊：白 75% 底 + 白 0.5 描边 + 背景高斯模糊（设计稿 490:79197）
+  lightButton: {
+    height: 16,
+    backgroundColor: "transparent",
+    borderRadius: 0,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    gap: 3,
+  },
+  // 俱乐部详情头像左下角试听胶囊：浅白底 + 白描边 + 品牌色图标文字（设计稿 490:79197）
   pillButton: {
-    position: "absolute",
-    left: 6,
-    bottom: 6,
-    zIndex: 1,
     height: 22,
-    overflow: "hidden",
+    backgroundColor: "rgba(255, 255, 255, 0.75)",
     borderWidth: 0.5,
     borderColor: "#FFFFFF",
     borderRadius: 99,
@@ -159,23 +148,6 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
     paddingRight: 6,
     gap: 3,
-  },
-  pillBlur: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    borderRadius: 99,
-  },
-  pillTint: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    borderRadius: 99,
-    backgroundColor: "rgba(255, 255, 255, 0.75)",
   },
   iconCircle: {
     width: 22,
@@ -187,7 +159,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   compactIconCircle: { width: 18, height: 18, borderRadius: 9 },
-  pillIconCircle: {
+  lightIconCircle: {
     width: 16,
     height: 16,
     borderRadius: 8,
@@ -202,10 +174,10 @@ const styles = StyleSheet.create({
   },
   // 紧凑态保持原有视觉位置
   compactPlayIcon: { fontSize: 8, lineHeight: 9, marginTop: -1 },
-  pillPlayBadge: { width: 16, height: 16 },
+  lightPlayTriangle: { width: 12, height: 12, opacity: 0.8 },
   pauseIcon: { flexDirection: "row", gap: 3 },
   compactPauseIcon: { gap: 2 },
-  pillPauseIcon: { gap: 2 },
+  lightPauseIcon: { gap: 2 },
   pauseBar: {
     width: 3,
     height: 10,
@@ -213,7 +185,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FE1F4C",
   },
   compactPauseBar: { width: 2, height: 8, borderRadius: 1 },
-  pillPauseBar: { width: 2, height: 7, backgroundColor: "#FFF" },
+  lightPauseBar: { width: 2, height: 7, backgroundColor: "#FFF" },
   duration: {
     color: "#fff",
     fontSize: 12,
@@ -221,6 +193,16 @@ const styles = StyleSheet.create({
     ...getDDinProStyle(700),
   },
   compactDuration: { fontSize: 10, lineHeight: 18 },
-  // 设计稿：品牌色 D-DIN-PRO Bold 12/14，引号沿用 12’’
-  pillDuration: { color: "#FE4267" },
+  lightDuration: {
+    color: "#FE4267",
+    fontSize: 12,
+    lineHeight: 14,
+    ...getDDinProStyle(700),
+  },
+  pillDuration: {
+    color: "#FE4267",
+    fontSize: 12,
+    lineHeight: 14,
+    ...getDDinProStyle(700),
+  },
 });

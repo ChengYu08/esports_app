@@ -135,6 +135,7 @@ export default function ReportScreen() {
           style={styles.descriptionInput}
           textAlignVertical="top"
           value={description}
+          cursorColor="#FE1F4C"
         />
         <Text style={styles.counter}>{description.length}/500</Text>
 

@@ -24,8 +24,14 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { publishQuickMatch } from "@/features/match/api/match.api";
-import type { MatchGame } from "@/features/match/api/match.types";
+import {
+  fetchActiveQuickMatch,
+  publishQuickMatch,
+} from "@/features/match/api/match.api";
+import {
+  isQuickMatchActive,
+  type MatchGame,
+} from "@/features/match/api/match.types";
 import { LightGameOptionChip } from "@/features/match/components/LightGameOptionChip";
 import { LightOptionChip } from "@/features/match/components/LightOptionChip";
 import { MatchLinearGradient } from "@/features/match/components/MatchLinearGradient";
@@ -51,6 +57,7 @@ import { showToast } from "@/shared/ui/app-toast";
 const diamondIcon = require("../../../../assets/mine/star-recharge-diamond-3f6fcf.png");
 
 const PUBLISH_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
+const EXISTING_DISPATCH_HINT = "已有派单";
 
 /** 发布按钮内的三个跳动小点 */
 function PublishingDots() {
@@ -364,7 +371,35 @@ export function ClubQuickMatchSheet({
         goMatching(result.requestNo, result.expireTime, selectedGame ?? null);
       }
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "发布失败，请重试");
+      const message =
+        error instanceof Error ? error.message : "发布失败，请重试";
+      // 接待代发撞老板已有派单：保持 Toast，不替老板恢复进房
+      if (!isReception && message.includes(EXISTING_DISPATCH_HINT)) {
+        try {
+          const active = await fetchActiveQuickMatch(form.token);
+          if (active && isQuickMatchActive(active)) {
+            const activeGame =
+              active.gameId && active.gameName
+                ? { id: active.gameId, name: active.gameName }
+                : null;
+            if (active.needVoice === false) {
+              goMatching(active.requestNo, active.expireTime, activeGame);
+              return;
+            }
+            const entered = await enterAuditionRoom(active.requestNo, {
+              expireTime: active.expireTime,
+              game: activeGame,
+            });
+            if (!entered) {
+              goMatching(active.requestNo, active.expireTime, activeGame);
+            }
+            return;
+          }
+        } catch {
+          // 恢复查询失败则落回原错误文案
+        }
+      }
+      showToast(message);
     } finally {
       setSubmitting(false);
     }
@@ -380,13 +415,35 @@ export function ClubQuickMatchSheet({
   ]);
 
   const handlePublish = useCallback(async () => {
+    // 先完成表单必填校验，再查语聊房，避免未选配置就弹退房提示
+    if (!form.token) {
+      showToast("请先登录");
+      return;
+    }
+    if (!form.club?.id) {
+      showToast("请先选择俱乐部");
+      return;
+    }
+    if (!form.gameId || !form.modeId || !form.levelId || !form.serviceId) {
+      showToast("请完整选择服务模式");
+      return;
+    }
+    if (form.showCompanionPreference && !form.companionPreference) {
+      showToast("请选择单陪或双陪");
+      return;
+    }
+    if (form.remarkOverLimit) {
+      showToast(`备注最多${MATCH_REMARK_MAX}字`);
+      return;
+    }
+    if (isReception && !buyerUserId) {
+      showToast("未识别到下单老板，请重试");
+      return;
+    }
+
     if (isReception || form.voice !== "需试音") {
       joinedRoomRef.current = null;
       void runPublish();
-      return;
-    }
-    if (!form.token) {
-      showToast("请先登录");
       return;
     }
     if (checkingJoinedRoomRef.current || submitting) return;
@@ -409,7 +466,7 @@ export function ClubQuickMatchSheet({
     } finally {
       checkingJoinedRoomRef.current = false;
     }
-  }, [form.token, form.voice, isReception, runPublish, submitting]);
+  }, [buyerUserId, form, isReception, runPublish, submitting]);
 
   const clubDisplayName = form.club?.name || lockedClub.name;
 
@@ -619,6 +676,7 @@ export function ClubQuickMatchSheet({
                 placeholderTextColor="#CACACC"
                 style={styles.remarkInput}
                 maxLength={MATCH_REMARK_MAX + 1}
+                cursorColor="#FE1F4C"
               />
             </View>
           </View>
