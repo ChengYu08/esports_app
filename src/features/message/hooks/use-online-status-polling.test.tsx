@@ -35,15 +35,15 @@ vi.mock("../message-store", () => ({
 // node 测试环境需要显式声明，否则 react-test-renderer 的 act() 会输出告警
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
-function Harness({ enabled, token }: { enabled: boolean; token: string | null }) {
-  useOnlineStatusPolling(enabled, token);
+function Harness({ enabled, token, peerId }: { enabled: boolean; token: string | null; peerId?: string | null }) {
+  useOnlineStatusPolling(enabled, token, peerId);
   return null;
 }
 
-function renderHarness(enabled: boolean, token: string | null) {
+function renderHarness(enabled: boolean, token: string | null, peerId?: string | null) {
   let renderer: ReactTestRenderer | undefined;
   act(() => {
-    renderer = create(<Harness enabled={enabled} token={token} />);
+    renderer = create(<Harness enabled={enabled} token={token} peerId={peerId} />);
   });
   return renderer as ReactTestRenderer;
 }
@@ -93,6 +93,19 @@ describe("useOnlineStatusPolling", () => {
     });
 
     expect(refreshMock).not.toHaveBeenCalled();
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it("forwards the peerId scope to the store refresh", async () => {
+    const renderer = renderHarness(true, "token-a", "peer-1");
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    expect(refreshMock).toHaveBeenCalledWith("token-a", "peer-1");
+
     act(() => {
       renderer.unmount();
     });

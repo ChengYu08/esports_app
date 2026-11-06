@@ -46,6 +46,7 @@ import { touchCustomerServiceSession } from "../customer-service.api";
 import { resolveConversationAvatar } from "../message-avatar";
 import type { ManagedMessage } from "../message-state";
 import { messageStore, useMessageStore } from "../message-store";
+import { useOnlineStatusPolling } from "../hooks/use-online-status-polling";
 import { getConversationDisplayTitle } from "../message-title";
 import {
   getSystemConversationTitle,
@@ -250,6 +251,13 @@ export function ChatConversation({
   useEffect(() => {
     if (active && accessToken) void refreshOnlineStatuses(accessToken);
   }, [active, accessToken, refreshOnlineStatuses]);
+
+  // 聊天页可见期间持续轮询当前对端的在线状态（列表页失焦后由本页接管，只查该对端）
+  useOnlineStatusPolling(
+    active && !isSystemConversationId(conversationId),
+    accessToken,
+    conversationId,
+  );
 
   // 前后台/覆盖与 openConversation 的 activePeerId 解耦：页面被覆盖或退后台时
   // activePeerId 仍在，但必须退出"已读"状态，否则新消息未读会被静默清零。

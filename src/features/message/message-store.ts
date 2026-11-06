@@ -96,7 +96,7 @@ export type MessageStoreState = {
   /** 诊断用：本次登录会话内确认为离线补偿重放的消息条数（隐藏弹窗展示，文案不含 SDK 厂商名） */
   compensatedCount: number;
   lastError: string | null;
-  refreshOnlineStatuses: (token: string) => Promise<boolean>;
+  refreshOnlineStatuses: (token: string, peerId?: string) => Promise<boolean>;
   refreshConversations: (token: string) => Promise<void>;
   /** 兜底：进入消息页发现列表为空时，延迟重读一次快照（每次登录会话最多一次） */
   retryIfEmpty: (token: string) => Promise<void>;
@@ -451,15 +451,19 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       compensatedCount: 0,
       lastError: null,
 
-      refreshOnlineStatuses: async (token) => {
+      refreshOnlineStatuses: async (token, peerId) => {
         const requestId = ++onlineStatusRequestId;
         if (!token) return false;
-        const userIds = Array.from(new Set(
-          get().conversations
-            .filter((conversation) => !isSystemConversationId(conversation.id))
-            .map((conversation) => normalizeSystemConversationId(conversation.id))
-            .filter(Boolean),
-        ));
+        // 传入 peerId 时只查该对端（聊天页轮询），否则查全部真实会话（消息列表轮询）
+        const scopedId = peerId ? normalizeSystemConversationId(peerId) : null;
+        const userIds = scopedId
+          ? [scopedId]
+          : Array.from(new Set(
+              get().conversations
+                .filter((conversation) => !isSystemConversationId(conversation.id))
+                .map((conversation) => normalizeSystemConversationId(conversation.id))
+                .filter(Boolean),
+            ));
 
         try {
           const statuses: Record<string, number> = userIds.length > 0
@@ -471,6 +475,18 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           set((state) => {
             let changed = false;
             const conversations = state.conversations.map((conversation) => {
+              if (scopedId) {
+                // 作用域模式只更新目标会话，不动系统会话与其它会话的在线态
+                if (conversation.id !== scopedId) {
+                  return conversation;
+                }
+                const isOnline = Number(statuses[conversation.id]) === 1;
+                if (Boolean(conversation.isOnline) === isOnline) {
+                  return conversation;
+                }
+                changed = true;
+                return { ...conversation, isOnline };
+              }
               if (isSystemConversationId(conversation.id)) {
                 if (!conversation.isOnline) {
                   return conversation;

@@ -629,4 +629,23 @@ describe('message store', () => {
     expect(store.getState().conversations).toBe(before);
     await store.getState().reset();
   });
+
+  it('scopes the refresh to the requested peer only', async () => {
+    const other: MessageConversation = { id: '77', title: 'Other', preview: '', time: '', unreadCount: 0, updatedAt: 1 };
+    const store = createMessageStore(makeAdapter({
+      getConversations: vi.fn(async () => [conversation, other]),
+    }));
+    await store.getState().initialize('token');
+    // initialize 会规范化会话对象，作用域外对比用初始化后的快照
+    const otherSnapshot = store.getState().conversations[1];
+    vi.mocked(clientAuthApi.getUserOnlineStatus).mockResolvedValueOnce({ '42': 1 });
+
+    await expect(store.getState().refreshOnlineStatuses('token', '42')).resolves.toBe(true);
+
+    expect(clientAuthApi.getUserOnlineStatus).toHaveBeenLastCalledWith('token', ['42']);
+    expect(store.getState().conversations[0].isOnline).toBe(true);
+    // 作用域外的会话保持原对象不动
+    expect(store.getState().conversations[1]).toBe(otherSnapshot);
+    await store.getState().reset();
+  });
 });
