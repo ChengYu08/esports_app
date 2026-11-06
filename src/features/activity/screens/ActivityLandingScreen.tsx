@@ -41,7 +41,7 @@ const ACTIVITY_SECKILL_ASSETS = {
   title: `${OSS_BASE}/activity_seckill_title.png`,
   price: `${OSS_BASE}/activity_seckill_price.png`,
   btnBg: `${OSS_BASE}/activity_seckill_btn_bg.png`,
-  countdownBg: `${OSS_BASE}/activity_seckill_countdown_bg.png`,
+  countdownBg: `${OSS_BASE}/activity_seckill_countdown_bg2.png`,
   btnText: `${OSS_BASE}/activity_seckill_btn_text.png`,
 } as const;
 
@@ -406,23 +406,23 @@ const styles = StyleSheet.create({
   countdownWrap: {
     zIndex: 1,
     marginBottom: -COUNTDOWN_OVERLAP,
-    minWidth: 134,
-    height: 27,
-    paddingHorizontal: 13,
+    // 资源 550×160 @3x，再缩放到 75%
+    width: (550 / 3) * 0.80,
+    height: (160 / 3) * 0.80,
+    paddingHorizontal: 16,
     alignItems: "center",
     justifyContent: "center",
-    transform: [{ translateX: 80 }, { translateY: -5 }],
+    transform: [{ translateX: 75 }, { translateY: -5 }],
   },
   countdownBg: {
     ...StyleSheet.absoluteFill,
   },
   countdownText: {
-    fontSize: 10,
+    fontSize: 11,
     lineHeight: 14,
     fontWeight: "600",
-    color: "#FFFFFF",
-    // 气泡尖在底部，文案相对几何中心略上移
-    transform: [{ translateY: -3 }],
+    color: "#000000",
+    transform: [{ translateX: 4 },{ translateY: -1 }],
   },
   joinButton: {
     width: "100%",
