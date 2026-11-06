@@ -38,7 +38,7 @@ export const ClubCard = memo(function ClubCard({
   };
 
   // 优先使用服务端批量返回的人数排序；旧数据缺人数时沿用接口顺序，避免逐卡查询。
-  // 超过 3 个按设计稿重叠展示（最多 8 个），不要提前截断成 3 个。
+  // 卡片最多展示排序后的前 3 个游戏。
   const games = [...(club.games ?? [])]
     .filter((game) => game.iconUrl)
     .sort((a, b) => (b.companionCount ?? -1) - (a.companionCount ?? -1));
@@ -113,6 +113,8 @@ const styles = StyleSheet.create({
   club: {
     minHeight: 104,
     flexDirection: "row",
+    // 设计稿卡片行 alignItems=center：右侧文案变高时左侧 80×80 封面仍垂直居中
+    alignItems: "center",
     gap: 12,
     backgroundColor: "#FFFFFF",
     paddingHorizontal: 16,

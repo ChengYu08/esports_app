@@ -141,6 +141,22 @@ export function CourtEvidencePicker({
         {showCount ? `证据截图(${images.length}/${MAX_IMAGES})` : "证据截图"}
       </Text>
       <View style={styles.images}>
+        <Pressable
+          accessibilityLabel="添加证据图片"
+          accessibilityRole="button"
+          disabled={disabled || images.length >= MAX_IMAGES}
+          onPress={onPick}
+          style={styles.addImage}
+        >
+          {picking ? (
+            <ActivityIndicator color="#979799" />
+          ) : (
+            <CachedImage
+              source={require("../../../../assets/svgs/ticket-add.svg")}
+              style={styles.addIcon}
+            />
+          )}
+        </Pressable>
         {images.map((image, index) => (
           <View key={`${image.uri}-${index}`} style={styles.imageWrap}>
             <Pressable
@@ -182,24 +198,6 @@ export function CourtEvidencePicker({
             )}
           </View>
         ))}
-        {images.length < MAX_IMAGES && (
-          <Pressable
-            accessibilityLabel="添加证据图片"
-            accessibilityRole="button"
-            disabled={disabled}
-            onPress={onPick}
-            style={styles.addImage}
-          >
-            {picking ? (
-              <ActivityIndicator color="#979799" />
-            ) : (
-              <CachedImage
-                source={require("../../../../assets/svgs/ticket-add.svg")}
-                style={styles.addIcon}
-              />
-            )}
-          </Pressable>
-        )}
       </View>
     </View>
   );

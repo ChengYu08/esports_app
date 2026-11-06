@@ -8,24 +8,12 @@ describe("computeGameIconLayout", () => {
     expect(computeGameIconLayout(3)).toEqual({ shown: 3, step: 16, totalWidth: 48 });
   });
 
-  it("count=4 开始重叠：步长 (48-14)/3≈11.33，总宽钳制 48", () => {
-    const layout = computeGameIconLayout(4);
-    expect(layout.shown).toBe(4);
-    expect(layout.step).toBeCloseTo((48 - 14) / 3, 5);
-    expect(layout.totalWidth).toBe(48);
-  });
-
-  it("count=8 步长收缩到 (48-14)/7，总宽不变", () => {
-    const layout = computeGameIconLayout(8);
-    expect(layout.shown).toBe(8);
-    expect(layout.step).toBeCloseTo(34 / 7, 5);
-    expect(layout.totalWidth).toBe(48);
-  });
-
-  it("count>8 只展示 8 个", () => {
-    const layout = computeGameIconLayout(20);
-    expect(layout.shown).toBe(8);
-    expect(layout.totalWidth).toBe(48);
+  it.each([4, 8, 20])("count=%i 只展示 3 个且保持平铺", (count) => {
+    expect(computeGameIconLayout(count)).toEqual({
+      shown: 3,
+      step: 16,
+      totalWidth: 48,
+    });
   });
 
   it("count=0 返回空布局", () => {
