@@ -164,7 +164,7 @@ export default function RankingScreen({
         },
       ]}
     >
-      <RankingBackground />
+      {embedded ? null : <RankingBackground />}
       <View style={styles.boardTabsArea}>
         <RankingBoardTabs value={filters.boardCode} onChange={changeBoard} />
       </View>

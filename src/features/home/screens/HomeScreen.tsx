@@ -1,6 +1,7 @@
 import { CourtHomeScreen } from "@/features/court/screens/CourtHomeScreen";
 import GodListScreen from "@/features/god/screens/GodListScreen";
 import RankingScreen from "@/features/ranking/screens/RankingScreen";
+import { RankingBackground } from "@/features/ranking/components/RankingBackground";
 import type { GameKey, HomeTab } from "@/features/home/api/home.types";
 import { ClubCard } from "@/features/home/components/ClubCard";
 import {
@@ -29,6 +30,9 @@ import {
 } from "react-native";
 import { showToast, toastDurations } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+// 排行榜 tab 渐变在安全区之下的高度：顶部导航 44 + 榜单切换 56 + 标题 88，与 RankingScreen 内嵌布局对齐。
+const RANKING_GRADIENT_BODY = 188;
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -260,6 +264,10 @@ export default function HomeScreen() {
         { paddingTop: insets.top },
       ]}
     >
+      {topTab === "ranking" ? (
+        // 设计稿渐变从屏幕顶端开始，覆盖安全区、顶部 tab、榜单切换和标题，止于白色榜单面板顶部。
+        <RankingBackground height={insets.top + RANKING_GRADIENT_BODY} />
+      ) : null}
       <HomeTopBar tab={topTab} onTabChange={selectTopTab} />
       <View style={styles.paneContainer}>
         {mountedTabs.home && (
