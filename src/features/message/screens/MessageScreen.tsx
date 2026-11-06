@@ -1,5 +1,6 @@
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { useAuthStore } from "@esports/auth";
+import { Image } from "expo-image";
 import { router, useFocusEffect, useIsFocused } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo } from "react";
@@ -7,6 +8,7 @@ import { AppState, FlatList, Pressable, StyleSheet, Text, View } from "react-nat
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { showToast } from "@/shared/ui/app-toast";
+import { layout } from "@/shared/theme/tokens";
 import { stripCustomerServiceTitlePrefix } from "../customer-service.api";
 import { MessageHeader } from "../components/MessageHeader";
 import { MessageListItem } from "../components/MessageListItem";
@@ -27,6 +29,15 @@ import {
 
 const defaultConversationAvatar = require("../../../../assets/images/avatar_default.webp");
 const systemNotificationAvatar = require("../../../../assets/svgs/message-system-notice.svg");
+// 设计稿 70-39249「消息页-无消息」：120×120 插画 + 8px 间距 + 12/18 #999 文案
+const messagePromptIllustration = (
+  <Image
+    accessibilityIgnoresInvertColors
+    contentFit="contain"
+    source={require("../../../../assets/svgs/message-empty-prompt.svg")}
+    style={{ width: 120, height: 120 }}
+  />
+);
 
 export default function MessageScreen() {
   const insets = useSafeAreaInsets();
@@ -37,6 +48,7 @@ export default function MessageScreen() {
   const lastError = useMessageStore((state) => state.lastError);
   const conversations = useMessageStore((state) => state.conversations);
   const blacklistedUserIds = useMessageStore((state) => state.blacklistedUserIds);
+  const initializeMessages = useMessageStore((state) => state.initialize);
   const refreshConversations = useMessageStore((state) => state.refreshConversations);
   const retryIfEmpty = useMessageStore((state) => state.retryIfEmpty);
   const refreshOnlineStatuses = useMessageStore((state) => state.refreshOnlineStatuses);
@@ -53,6 +65,17 @@ export default function MessageScreen() {
   const handleClear = async () => {
     await clearAllUnread();
     showToast("清理完成");
+  };
+
+  const handleRetry = async () => {
+    if (!accessToken) return;
+    // 连接异常先重连（initialize 内部完成会话同步）；仅列表类错误才刷新列表。
+    // 非 ready 时 refreshConversations 会再触发一次 initialize，所以这里必须分支处理
+    if (connectionState === "ready") {
+      await refreshConversations(accessToken);
+      return;
+    }
+    await initializeMessages(accessToken);
   };
 
   useFocusEffect(
@@ -155,6 +178,11 @@ export default function MessageScreen() {
         : connectionState === "error"
           ? lastError || "消息连接失败"
           : items.length === 0 ? conversationError : null;
+  // header 在布局内占位，tabbar 是悬浮层：状态区扣掉 tabbar 高度后，剩余区域才是视觉居中区
+  const stateAreaStyle = useMemo(
+    () => [styles.state, { paddingBottom: layout.tabBarHeight + insets.bottom }],
+    [insets.bottom],
+  );
   return (
     <View style={styles.screen}>
       <StatusBar style="dark" />
@@ -167,12 +195,12 @@ export default function MessageScreen() {
         />
       </View>
       {stateMessage ? (
-        <View style={styles.state}>
-          <Text style={styles.stateText}>{stateMessage}</Text>
+        <View style={stateAreaStyle}>
+          <EmptyState illustration={messagePromptIllustration} message={stateMessage} />
           {accessToken && (connectionState === "error" || conversationError) ? (
             <Pressable
               accessibilityRole="button"
-              onPress={() => accessToken && void refreshConversations(accessToken)}
+              onPress={handleRetry}
               style={styles.retry}
             >
               <Text style={styles.retryText}>重试</Text>
@@ -180,8 +208,8 @@ export default function MessageScreen() {
           ) : null}
         </View>
       ) : items.length === 0 ? (
-        <View style={styles.state}>
-          <EmptyState message="暂无消息" />
+        <View style={stateAreaStyle}>
+          <EmptyState illustration={messagePromptIllustration} message="暂无消息" />
         </View>
       ) : (
         <FlatList
@@ -203,11 +231,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: 24,
+    paddingHorizontal: 24,
   },
-  stateText: { color: "#999999", fontSize: 14 },
   retry: {
-    marginTop: 12,
+    marginTop: 2,
     paddingHorizontal: 18,
     paddingVertical: 8,
     borderRadius: 16,

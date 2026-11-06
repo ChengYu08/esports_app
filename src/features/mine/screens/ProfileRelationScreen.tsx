@@ -24,6 +24,7 @@ import {
 import { requireLogin } from "@/shared/navigation/require-login";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { EmptyState, ErrorState } from "@/shared/ui/AsyncStates";
+import { PaginationFooter } from "@/shared/ui/PaginationFooter";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 
 const fallbackAvatar = require("../../../../assets/images/avatar_default.webp");
@@ -320,18 +321,21 @@ export default function ProfileRelationScreen() {
           )
         }
         ListFooterComponent={
-          query.isFetchingNextPage ? (
-            <ActivityIndicator style={styles.footer} color="#FE1F4C" />
-          ) : query.isFetchNextPageError ? (
+          items.length === 0 ? null : query.isFetchNextPageError &&
+            !query.isFetchingNextPage ? (
             <Pressable
               onPress={() => void fetchNextRelations()}
               style={styles.footer}
             >
               <Text style={styles.retryText}>加载失败，点击重试</Text>
             </Pressable>
-          ) : items.length > 0 && !query.hasNextPage ? (
-            <Text style={styles.footerText}>没有更多了</Text>
-          ) : null
+          ) : (
+            <PaginationFooter
+              loading={query.isFetchingNextPage}
+              hasMore={query.hasNextPage}
+              pageCount={query.data?.pages.length}
+            />
+          )
         }
         showsVerticalScrollIndicator={false}
       />
@@ -439,10 +443,4 @@ const styles = StyleSheet.create({
   emptyLoading: { flex: 1, alignSelf: "center" },
   retryText: { color: "#FE1F4C", fontSize: 13 },
   footer: { alignItems: "center", paddingVertical: 20 },
-  footerText: {
-    paddingVertical: 20,
-    color: "#BBBBBB",
-    fontSize: 12,
-    textAlign: "center",
-  },
 });

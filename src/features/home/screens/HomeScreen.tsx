@@ -24,6 +24,7 @@ import {
   useHomeGames,
 } from "@/features/home/hooks/use-home-data";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
+import { PaginationFooter } from "@/shared/ui/PaginationFooter";
 import { router, useFocusEffect, useIsFocused, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -344,6 +345,15 @@ export default function HomeScreen() {
                   ) : (
                     <EmptyState message="暂无俱乐部" />
                   )
+                }
+                ListFooterComponent={
+                  clubItems.length > 0 ? (
+                    <PaginationFooter
+                      loading={clubs.isFetchingNextPage}
+                      hasMore={clubs.hasNextPage}
+                      pageCount={clubs.data?.pages.length}
+                    />
+                  ) : null
                 }
               />
             )}
