@@ -19,6 +19,7 @@ import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.text.SpannableStringBuilder
 import android.text.Spanned
+import android.text.TextPaint
 import android.text.method.LinkMovementMethod
 import android.text.style.ClickableSpan
 import android.text.style.ForegroundColorSpan
@@ -515,9 +516,15 @@ class PzOneClickModule : Module() {
     }
   }
 
-  private fun openProtocol(activity: Activity, url: String) {
+  // 用 App 内共用 WebView（Expo Router /web-view）打开协议，避免跳外部浏览器
+  private fun openProtocol(activity: Activity, url: String, title: String) {
     try {
-      activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+      val link = Uri.parse("esportsapp://web-view")
+        .buildUpon()
+        .appendQueryParameter("url", url)
+        .appendQueryParameter("title", title)
+        .build()
+      activity.startActivity(Intent(Intent.ACTION_VIEW, link))
     } catch (error: Exception) {
       Log.w(TAG, "[DEBUG-QUICK-LOGIN] failed to open protocol url", error)
     }
@@ -558,6 +565,11 @@ class PzOneClickModule : Module() {
       userName to USER_AGREEMENT_URL,
       privacyName to PRIVACY_POLICY_URL,
     )
+    val titles = mapOf(
+      operatorName to "运营商协议",
+      userName to "用户协议",
+      privacyName to "隐私政策",
+    )
     val content = SpannableStringBuilder().apply {
       append(preText)
       for ((name, url) in links) {
@@ -566,7 +578,12 @@ class PzOneClickModule : Module() {
         setSpan(
           object : ClickableSpan() {
             override fun onClick(widget: View) {
-              openProtocol(activity, url)
+              openProtocol(activity, url, titles[name] ?: "协议")
+            }
+
+            // 去掉链接默认下划线，只保留蓝色文字
+            override fun updateDrawState(ds: TextPaint) {
+              ds.isUnderlineText = false
             }
           },
           start,
@@ -654,15 +671,46 @@ class PzOneClickModule : Module() {
     dialog.setCanceledOnTouchOutside(true)
     disagree.setOnClickListener { dialog.dismiss() }
     agree.setOnClickListener {
-      // 只负责勾选协议，用户随后再点一次「一键登录」发起取号
+      // 勾选协议后自动触发登录，用户无需再点一次「一键登录」
       authHelper?.setProtocolChecked(true)
       dialog.dismiss()
+      performLoginButtonClick(activity)
     }
     dialog.show()
     dialog.window?.apply {
       setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
       // AlertDialog 默认遮罩即 60%，与设计稿一致
       setLayout(dp(activity, 295f), ViewGroup.LayoutParams.WRAP_CONTENT)
+    }
+  }
+
+  // 同意协议后模拟点击 SDK 授权页的「一键登录」按钮，走 SDK 原生取号流程
+  private fun performLoginButtonClick(activity: Activity) {
+    val decor = activity.window?.decorView ?: return
+    decor.post {
+      try {
+        val loginTV = reflectAuthPageView(activity, "mLoginTV")
+        val loginRL = reflectAuthPageView(activity, "mLoginRL")
+        val target = listOfNotNull(loginTV, loginRL).firstOrNull { it.hasOnClickListeners() }
+        if (target == null) {
+          Log.w(TAG, "[DEBUG-QUICK-LOGIN] login button not found on auth page")
+          return@post
+        }
+        target.performClick()
+      } catch (error: Exception) {
+        Log.w(TAG, "[DEBUG-QUICK-LOGIN] failed to auto trigger login", error)
+      }
+    }
+  }
+
+  // 反射读取 LoginAuthActivity 的私有 View 字段
+  private fun reflectAuthPageView(activity: Activity, fieldName: String): View? {
+    return try {
+      val field = activity.javaClass.getDeclaredField(fieldName)
+      field.isAccessible = true
+      field.get(activity) as? View
+    } catch (_: Exception) {
+      null
     }
   }
 
