@@ -1100,6 +1100,7 @@ function ProfileIdentity({
               />
               {age ? (
                 <Text
+                  allowFontScaling={false}
                   style={profile.sex === 2 ? styles.femaleAge : styles.male}
                 >
                   {age}
@@ -1448,6 +1449,7 @@ function toLocalProfile(
     signature: user?.signature || "",
     headImage: user?.headImage,
     sex: user?.gender,
+    birth: user?.birth,
     followCount: 0,
     fansCount: 0,
     clubId: user?.clubInfo?.id ?? 0,
@@ -1683,8 +1685,8 @@ const styles = StyleSheet.create({
   name: {
     flexShrink: 1,
     color: "#fff",
-    fontSize: 20,
-    lineHeight: 28,
+    fontSize: 18,
+    lineHeight: 26,
     fontWeight: "600",
   },
   blacklistTag: {

@@ -64,31 +64,38 @@ export function BottomSheet({
   // padding 的镜像 ref：measureInWindow 异步回调里读最新值，state 读到的是旧闭包
   const keyboardPaddingRef = useRef(0);
   const [androidKeyboardPadding, setAndroidKeyboardPadding] = useState(0);
-  // 收敛尝试上限：测量异常时防止 rAF 反馈环不停空转
+  // 收敛尝试上限：测量异常时防止反馈环不停空转
   const alignAttemptsRef = useRef(0);
+  // 键盘弹出后主动触发一次对齐（padding 变化会经 effect 链继续收敛）
+  const [alignNonce, setAlignNonce] = useState(0);
 
   const applyKeyboardPadding = useCallback((next: number) => {
     keyboardPaddingRef.current = next;
     setAndroidKeyboardPadding(next);
   }, []);
 
-  const alignSheetToKeyboard = useCallback(() => {
+  // 对齐收敛环：padding 变化 → effect 重跑 → 实测 sheet 底边 → 修正 padding，
+  // 底边贴住键盘顶边（差值 ≤1）后不再 setState，环自然停止
+  useEffect(() => {
+    if (!keyboardAvoiding || Platform.OS !== "android") {
+      return;
+    }
     if (keyboardTopRef.current == null || alignAttemptsRef.current >= 8) {
       return;
     }
     alignAttemptsRef.current += 1;
     // 等一帧再测：让上一轮 padding 变化先完成布局提交
-    requestAnimationFrame(() => {
-      if (keyboardTopRef.current == null) {
+    const rafId = requestAnimationFrame(() => {
+      const keyboardTop = keyboardTopRef.current;
+      if (keyboardTop == null) {
         return;
       }
       sheetRef.current?.measureInWindow((_x, y, _width, height) => {
-        const keyboardTop = keyboardTopRef.current;
-        if (keyboardTop == null) {
+        const top = keyboardTopRef.current;
+        if (top == null) {
           return;
         }
-        const visualBottom = y + height;
-        const delta = visualBottom - keyboardTop;
+        const delta = y + height - top;
         if (Math.abs(delta) <= 1) {
           return;
         }
@@ -100,10 +107,10 @@ export function BottomSheet({
           return;
         }
         applyKeyboardPadding(next);
-        alignSheetToKeyboard();
       });
     });
-  }, [applyKeyboardPadding]);
+    return () => cancelAnimationFrame(rafId);
+  }, [alignNonce, androidKeyboardPadding, applyKeyboardPadding, keyboardAvoiding]);
 
   useEffect(() => {
     if (!keyboardAvoiding || Platform.OS !== "android") {
@@ -116,7 +123,7 @@ export function BottomSheet({
         keyboardTopRef.current = event.endCoordinates.screenY;
         alignAttemptsRef.current = 0;
         applyKeyboardPadding(event.endCoordinates.height);
-        alignSheetToKeyboard();
+        setAlignNonce((n) => n + 1);
       },
     );
     const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
@@ -127,7 +134,7 @@ export function BottomSheet({
       showSubscription.remove();
       hideSubscription.remove();
     };
-  }, [keyboardAvoiding, applyKeyboardPadding, alignSheetToKeyboard]);
+  }, [keyboardAvoiding, applyKeyboardPadding]);
 
   useEffect(() => {
     if (visible) {

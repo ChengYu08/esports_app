@@ -5,7 +5,7 @@ import {
   ChevronRight20Regular,
   Dismiss24Regular,
 } from "@fluentui/react-native-icons";
-import { Image } from "expo-image";
+import { Image, type ImageSource } from "expo-image";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as MediaLibrary from "expo-media-library";
 import { router, useFocusEffect } from "expo-router";
@@ -27,6 +27,7 @@ import { logger } from "@/core/logging/logger";
 import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { fetchStarBalance } from "@/features/mine/api/companion-order.api";
 import { resolveMineMenuKeys, type MineMenuKey } from "@/features/mine/mine-menu";
+import { calculateAge } from "@/features/mine/profile-utils";
 import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
 import { useUserFollowCount } from "@/features/mine/hooks/use-user-follow";
 import {
@@ -188,6 +189,9 @@ export default function MineScreen() {
 
   const genderIcon =
     user?.gender === 1 ? maleIcon : user?.gender === 2 ? femaleIcon : null;
+  // 年龄由生日推算，缺失或非法时不展示
+  const age = calculateAge(user?.birth ?? "");
+  const genderColor = user?.gender === 1 ? "#3DA5FF" : "#FF42A1";
 
   // 已加入俱乐部（login/info 返回 clubInfo）的用户不再展示入驻入口。
   const hasClub = Boolean(user?.clubInfo?.id);
@@ -319,6 +323,14 @@ export default function MineScreen() {
                   {genderIcon ? (
                     <View style={styles.badge}>
                       <Image source={genderIcon} style={styles.genderIcon} />
+                      {age ? (
+                        <Text
+                          allowFontScaling={false}
+                          style={[styles.ageText, { color: genderColor }]}
+                        >
+                          {age}
+                        </Text>
+                      ) : null}
                     </View>
                   ) : null}
                 </View>
@@ -397,6 +409,42 @@ export default function MineScreen() {
   );
 }
 
+/** 保存二维码原图到系统相册：直接从图片资源取像素，不截屏，避免弹层内截图失败或糊图 */
+function useSaveQrCode(source: ImageSource) {
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (saving) {
+      return;
+    }
+    setSaving(true);
+    try {
+      // Android 10 起写入相册不需要存储权限，只有 iOS 和更老系统要申请
+      if (Platform.OS !== "android" || Number(Platform.Version) < 30) {
+        const permission = await MediaLibrary.requestPermissionsAsync(true);
+        if (!permission.granted) {
+          showToast("请在系统设置中允许盼之电竞访问相册");
+          return;
+        }
+      }
+      const image = await Image.loadAsync(source);
+      const rendered = await ImageManipulator.manipulate(image).renderAsync();
+      const { uri } = await rendered.saveAsync({ format: SaveFormat.PNG });
+      await MediaLibrary.Asset.create(uri);
+      showToast("已保存到相册");
+    } catch (error) {
+      logger.warn("save qrcode failed", {
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      showToast("保存失败，请稍后重试");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return { saving, save };
+}
+
 function ClubQrModal({
   visible,
   onClose,
@@ -404,6 +452,8 @@ function ClubQrModal({
   visible: boolean;
   onClose: () => void;
 }) {
+  const { saving, save } = useSaveQrCode(clubEntryQrCode);
+
   return (
     <Modal
       animationType="fade"
@@ -438,6 +488,25 @@ function ClubQrModal({
           <Text style={styles.qrModalHint}>
             扫码联系工作人员，申请俱乐部入驻
           </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="保存二维码"
+            accessibilityState={{ disabled: saving, busy: saving }}
+            disabled={saving}
+            onPress={save}
+            style={({ pressed }) => [
+              styles.qrSaveButton,
+              styles.qrSaveButtonWide,
+              pressed && styles.buttonPressed,
+              saving && styles.qrSaveButtonDisabled,
+            ]}
+          >
+            {saving ? (
+              <ActivityIndicator color="#FE1F4C" size="small" />
+            ) : (
+              <Text style={styles.qrSaveText}>保存二维码</Text>
+            )}
+          </Pressable>
         </View>
       </View>
     </Modal>
@@ -451,37 +520,7 @@ function CompanionQrModal({
   visible: boolean;
   onClose: () => void;
 }) {
-  const [saving, setSaving] = useState(false);
-
-  // 把二维码原图转成 PNG 写入系统相册：直接从图片资源取像素，不截屏，避免弹层内截图失败或糊图
-  async function saveQrCode() {
-    if (saving) {
-      return;
-    }
-    setSaving(true);
-    try {
-      // Android 10 起写入相册不需要存储权限，只有 iOS 和更老系统要申请
-      if (Platform.OS !== "android" || Number(Platform.Version) < 30) {
-        const permission = await MediaLibrary.requestPermissionsAsync(true);
-        if (!permission.granted) {
-          showToast("请在系统设置中允许盼之电竞访问相册");
-          return;
-        }
-      }
-      const source = await Image.loadAsync(companionEntryQrCode);
-      const rendered = await ImageManipulator.manipulate(source).renderAsync();
-      const { uri } = await rendered.saveAsync({ format: SaveFormat.PNG });
-      await MediaLibrary.Asset.create(uri);
-      showToast("已保存到相册");
-    } catch (error) {
-      logger.warn("save companion qrcode failed", {
-        reason: error instanceof Error ? error.message : String(error),
-      });
-      showToast("保存失败，请稍后重试");
-    } finally {
-      setSaving(false);
-    }
-  }
+  const { saving, save } = useSaveQrCode(companionEntryQrCode);
 
   return (
     <Modal
@@ -518,17 +557,17 @@ function CompanionQrModal({
               accessibilityLabel="保存二维码"
               accessibilityState={{ disabled: saving, busy: saving }}
               disabled={saving}
-              onPress={saveQrCode}
+              onPress={save}
               style={({ pressed }) => [
-                styles.companionQrSaveButton,
+                styles.qrSaveButton,
                 pressed && styles.buttonPressed,
-                saving && styles.companionQrSaveButtonDisabled,
+                saving && styles.qrSaveButtonDisabled,
               ]}
             >
               {saving ? (
                 <ActivityIndicator color="#FE1F4C" size="small" />
               ) : (
-                <Text style={styles.companionQrSaveText}>保存二维码</Text>
+                <Text style={styles.qrSaveText}>保存二维码</Text>
               )}
             </Pressable>
           </View>
@@ -640,7 +679,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   profileCopy: { flex: 1, gap: 4, paddingRight: 96 },
-  nameLine: { flexDirection: "row", alignItems: "center", gap: 8 },
+  nameLine: { flexDirection: "row", alignItems: "center", gap: 4 },
   name: {
     flexShrink: 1,
     color: "#0D0D0F",
@@ -654,11 +693,16 @@ const styles = StyleSheet.create({
     gap: 2,
     height: 18,
     paddingHorizontal: 6,
-    paddingVertical: 1,
     borderRadius: 9,
     backgroundColor: "#FFFFFF",
   },
   genderIcon: { width: 12, height: 12 },
+  ageText: {
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: 500,
+    includeFontPadding: false,
+  },
   signatureText: {
     flexShrink: 1,
     color: "#979799",
@@ -826,7 +870,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
   },
-  companionQrSaveButton: {
+  qrSaveButton: {
     height: 36,
     alignItems: "center",
     justifyContent: "center",
@@ -835,8 +879,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: "#FFFFFF",
   },
-  companionQrSaveButtonDisabled: { opacity: 0.6 },
-  companionQrSaveText: {
+  // 俱乐部入驻弹窗：按钮贴卡片底部通栏
+  qrSaveButtonWide: { marginTop: 20, width: "100%" },
+  qrSaveButtonDisabled: { opacity: 0.6 },
+  qrSaveText: {
     color: "#FE1F4C",
     fontSize: 14,
     lineHeight: 22,
