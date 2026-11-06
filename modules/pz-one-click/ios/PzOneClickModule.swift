@@ -164,7 +164,7 @@ public class PzOneClickModule: Module {
 
   /// MiSans Bold（Figma 号码栏字体，Fontmin 子集只含号码所需字符），注册一次进程内复用
   private static let miSansNumberFont: UIFont? = {
-      guard let url = Bundle.main.url(forResource: "pz_misans_bold", withExtension: "ttf") else {
+    guard let url = Bundle.main.url(forResource: "pz_misans_bold", withExtension: "ttf") else {
       NSLog("\(quickLoginTag) MiSans font resource not found in main bundle")
       return nil
     }
