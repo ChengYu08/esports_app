@@ -16,6 +16,7 @@ import {
 import { COURT_FONT_FAMILY } from "@/features/court/court.theme";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { CachedImage } from "@/shared/ui/CachedImage";
+import { PaginationFooter } from "@/shared/ui/PaginationFooter";
 import { useAuthStore } from "@esports/auth";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
@@ -530,8 +531,8 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
         }
         ListFooterComponent={
           <View>
-            {loadingMore && (
-              <ActivityIndicator color="#FE1F4C" style={styles.loading} />
+            {data.length > 0 && (
+              <PaginationFooter loading={loadingMore} hasMore={hasMore} pageCount={page} />
             )}
             <View
               style={{ height: (data.length === 0 ? 44 : 60) + bottomInset }}

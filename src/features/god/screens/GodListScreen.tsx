@@ -25,6 +25,7 @@ import { fetchGames } from "@/features/home/api/home.api";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { CompanionCard } from "@/shared/ui/CompanionCard";
+import { PaginationFooter } from "@/shared/ui/PaginationFooter";
 
 const allGamesIcon = require("../../../../assets/svgs/god-all-games.svg");
 const arrowDownIcon = require("../../../../assets/svgs/arrow-fill-down.svg");
@@ -370,6 +371,15 @@ export default function GodListScreen({ active = true }: { active?: boolean }) {
             godList.isLoading ? null : (
               <EmptyState message="暂无大神，换个筛选条件试试" />
             )
+          }
+          ListFooterComponent={
+            list.length > 0 ? (
+              <PaginationFooter
+                loading={godList.isFetchingNextPage}
+                hasMore={godList.hasNextPage}
+                pageCount={godList.data?.pages.length}
+              />
+            ) : null
           }
           // 与首页俱乐部列表同口径：悬浮 tab 栏高 58 + 底部安全区，24 不足会被遮末行
           contentContainerStyle={{ flexGrow: 1, paddingBottom: 100 + insets.bottom }}

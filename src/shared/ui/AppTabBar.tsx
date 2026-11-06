@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { formatUnreadCount, sumVisibleUnreadCount } from "@/features/message/message-unread";
 import { useMessageStore } from "@/features/message/message-store";
+import { layout } from "@/shared/theme/tokens";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import {
   getTabPressAction,
@@ -18,7 +19,7 @@ type AppTabBarProps = {
   navigation: { navigate: (name: string) => void };
 };
 
-const TAB_CONTENT_HEIGHT = 58;
+const TAB_CONTENT_HEIGHT = layout.tabBarHeight;
 const TAB_ITEM_HEIGHT = 46;
 const BAR_TOP_OFFSET = 12;
 // 隐藏诊断入口：3 秒内连点消息 tab 5 次，弹窗展示本次启动的回补消息条数

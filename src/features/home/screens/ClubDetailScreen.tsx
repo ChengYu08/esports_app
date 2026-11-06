@@ -11,6 +11,7 @@ import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
 import { showToast } from "@/shared/ui/app-toast";
 import { EmptyState, ErrorState } from "@/shared/ui/AsyncStates";
+import { PaginationFooter } from "@/shared/ui/PaginationFooter";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { CompanionCard } from "@/shared/ui/CompanionCard";
 import { useAuthStore } from "@esports/auth";
@@ -25,7 +26,6 @@ import { router, useIsFocused, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Animated,
   Easing,
   FlatList,
@@ -754,8 +754,12 @@ export default function ClubDetailScreen() {
             )
           }
           ListFooterComponent={
-            companionsQuery.isFetchingNextPage ? (
-              <ActivityIndicator color={COLORS.brand} style={styles.memberLoadMore} />
+            members.length > 0 ? (
+              <PaginationFooter
+                loading={companionsQuery.isFetchingNextPage}
+                hasMore={companionsQuery.hasNextPage}
+                pageCount={companionsQuery.data?.pages.length}
+              />
             ) : null
           }
         />
@@ -1764,7 +1768,6 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   memberEmpty: { alignSelf: "center", marginTop: 24 },
-  memberLoadMore: { paddingVertical: 16 },
   // 成员卡片分隔符（对齐大神列表 hairline 分割线）
   memberSeparator: {
     height: StyleSheet.hairlineWidth,

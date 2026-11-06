@@ -11,7 +11,6 @@ import {
   FlatList,
   RefreshControl,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,6 +19,7 @@ import { grabQuickMatchAndEnterAudition } from "@/features/match/grab-quick-matc
 import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
 import { useHomeGames } from "@/features/home/hooks/use-home-data";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
+import { PaginationFooter } from "@/shared/ui/PaginationFooter";
 import { buildAfterSalePayload } from "../after-sale-card";
 import { OrderAfterSaleSheet } from "../components/OrderAfterSaleSheet";
 import { OrderMultiCompanionSheet } from "../components/OrderMultiCompanionSheet";
@@ -568,13 +568,18 @@ export default function OrderScreen() {
         keyExtractor={(item) => item.id}
         ListEmptyComponent={listEmpty}
         ListFooterComponent={
-          orders.isFetchingNextPage ? (
-            <Text style={styles.listFooter}>加载中...</Text>
+          items.length > 0 ? (
+            <PaginationFooter
+              loading={orders.isFetchingNextPage}
+              hasMore={orders.hasNextPage}
+              pageCount={orders.data?.pages.length}
+            />
           ) : null
         }
         onEndReached={() => {
-          if (orders.hasNextPage && !orders.isFetchingNextPage)
+          if (orders.hasNextPage && !orders.isFetchingNextPage) {
             void orders.fetchNextPage();
+          }
         }}
         onEndReachedThreshold={0.35}
         renderItem={renderOrderItem}
@@ -789,11 +794,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  listFooter: {
-    paddingVertical: 16,
-    color: "#999",
-    fontSize: 12,
-    textAlign: "center",
-  },
-
 });

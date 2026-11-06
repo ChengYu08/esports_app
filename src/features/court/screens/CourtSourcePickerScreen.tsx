@@ -286,11 +286,6 @@ function CourtSourcePickerScreen({ step }: { step: "orders" | "reviews" }) {
               }
             />
           }
-          ListFooterComponent={
-            rows.length > 0 ? (
-              <Text style={styles.end}>没有更多啦～</Text>
-            ) : null
-          }
         />
       )}
       <View
@@ -401,14 +396,6 @@ const styles = StyleSheet.create({
   retry: { padding: 12 },
   retryText: { color: C.brand, fontFamily: COURT_FONT_FAMILY, fontSize: 14 },
   empty: { flex: 1 },
-  end: {
-    color: C.footerMuted,
-    fontFamily: COURT_FONT_FAMILY,
-    fontSize: 12,
-    lineHeight: 18,
-    textAlign: "center",
-    paddingVertical: 16,
-  },
   footer: {
     backgroundColor: C.surface,
     flexDirection: "row",
