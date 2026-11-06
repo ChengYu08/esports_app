@@ -46,6 +46,7 @@ import { touchCustomerServiceSession } from "../customer-service.api";
 import { resolveConversationAvatar } from "../message-avatar";
 import type { ManagedMessage } from "../message-state";
 import { messageStore, useMessageStore } from "../message-store";
+import { useOnlineStatusPolling } from "../hooks/use-online-status-polling";
 import { getConversationDisplayTitle } from "../message-title";
 import {
   getSystemConversationTitle,
@@ -188,9 +189,6 @@ export function ChatConversation({
   );
   const connectionState = useMessageStore((state) => state.connectionState);
   const lastError = useMessageStore((state) => state.lastError);
-  const refreshOnlineStatuses = useMessageStore(
-    (state) => state.refreshOnlineStatuses,
-  );
   const openConversation = useMessageStore((state) => state.openConversation);
   const closeConversation = useMessageStore((state) => state.closeConversation);
   const sendText = useMessageStore((state) => state.sendText);
@@ -244,12 +242,20 @@ export function ChatConversation({
     () => (myAvatarUrl ? { uri: myAvatarUrl } : defaultMyAvatar),
     [myAvatarUrl],
   );
-  const peerOnline = conversation?.isOnline;
+  // 对端在线状态优先取轮询结果（不依赖会话行是否已进列表），缺省按离线展示，
+  // 避免会话还没拉到状态时整块在线信息不渲染
+  const peerOnlineFromPolling = useMessageStore(
+    (state) => state.peerOnlineById[conversationId],
+  );
+  const peerOnline = peerOnlineFromPolling ?? conversation?.isOnline === true;
 
-  // 页面聚焦 / 弹窗可见时刷新在线状态（原聊天页 useFocusEffect 逻辑）
-  useEffect(() => {
-    if (active && accessToken) void refreshOnlineStatuses(accessToken);
-  }, [active, accessToken, refreshOnlineStatuses]);
+  // 聊天页可见期间立即查一次并持续轮询当前对端的在线状态
+  // （列表页失焦后由本页接管，只查该对端）
+  useOnlineStatusPolling(
+    active && !isSystemConversationId(conversationId),
+    accessToken,
+    conversationId,
+  );
 
   // 前后台/覆盖与 openConversation 的 activePeerId 解耦：页面被覆盖或退后台时
   // activePeerId 仍在，但必须退出"已读"状态，否则新消息未读会被静默清零。
@@ -336,11 +342,24 @@ export function ChatConversation({
   const openImagePreview = useCallback(
     async (message: ManagedMessage) => {
       try {
-        const uri = await resolveImagePreview(conversationId, message);
+        const resolvedUri = await resolveImagePreview(message);
+        // 连看列表：当前会话全部图片消息按时间序组装，点开哪张定位到哪张；
+        // 未点开的图片直接用气泡现有地址（远端或本地均可预览），不逐张触发下载
+        const imageMessages = visibleMessages.filter(
+          (item): item is Extract<ManagedMessage, { kind: "image" }> =>
+            item.kind === "image",
+        );
+        const images = imageMessages.map((item) =>
+          item.id === message.id ? resolvedUri : item.imageUrl,
+        );
+        const index = Math.max(
+          0,
+          imageMessages.findIndex((item) => item.id === message.id),
+        );
         navigateWithSheetDismiss(() => {
           router.push({
             pathname: "/image-preview",
-            params: createImagePreviewParams([uri], 0),
+            params: createImagePreviewParams(images, index),
           });
         });
       } catch (error) {
@@ -350,7 +369,7 @@ export function ChatConversation({
       });
       }
     },
-    [conversationId, navigateWithSheetDismiss, resolveImagePreview],
+    [navigateWithSheetDismiss, resolveImagePreview, visibleMessages],
   );
   const openProfile = useCallback(() => {
     setSettingsVisible(false);
@@ -575,8 +594,7 @@ export function ChatConversation({
           <Text numberOfLines={1} style={styles.name}>
             {conversationTitle}
           </Text>
-          {!isSystemConversationId(conversationId) &&
-          typeof peerOnline === "boolean" ? (
+          {!isSystemConversationId(conversationId) ? (
             <View style={styles.onlineStatus}>
               <Image
                 source={peerOnline ? chatOnline : chatOffline}

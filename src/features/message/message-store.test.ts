@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { createMessageStore, type MessageAdapter } from './message-store';
+import { clientAuthApi } from '@/features/auth/client-auth.api';
 import type { ManagedMessage, MessageConversation, MessageHistoryPage } from './message-state';
 import { useInAppNotification } from './notification-hub';
 
@@ -154,6 +155,31 @@ describe('message store', () => {
     expect(store.getState().conversations).toEqual([]);
     await store.getState().retryIfEmpty('token');
     expect(store.getState().conversations).toEqual([expect.objectContaining({ id: '42' })]);
+  });
+
+  it('resolveImagePreview returns the preview uri without re-pointing the chat bubble at the local original', async () => {
+    // 场景：预览大图时下载原图到本地，但气泡仍展示远端缩略源；
+    // 覆写气泡 URL 会让返回聊天后多张原图同时重新解码，造成列表滚动卡顿
+    let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
+    const imageMessage: ManagedMessage = {
+      id: 'img-1', kind: 'image', imageUrl: 'https://ronghub.com/original.jpg',
+      time: '10:01', isMine: false, status: 'sent', sentAt: 11,
+    };
+    const adapter = makeAdapter({
+      getConversations: vi.fn(async () => [conversation]),
+      subscribeMessages: (listener) => { receiveMessage = listener; return () => undefined; },
+      downloadImage: vi.fn(async () => 'file:///cache/original.jpg'),
+    });
+    const store = createMessageStore(adapter);
+    await store.getState().initialize('token');
+    await store.getState().openConversation({ id: '42', title: 'Peer' });
+    receiveMessage?.('42', imageMessage, conversation);
+    const previewUri = await store.getState().resolveImagePreview(imageMessage);
+    expect(previewUri).toBe('file:///cache/original.jpg');
+    expect(store.getState().messagesByPeerId['42']?.[0]).toMatchObject({
+      imageUrl: 'https://ronghub.com/original.jpg',
+    });
+    await store.getState().reset();
   });
 
   it('does not re-read when the list already has conversations', async () => {
@@ -570,5 +596,69 @@ describe('message store', () => {
     await store.getState().loadOlder('42');
     expect(adapter.getMessages).toHaveBeenCalledTimes(2);
     expect(store.getState().messagesByPeerId['42'].map((item) => item.id)).toEqual(['old', 'server-1']);
+  });
+
+  it('refreshes online flags and reports success', async () => {
+    const store = createMessageStore(makeAdapter({ getConversations: vi.fn(async () => [conversation]) }));
+    await store.getState().initialize('token');
+    vi.mocked(clientAuthApi.getUserOnlineStatus).mockResolvedValueOnce({ '42': 1 });
+
+    await expect(store.getState().refreshOnlineStatuses('token')).resolves.toBe(true);
+    expect(store.getState().conversations[0].isOnline).toBe(true);
+    await store.getState().reset();
+  });
+
+  it('keeps conversations reference when online flags do not change', async () => {
+    const store = createMessageStore(makeAdapter({ getConversations: vi.fn(async () => [conversation]) }));
+    await store.getState().initialize('token');
+    const before = store.getState().conversations;
+
+    await store.getState().refreshOnlineStatuses('token');
+
+    expect(store.getState().conversations).toBe(before);
+    await store.getState().reset();
+  });
+
+  it('reports failure and keeps the previous snapshot when the request throws', async () => {
+    const store = createMessageStore(makeAdapter({ getConversations: vi.fn(async () => [conversation]) }));
+    await store.getState().initialize('token');
+    vi.mocked(clientAuthApi.getUserOnlineStatus).mockRejectedValueOnce(new Error('network'));
+    const before = store.getState().conversations;
+
+    await expect(store.getState().refreshOnlineStatuses('token')).resolves.toBe(false);
+    expect(store.getState().conversations).toBe(before);
+    await store.getState().reset();
+  });
+
+  it('scopes the refresh to the requested peer only', async () => {
+    const other: MessageConversation = { id: '77', title: 'Other', preview: '', time: '', unreadCount: 0, updatedAt: 1 };
+    const store = createMessageStore(makeAdapter({
+      getConversations: vi.fn(async () => [conversation, other]),
+    }));
+    await store.getState().initialize('token');
+    // initialize 会规范化会话对象，作用域外对比用初始化后的快照
+    const otherSnapshot = store.getState().conversations[1];
+    vi.mocked(clientAuthApi.getUserOnlineStatus).mockResolvedValueOnce({ '42': 1 });
+
+    await expect(store.getState().refreshOnlineStatuses('token', '42')).resolves.toBe(true);
+
+    expect(clientAuthApi.getUserOnlineStatus).toHaveBeenLastCalledWith('token', ['42']);
+    expect(store.getState().conversations[0].isOnline).toBe(true);
+    // 作用域外的会话保持原对象不动
+    expect(store.getState().conversations[1]).toBe(otherSnapshot);
+    await store.getState().reset();
+  });
+
+  it('records the scoped peer status even when the conversation is not in the list', async () => {
+    const store = createMessageStore(makeAdapter({ getConversations: vi.fn(async () => []) }));
+    await store.getState().initialize('token');
+    vi.mocked(clientAuthApi.getUserOnlineStatus).mockResolvedValueOnce({ '42': 1 });
+
+    await expect(store.getState().refreshOnlineStatuses('token', '42')).resolves.toBe(true);
+
+    // 聊天页头部不依赖会话行：对端状态按 id 单独留存
+    expect(store.getState().peerOnlineById['42']).toBe(true);
+    await store.getState().reset();
+    expect(store.getState().peerOnlineById).toEqual({});
   });
 });

@@ -93,10 +93,12 @@ export type MessageStoreState = {
   activePeerId: string | null;
   /** 聊天界面是否在前台可见；activePeerId 在页面被覆盖/退后台时仍保留，已读判断必须叠加此项 */
   chatForeground: boolean;
+  /** 服务端返回的对端在线状态（按对端 id 存），与 conversations 解耦：会话壳可能还没进列表 */
+  peerOnlineById: Record<string, boolean>;
   /** 诊断用：本次登录会话内确认为离线补偿重放的消息条数（隐藏弹窗展示，文案不含 SDK 厂商名） */
   compensatedCount: number;
   lastError: string | null;
-  refreshOnlineStatuses: (token: string) => Promise<void>;
+  refreshOnlineStatuses: (token: string, peerId?: string) => Promise<boolean>;
   refreshConversations: (token: string) => Promise<void>;
   /** 兜底：进入消息页发现列表为空时，延迟重读一次快照（每次登录会话最多一次） */
   retryIfEmpty: (token: string) => Promise<void>;
@@ -108,7 +110,7 @@ export type MessageStoreState = {
   sendText: (peerId: string, text: string) => Promise<void>;
   sendAfterSaleCard: (peerId: string, payload: import('@/features/order/after-sale-card').AfterSaleCardPayload) => Promise<boolean>;
   sendImage: (peerId: string, path: string) => Promise<void>;
-  resolveImagePreview: (peerId: string, message: ManagedMessage) => Promise<string>;
+  resolveImagePreview: (message: ManagedMessage) => Promise<string>;
   retryMessage: (peerId: string, clientId: string) => Promise<void>;
   markRead: (peerId: string) => Promise<void>;
   setConversationNote: (peerId: string, note: string) => void;
@@ -448,36 +450,85 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       openPeerIds: [],
       activePeerId: null,
       chatForeground: false,
+      peerOnlineById: {},
       compensatedCount: 0,
       lastError: null,
 
-      refreshOnlineStatuses: async (token) => {
+      refreshOnlineStatuses: async (token, peerId) => {
         const requestId = ++onlineStatusRequestId;
-        if (!token) return;
-        const userIds = Array.from(new Set(
-          get().conversations
-            .filter((conversation) => !isSystemConversationId(conversation.id))
-            .map((conversation) => normalizeSystemConversationId(conversation.id))
-            .filter(Boolean),
-        ));
+        if (!token) return false;
+        // 传入 peerId 时只查该对端（聊天页轮询），否则查全部真实会话（消息列表轮询）
+        const scopedId = peerId ? normalizeSystemConversationId(peerId) : null;
+        const userIds = scopedId
+          ? [scopedId]
+          : Array.from(new Set(
+              get().conversations
+                .filter((conversation) => !isSystemConversationId(conversation.id))
+                .map((conversation) => normalizeSystemConversationId(conversation.id))
+                .filter(Boolean),
+            ));
 
         try {
           const statuses: Record<string, number> = userIds.length > 0
             ? await clientAuthApi.getUserOnlineStatus(token, userIds)
             : {};
-          if (requestId !== onlineStatusRequestId) return;
+          // 被更新请求顶替不算失败，避免轮询误判进入退避
+          if (requestId !== onlineStatusRequestId) return true;
           const requestedIds = new Set(userIds);
-          set((state) => ({
-            conversations: state.conversations.map((conversation) => {
-              if (isSystemConversationId(conversation.id)) {
-                return conversation.isOnline ? { ...conversation, isOnline: false } : conversation;
+          set((state) => {
+            // 按对端记录状态：会话壳可能还没进 conversations（如从主页直接发起私聊），
+            // 聊天页头部据此展示在线态，不依赖会话行是否存在
+            const peerOnlineById = { ...state.peerOnlineById };
+            let statusesChanged = false;
+            userIds.forEach((id) => {
+              const isOnline = Number(statuses[id]) === 1;
+              if (peerOnlineById[id] !== isOnline) {
+                peerOnlineById[id] = isOnline;
+                statusesChanged = true;
               }
-              if (!requestedIds.has(conversation.id)) return conversation;
-              return { ...conversation, isOnline: Number(statuses[conversation.id]) === 1 };
-            }),
-          }));
+            });
+            let changed = false;
+            const conversations = state.conversations.map((conversation) => {
+              if (scopedId) {
+                // 作用域模式只更新目标会话，不动系统会话与其它会话的在线态
+                if (conversation.id !== scopedId) {
+                  return conversation;
+                }
+                const isOnline = Number(statuses[conversation.id]) === 1;
+                if (Boolean(conversation.isOnline) === isOnline) {
+                  return conversation;
+                }
+                changed = true;
+                return { ...conversation, isOnline };
+              }
+              if (isSystemConversationId(conversation.id)) {
+                if (!conversation.isOnline) {
+                  return conversation;
+                }
+                changed = true;
+                return { ...conversation, isOnline: false };
+              }
+              if (!requestedIds.has(conversation.id)) {
+                return conversation;
+              }
+              const isOnline = Number(statuses[conversation.id]) === 1;
+              // 状态未变化时复用原对象，避免轮询每 5 秒击穿列表项 memo
+              if (Boolean(conversation.isOnline) === isOnline) {
+                return conversation;
+              }
+              changed = true;
+              return { ...conversation, isOnline };
+            });
+            if (!changed && !statusesChanged) return state;
+            return {
+              peerOnlineById,
+              ...(changed ? { conversations } : {}),
+            };
+          });
+          return true;
         } catch {
-          // Keep the previous snapshot if the request fails.
+          // 失败保留旧快照，由调用方按自己的节奏重试
+          return false;
         }
       },
 
@@ -749,21 +800,13 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         }
       },
 
-      resolveImagePreview: async (peerId, message) => {
+      resolveImagePreview: async (message) => {
         if (message.kind !== 'image') throw new Error('消息不是图片');
+        // 只返回预览地址，不覆写气泡的 imageUrl：把气泡换成下载好的本地原图
+        // 会让返回聊天后多张大图同时重新解码，滚动直接卡顿
         const imageUrl = adapter.downloadImage
           ? await adapter.downloadImage(message)
           : message.imageUrl;
-        set((state) => ({
-          messagesByPeerId: {
-            ...state.messagesByPeerId,
-            [peerId]: (state.messagesByPeerId[peerId] || []).map((item) =>
-              item.id === message.id && item.kind === 'image'
-                ? { ...item, imageUrl }
-                : item,
-            ),
-          },
-        }));
         return imageUrl;
       },
 
@@ -867,7 +910,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         stopConversationSyncSubscription = undefined;
         stopReadSyncSubscription = undefined;
         await adapter.disconnect();
-        set({ connectionState: 'idle', conversationError: null, conversations: [], blacklistedUserIds: [], messagesByPeerId: {}, historyByPeerId: {}, openPeerIds: [], activePeerId: null, chatForeground: false, compensatedCount: 0, lastError: null });
+        set({ connectionState: 'idle', conversationError: null, conversations: [], blacklistedUserIds: [], messagesByPeerId: {}, historyByPeerId: {}, openPeerIds: [], activePeerId: null, chatForeground: false, peerOnlineById: {}, compensatedCount: 0, lastError: null });
       },
     };
   });

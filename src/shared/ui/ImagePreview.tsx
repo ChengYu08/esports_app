@@ -81,7 +81,8 @@ export function ImagePreview({ images, index, onClose }: { images: string[]; ind
       Math.min(images.length, centerIndex + 2),
     );
     if (nearbyImages.length > 0) {
-      void Image.prefetch(nearbyImages, "memory-disk");
+      // 只预取到磁盘：原图进内存缓存会放大内存压力，返回聊天后易触发 GC 卡顿
+      void Image.prefetch(nearbyImages, "disk");
     }
   }, [images]);
 
