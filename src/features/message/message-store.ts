@@ -96,7 +96,7 @@ export type MessageStoreState = {
   /** 诊断用：本次登录会话内确认为离线补偿重放的消息条数（隐藏弹窗展示，文案不含 SDK 厂商名） */
   compensatedCount: number;
   lastError: string | null;
-  refreshOnlineStatuses: (token: string) => Promise<void>;
+  refreshOnlineStatuses: (token: string) => Promise<boolean>;
   refreshConversations: (token: string) => Promise<void>;
   /** 兜底：进入消息页发现列表为空时，延迟重读一次快照（每次登录会话最多一次） */
   retryIfEmpty: (token: string) => Promise<void>;
@@ -108,7 +108,7 @@ export type MessageStoreState = {
   sendText: (peerId: string, text: string) => Promise<void>;
   sendAfterSaleCard: (peerId: string, payload: import('@/features/order/after-sale-card').AfterSaleCardPayload) => Promise<boolean>;
   sendImage: (peerId: string, path: string) => Promise<void>;
-  resolveImagePreview: (peerId: string, message: ManagedMessage) => Promise<string>;
+  resolveImagePreview: (message: ManagedMessage) => Promise<string>;
   retryMessage: (peerId: string, clientId: string) => Promise<void>;
   markRead: (peerId: string) => Promise<void>;
   setConversationNote: (peerId: string, note: string) => void;
@@ -453,7 +453,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
 
       refreshOnlineStatuses: async (token) => {
         const requestId = ++onlineStatusRequestId;
-        if (!token) return;
+        if (!token) return false;
         const userIds = Array.from(new Set(
           get().conversations
             .filter((conversation) => !isSystemConversationId(conversation.id))
@@ -465,19 +465,36 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           const statuses: Record<string, number> = userIds.length > 0
             ? await clientAuthApi.getUserOnlineStatus(token, userIds)
             : {};
-          if (requestId !== onlineStatusRequestId) return;
+          // 被更新请求顶替不算失败，避免轮询误判进入退避
+          if (requestId !== onlineStatusRequestId) return true;
           const requestedIds = new Set(userIds);
-          set((state) => ({
-            conversations: state.conversations.map((conversation) => {
+          set((state) => {
+            let changed = false;
+            const conversations = state.conversations.map((conversation) => {
               if (isSystemConversationId(conversation.id)) {
-                return conversation.isOnline ? { ...conversation, isOnline: false } : conversation;
+                if (!conversation.isOnline) {
+                  return conversation;
+                }
+                changed = true;
+                return { ...conversation, isOnline: false };
               }
-              if (!requestedIds.has(conversation.id)) return conversation;
-              return { ...conversation, isOnline: Number(statuses[conversation.id]) === 1 };
-            }),
-          }));
+              if (!requestedIds.has(conversation.id)) {
+                return conversation;
+              }
+              const isOnline = Number(statuses[conversation.id]) === 1;
+              // 状态未变化时复用原对象，避免轮询每 5 秒击穿列表项 memo
+              if (Boolean(conversation.isOnline) === isOnline) {
+                return conversation;
+              }
+              changed = true;
+              return { ...conversation, isOnline };
+            });
+            return changed ? { conversations } : state;
+          });
+          return true;
         } catch {
-          // Keep the previous snapshot if the request fails.
+          // 失败保留旧快照，由调用方按自己的节奏重试
+          return false;
         }
       },
 
@@ -749,21 +766,13 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         }
       },
 
-      resolveImagePreview: async (peerId, message) => {
+      resolveImagePreview: async (message) => {
         if (message.kind !== 'image') throw new Error('消息不是图片');
+        // 只返回预览地址，不覆写气泡的 imageUrl：把气泡换成下载好的本地原图
+        // 会让返回聊天后多张大图同时重新解码，滚动直接卡顿
         const imageUrl = adapter.downloadImage
           ? await adapter.downloadImage(message)
           : message.imageUrl;
-        set((state) => ({
-          messagesByPeerId: {
-            ...state.messagesByPeerId,
-            [peerId]: (state.messagesByPeerId[peerId] || []).map((item) =>
-              item.id === message.id && item.kind === 'image'
-                ? { ...item, imageUrl }
-                : item,
-            ),
-          },
-        }));
         return imageUrl;
       },
 

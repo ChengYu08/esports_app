@@ -467,46 +467,42 @@ function ClubQrModal({
           onPress={onClose}
           style={StyleSheet.absoluteFill}
         />
-        <View accessibilityViewIsModal style={styles.qrModalCard}>
-          <View style={styles.qrModalHeader}>
-            <Text style={styles.qrModalTitle}>俱乐部入驻</Text>
+        {/* 与成为陪玩师弹窗同版式：标题 + 说明 + 120 二维码 + 保存按钮，无关闭叉号 */}
+        <View accessibilityViewIsModal style={styles.qrEntryCard}>
+          <View style={styles.qrEntryContent}>
+            <Text style={styles.qrEntryTitle}>俱乐部入驻</Text>
+            <Text style={styles.qrEntryBody}>
+              扫码联系工作人员，申请俱乐部入驻
+            </Text>
+            <View style={styles.qrEntryImageWrap}>
+              <Image
+                accessibilityLabel="俱乐部入驻二维码"
+                contentFit="contain"
+                source={clubEntryQrCode}
+                style={styles.qrEntryCode}
+              />
+            </View>
+          </View>
+          <View style={styles.qrEntryActions}>
             <Pressable
-              accessibilityLabel="关闭"
-              hitSlop={10}
-              onPress={onClose}
-              style={styles.qrModalClose}
+              accessibilityRole="button"
+              accessibilityLabel="保存二维码"
+              accessibilityState={{ disabled: saving, busy: saving }}
+              disabled={saving}
+              onPress={save}
+              style={({ pressed }) => [
+                styles.qrSaveButton,
+                pressed && styles.buttonPressed,
+                saving && styles.qrSaveButtonDisabled,
+              ]}
             >
-              <Dismiss24Regular color="#999999" height={20} width={20} />
+              {saving ? (
+                <ActivityIndicator color="#FE1F4C" size="small" />
+              ) : (
+                <Text style={styles.qrSaveText}>保存二维码</Text>
+              )}
             </Pressable>
           </View>
-          <Image
-            accessibilityLabel="俱乐部入驻二维码"
-            contentFit="contain"
-            source={clubEntryQrCode}
-            style={styles.qrCode}
-          />
-          <Text style={styles.qrModalHint}>
-            扫码联系工作人员，申请俱乐部入驻
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="保存二维码"
-            accessibilityState={{ disabled: saving, busy: saving }}
-            disabled={saving}
-            onPress={save}
-            style={({ pressed }) => [
-              styles.qrSaveButton,
-              styles.qrSaveButtonWide,
-              pressed && styles.buttonPressed,
-              saving && styles.qrSaveButtonDisabled,
-            ]}
-          >
-            {saving ? (
-              <ActivityIndicator color="#FE1F4C" size="small" />
-            ) : (
-              <Text style={styles.qrSaveText}>保存二维码</Text>
-            )}
-          </Pressable>
         </View>
       </View>
     </Modal>
@@ -536,22 +532,22 @@ function CompanionQrModal({
           style={StyleSheet.absoluteFill}
         />
         {/* 设计稿 571-59485：295 宽白卡，标题+说明+120 二维码+单个保存按钮，无关闭叉号 */}
-        <View accessibilityViewIsModal style={styles.companionQrCard}>
-          <View style={styles.companionQrContent}>
-            <Text style={styles.companionQrTitle}>成为陪玩师</Text>
-            <Text style={styles.companionQrBody}>
+        <View accessibilityViewIsModal style={styles.qrEntryCard}>
+          <View style={styles.qrEntryContent}>
+            <Text style={styles.qrEntryTitle}>成为陪玩师</Text>
+            <Text style={styles.qrEntryBody}>
               加入盼之电竞自营俱乐部，赚取丰厚报酬
             </Text>
-            <View style={styles.companionQrImageWrap}>
+            <View style={styles.qrEntryImageWrap}>
               <Image
                 accessibilityLabel="成为陪玩师二维码"
                 contentFit="contain"
                 source={companionEntryQrCode}
-                style={styles.companionQrCode}
+                style={styles.qrEntryCode}
               />
             </View>
           </View>
-          <View style={styles.companionQrActions}>
+          <View style={styles.qrEntryActions}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="保存二维码"
@@ -818,54 +814,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  qrCode: {
-    width: 160,
-    height: 160,
-    marginTop: 20,
-  },
-  qrModalHint: {
-    marginTop: 16,
-    color: "#666",
-    fontSize: 13,
-    lineHeight: 20,
-    textAlign: "center",
-  },
-  // 成为陪玩师弹窗（设计稿 571-59485）：295 宽白卡，内容 16/16/20，按钮区 4/16/16
-  companionQrCard: {
+  // 入驻二维码弹窗（设计稿 571-59485）：295 宽白卡，内容 16/16/20，按钮区 4/16/16
+  qrEntryCard: {
     width: "100%",
     maxWidth: 295,
     borderRadius: 12,
     backgroundColor: "#FFFFFF",
     overflow: "hidden",
   },
-  companionQrContent: {
+  qrEntryContent: {
     paddingTop: 16,
     paddingHorizontal: 16,
     paddingBottom: 20,
     gap: 12,
   },
-  companionQrTitle: {
+  qrEntryTitle: {
     color: "#333333",
     fontSize: 16,
     lineHeight: 24,
     fontWeight: "600",
     textAlign: "center",
   },
-  companionQrBody: {
+  qrEntryBody: {
     color: "#666666",
     fontSize: 14,
     lineHeight: 22,
     textAlign: "center",
   },
   // 二维码容器：纯白底托住圆角图片，居中展示
-  companionQrImageWrap: {
+  qrEntryImageWrap: {
     width: 120,
     height: 120,
     alignSelf: "center",
     backgroundColor: "#FFFFFF",
   },
-  companionQrCode: { width: 120, height: 120, borderRadius: 8 },
-  companionQrActions: {
+  qrEntryCode: { width: 120, height: 120, borderRadius: 8 },
+  qrEntryActions: {
     paddingTop: 4,
     paddingHorizontal: 16,
     paddingBottom: 16,
@@ -879,8 +863,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: "#FFFFFF",
   },
-  // 俱乐部入驻弹窗：按钮贴卡片底部通栏
-  qrSaveButtonWide: { marginTop: 20, width: "100%" },
   qrSaveButtonDisabled: { opacity: 0.6 },
   qrSaveText: {
     color: "#FE1F4C",

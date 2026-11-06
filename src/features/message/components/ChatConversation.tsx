@@ -336,11 +336,24 @@ export function ChatConversation({
   const openImagePreview = useCallback(
     async (message: ManagedMessage) => {
       try {
-        const uri = await resolveImagePreview(conversationId, message);
+        const resolvedUri = await resolveImagePreview(message);
+        // 连看列表：当前会话全部图片消息按时间序组装，点开哪张定位到哪张；
+        // 未点开的图片直接用气泡现有地址（远端或本地均可预览），不逐张触发下载
+        const imageMessages = visibleMessages.filter(
+          (item): item is Extract<ManagedMessage, { kind: "image" }> =>
+            item.kind === "image",
+        );
+        const images = imageMessages.map((item) =>
+          item.id === message.id ? resolvedUri : item.imageUrl,
+        );
+        const index = Math.max(
+          0,
+          imageMessages.findIndex((item) => item.id === message.id),
+        );
         navigateWithSheetDismiss(() => {
           router.push({
             pathname: "/image-preview",
-            params: createImagePreviewParams([uri], 0),
+            params: createImagePreviewParams(images, index),
           });
         });
       } catch (error) {
@@ -350,7 +363,7 @@ export function ChatConversation({
       });
       }
     },
-    [conversationId, navigateWithSheetDismiss, resolveImagePreview],
+    [navigateWithSheetDismiss, resolveImagePreview, visibleMessages],
   );
   const openProfile = useCallback(() => {
     setSettingsVisible(false);

@@ -123,6 +123,8 @@ const styles = StyleSheet.create({
   club: {
     minHeight: 104,
     flexDirection: "row",
+    // 设计稿卡片行 alignItems=center：右侧文案变高时左侧 80×80 封面仍垂直居中
+    alignItems: "center",
     gap: 12,
     backgroundColor: "#FFFFFF",
     paddingHorizontal: 16,

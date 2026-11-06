@@ -1,6 +1,6 @@
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { useAuthStore } from "@esports/auth";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useIsFocused } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo } from "react";
 import { AppState, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
@@ -15,6 +15,7 @@ import {
   resolveConversationAvatar,
 } from "../message-avatar";
 import { useMessageStore } from "../message-store";
+import { useOnlineStatusPolling } from "../hooks/use-online-status-polling";
 import { isVisibleMessageConversation } from "../message-unread";
 import { getConversationDisplayTitle } from "../message-title";
 import type { MessageListItemModel } from "../message.types";
@@ -40,6 +41,14 @@ export default function MessageScreen() {
   const retryIfEmpty = useMessageStore((state) => state.retryIfEmpty);
   const refreshOnlineStatuses = useMessageStore((state) => state.refreshOnlineStatuses);
   const clearAllUnread = useMessageStore((state) => state.clearAllUnread);
+
+  const isFocused = useIsFocused();
+  // 只有存在真实会话时才轮询；纯系统会话（通知/订单助手）没有在线状态
+  const hasPeerConversations = useMemo(
+    () => conversations.some((item) => !isSystemConversationId(item.id)),
+    [conversations],
+  );
+  useOnlineStatusPolling(isFocused && hasPeerConversations, accessToken);
 
   const handleClear = async () => {
     await clearAllUnread();
