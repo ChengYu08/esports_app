@@ -1,8 +1,8 @@
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
-import { formatCoolEndTime } from "./cancellation-cooling";
-import type { CoolingRecord } from "./cancellation-cooling";
 import { colors } from "@/shared/theme/tokens";
+import type { CoolingRecord } from "./cancellation-cooling";
+import { formatCoolEndTime } from "./cancellation-cooling";
 
 export function CancellationCoolingDialog({
   record,
@@ -16,7 +16,12 @@ export function CancellationCoolingDialog({
   onAbandon: () => void;
 }) {
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onCancel}>
+    <Modal
+      transparent
+      visible={visible}
+      animationType="fade"
+      onRequestClose={onCancel}
+    >
       <View style={styles.backdrop}>
         <View style={styles.dialog}>
           <Text style={styles.title}>该账号正处于注销冷静期</Text>
@@ -25,7 +30,7 @@ export function CancellationCoolingDialog({
             <Text style={styles.highlight}>
               {` ${formatCoolEndTime(record.coolEndTime)} `}
             </Text>
-            完成注销，若此时登陆该账号视为取消注销。
+            完成注销，若此时登录该账号视为取消注销。
           </Text>
           <View style={styles.actions}>
             <Pressable

@@ -2,7 +2,7 @@ import { ImageZoom } from "@likashefqet/react-native-image-zoom";
 import { Image, type ImageErrorEventData } from "expo-image";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FlatList, NativeScrollEvent, NativeSyntheticEvent, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { FlatList, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import type { ImageErrorEvent as NativeImageErrorEvent } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -70,7 +70,34 @@ function PreviewImage({ uri, width, height }: { uri: string; width: number; heig
   );
 }
 
-export function ImagePreview({ images, index, onClose }: { images: string[]; index: number; onClose: () => void }) {
+function FitWidthImage({ uri, width }: { uri: string; width: number }) {
+  const [aspectRatio, setAspectRatio] = useState<number | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return <View style={[styles.imageError, { height: width }]}><Text style={styles.imageErrorText}>图片加载失败</Text></View>;
+  }
+
+  return (
+    <Image
+      source={{ uri }}
+      contentFit="contain"
+      cachePolicy="disk"
+      onLoad={({ source }) => {
+        if (source.width > 0 && source.height > 0) {
+          setAspectRatio(source.width / source.height);
+        }
+      }}
+      onError={(event) => {
+        reportImageLoadFailure("fit-width", uri, event.error);
+        setFailed(true);
+      }}
+      style={{ width, height: aspectRatio ? width / aspectRatio : width }}
+    />
+  );
+}
+
+export function ImagePreview({ images, index, onClose, mode }: { images: string[]; index: number; onClose: () => void; mode?: "fit-width" }) {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const visibleIndex = useRef(index);
@@ -104,6 +131,20 @@ export function ImagePreview({ images, index, onClose }: { images: string[]; ind
 
   if (images.length === 0) {
     return <View style={styles.empty}><EmptyState message="暂无图片" /></View>;
+  }
+
+  if (mode === "fit-width") {
+    return (
+      <View style={styles.screen}>
+        <StatusBar style="light" />
+        <ScrollView contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom }}>
+          <FitWidthImage key={images[index]} uri={images[index]} width={width} />
+        </ScrollView>
+        <Pressable accessibilityRole="button" accessibilityLabel="关闭图片预览" hitSlop={12} onPress={onClose} style={[styles.closeButton, { top: insets.top + 8 }]}>
+          <Text style={styles.closeText}>×</Text>
+        </Pressable>
+      </View>
+    );
   }
 
   return (

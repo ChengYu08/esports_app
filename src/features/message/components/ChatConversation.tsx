@@ -978,9 +978,9 @@ const ChatComposer = memo(function ChatComposer({
     };
   }, [backInterceptorRef, emojiPickerOpen, isSheet]);
 
+  // 对齐微信：选中 emoji 只追加草稿，面板保持展开可连续选择
   const selectEmoji = useCallback((emoji: EmojiType) => {
     setDraft((current) => `${current}${emoji.emoji}`);
-    setEmojiPickerOpen(false);
   }, []);
 
   const sendMessage = async () => {

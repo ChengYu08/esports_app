@@ -32,6 +32,7 @@ import type {
 import {
   handleOrderFailurePromptConfirm,
   requiresRealNameVerification,
+  requiresSelfRealNameVerification,
 } from "@/features/mine/order-real-name";
 import { calculateAge } from "@/features/mine/profile-utils";
 import { getDDinProStyle } from "@/shared/theme/typography";
@@ -232,6 +233,16 @@ export function CompanionOrderSheet({
         afterClose?.();
       }
     });
+  }
+
+  const promptMessage = prompt?.message ?? "";
+  const companionRealNameRequired = requiresRealNameVerification(promptMessage);
+  const selfRealNameRequired = requiresSelfRealNameVerification(promptMessage);
+  let realNameGuideConfirmText: string | undefined;
+  if (companionRealNameRequired) {
+    realNameGuideConfirmText = "去认证";
+  } else if (selfRealNameRequired) {
+    realNameGuideConfirmText = "去实名";
   }
 
   return (
@@ -454,23 +465,18 @@ export function CompanionOrderSheet({
       <AppPrompt
         visible={Boolean(prompt)}
         title={prompt?.title}
-        message={prompt?.message ?? ""}
+        message={promptMessage}
         cancelText={
-          requiresRealNameVerification(prompt?.message ?? "")
-            ? "我知道了"
-            : undefined
+          realNameGuideConfirmText !== undefined ? "我知道了" : undefined
         }
-        confirmText={
-          requiresRealNameVerification(prompt?.message ?? "")
-            ? "去认证"
-            : undefined
-        }
+        confirmText={realNameGuideConfirmText}
         onCancel={() => setPrompt(null)}
         onConfirm={() => {
-          handleOrderFailurePromptConfirm(prompt?.message ?? "", {
+          handleOrderFailurePromptConfirm(promptMessage, {
             dismissPrompt: () => setPrompt(null),
             dismissSheet: closeSheet,
             openVerification: onRealNameVerificationRequired,
+            openSelfVerification: () => router.push("/real-name-verification"),
           });
         }}
       />

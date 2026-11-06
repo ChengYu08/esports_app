@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { APP_LINKS } from "@/core/config/links";
 import { useStarIap } from "@/features/iap/use-star-iap";
 import { fetchStarBalance } from "@/features/mine/api/companion-order.api";
+import { requiresSelfRealNameVerification } from "@/features/mine/order-real-name";
 import { openInAppWebView } from "@/shared/navigation/open-web-view";
 import { getDDinProStyle } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
@@ -295,7 +296,23 @@ export default function StarRechargeScreen() {
         visible={prompt !== null}
         title={prompt?.title ?? "提示"}
         message={prompt?.message ?? ""}
-        onConfirm={() => setPrompt(null)}
+        cancelText={
+          requiresSelfRealNameVerification(prompt?.message ?? "")
+            ? "我知道了"
+            : undefined
+        }
+        onCancel={() => setPrompt(null)}
+        confirmText={
+          requiresSelfRealNameVerification(prompt?.message ?? "")
+            ? "去实名"
+            : undefined
+        }
+        onConfirm={() => {
+          setPrompt(null);
+          if (requiresSelfRealNameVerification(prompt?.message ?? "")) {
+            router.push("/real-name-verification");
+          }
+        }}
       />
     </View>
   );

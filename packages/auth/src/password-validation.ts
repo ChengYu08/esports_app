@@ -9,6 +9,11 @@ export function sanitizeCode(value: string): string {
   return value.replace(/\D/g, "").slice(0, 6);
 }
 
+// 密码仅允许可见 ASCII 字符，拦截中文输入法和全角符号的输入
+export function sanitizePassword(value: string): string {
+  return value.replace(/[^\x20-\x7E]/g, "");
+}
+
 export function validatePhone(phone: string): string | null {
   if (!phone) return "请输入手机号";
   if (!MAINLAND_PHONE_PATTERN.test(phone)) return "请输入正确的手机号";

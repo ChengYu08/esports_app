@@ -1,5 +1,5 @@
-import type { RCIMIWMessage, RCIMIWTextMessage } from '@rongcloud/react-native-im-wrapper';
-import type { RongSdkMessage } from '@/features/message/chat-message';
+import type { RCIMIWEngine, RCIMIWMessage, RCIMIWTextMessage } from '@rongcloud/react-native-im-wrapper';
+import { pickRongImageUrl, type RongSdkMessage } from '@/features/message/chat-message';
 
 import {
   initializeRongCloud,
@@ -69,7 +69,10 @@ function normalizeRoomMessage(message: RCIMIWMessage): RoomMessage | null {
   const sdkMessage = message as RCIMIWTextMessage & RongSdkMessage;
   const isImage = sdk != null && sdkMessage.messageType === sdk.RCIMIWMessageType.IMAGE;
   const text = sdkMessage.text ?? "";
-  const imageUrl = sdkMessage.local || sdkMessage.remote || sdkMessage.mediaUrl;
+  // App 端发送的图片会把发送方的 localPath 带进消息体，接收方必须优先 remote；
+  // 聊天室不会回显自己发的消息，这里再按 direction 兜底区分本地/远端优先级
+  const isMine = sdk != null && message.direction === sdk.RCIMIWMessageDirection.SEND;
+  const imageUrl = pickRongImageUrl(sdkMessage, isMine);
   if (!text && !(isImage && imageUrl)) return null;
   return {
     id: String(message.messageUId || message.messageId || message.sentTime),
@@ -164,15 +167,21 @@ export async function sendVoiceChatMessage(
   return sent;
 }
 
-export async function sendVoiceChatImage(
-  chatroomId: string,
+/**
+ * 融云私有存储的媒体 URL 直接访问会 401，图片必须先上传自家 OSS、
+ * 把公网地址预置到消息 remote 后用 sendMessage 直发——自带远端地址的
+ * 媒体消息不经融云文件服务托管（官方文档支持该用法），接收方与 PC 端
+ * 拿到的都是可直接显示的公网 URL。
+ */
+export async function sendVoiceChatImageMessage(
+  engine: Pick<RCIMIWEngine, 'createImageMessage' | 'sendMessage'>,
+  conversationType: number,
+  targetId: string,
   imagePath: string,
+  imageUrl: string,
   sender?: VoiceChatSender,
 ) {
-  const engine = getRongCloudEngine();
-  const sdk = loadSdk();
-  if (!engine || !sdk) throw new Error('融云 SDK 不可用');
-  const message = await engine.createImageMessage(sdk.RCIMIWConversationType.CHATROOM, chatroomId, '', imagePath);
+  const message = await engine.createImageMessage(conversationType, targetId, '', imagePath);
   if (sender) {
     message.userInfo = {
       userId: sender.userId,
@@ -180,8 +189,21 @@ export async function sendVoiceChatImage(
       portrait: sender.headImage || '',
     };
   }
-  const code = await engine.sendMediaMessage(message, {});
+  message.remote = imageUrl;
+  const code = await engine.sendMessage(message, {});
   if (code !== 0) throw new Error(`发送图片失败（${code}）`);
+}
+
+export async function sendVoiceChatImage(
+  chatroomId: string,
+  imagePath: string,
+  imageUrl: string,
+  sender?: VoiceChatSender,
+) {
+  const engine = getRongCloudEngine();
+  const sdk = loadSdk();
+  if (!engine || !sdk) throw new Error('融云 SDK 不可用');
+  return sendVoiceChatImageMessage(engine, sdk.RCIMIWConversationType.CHATROOM, chatroomId, imagePath, imageUrl, sender);
 }
 
 export function subscribeVoiceChatMessages(listener: (chatroomId: string, message: RoomMessage) => void) {

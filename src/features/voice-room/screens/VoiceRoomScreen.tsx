@@ -32,9 +32,6 @@ import {
   UIManager,
   View,
 } from "react-native";
-import {
-  KeyboardAvoidingView,
-} from "react-native-keyboard-controller";
 import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -66,6 +63,7 @@ import { useVoiceRoomMembersReconcile } from "../use-voice-room-members-reconcil
 import { useVoiceRoomReception } from "../use-voice-room-reception";
 import { useVoiceRoomRtc } from "../use-voice-room-rtc";
 import { useVoiceRoomSessionStore } from "../voice-room-session";
+import { uploadChatImage } from "@/features/message/chat-image-upload";
 import {
   sendVoiceChatImage,
   sendVoiceChatMessage,
@@ -207,6 +205,8 @@ export default function VoiceRoomScreen() {
   membersRef.current = members;
   /** 评论面板（键盘拉起输入态）是否展开：Figma 550:124041 */
   const [commentOpen, setCommentOpen] = useState(false);
+  /** 评论输入草稿：状态挂在屏幕级，面板随键盘收起卸载后草稿仍保留 */
+  const [commentDraft, setCommentDraft] = useState("");
   const [selectedMember, setSelectedMember] = useState<VoiceRoomMember | null>(
     null,
   );
@@ -1063,15 +1063,18 @@ export default function VoiceRoomScreen() {
       kind: "chat" as const,
     };
     setMessages((items) => [...items, local].slice(-80));
-    if (chatroomId)
-      await sendVoiceChatImage(chatroomId, imageUri, buildChatSender()).catch(
-        () => {
+    if (chatroomId && accessToken) {
+      // 先上传自家 OSS 拿公网地址，再预置到消息 remote 发送：
+      // 融云私有存储的 URL 对方直接访问会 401
+      await uploadChatImage(accessToken, imageUri)
+        .then((imageUrl) => sendVoiceChatImage(chatroomId, imageUri, imageUrl, buildChatSender()))
+        .catch(() => {
           void useAppConfirm.getState().confirm({
             title: "发送失败",
             message: "图片发送失败，请稍后重试",
           });
-        },
-      );
+        });
+    }
   };
 
   const ensureMicrophonePermission = async () => {
@@ -1203,10 +1206,7 @@ export default function VoiceRoomScreen() {
     <View style={styles.screen}>
       <StatusBar style="light" />
       <VoiceRoomBackground />
-      <KeyboardAvoidingView
-        behavior="padding"
-        style={[styles.safe, { paddingTop: insets.top }]}
-      >
+      <View style={[styles.safe, { paddingTop: insets.top }]}>
         <View style={styles.header}>
           <Pressable
             accessibilityRole="button"
@@ -1276,9 +1276,23 @@ export default function VoiceRoomScreen() {
           />
         </View>
 
+        {/* 评论面板展开时覆盖面板以外区域的点击捕获层：点外部收起键盘并整体关闭面板 */}
+        {commentOpen ? (
+          <Pressable
+            accessibilityLabel="关闭评论面板"
+            accessibilityRole="button"
+            style={styles.commentBackdrop}
+            onPress={() => {
+              Keyboard.dismiss();
+              closeCommentPanel();
+            }}
+          />
+        ) : null}
         {commentOpen ? (
           <VoiceRoomCommentPanel
             bottomInset={insets.bottom}
+            draft={commentDraft}
+            onDraftChange={setCommentDraft}
             onSendText={(text) => sendMessage(text)}
             onSendImage={(imageUri) => sendImage(imageUri)}
             onClose={closeCommentPanel}
@@ -1315,7 +1329,7 @@ export default function VoiceRoomScreen() {
             onSelectCompanion={openSelectCompanion}
           />
         )}
-      </KeyboardAvoidingView>
+      </View>
       <VoiceRoomExitDialog
         visible={exitDialogVisible}
         isOwner={isOwner}
@@ -1465,6 +1479,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 1,
   },
   inviteName: { color: "#979799", textShadowColor: "transparent" },
+  commentBackdrop: StyleSheet.absoluteFill,
   chatPanel: {
     flex: 1,
     marginTop: 0,

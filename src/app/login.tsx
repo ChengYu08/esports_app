@@ -112,7 +112,11 @@ export default function LoginRoute() {
         if (!active) return;
         if (isCoolingActive(record)) {
           setCoolingRecord(record);
-          setCoolingDialogVisible(true);
+          // 只在带入的手机号命中注销记录时才主动弹窗，
+          // 否则换账号登录的用户会被别人的冷静期提示打断
+          if (initialPhone && record.phone === initialPhone) {
+            setCoolingDialogVisible(true);
+          }
         } else {
           setCoolingRecord(null);
         }
@@ -120,16 +124,33 @@ export default function LoginRoute() {
       return () => {
         active = false;
       };
-    }, []),
+    }, [initialPhone]),
   );
 
-  const ensureNotCooling = () => {
-    if (coolingRecord) {
-      setCoolingDialogVisible(true);
-      return false;
+  // 冷静期只对注销的那个手机号生效，其他账号在同一台设备上登录不受影响
+  const ensureNotCooling = (phone?: string) => {
+    if (!coolingRecord) {
+      return true;
     }
-    return true;
+    if (phone && phone !== coolingRecord.phone) {
+      return true;
+    }
+    setCoolingDialogVisible(true);
+    return false;
   };
+
+  // 登录成功即视为取消注销（服务端侧已取消），本地冷静期记录要同步清掉，
+  // 否则下次回到登录页还会按未失效的记录继续弹冷静期弹窗
+  const clearCoolingIfMatched = useCallback(
+    async (phone?: string) => {
+      if (!coolingRecord || !phone || phone !== coolingRecord.phone) {
+        return;
+      }
+      await clearCoolingRecord();
+      setCoolingRecord(null);
+    },
+    [coolingRecord],
+  );
 
   // 拉起运营商授权页并完成一键登录。原生授权页拿到 token 就会关闭，
   // 但 token 换登录态还要几秒网络请求，这期间盖住下面的登录页，
@@ -146,6 +167,16 @@ export default function LoginRoute() {
     let keepOverlayUntilUnmount = false;
     try {
       const token = await adapter.authorizeQuickLogin(quickLoginProvider);
+      // 一键登录的手机号在授权前拿不到，只能拿到 token 后再校验冷静期；
+      // 只拦注销的那个号码，换卡/换账号不受影响
+      if (
+        isCoolingActive(coolingRecord) &&
+        coolingRecord.phone === token.phone
+      ) {
+        setCoolingDialogVisible(true);
+        setQuickLoginPhase("fallback");
+        return;
+      }
       await completeClientLogin(
         token,
         "ONE_CLICK_LOGIN",
@@ -153,6 +184,7 @@ export default function LoginRoute() {
         setCompanionStatus,
         token.phone,
       );
+      await clearCoolingIfMatched(token.phone);
       backAfterLogin();
       keepOverlayUntilUnmount = true;
     } catch (error) {
@@ -183,7 +215,7 @@ export default function LoginRoute() {
         setQuickLoginLoading(false);
       }
     }
-  }, [adapter, quickLoginProvider, setSession, setCompanionStatus]);
+  }, [adapter, quickLoginProvider, setSession, setCompanionStatus, coolingRecord, clearCoolingIfMatched]);
 
   // 进入登录页先探测一键登录可用性：可用 → 自动拉起授权页；不可用 → 显示密码/验证码界面
   useEffect(() => {
@@ -254,8 +286,10 @@ export default function LoginRoute() {
           onBack={backAfterLogin}
           onSkip={backAfterLogin}
           onSendCode={async (phone) => {
-            if (!ensureNotCooling()) {
-              return;
+            if (!ensureNotCooling(phone)) {
+              // 冷静期弹窗已展示，必须让 Promise 失败，
+              // 否则 LoginScreen 会当作发送成功进入 60s 倒计时
+              throw new Error("账号处于注销冷静期");
             }
             if (!adapter) {
               showToast("验证码发送失败，请先配置 SSO client secret。");
@@ -271,6 +305,9 @@ export default function LoginRoute() {
             }
           }}
           onPasswordLogin={async (payload) => {
+            if (!ensureNotCooling(payload.username)) {
+              return;
+            }
             if (!adapter) {
               setPasswordLoginError("请先配置 SSO client secret。");
               return;
@@ -284,6 +321,7 @@ export default function LoginRoute() {
                 setCompanionStatus,
                 payload.username,
               );
+              await clearCoolingIfMatched(payload.username);
               backAfterLogin();
             } catch (error) {
               setPasswordLoginError(getPasswordLoginErrorMessage(error));
@@ -299,9 +337,6 @@ export default function LoginRoute() {
             openInAppWebView(APP_LINKS.privacyPolicy, "隐私政策")
           }
           onQuickLogin={async () => {
-            if (!ensureNotCooling()) {
-              return;
-            }
             if (!adapter) {
               showToast("暂无法一键登录，请先配置 SSO client secret。");
               return;
@@ -309,7 +344,7 @@ export default function LoginRoute() {
             await runQuickLogin();
           }}
           onLogin={async (payload) => {
-            if (!ensureNotCooling()) {
+            if (!ensureNotCooling(payload.phone)) {
               return;
             }
             if (!adapter) {
@@ -325,6 +360,7 @@ export default function LoginRoute() {
                 setCompanionStatus,
                 payload.phone,
               );
+              await clearCoolingIfMatched(payload.phone);
               backAfterLogin();
             } catch (error) {
               showToast(

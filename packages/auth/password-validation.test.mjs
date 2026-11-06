@@ -3,6 +3,7 @@ import test from "node:test";
 import * as passwordValidation from "./src/password-validation.ts";
 import {
   sanitizeCode,
+  sanitizePassword,
   sanitizePhone,
   validateForgotPasswordForm,
   validatePassword,
@@ -13,6 +14,13 @@ import {
 test("phone and code sanitizers keep only supported digits and lengths", () => {
   assert.equal(sanitizePhone("13a800-138000"), "13800138000");
   assert.equal(sanitizeCode("12a34567"), "123456");
+});
+
+test("password sanitizer strips CJK and full-width characters but keeps ASCII", () => {
+  assert.equal(sanitizePassword("Abc123!@"), "Abc123!@");
+  assert.equal(sanitizePassword("Abc密码123!"), "Abc123!");
+  assert.equal(sanitizePassword("Ａｂｃ！＠"), "");
+  assert.equal(sanitizePassword("Abc 123"), "Abc 123");
 });
 
 test("phone validation requires a mainland China mobile number", () => {

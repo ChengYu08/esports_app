@@ -62,7 +62,13 @@ export async function createAppPayOrder(
 ): Promise<CreateAppPayOrderResult> {
   const response = await apiClient<ApiEnvelope<CreateAppPayOrderResult>>(
     "/client/v1/pay/createAppPayOrder",
-    { method: "POST", token, body: action },
+    {
+      method: "POST",
+      token,
+      body: action,
+      // 未实名时由充值页弹窗「去实名」按钮引导，不走全局自动跳转
+      suppressRealNameRedirect: true,
+    },
   );
   return requireSuccess(response, "创建支付订单失败，请稍后再试");
 }
@@ -87,7 +93,13 @@ export async function createPayOrder(
 ): Promise<CreatePayOrderResult> {
   const response = await apiClient<ApiEnvelope<CreatePayOrderResult>>(
     "/client/v1/pay/createPayOrder",
-    { method: "POST", token, body: action },
+    {
+      method: "POST",
+      token,
+      body: action,
+      // 未实名时由充值页弹窗「去实名」按钮引导，不走全局自动跳转
+      suppressRealNameRedirect: true,
+    },
   );
   return requireSuccess(response, "创建支付订单失败，请稍后再试");
 }

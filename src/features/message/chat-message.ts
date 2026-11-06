@@ -157,6 +157,17 @@ export function parseRoomInviteLink(text: string): { roomId: string; roomVersion
   return { roomId: match[1], roomVersion: match[2] };
 }
 
+/**
+ * 融云 App 端发出的图片消息会把发送方的 localPath 序列化进消息体（RC:ImgMsg 的
+ * localPath 字段），接收方拿到的 local 是对方设备上的文件路径、本机并不存在；
+ * 只有自己发出的消息 local 才指向本机文件。因此接收方向必须优先远端 URL。
+ */
+export function pickRongImageUrl(message: RongSdkMessage, isMine: boolean): string {
+  const { local, remote, mediaUrl } = message;
+  if (isMine) return local || remote || mediaUrl || "";
+  return remote || mediaUrl || local || "";
+}
+
 export function mapRongMessage(message: RongSdkMessage, enums: { image: number; send: number }): ChatMessage | null {
   const id = message.messageUId || String(message.messageId || `${message.sentTime}-${message.senderUserId}`);
   const time = message.sentTime
@@ -165,7 +176,7 @@ export function mapRongMessage(message: RongSdkMessage, enums: { image: number; 
   const isMine = message.direction === enums.send;
 
   if (message.messageType === enums.image) {
-    const imageUrl = message.local || message.remote || message.mediaUrl;
+    const imageUrl = pickRongImageUrl(message, isMine);
     return imageUrl ? { id, kind: "image", imageUrl, time, isMine } : null;
   }
 
