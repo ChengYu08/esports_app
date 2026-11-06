@@ -648,4 +648,17 @@ describe('message store', () => {
     expect(store.getState().conversations[1]).toBe(otherSnapshot);
     await store.getState().reset();
   });
+
+  it('records the scoped peer status even when the conversation is not in the list', async () => {
+    const store = createMessageStore(makeAdapter({ getConversations: vi.fn(async () => []) }));
+    await store.getState().initialize('token');
+    vi.mocked(clientAuthApi.getUserOnlineStatus).mockResolvedValueOnce({ '42': 1 });
+
+    await expect(store.getState().refreshOnlineStatuses('token', '42')).resolves.toBe(true);
+
+    // 聊天页头部不依赖会话行：对端状态按 id 单独留存
+    expect(store.getState().peerOnlineById['42']).toBe(true);
+    await store.getState().reset();
+    expect(store.getState().peerOnlineById).toEqual({});
+  });
 });
