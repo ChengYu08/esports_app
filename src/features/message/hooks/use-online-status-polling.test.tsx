@@ -67,11 +67,11 @@ describe("useOnlineStatusPolling", () => {
     vi.useRealTimers();
   });
 
-  it("polls every 5 seconds while enabled and foregrounded", async () => {
+  it("polls immediately on mount and then every 5 seconds while foregrounded", async () => {
     const renderer = renderHarness(true, "token-a");
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(5_000);
+      await vi.advanceTimersByTimeAsync(0);
     });
     expect(refreshMock).toHaveBeenCalledTimes(1);
 
@@ -102,7 +102,7 @@ describe("useOnlineStatusPolling", () => {
     const renderer = renderHarness(true, "token-a", "peer-1");
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(5_000);
+      await vi.advanceTimersByTimeAsync(0);
     });
     expect(refreshMock).toHaveBeenCalledWith("token-a", "peer-1");
 
@@ -122,7 +122,7 @@ describe("useOnlineStatusPolling", () => {
 
     emitAppState("active");
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(5_000);
+      await vi.advanceTimersByTimeAsync(0);
     });
     expect(refreshMock).toHaveBeenCalledTimes(1);
 
@@ -141,7 +141,7 @@ describe("useOnlineStatusPolling", () => {
     const renderer = renderHarness(true, "token-a");
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(5_000);
+      await vi.advanceTimersByTimeAsync(0);
     });
     expect(refreshMock).toHaveBeenCalledTimes(1);
 
@@ -168,7 +168,7 @@ describe("useOnlineStatusPolling", () => {
     const renderer = renderHarness(true, "token-a");
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(5_000);
+      await vi.advanceTimersByTimeAsync(0);
     });
     expect(refreshMock).toHaveBeenCalledTimes(1);
 

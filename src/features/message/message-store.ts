@@ -93,6 +93,8 @@ export type MessageStoreState = {
   activePeerId: string | null;
   /** 聊天界面是否在前台可见；activePeerId 在页面被覆盖/退后台时仍保留，已读判断必须叠加此项 */
   chatForeground: boolean;
+  /** 服务端返回的对端在线状态（按对端 id 存），与 conversations 解耦：会话壳可能还没进列表 */
+  peerOnlineById: Record<string, boolean>;
   /** 诊断用：本次登录会话内确认为离线补偿重放的消息条数（隐藏弹窗展示，文案不含 SDK 厂商名） */
   compensatedCount: number;
   lastError: string | null;
@@ -448,6 +450,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
       openPeerIds: [],
       activePeerId: null,
       chatForeground: false,
+      peerOnlineById: {},
       compensatedCount: 0,
       lastError: null,
 
@@ -473,6 +476,17 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           if (requestId !== onlineStatusRequestId) return true;
           const requestedIds = new Set(userIds);
           set((state) => {
+            // 按对端记录状态：会话壳可能还没进 conversations（如从主页直接发起私聊），
+            // 聊天页头部据此展示在线态，不依赖会话行是否存在
+            const peerOnlineById = { ...state.peerOnlineById };
+            let statusesChanged = false;
+            userIds.forEach((id) => {
+              const isOnline = Number(statuses[id]) === 1;
+              if (peerOnlineById[id] !== isOnline) {
+                peerOnlineById[id] = isOnline;
+                statusesChanged = true;
+              }
+            });
             let changed = false;
             const conversations = state.conversations.map((conversation) => {
               if (scopedId) {
@@ -505,7 +519,11 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
               changed = true;
               return { ...conversation, isOnline };
             });
-            return changed ? { conversations } : state;
+            if (!changed && !statusesChanged) return state;
+            return {
+              peerOnlineById,
+              ...(changed ? { conversations } : {}),
+            };
           });
           return true;
         } catch {
@@ -892,7 +910,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         stopConversationSyncSubscription = undefined;
         stopReadSyncSubscription = undefined;
         await adapter.disconnect();
-        set({ connectionState: 'idle', conversationError: null, conversations: [], blacklistedUserIds: [], messagesByPeerId: {}, historyByPeerId: {}, openPeerIds: [], activePeerId: null, chatForeground: false, compensatedCount: 0, lastError: null });
+        set({ connectionState: 'idle', conversationError: null, conversations: [], blacklistedUserIds: [], messagesByPeerId: {}, historyByPeerId: {}, openPeerIds: [], activePeerId: null, chatForeground: false, peerOnlineById: {}, compensatedCount: 0, lastError: null });
       },
     };
   });

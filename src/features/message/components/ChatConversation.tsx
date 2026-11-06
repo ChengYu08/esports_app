@@ -189,9 +189,6 @@ export function ChatConversation({
   );
   const connectionState = useMessageStore((state) => state.connectionState);
   const lastError = useMessageStore((state) => state.lastError);
-  const refreshOnlineStatuses = useMessageStore(
-    (state) => state.refreshOnlineStatuses,
-  );
   const openConversation = useMessageStore((state) => state.openConversation);
   const closeConversation = useMessageStore((state) => state.closeConversation);
   const sendText = useMessageStore((state) => state.sendText);
@@ -245,14 +242,15 @@ export function ChatConversation({
     () => (myAvatarUrl ? { uri: myAvatarUrl } : defaultMyAvatar),
     [myAvatarUrl],
   );
-  const peerOnline = conversation?.isOnline;
+  // 对端在线状态优先取轮询结果（不依赖会话行是否已进列表），缺省按离线展示，
+  // 避免会话还没拉到状态时整块在线信息不渲染
+  const peerOnlineFromPolling = useMessageStore(
+    (state) => state.peerOnlineById[conversationId],
+  );
+  const peerOnline = peerOnlineFromPolling ?? conversation?.isOnline === true;
 
-  // 页面聚焦 / 弹窗可见时刷新在线状态（原聊天页 useFocusEffect 逻辑）
-  useEffect(() => {
-    if (active && accessToken) void refreshOnlineStatuses(accessToken);
-  }, [active, accessToken, refreshOnlineStatuses]);
-
-  // 聊天页可见期间持续轮询当前对端的在线状态（列表页失焦后由本页接管，只查该对端）
+  // 聊天页可见期间立即查一次并持续轮询当前对端的在线状态
+  // （列表页失焦后由本页接管，只查该对端）
   useOnlineStatusPolling(
     active && !isSystemConversationId(conversationId),
     accessToken,
@@ -596,8 +594,7 @@ export function ChatConversation({
           <Text numberOfLines={1} style={styles.name}>
             {conversationTitle}
           </Text>
-          {!isSystemConversationId(conversationId) &&
-          typeof peerOnline === "boolean" ? (
+          {!isSystemConversationId(conversationId) ? (
             <View style={styles.onlineStatus}>
               <Image
                 source={peerOnline ? chatOnline : chatOffline}
