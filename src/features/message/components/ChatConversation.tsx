@@ -46,6 +46,7 @@ import { touchCustomerServiceSession } from "../customer-service.api";
 import { resolveConversationAvatar } from "../message-avatar";
 import type { ManagedMessage } from "../message-state";
 import { messageStore, useMessageStore } from "../message-store";
+import { useOnlineStatusPolling } from "../hooks/use-online-status-polling";
 import { getConversationDisplayTitle } from "../message-title";
 import {
   getSystemConversationTitle,
@@ -251,6 +252,13 @@ export function ChatConversation({
     if (active && accessToken) void refreshOnlineStatuses(accessToken);
   }, [active, accessToken, refreshOnlineStatuses]);
 
+  // 聊天页可见期间持续轮询当前对端的在线状态（列表页失焦后由本页接管，只查该对端）
+  useOnlineStatusPolling(
+    active && !isSystemConversationId(conversationId),
+    accessToken,
+    conversationId,
+  );
+
   // 前后台/覆盖与 openConversation 的 activePeerId 解耦：页面被覆盖或退后台时
   // activePeerId 仍在，但必须退出"已读"状态，否则新消息未读会被静默清零。
   const [appStateActive, setAppStateActive] = useState(
@@ -336,11 +344,24 @@ export function ChatConversation({
   const openImagePreview = useCallback(
     async (message: ManagedMessage) => {
       try {
-        const uri = await resolveImagePreview(conversationId, message);
+        const resolvedUri = await resolveImagePreview(message);
+        // 连看列表：当前会话全部图片消息按时间序组装，点开哪张定位到哪张；
+        // 未点开的图片直接用气泡现有地址（远端或本地均可预览），不逐张触发下载
+        const imageMessages = visibleMessages.filter(
+          (item): item is Extract<ManagedMessage, { kind: "image" }> =>
+            item.kind === "image",
+        );
+        const images = imageMessages.map((item) =>
+          item.id === message.id ? resolvedUri : item.imageUrl,
+        );
+        const index = Math.max(
+          0,
+          imageMessages.findIndex((item) => item.id === message.id),
+        );
         navigateWithSheetDismiss(() => {
           router.push({
             pathname: "/image-preview",
-            params: createImagePreviewParams([uri], 0),
+            params: createImagePreviewParams(images, index),
           });
         });
       } catch (error) {
@@ -350,7 +371,7 @@ export function ChatConversation({
       });
       }
     },
-    [conversationId, navigateWithSheetDismiss, resolveImagePreview],
+    [navigateWithSheetDismiss, resolveImagePreview, visibleMessages],
   );
   const openProfile = useCallback(() => {
     setSettingsVisible(false);

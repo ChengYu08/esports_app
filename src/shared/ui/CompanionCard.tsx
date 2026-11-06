@@ -203,7 +203,10 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: "row",
     gap: 12,
-    padding: 16,
+    // 设计稿卡片高 132（左侧头像 100 + 上下各 16），底部拆开写以便在保留上方行距的前提下收回多余留白
+    paddingTop: 16,
+    paddingBottom: 13,
+    paddingHorizontal: 16,
   },
   cardPressed: { backgroundColor: "#F7F7F7" },
   cardLeft: { width: 100, height: 100 },
@@ -227,6 +230,8 @@ const styles = StyleSheet.create({
   cardRight: {
     flex: 1,
     justifyContent: "space-between",
+    // 价格行与上方内容的最小间距，只作用于价格行，不影响上方各行行距
+    gap: 5,
   },
   cardContent: { gap: 4 },
   nameRow: {
@@ -318,11 +323,15 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   priceWrap: { flexDirection: "row", alignItems: "flex-end", gap: 4 },
+  // 固定行盒为设计稿 24，避免字体缩放把价格行撑到 26 从而拉高整张卡片
   price: {
     ...getDDinProStyle(600),
     color: "#FE1F4C",
     fontSize: 20,
     lineHeight: 24,
+    height: 24,
+    includeFontPadding: false,
+    textAlignVertical: "center",
   },
   diamond: { width: 15, height: 13, marginBottom: 5 },
   salesWrap: {
