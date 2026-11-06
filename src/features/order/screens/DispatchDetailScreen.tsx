@@ -2,6 +2,8 @@ import { showToast } from "@/shared/ui/app-toast";
 import { useAuthStore } from "@esports/auth";
 import { useQuery } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Clipboard from "expo-clipboard";
+import { Copy16Regular } from "@fluentui/react-native-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -75,6 +77,15 @@ export function DispatchDetailScreen({ requestNo }: { requestNo: string }) {
   /** 活动派单判定：activityCode 非空即活动需求；普通需求渲染零变化 */
   const isActivity = isActivityDispatchRequest(request);
   const cardItems = isActivity ? request.cardItems ?? [] : [];
+
+  const copyOrderNumber = async () => {
+    try {
+      await Clipboard.setStringAsync(request.requestNo || requestNo);
+      showToast("订单编号已复制");
+    } catch {
+      showToast("复制失败，请稍后重试");
+    }
+  };
 
   const grabOrder = async () => {
     if (!canGrab || !request.requestNo || !token || grabbing) return;
@@ -150,20 +161,22 @@ export function DispatchDetailScreen({ requestNo }: { requestNo: string }) {
             </View>
           </View>
           <View style={styles.divider} />
-          <Text style={styles.sectionTitle}>需求信息</Text>
           <View style={styles.gameRow}>
-            <CachedImage
-              source={
-                request.gameIconUrl
-                  ? { uri: request.gameIconUrl }
-                  : GAME_FALLBACK
-              }
-              contentFit="contain"
-              style={styles.gameIcon}
-            />
-            <Text numberOfLines={1} style={styles.gameName}>
-              {request.gameName || "未知游戏"}
-            </Text>
+            <Text style={styles.label}>游戏</Text>
+            <View style={styles.gameValue}>
+              <CachedImage
+                source={
+                  request.gameIconUrl
+                    ? { uri: request.gameIconUrl }
+                    : GAME_FALLBACK
+                }
+                contentFit="contain"
+                style={styles.gameIcon}
+              />
+              <Text numberOfLines={1} style={styles.gameName}>
+                {request.gameName || "未知游戏"}
+              </Text>
+            </View>
           </View>
           {cardItems.length > 0 ? (
             <View style={styles.activityCard}>
@@ -202,8 +215,15 @@ export function DispatchDetailScreen({ requestNo }: { requestNo: string }) {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>派单信息</Text>
-          <InfoRow label="派单编号" value={request.requestNo || requestNo} />
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>订单编号</Text>
+            <View style={styles.orderNumberValue}>
+              <Text style={styles.value}>{request.requestNo || requestNo}</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="复制订单编号" hitSlop={8} onPress={copyOrderNumber}>
+                <Copy16Regular color="#808080" width={16} height={16} />
+              </Pressable>
+            </View>
+          </View>
           <InfoRow label="发布时间" value={formatTime(request.createTime)} />
           <InfoRow
             label="截止时间"
@@ -367,20 +387,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#EEE",
     marginVertical: 12,
   },
-  sectionTitle: {
-    marginBottom: 10,
-    color: "#111",
-    fontSize: 14,
-    fontWeight: "600",
-  },
   gameRow: {
     minHeight: 34,
     flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+    alignItems: "flex-start",
+    gap: 12,
   },
+  gameValue: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 4 },
   gameIcon: { width: 20, height: 20 },
-  gameName: { flex: 1, color: "#222", fontSize: 13 },
+  gameName: { flexShrink: 1, color: "#222", fontSize: 12, lineHeight: 20 },
   activityCard: { gap: 6, padding: 12, borderRadius: 8, backgroundColor: "#FFF5F6" },
   activityCardTitle: { color: "#FE1F4C", fontSize: 13, fontWeight: "600" },
   activityRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
@@ -394,6 +409,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   multilineRow: { minHeight: 44 },
+  orderNumberValue: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 8 },
   label: {
     width: 70,
     color: "#999",
