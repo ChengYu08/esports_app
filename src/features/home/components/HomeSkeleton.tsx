@@ -16,6 +16,13 @@ export function HomeSkeleton({ bottomPadding = 0 }: HomeSkeletonProps) {
       contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
       showsVerticalScrollIndicator={false}
     >
+      <View style={styles.highlights}>
+        <Skeleton width="100%" radius={8} style={styles.bannerPlaceholder} />
+        <Skeleton width="100%" radius={8} style={styles.broadcastPlaceholder} />
+        <View style={styles.highlightCards}>
+          {[0, 1].map((index) => <Skeleton key={index} radius={8} style={styles.highlightCard} />)}
+        </View>
+      </View>
       <View style={styles.categories}>
         {[0, 1, 2].map((index) => (
           <View key={index} style={styles.category}>
@@ -54,6 +61,11 @@ export function HomeSkeleton({ bottomPadding = 0 }: HomeSkeletonProps) {
 
 const styles = StyleSheet.create({
   content: { flexGrow: 1, backgroundColor: colors.surface },
+  highlights: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, gap: 8 },
+  bannerPlaceholder: { height: "auto", aspectRatio: 343 / 80 },
+  broadcastPlaceholder: { height: "auto", aspectRatio: 343 / 64 },
+  highlightCards: { flexDirection: "row", gap: 8 },
+  highlightCard: { flex: 1, width: "auto", height: "auto", aspectRatio: 167 / 96 },
   categories: { flexDirection: "row", paddingHorizontal: spacing.lg, paddingTop: spacing.xs, paddingBottom: spacing.sm, gap: spacing.sm },
   category: { flex: 1, aspectRatio: 15 / 4 },
   categoryPlaceholder: { height: "100%" },
