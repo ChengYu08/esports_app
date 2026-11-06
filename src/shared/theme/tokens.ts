@@ -25,3 +25,8 @@ export const radius = {
   lg: 12,
   pill: 15,
 } as const;
+
+// 悬浮 tabbar 内容高度（不含底部安全区）；页面计算垂直居中区域时需扣除
+export const layout = {
+  tabBarHeight: 58,
+} as const;

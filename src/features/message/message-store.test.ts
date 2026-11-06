@@ -521,6 +521,46 @@ describe('message store', () => {
     await store.getState().reset();
   });
 
+  it('does not surface a terminal signal while initialization is still running', async () => {
+    // reload 后连接前的状态轮询可能广播上一个会话残留的 terminal 状态，
+    // 初始化未完成时不落错误态，最终状态由 initialize 自己的结果决定
+    let statusListener: ((signal: 'connected' | 'connecting' | 'terminal' | 'timeout') => void) | undefined;
+    let completeSnapshot!: (value: MessageConversation[]) => void;
+    const adapter = makeAdapter({
+      getConversations: vi.fn(() => new Promise<MessageConversation[]>((resolve) => { completeSnapshot = resolve; })),
+      subscribeConnectionStatus: vi.fn((listener) => { statusListener = listener; return () => undefined; }),
+    });
+    const store = createMessageStore(adapter);
+    const initializing = store.getState().initialize('token');
+    await vi.waitFor(() => expect(statusListener).toBeDefined());
+    statusListener?.('terminal');
+    expect(store.getState().connectionState).toBe('connecting');
+    completeSnapshot([]);
+    await initializing;
+    expect(store.getState().connectionState).toBe('ready');
+    await store.getState().reset();
+  });
+
+  it('surfaces a terminal signal after the session is ready with a friendlier copy', async () => {
+    let statusListener: ((signal: 'connected' | 'connecting' | 'terminal' | 'timeout') => void) | undefined;
+    const adapter = makeAdapter({
+      subscribeConnectionStatus: vi.fn((listener) => { statusListener = listener; return () => undefined; }),
+    });
+    const store = createMessageStore(adapter);
+    await store.getState().initialize('token');
+    statusListener?.('terminal');
+    expect(store.getState().connectionState).toBe('error');
+    expect(store.getState().lastError).toBe('消息服务连接中断，请稍后重试');
+    await store.getState().reset();
+  });
+
+  it('shows a friendly connection error when initialization fails', async () => {
+    const store = createMessageStore(makeAdapter({ initialize: vi.fn(async () => false) }));
+    await store.getState().initialize('token');
+    expect(store.getState().connectionState).toBe('error');
+    expect(store.getState().lastError).toBe('消息服务连接中断，请稍后重试');
+  });
+
   it('creates the dispatch assistant conversation with a card preview when an invite arrives', async () => {
     let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
     const store = createMessageStore(makeAdapter({

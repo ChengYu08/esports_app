@@ -433,8 +433,11 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         }
         if (reconnectTimer) clearTimeout(reconnectTimer);
         reconnectTimer = undefined;
+        // reload 后连接前的状态轮询可能广播上一个会话残留的 terminal 状态，
+        // 初始化未完成时不落错误态，避免登录用户看到「连接失败」误报；最终状态由 initialize 的结果决定
+        if (initializeInProgress) return;
         if (get().connectionState !== 'idle' && get().connectionState !== 'unavailable') {
-          set({ connectionState: 'error', lastError: '即时消息连接失败，请检查登录状态后重试' });
+          set({ connectionState: 'error', lastError: '消息服务连接中断，请稍后重试' });
         }
       });
       if (stopListening) stopConnectionStatusSubscription = stopListening;
@@ -654,7 +657,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
               stage: 'adapter-initialize',
               attempt: reconnectAttempts,
             });
-            set({ connectionState: 'error', lastError: '即时消息连接失败，请稍后重试' });
+            set({ connectionState: 'error', lastError: '消息服务连接中断，请稍后重试' });
             return;
           }
           // List restoration can fail while the IM connection remains usable.
@@ -694,7 +697,7 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
             attempt: reconnectAttempts,
             errorName: error instanceof Error ? error.name : typeof error,
           });
-          set({ connectionState: 'error', lastError: error instanceof Error ? error.message : '即时消息连接失败，请稍后重试' });
+          set({ connectionState: 'error', lastError: error instanceof Error ? error.message : '消息服务连接中断，请稍后重试' });
         }
       },
 

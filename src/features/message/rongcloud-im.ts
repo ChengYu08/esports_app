@@ -267,13 +267,21 @@ export function subscribeRongConnectionStatus(
   return () => connectionStatusListeners.delete(listener);
 }
 
+// 离线时 SDK 可能长时间不发任何状态回调，等待不能没有上限，否则页面永远停在「消息连接中」
+const CONNECTION_WAIT_TIMEOUT_MS = 8_000;
+const CONNECTION_WAIT_POLL_INTERVAL_MS = 2_000;
+
 function waitForRongCloudConnection(currentEngine: RCIMIWEngine) {
   return new Promise<boolean>((resolve) => {
     let settled = false;
+    let pollTimer: ReturnType<typeof setInterval> | undefined;
+    let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
     const finish = (value: boolean) => {
       if (settled) return;
       settled = true;
       stopListening();
+      if (pollTimer) clearInterval(pollTimer);
+      if (timeoutTimer) clearTimeout(timeoutTimer);
       if (cancelConnectionAttempt === cancel) cancelConnectionAttempt = null;
       resolve(value);
     };
@@ -284,9 +292,18 @@ function waitForRongCloudConnection(currentEngine: RCIMIWEngine) {
     const stopListening = subscribeRongConnectionStatus(onStatus);
     const cancel = () => finish(false);
     cancelConnectionAttempt = cancel;
-    void currentEngine.getConnectionStatus()
-      .then((status) => publishConnectionStatus(status))
-      .catch(() => undefined);
+    const inspect = () => {
+      void currentEngine.getConnectionStatus()
+        .then((status) => publishConnectionStatus(status))
+        .catch(() => undefined);
+    };
+    // 限时轮询（2s × 4 次）：SDK 发出状态信号则立即返回，否则 8s 后放弃交给上层落错误态
+    pollTimer = setInterval(inspect, CONNECTION_WAIT_POLL_INTERVAL_MS);
+    timeoutTimer = setTimeout(() => {
+      logger.warn('RongCloud reconnect wait timed out', { stage: 'reconnect-wait' });
+      finish(false);
+    }, CONNECTION_WAIT_TIMEOUT_MS);
+    inspect();
   });
 }
 
@@ -314,14 +331,29 @@ function isTransientImTokenError(error: unknown): error is ApiError {
     || error.status >= 500;
 }
 
+// 断网时 getImToken 会持续返回临时错误，无限重试会让 initialize 永不返回、页面一直停在「消息连接中」；
+// 限制首次连接的总重试预算与次数，超时后让上层落错误态并暴露重试入口
+const IM_TOKEN_RETRY_BUDGET_MS = 8_000;
+const IM_TOKEN_MAX_RETRIES = 4;
+
 async function fetchImTokenWithRetry(accessToken: string, attemptEpoch: number) {
+  const deadline = Date.now() + IM_TOKEN_RETRY_BUDGET_MS;
   let retryCount = 0;
   while (attemptEpoch === connectionEpoch) {
     try {
       return await getClientAuthApi().getImToken(accessToken);
     } catch (error) {
       if (!isTransientImTokenError(error) || attemptEpoch !== connectionEpoch) throw error;
-      const delayMs = Math.min(1_000 * 2 ** Math.min(retryCount, 5), 30_000);
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0 || retryCount >= IM_TOKEN_MAX_RETRIES) {
+        logger.warn('IM token retry budget exhausted', {
+          stage: 'im-token',
+          attempts: retryCount,
+          status: error.status,
+        });
+        return null;
+      }
+      const delayMs = Math.min(1_000 * 2 ** Math.min(retryCount, 5), 30_000, remainingMs);
       retryCount += 1;
       logger.warn('IM token request failed temporarily; retrying', {
         stage: 'im-token',
@@ -539,6 +571,12 @@ async function connectRongCloudOnce(accessToken: string, attemptEpoch: number) {
     if (attemptEpoch !== connectionEpoch) return false;
     if (typeof currentStatus === 'number') {
       const signal = publishConnectionStatus(currentStatus);
+      // 这条轮询路径绕过了 status_changed 监听器，必须留痕，否则连接状态广播无日志可查
+      logger.info('RongCloud connection status polled before connect', {
+        stage: 'connection-status-poll',
+        status: currentStatus,
+        signal,
+      });
       if (signal === 'connected') return true;
       const statuses = sdk.RCIMIWConnectionStatus;
       const sdkIsReconnecting = currentStatus === statuses.CONNECTING
@@ -585,7 +623,15 @@ async function connectRongCloudOnce(accessToken: string, attemptEpoch: number) {
       cancelConnectionAttempt = cancel;
       const inspectStatus = () => {
         void currentEngine.getConnectionStatus()
-          .then((status) => publishConnectionStatus(status))
+          .then((status) => {
+            const signal = publishConnectionStatus(status);
+            // 34001 兜底路径的广播同样绕过 status_changed 监听器，需留痕
+            logger.info('RongCloud connection status inspected after existing-connection code', {
+              stage: 'connection-status-inspect',
+              status,
+              signal,
+            });
+          })
           .catch(() => undefined);
       };
       const handleConnectResult = (code: number, resultStage: string) => {
@@ -783,12 +829,18 @@ export async function sendRongAfterSaleCard(targetId: string, payload: AfterSale
   if (!sdk) throw new Error('当前版本暂不支持即时消息');
   const currentEngine = requireConnected();
   const fields = new Map<string, string>([['data', JSON.stringify(payload)], ['content', '【售后申请】订单 ' + (payload.orderNo || '')]]);
-  const message = await currentEngine.createCustomMessage(sdk.RCIMIWConversationType.PRIVATE, getRongConversationTargetId(targetId), '', sdk.RCIMIWCustomMessagePolicy.NORMAL, 'PZAfterSaleApply', fields);
+  // 原生自定义消息：线上标识为 PZAfterSaleApply 本身，与 PC 端 registerMessageType 对齐；
+  // createCustomMessage 会包装成 RC:CustomMsg，PC 端无法按卡片解析
+  const message = await currentEngine.createNativeCustomMessage(sdk.RCIMIWConversationType.PRIVATE, getRongConversationTargetId(targetId), '', 'PZAfterSaleApply', fields);
   return new Promise((resolve, reject) => {
     void currentEngine.sendMessage(message, { onMessageSent: (code, sent) => {
       if (code !== 0) return reject(new Error(`售后卡片发送失败（${code}）`));
       const managed = sent ? toManagedMessage(sent) : null;
-      managed ? resolve({ ...managed, isMine: true }) : reject(new Error('发送消息失败'));
+      if (managed) {
+        resolve({ ...managed, isMine: true });
+        return;
+      }
+      reject(new Error('发送消息失败'));
     } });
   });
 }
