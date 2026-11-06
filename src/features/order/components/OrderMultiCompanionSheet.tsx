@@ -21,7 +21,7 @@ import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import type { MultiCompanionCandidate } from "../order.api";
 
-const CONFIRM_GRADIENT = ["#FF2145", "#FF3158"] as const;
+const CONFIRM_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
 
 type OrderMultiCompanionSheetProps = {
   visible: boolean;
@@ -132,6 +132,7 @@ export function OrderMultiCompanionSheet({
             autoCorrect={false}
             autoCapitalize="none"
             editable={!submitting}
+            cursorColor="#FE1F4C"
           />
         </View>
         <FlatList

@@ -55,7 +55,13 @@ export default function EditProfileScreen() {
 
   const rows: EditRow[] = [
     { key: "nickname", label: "昵称", value: user?.nickname || "-" },
-    { key: "signature", label: "个性签名", value: user?.signature || "-" },
+    {
+      key: "signature",
+      label: "个性签名",
+      // 设计稿 253-36819：未设置时展示占位文案并置灰
+      value: user?.signature || "在这里写下个性签名",
+      muted: !user?.signature,
+    },
     {
       key: "gender",
       label: "性别",
@@ -397,7 +403,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     gap: 4,
   },
-  rowValueMuted: { color: "#CACACA" },
+  rowValueMuted: { color: "#CACACC" },
   rowValue: {
     flexShrink: 1,
     color: "#333333",
@@ -429,7 +435,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   genderOptionActive: {
-    borderColor: "#FF1F4C",
+    borderColor: "#FE1F4C",
     backgroundColor: "#FFF0F3",
   },
   genderOptionText: {
@@ -482,7 +488,7 @@ const styles = StyleSheet.create({
     height: 16,
     borderRadius: 8,
     borderWidth: 1.5,
-    borderColor: "#E01B28",
+    borderColor: "#FE1F4C",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -490,7 +496,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#E01B28",
+    backgroundColor: "#FE1F4C",
   },
   genderDivider: {
     height: StyleSheet.hairlineWidth,

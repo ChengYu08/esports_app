@@ -3,17 +3,15 @@ import { StyleSheet, Text, View } from "react-native";
 import { formatCountdown } from "@/features/order/order-detail-format";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
 
-/** 订单状态头：大标题 + 提示语（抢单倒计时替换展示） */
+/** 订单状态头：显示状态及抢单倒计时。 */
 export function OrderDetailStatusBar({
   scope,
   statusTitle,
-  statusHint,
   showDispatchCountdown,
   dispatchCountdown,
 }: {
   scope: "accept" | "place";
   statusTitle: string;
-  statusHint: string;
   showDispatchCountdown: boolean;
   dispatchCountdown?: number;
 }) {
@@ -32,15 +30,14 @@ export function OrderDetailStatusBar({
       >
         {statusTitle}
       </Text>
-      {statusHint || showDispatchCountdown ? (
+      {showDispatchCountdown ? (
         <Text
           style={[
             styles.statusHint,
             scope === "accept" && styles.acceptStatusHint,
           ]}
         >
-          {showDispatchCountdown ? (
-            dispatchCountdown === 0 ? (
+          {dispatchCountdown === 0 ? (
               "抢单已截止"
             ) : (
               <>
@@ -50,10 +47,7 @@ export function OrderDetailStatusBar({
                 </Text>{" "}
                 停止抢单
               </>
-            )
-          ) : (
-            statusHint
-          )}
+            )}
         </Text>
       ) : null}
     </View>
@@ -63,7 +57,7 @@ export function OrderDetailStatusBar({
 const styles = StyleSheet.create({
   statusBlock: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, backgroundColor: "#FFF" },
   statusTitle: {
-    color: "#161616",
+    color: "#0D0D0F",
     fontFamily: SYSTEM_FONT,
     fontSize: 24,
     fontWeight: "600",
@@ -77,7 +71,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   acceptStatusBlock: { paddingTop: 8, paddingBottom: 12 },
-  acceptStatusTitle: { color: "#0A0A0A", fontSize: 24, fontWeight: "600", lineHeight: 30 },
+  acceptStatusTitle: { color: "#0D0D0F", fontSize: 24, fontWeight: "600", lineHeight: 30 },
   acceptStatusHint: { color: "#0A0A0A", fontSize: 14, marginTop: 12, lineHeight: 22 },
   countdownAccent: { color: "#FE1F4C" },
 });

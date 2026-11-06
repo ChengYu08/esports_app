@@ -39,8 +39,8 @@ import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { CachedImage } from "@/shared/ui/CachedImage";
 
 const fallbackAvatar = require("../../../../assets/mine/mine-avatar.png");
-const maleIcon = require("../../../../assets/svgs/male.svg");
-const femaleIcon = require("../../../../assets/svgs/mine-female.svg");
+const maleIcon = require("../../../../assets/svgs/gender-male.svg");
+const femaleIcon = require("../../../../assets/svgs/gender-female.svg");
 const clubIcon = require("../../../../assets/svgs/mine-club-flag.svg");
 const starDiamondIcon = require("../../../../assets/mine/star-recharge-diamond-3f6fcf.png");
 
@@ -410,6 +410,7 @@ export function CompanionOrderSheet({
                   value={remark}
                   onChangeText={setRemark}
                   style={styles.remarkInput}
+                  cursorColor="#FE1F4C"
                 />
               </OrderFieldRow>
 

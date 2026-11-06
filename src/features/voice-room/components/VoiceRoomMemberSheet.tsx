@@ -1,9 +1,10 @@
 import { Dismiss16Regular } from "@fluentui/react-native-icons";
 import { useAuthStore } from "@esports/auth";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueries } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -15,12 +16,20 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { fetchProfileGameDetail } from "@/features/mine/api/profile.api";
+import type { ProfileSkillCard } from "@/features/mine/api/profile.types";
+import { CompanionOrderSheet } from "@/features/mine/components/CompanionOrderSheet";
+import { StarPaymentSheet } from "@/features/mine/components/StarPaymentSheet";
 import { useProfileDetail } from "@/features/mine/hooks/use-profile-data";
 import {
   useToggleUserFollow,
   useUserFollowState,
 } from "@/features/mine/hooks/use-user-follow";
+import { afterOrderPaidOpenChat } from "@/features/order/notify-order-paid";
+import { invalidateOrderQueries } from "@/features/order/order-query";
+import { requireLogin } from "@/shared/navigation/require-login";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
+import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { showToast } from "@/shared/ui/app-toast";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { canKickVoiceRoomMember, getMemberAge } from "../member-profile";
@@ -28,16 +37,25 @@ import { voiceRoomApi } from "../voice-room.api";
 import type { VoiceRoomDetail, VoiceRoomMember } from "../voice-room.types";
 
 const defaultAvatar = require("../../../../assets/images/avatar_default.webp");
-const femaleIcon = require("../../../../assets/svgs/member-female.svg");
-const maleIcon = require("../../../../assets/svgs/male.svg");
+const femaleIcon = require("../../../../assets/svgs/gender-female.svg");
+const maleIcon = require("../../../../assets/svgs/gender-male.svg");
 const idIcon = require("../../../../assets/svgs/member-id.svg");
+const diamondIcon = require("../../../../assets/message/order-assistant-coin-3f6fcf.webp");
+
+type OrderTarget = {
+  card: ProfileSkillCard;
+  gameName: string;
+  gameId: number;
+};
+
+type ServiceListItem = OrderTarget;
 
 type Props = {
   visible: boolean;
   member: VoiceRoomMember | null;
   room: VoiceRoomDetail | null;
   roomId?: string;
-  /** 非空时「主页」入口拦截（活动需求进行中限制唯一下单链路），点击仅提示不跳转 */
+  /** 非空时「主页」/「下单」入口拦截（活动需求进行中限制唯一下单链路），点击仅提示不跳转 */
   orderEntryBlockedText?: string;
   onClose: () => void;
   onMemberKicked: (userId: string) => void;
@@ -60,8 +78,50 @@ export function VoiceRoomMemberSheet({
   const isSelf = member?.userId === viewerId;
   const profileQuery = useProfileDetail(
     member ? { userId: member.userId } : null,
+    visible,
   );
-  const followQuery = useUserFollowState(isSelf ? undefined : member?.userId);
+  const profile = profileQuery.data;
+  const games = profile?.games ?? [];
+  const clubId = profile?.clubId;
+  const memberUserId = member?.userId;
+
+  const gameDetailQueries = useQueries({
+    queries: games.map((game) => ({
+      queryKey: [
+        "profile-game-detail",
+        clubId == null ? "" : String(clubId),
+        memberUserId ?? "",
+        String(game.gameId),
+      ],
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchProfileGameDetail(
+          {
+            clubId: String(clubId),
+            userId: memberUserId as string,
+            gameId: String(game.gameId),
+          },
+          signal,
+        ),
+      enabled:
+        visible &&
+        Boolean(clubId) &&
+        Boolean(memberUserId) &&
+        games.length > 0,
+    })),
+  });
+
+  const [orderTarget, setOrderTarget] = useState<OrderTarget | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [paymentOrder, setPaymentOrder] = useState<{
+    orderId: number;
+    total: number;
+  } | null>(null);
+  const [paymentSheetVisible, setPaymentSheetVisible] = useState(false);
+  const [profileBlockHeight, setProfileBlockHeight] = useState(0);
+
+  const followQuery = useUserFollowState(
+    isSelf || !visible ? undefined : member?.userId,
+  );
   const toggleFollow = useToggleUserFollow();
   const kickMember = useMutation({
     mutationFn: (params: {
@@ -85,9 +145,21 @@ export function VoiceRoomMemberSheet({
     },
   });
 
+  const serviceItems: ServiceListItem[] = [];
+  for (const query of gameDetailQueries) {
+    const detail = query.data;
+    if (!detail) continue;
+    for (const card of detail.skillCards) {
+      serviceItems.push({
+        card,
+        gameName: detail.gameName,
+        gameId: detail.gameId,
+      });
+    }
+  }
+
   if (!member) return null;
 
-  const profile = profileQuery.data;
   const nickname = profile?.nickname || member.nickname;
   const avatar = (profile?.headImage || member.avatar)?.trim();
   const avatarSource = avatar
@@ -146,38 +218,38 @@ export function VoiceRoomMemberSheet({
     }
   }
 
+  function handleOrder(item: ServiceListItem) {
+    if (orderEntryBlockedText) {
+      showToast(orderEntryBlockedText);
+      return;
+    }
+    if (!requireLogin() || !profile) return;
+    setOrderTarget(item);
+  }
+
+  // 弹层最高占屏 85%；关闭 / 头像资料 / 底栏固定，仅服务列表滚动
+  const sheetMaxHeight = height * 0.85;
+  const serviceListGap = 16;
+  // 无列表时资料区与底栏间距 24；有列表时列表与底栏间距 16
+  const actionsTopGap = serviceItems.length > 0 ? serviceListGap : 24;
+  const actionsBlockHeight = actionsTopGap + 44 + insets.bottom + 16;
+  const scrollMaxHeight = Math.max(
+    80,
+    sheetMaxHeight -
+      profileBlockHeight -
+      serviceListGap -
+      actionsBlockHeight,
+  );
+
   return (
-    <BottomSheet
-      visible={visible}
-      onClose={onClose}
-      contentStyle={styles.sheet}
-      backdropStyle={styles.backdrop}
-    >
-      <ScrollView
-        bounces={false}
-        showsVerticalScrollIndicator={false}
-        style={{ maxHeight: height - insets.top - 24 }}
+    <>
+      <BottomSheet
+        visible={visible}
+        onClose={onClose}
+        contentStyle={styles.sheet}
+        backdropStyle={styles.backdrop}
       >
-        <View style={styles.header}>
-          <LinearGradient
-            colors={["#FFEFF0", "#F5F4FF"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0.17 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <LinearGradient
-            colors={["rgba(255,255,255,0)", "#FFFFFF"]}
-            locations={[0.6, 1]}
-            style={StyleSheet.absoluteFill}
-          />
-          <View style={styles.avatarShadow}>
-            <Image
-              source={avatarSource}
-              contentFit="cover"
-              style={styles.avatar}
-              accessibilityLabel={`${nickname}的头像`}
-            />
-          </View>
+        <View style={[styles.sheetInner, { maxHeight: sheetMaxHeight }]}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="关闭用户资料"
@@ -189,56 +261,115 @@ export function VoiceRoomMemberSheet({
               <Dismiss16Regular color="#161823" width={16} height={16} />
             </View>
           </Pressable>
-        </View>
 
-        <View style={[styles.body, { paddingBottom: insets.bottom + 16 }]}>
-          <View style={styles.info}>
-            <Text numberOfLines={2} style={styles.nickname}>
-              {nickname}
-            </Text>
-            <View style={styles.meta}>
-              {gender === 1 || gender === 2 || age ? (
-                <View style={styles.metaItem}>
-                  {gender === 1 || gender === 2 ? (
-                    <Image
-                      source={gender === 2 ? femaleIcon : maleIcon}
-                      style={styles.genderIcon}
-                    />
-                  ) : null}
-                  {age ? (
-                    <Text style={[styles.age, gender === 2 && styles.femaleAge]}>
-                      {age}
-                    </Text>
-                  ) : null}
-                </View>
-              ) : null}
-              <View
-                style={styles.metaItem}
-                accessibilityLabel={`用户 ID ${member.userId}`}
-              >
-                <Image source={idIcon} style={styles.idIcon} />
-                <Text selectable style={styles.userId}>
-                  {member.userId}
-                </Text>
+          <View
+            style={styles.profileBlock}
+            onLayout={(event) => {
+              const next = event.nativeEvent.layout.height;
+              setProfileBlockHeight((prev) =>
+                Math.abs(prev - next) > 1 ? next : prev,
+              );
+            }}
+          >
+            <View style={styles.header}>
+              <LinearGradient
+                colors={["#FFEFF0", "#F5F4FF"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0.17 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <LinearGradient
+                colors={["rgba(255,255,255,0)", "#FFFFFF"]}
+                locations={[0.6, 1]}
+                style={StyleSheet.absoluteFill}
+              />
+              <View style={styles.avatarShadow}>
+                <Image
+                  source={avatarSource}
+                  contentFit="cover"
+                  style={styles.avatar}
+                  accessibilityLabel={`${nickname}的头像`}
+                />
               </View>
             </View>
-            <Pressable
-              disabled={!profileQuery.isError}
-              accessibilityRole={profileQuery.isError ? "button" : undefined}
-              onPress={() => void profileQuery.refetch()}
-              style={styles.signatureArea}
-            >
-              <Text style={styles.signature}>
-                {profileQuery.isPending
-                  ? "资料加载中…"
-                  : profileQuery.isError && !profile
-                    ? "资料加载失败，点击重试"
-                    : signature}
+
+            <View style={styles.info}>
+              <Text numberOfLines={2} style={styles.nickname}>
+                {nickname}
               </Text>
-            </Pressable>
+              <View style={styles.meta}>
+                {gender === 1 || gender === 2 || age ? (
+                  <View style={styles.metaItem}>
+                    {gender === 1 || gender === 2 ? (
+                      <Image
+                        source={gender === 2 ? femaleIcon : maleIcon}
+                        style={styles.genderIcon}
+                      />
+                    ) : null}
+                    {age ? (
+                      <Text
+                        style={[styles.age, gender === 2 && styles.femaleAge]}
+                      >
+                        {age}
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : null}
+                <View
+                  style={styles.metaItem}
+                  accessibilityLabel={`用户 ID ${member.userId}`}
+                >
+                  <Image source={idIcon} style={styles.idIcon} />
+                  <Text selectable style={styles.userId}>
+                    {member.userId}
+                  </Text>
+                </View>
+              </View>
+              <Pressable
+                disabled={!profileQuery.isError}
+                accessibilityRole={profileQuery.isError ? "button" : undefined}
+                onPress={() => void profileQuery.refetch()}
+                style={styles.signatureArea}
+              >
+                <Text style={styles.signature}>
+                  {profileQuery.isPending
+                    ? "资料加载中…"
+                    : profileQuery.isError && !profile
+                      ? "资料加载失败，点击重试"
+                      : signature}
+                </Text>
+              </Pressable>
+            </View>
           </View>
 
-          <View style={styles.actions}>
+          {serviceItems.length > 0 ? (
+            <ScrollView
+              bounces={false}
+              showsVerticalScrollIndicator={false}
+              style={[styles.scroll, { maxHeight: scrollMaxHeight }]}
+              contentContainerStyle={styles.scrollContent}
+            >
+              <View style={styles.serviceList}>
+                {serviceItems.map((item) => (
+                  <MemberServiceCard
+                    key={`${item.card.companionServiceId}-${item.card.gameLevelId}`}
+                    item={item}
+                    onOrder={handleOrder}
+                  />
+                ))}
+              </View>
+            </ScrollView>
+          ) : null}
+
+          <View
+            style={[
+              styles.actions,
+              {
+                paddingTop: actionsTopGap,
+                paddingBottom: insets.bottom + 16,
+              },
+            ]}
+          >
             {canKick ? (
               <Pressable
                 accessibilityRole="button"
@@ -308,8 +439,114 @@ export function VoiceRoomMemberSheet({
             ) : null}
           </View>
         </View>
-      </ScrollView>
-    </BottomSheet>
+      </BottomSheet>
+
+      {orderTarget && profile ? (
+        <CompanionOrderSheet
+          card={orderTarget.card}
+          profile={profile}
+          gameName={orderTarget.gameName}
+          context={{
+            serviceUserId: profile.userId,
+            clubId: profile.clubId,
+            gameId: orderTarget.gameId,
+            gameLevelId: orderTarget.card.gameLevelId,
+            gameModeName: orderTarget.card.modeName,
+            gameLevelName: orderTarget.card.levelName,
+            buyerUserId: Number(viewer?.id) || 0,
+          }}
+          token={token}
+          onClose={() => setOrderTarget(null)}
+          onRealNameVerificationRequired={() => router.push("/account-settings")}
+          onOrderCreated={(order) => {
+            setOrderTarget(null);
+            setPaymentError(null);
+            setPaymentOrder(order);
+            setPaymentSheetVisible(true);
+          }}
+        />
+      ) : null}
+      {paymentOrder ? (
+        <StarPaymentSheet
+          order={paymentOrder}
+          visible={paymentSheetVisible}
+          token={token}
+          onClose={() => {
+            const orderId = paymentOrder.orderId;
+            setPaymentSheetVisible(false);
+            setPaymentOrder(null);
+            invalidateOrderQueries(orderId);
+          }}
+          onPaid={() => {
+            const paidOrderId = paymentOrder.orderId;
+            // 语聊房场景优先用成员 id，避免 profile 查询态抖动导致跳过发消息
+            const companionUserId = String(profile?.userId || member.userId);
+            const chatTitle =
+              profile?.nickname || nickname || member.nickname || "用户聊天";
+            const chatAvatar = profile?.headImage || member.avatar;
+            const chatClubId = profile?.clubId;
+            const accessToken = useAuthStore.getState().accessToken;
+            setPaymentSheetVisible(false);
+            setPaymentOrder(null);
+            setPaymentError(null);
+            void invalidateOrderQueries(paidOrderId);
+            void afterOrderPaidOpenChat({
+              companionUserIds: [companionUserId],
+              token: accessToken,
+              chat: {
+                id: companionUserId,
+                title: chatTitle,
+                avatar: chatAvatar || undefined,
+                clubId: chatClubId ? String(chatClubId) : undefined,
+              },
+              beforeNavigate: onClose,
+            });
+          }}
+          onPaymentFailed={(message) => setPaymentError(message)}
+        />
+      ) : null}
+      <AppPrompt
+        visible={Boolean(paymentError)}
+        title="支付失败"
+        message={paymentError ?? ""}
+        onConfirm={() => setPaymentError(null)}
+      />
+    </>
+  );
+}
+
+function MemberServiceCard({
+  item,
+  onOrder,
+}: {
+  item: ServiceListItem;
+  onOrder: (item: ServiceListItem) => void;
+}) {
+  const { card, gameName } = item;
+  return (
+    <View style={styles.serviceCard}>
+      <View style={styles.serviceCopy}>
+        <Text numberOfLines={1} style={styles.serviceName}>
+          {`${gameName}-${card.modeName}-${card.levelName}`}
+        </Text>
+        <View style={styles.serviceMeta}>
+          <Text style={styles.price}>{card.price}</Text>
+          <Image source={diamondIcon} style={styles.diamond} />
+          <Text style={styles.metaText}>{`订单${card.orderCount}`}</Text>
+          {card.goodRate !== null && card.goodRate !== undefined ? (
+            <Text style={styles.metaText}>{`${card.goodRate}%好评`}</Text>
+          ) : null}
+        </View>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`下单 ${gameName} ${card.modeName} ${card.levelName}`}
+        style={styles.orderButton}
+        onPress={() => onOrder(item)}
+      >
+        <Text style={styles.orderText}>下单</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -320,7 +557,23 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     overflow: "hidden",
   },
+  sheetInner: {
+    position: "relative",
+    width: "100%",
+  },
   backdrop: { backgroundColor: "transparent" },
+  profileBlock: {
+    width: "100%",
+  },
+  scroll: {
+    flexGrow: 0,
+    width: "100%",
+    marginTop: 16,
+  },
+  scrollContent: {
+    flexGrow: 0,
+    paddingHorizontal: 16,
+  },
   header: {
     height: 160,
     alignItems: "center",
@@ -341,7 +594,12 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   avatar: { width: 80, height: 80, borderRadius: 40 },
-  close: { position: "absolute", right: 13, top: 12 },
+  close: {
+    position: "absolute",
+    right: 13,
+    top: 12,
+    zIndex: 2,
+  },
   closeIcon: {
     width: 28,
     height: 28,
@@ -350,8 +608,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 14,
   },
-  body: { paddingHorizontal: 16, alignItems: "center", gap: 24 },
-  info: { width: "100%", alignItems: "center", gap: 8 },
+  info: {
+    width: "100%",
+    paddingHorizontal: 16,
+    alignItems: "center",
+    gap: 8,
+  },
   nickname: {
     color: "#161823",
     fontSize: 20,
@@ -381,7 +643,60 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     textAlign: "center",
   },
-  actions: { flexDirection: "row", gap: 12, width: "100%" },
+  serviceList: {
+    width: "100%",
+    gap: 8,
+  },
+  serviceCard: {
+    minHeight: 67,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: "#F7F7F7",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  serviceCopy: { flex: 1, minWidth: 0, gap: 6 },
+  serviceName: {
+    color: "#0A0A0A",
+    fontSize: 14,
+    fontWeight: "400",
+  },
+  serviceMeta: { flexDirection: "row", alignItems: "center", gap: 7 },
+  price: {
+    color: "#FE1F4C",
+    fontSize: 18,
+    lineHeight: 22,
+    fontWeight: "600",
+  },
+  diamond: { width: 15, height: 12.8, borderRadius: 4 },
+  metaText: {
+    color: "#979799",
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  orderButton: {
+    flexShrink: 0,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "#FE1F4C",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  orderText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  actions: {
+    flexDirection: "row",
+    gap: 12,
+    width: "100%",
+    paddingHorizontal: 16,
+    backgroundColor: "#FFFFFF",
+  },
   button: {
     flex: 1,
     minHeight: 44,

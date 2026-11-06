@@ -1,12 +1,17 @@
 import { Image } from "expo-image";
-import { memo } from "react";
+import { requireOptionalNativeModule } from "expo";
+import { BlurTargetView, BlurView } from "expo-blur";
+import { memo, useRef } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { getDDinProStyle } from "@/shared/theme/typography";
 
-const maleIcon = require("../../../assets/svgs/male.svg");
-const femaleIcon = require("../../../assets/svgs/mine-female.svg");
+const blurAvailable = requireOptionalNativeModule("ExpoBlur") != null;
+const AvatarTarget = blurAvailable ? BlurTargetView : View;
+
+const maleIcon = require("../../../assets/svgs/gender-male.svg");
+const femaleIcon = require("../../../assets/svgs/gender-female.svg");
 const diamondIcon = require("../../../assets/message/order-assistant-coin-3f6fcf.webp");
 const emptyAvatar = require("../../../assets/mine/mine-avatar.png");
 const statusPlayingIcon = require("../../../assets/svgs/club-status-playing.svg");
@@ -62,6 +67,7 @@ export const CompanionCard = memo(function CompanionCard({
   onToggleVoice,
   onPress,
 }: CompanionCardProps) {
+  const blurTargetRef = useRef<View>(null);
   const online = onlineStatus === 1;
   const busy = gameStatus === 1;
   // 第三行文案：模式 / 等级 / 服务 斜杠分割纯文本，接口未配置时兜底个性签名
@@ -76,22 +82,29 @@ export const CompanionCard = memo(function CompanionCard({
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
     >
       <View style={styles.cardLeft}>
-        <Image
-          source={avatar ? { uri: avatar } : emptyAvatar}
-          style={styles.avatar}
-          contentFit="cover"
-        />
-        {voiceUrl ? (
-          <View style={styles.voicePill}>
-            <VoicePlayButton
-              url={voiceUrl}
-              duration={voiceDurationSeconds}
-              tone="light"
-              playingUrl={voicePlayingUrl}
-              onToggleVoice={onToggleVoice}
-            />
+        <AvatarTarget ref={blurTargetRef} style={styles.avatar}>
+          <Image
+            source={avatar ? { uri: avatar } : emptyAvatar}
+            style={styles.avatar}
+            contentFit="cover"
+          />
+        </AvatarTarget>
+        {voiceUrl && (blurAvailable ? (
+          <BlurView
+            blurTarget={blurTargetRef}
+            blurMethod="dimezisBlurViewSdk31Plus"
+            intensity={35}
+            tint="light"
+            style={styles.voicePill}
+          >
+            <VoicePlayButton url={voiceUrl} duration={voiceDurationSeconds} tone="light" playingUrl={voicePlayingUrl} onToggleVoice={onToggleVoice} />
+          </BlurView>
+        ) : (
+          <View style={[styles.voicePill, styles.voicePillFallback]}>
+            <VoicePlayButton url={voiceUrl} duration={voiceDurationSeconds} tone="light" playingUrl={voicePlayingUrl} onToggleVoice={onToggleVoice} />
           </View>
-        ) : null}
+        ))}
+
       </View>
       <View style={styles.cardRight}>
         <View style={styles.cardContent}>
@@ -200,14 +213,17 @@ const styles = StyleSheet.create({
     left: 6,
     bottom: 6,
     backgroundColor: "rgba(255,255,255,0.75)",
-    borderWidth: StyleSheet.hairlineWidth,
+    minWidth: 49,
+    height: 23,
+    overflow: "hidden",
+    borderWidth: 0.5,
     borderColor: "#FFF",
     borderRadius: 99,
-    paddingTop: 3,
-    paddingRight: 2,
-    paddingBottom: 3,
-    paddingLeft: 2,
+    paddingVertical: 3,
+    paddingLeft: 4,
+    paddingRight: 6,
   },
+  voicePillFallback: { backgroundColor: "rgba(255,255,255,0.75)" },
   cardRight: {
     flex: 1,
     justifyContent: "space-between",

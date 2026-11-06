@@ -58,7 +58,7 @@ export default function CourtTargetPickerScreen() {
     trimmed && !debouncing ? (query.data ?? EMPTY_TARGETS) : EMPTY_TARGETS;
   const loading =
     !!trimmed && (debouncing || query.isPending || query.isFetching);
-  const selected = rows.find((item) => item.id === selectedId) ?? rows[0];
+  const selected = rows.find((item) => item.id === selectedId);
   const disabled = !validSession || !selected || loading || query.isError;
   const showIds = /^\d+$/.test(search);
 
@@ -124,6 +124,7 @@ export default function CourtTargetPickerScreen() {
             autoCapitalize="none"
             editable={validSession}
             style={styles.searchInput}
+            cursorColor="#FE1F4C"
           />
           {!!keyword && (
             <Pressable

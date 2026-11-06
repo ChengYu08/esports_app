@@ -304,7 +304,7 @@ export default function AccountSettingsScreen() {
               <Switch
                 value={smsEnabled}
                 onValueChange={updateSms}
-                trackColor={{ false: "#D9D9D9", true: "#FF1F4C" }}
+                trackColor={{ false: "#D9D9D9", true: "#FE1F4C" }}
                 thumbColor="#FFFFFF"
               />
             </SettingRow>
@@ -359,6 +359,7 @@ export default function AccountSettingsScreen() {
                 editing === "birth" ? "请输入出生日期，如 2000-01-01" : "请输入"
               }
               style={styles.input}
+              cursorColor="#FE1F4C"
             />
           )}
           <View style={styles.modalActions}>
@@ -554,7 +555,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  logoutText: { color: "#FF1F4C", fontSize: 15 },
+  logoutText: { color: "#FE1F4C", fontSize: 15 },
   modalBackdrop: {
     flex: 1,
     justifyContent: "flex-end",
@@ -583,7 +584,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 12,
   },
-  feedbackMarkText: { color: "#FF1F4C", fontSize: 22, fontWeight: "700" },
+  feedbackMarkText: { color: "#FE1F4C", fontSize: 22, fontWeight: "700" },
   feedbackTitle: {
     color: "#0A0A0A",
     fontSize: 17,
@@ -600,7 +601,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 44,
     borderRadius: 8,
-    backgroundColor: "#FF1F4C",
+    backgroundColor: "#FE1F4C",
     alignItems: "center",
     justifyContent: "center",
     marginTop: 22,
@@ -658,7 +659,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 44,
     borderRadius: 8,
-    backgroundColor: "#FF1F4C",
+    backgroundColor: "#FE1F4C",
     alignItems: "center",
     justifyContent: "center",
   },

@@ -193,7 +193,7 @@ export default function BasicSettingsScreen() {
           />
           <View accessibilityViewIsModal style={styles.cacheModalCard}>
             <View style={styles.cacheModalIcon}>
-              <Delete24Regular color="#FF1F4C" height={24} width={24} />
+              <Delete24Regular color="#FE1F4C" height={24} width={24} />
             </View>
             <Text style={styles.cacheModalTitle}>清除缓存</Text>
             <Text style={styles.cacheModalMessage}>
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   logoutText: {
-    color: "#FF1F4C",
+    color: "#FE1F4C",
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "600",
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   cacheSizeValue: {
-    color: "#FF1F4C",
+    color: "#FE1F4C",
     fontSize: 15,
     lineHeight: 22,
     fontWeight: "600",
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 8,
-    backgroundColor: "#FF1F4C",
+    backgroundColor: "#FE1F4C",
   },
   cacheCancelText: {
     color: "#555",

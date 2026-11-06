@@ -75,5 +75,5 @@ const styles = StyleSheet.create({
   heading: { color: "#111", fontSize: 16, lineHeight: 24, fontWeight: "600", marginBottom: 8 },
   body: { color: "#555", fontSize: 14, lineHeight: 24 },
   linkButton: { alignSelf: "flex-start", marginTop: 4, paddingVertical: 8 },
-  linkText: { color: "#FF1F4C", fontSize: 14, lineHeight: 22 },
+  linkText: { color: "#FE1F4C", fontSize: 14, lineHeight: 22 },
 });

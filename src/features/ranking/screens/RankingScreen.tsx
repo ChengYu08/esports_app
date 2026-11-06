@@ -4,7 +4,7 @@ import { Info16Regular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useIsFocused } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   FlatList,
   Pressable,
@@ -27,12 +27,13 @@ import { RankingGameFilter } from "../components/RankingGameFilter";
 import { RankingPeriodTabs } from "../components/RankingPeriodTabs";
 import { RankingRulesSheet } from "../components/RankingRulesSheet";
 import { useRankingData } from "../hooks/use-ranking-data";
-import { DEFAULT_RANKING_FILTERS, getRankingBoard } from "../ranking.config";
+import { DEFAULT_RANKING_FILTERS, getRankingBoard, withRankingGap } from "../ranking.config";
 
 const godLabel = require("../../../../assets/svgs/ranking-title-god.svg");
 const orderLabel = require("../../../../assets/svgs/ranking-title-order.svg");
 const turnoverLabel = require("../../../../assets/svgs/ranking-title-turnover.svg");
-const trophy = require("../../../../assets/svgs/ranking-trophy.svg");
+// 原 svg 内嵌 2048x2048 位图且依赖 pattern/mask，iOS 的 SVGKit 不支持，改用抽取后的 PNG
+const trophy = require("../../../../assets/images/ranking-trophy.png");
 const emptyRows: RankingItem[] = [];
 const TAB_BAR_HEIGHT = 58;
 
@@ -59,6 +60,7 @@ export default function RankingScreen({
   const listKey = `${params.boardCode}-${params.rankType}-${params.gameId}`;
   const visibleMyRank =
     isAuthenticated && myRank.data?.visible === true ? myRank.data : undefined;
+  const topItems = useMemo(() => withRankingGap(top.data ?? emptyRows), [top.data]);
 
   const viewProfile = useCallback((item: RankingItem) => {
     const profileParams = getRankingProfileParams(item);
@@ -219,7 +221,7 @@ export default function RankingScreen({
         />
         <FlatList
           key={listKey}
-          data={top.data ?? emptyRows}
+          data={topItems}
           keyExtractor={(item) => item.userId}
           renderItem={renderItem}
           style={styles.list}

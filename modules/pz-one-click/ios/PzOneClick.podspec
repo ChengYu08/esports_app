@@ -18,6 +18,14 @@ Pod::Spec.new do |s|
     'Vendor/YTXMonitor.xcframework',
     'Vendor/YTXOperators.xcframework',
   ]
+
+  # ATAuthSDK 是静态库，framework 内嵌的 ATAuthSDK.bundle（默认 checkbox、弹窗关闭按钮等 icon）
+  # 不会被 CocoaPods 自动拷进 app 包，必须显式声明为资源，否则授权页默认图片不显示
+  # Resources/pz_login_top_bg.png 是 Figma 授权页顶部背景装饰图（白底 + 吉祥物角色）
+  s.resources = [
+    'Vendor/ATAuthSDK.xcframework/ios-arm64/ATAuthSDK.framework/ATAuthSDK.bundle',
+    'Resources/*',
+  ]
   s.frameworks = 'UIKit', 'Foundation', 'Security', 'SystemConfiguration'
 
   # Swift/Objective-C compatibility

@@ -100,6 +100,7 @@ export default function EditNicknameScreen() {
               placeholder="请填写名字"
               placeholderTextColor="#CCCCCC"
               style={styles.input}
+              cursorColor="#FE1F4C"
             />
             <View style={styles.counter}>
               <Text

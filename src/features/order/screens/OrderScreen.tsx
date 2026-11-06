@@ -1,15 +1,14 @@
+import { StarPaymentPrompt } from "../components/StarPaymentPrompt";
 import { queryClient } from "@/core/query/query-client";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { showToast } from "@/shared/ui/app-toast";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
-import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { useAuthStore } from "@esports/auth";
 import { router, useFocusEffect, useIsFocused, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
-  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
@@ -18,10 +17,6 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { grabQuickMatchAndEnterAudition } from "@/features/match/grab-quick-match-flow";
-import {
-  fetchStarBalance,
-  payCompanionOrder,
-} from "@/features/mine/api/companion-order.api";
 import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
 import { useHomeGames } from "@/features/home/hooks/use-home-data";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
@@ -42,6 +37,7 @@ import {
 } from "../free-amount";
 import { useOrderPage } from "../hooks/use-order-page";
 import { useOrderClubNames } from "../hooks/use-order-club-names";
+import { afterOrderPaidOpenChat } from "../notify-order-paid";
 import {
   invalidateOrderQueries,
   refreshOrderAfterAction,
@@ -118,6 +114,7 @@ export default function OrderScreen() {
   const token = useAuthStore((state) => state.accessToken);
   const currentUser = useAuthStore((state) => state.user);
   const currentUserId = currentUser?.id;
+  const [rejectTarget, setRejectTarget] = useState<OrderItemModel | null>(null);
   const [pendingOrderId, setPendingOrderId] = useState<string | null>(null);
   const pendingOrderRef = useRef<string | null>(null);
   const expiryRefetchTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -245,6 +242,10 @@ export default function OrderScreen() {
       setCompletePromptVisible(true);
     }
     if (action === "free") setFreeTarget(item);
+    if (action === "reject") {
+      setRejectTarget(item);
+      return;
+    }
     if (action === "grab" && item.requestNo && token) {
       if (pendingOrderRef.current) return;
       pendingOrderRef.current = item.id;
@@ -273,7 +274,7 @@ export default function OrderScreen() {
       return;
     }
     if (
-      (action === "accept" || action === "reject" || action === "start") &&
+      (action === "accept" || action === "start") &&
       token
     ) {
       if (pendingOrderRef.current) return;
@@ -282,7 +283,6 @@ export default function OrderScreen() {
       let actionSucceeded = false;
       try {
         if (action === "accept") await acceptOrder(item.id, token);
-        if (action === "reject") await rejectOrder(item.id, token);
         if (action === "start") await startOrderService(item.id, token);
         actionSucceeded = true;
         if (currentUser?.id) {
@@ -374,6 +374,39 @@ export default function OrderScreen() {
     }
   };
 
+  const confirmReject = async () => {
+    if (!rejectTarget || !token || pendingOrderRef.current) {
+      return;
+    }
+    if (useAuthStore.getState().accessToken !== token) {
+      setRejectTarget(null);
+      showToast("登录状态已变化，请重新操作");
+      return;
+    }
+    const target = rejectTarget;
+    setRejectTarget(null);
+    pendingOrderRef.current = target.id;
+    setPendingOrderId(target.id);
+    let rejected = false;
+    try {
+      await rejectOrder(target.id, token);
+      rejected = true;
+      if (currentUser?.id) {
+        await refreshOrderAfterAction(target.id, token, currentUser.id);
+      } else {
+        await invalidateOrderQueries(target.id);
+      }
+    } catch (error) {
+      setPrompt({
+        title: rejected ? "订单已更新" : "拒绝订单失败",
+        message: rejected ? "状态刷新失败，请下拉刷新订单列表" : error instanceof Error ? error.message : "请稍后重试",
+      });
+    } finally {
+      pendingOrderRef.current = null;
+      setPendingOrderId(null);
+    }
+  };
+
   const confirmCancel = async () => {
     if (!cancelTarget || !token) return;
     const target = cancelTarget;
@@ -399,9 +432,6 @@ export default function OrderScreen() {
       return;
     }
     const target = completeTarget;
-    if (scope !== "accept") {
-      setCompletePromptVisible(false);
-    }
     setCompleting(true);
     try {
       await completeOrderRequest(target.id, token);
@@ -558,6 +588,15 @@ export default function OrderScreen() {
         showsVerticalScrollIndicator={false}
       />
       <AppPrompt
+        visible={Boolean(rejectTarget)}
+        title="拒绝订单"
+        message="拒绝后订单将直接关闭，是否确认拒绝？"
+        cancelText="取消"
+        confirmText="确认"
+        onCancel={() => setRejectTarget(null)}
+        onConfirm={confirmReject}
+      />
+      <AppPrompt
         visible={Boolean(cancelTarget)}
         title="提示"
         message={`确定取消订单吗，订单号：${cancelTarget?.orderNo ?? cancelTarget?.id ?? ""}`}
@@ -630,25 +669,16 @@ export default function OrderScreen() {
           }
         }}
       />
-      <AppPrompt
-        visible={completePromptVisible && scope !== "accept"}
-        title="提示"
-        message={`确定完成订单吗，订单号：${completeTarget?.orderNo ?? completeTarget?.id ?? ""}`}
-        cancelText="取消"
-        confirmText="确认"
-        onCancel={() => setCompletePromptVisible(false)}
-        onConfirm={confirmComplete}
-      />
       {completeTarget ? (
         <OrderCompleteConfirmSheet
-          visible={completePromptVisible && scope === "accept"}
+          visible={completePromptVisible}
           order={completeTarget}
-          companionName={
-            completeTarget.receiverName || currentUser?.nickname || "陪玩师"
-          }
+          buyerName={scope === "place" ? currentUser?.nickname || "老板" : undefined}
+          buyerAvatar={scope === "place" ? (currentUser?.headImage ? { uri: currentUser.headImage } : require("../../../../assets/images/avatar_default.webp")) : undefined}
+          companionName={completeTarget.receiverName || (scope === "place" ? completeTarget.sellerName : currentUser?.nickname) || "陪玩师"}
           companionAvatar={
             completeTarget.receiverAvatar ??
-            (currentUser?.headImage
+            (scope === "accept" && currentUser?.headImage
               ? { uri: currentUser.headImage }
               : undefined)
           }
@@ -677,7 +707,7 @@ export default function OrderScreen() {
           }
           companionAvatar={
             freeTarget.receiverAvatar ??
-            (currentUser?.headImage
+            (scope === "accept" && currentUser?.headImage
               ? { uri: currentUser.headImage }
               : undefined)
           }
@@ -713,15 +743,17 @@ export default function OrderScreen() {
             void orders.refetch();
           }
           if (paid?.receiverUserId) {
-            router.push({
-              pathname: "/chat/[id]",
-              params: {
-                id: String(paid.receiverUserId),
+            const companionUserId = String(paid.receiverUserId);
+            void afterOrderPaidOpenChat({
+              companionUserIds: [companionUserId],
+              token,
+              chat: {
+                id: companionUserId,
                 title: paid.receiverName || "用户聊天",
                 avatar:
                   paid.receiverAvatar && "uri" in paid.receiverAvatar
                     ? String(paid.receiverAvatar.uri)
-                    : "",
+                    : undefined,
               },
             });
           } else {
@@ -739,102 +771,6 @@ export default function OrderScreen() {
         onConfirm={() => setPrompt(null)}
       />
     </View>
-  );
-}
-
-function StarPaymentPrompt({
-  item,
-  token,
-  onClose,
-  onPaid,
-  onPaymentFailed,
-}: {
-  item: OrderItemModel | null;
-  token: string | null;
-  onClose: () => void;
-  onPaid: () => void;
-  onPaymentFailed: (message: string) => void;
-}) {
-  const insets = useSafeAreaInsets();
-  const [balance, setBalance] = useState<number | null>(null);
-  const [paying, setPaying] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const settledRef = useRef(false);
-
-  useEffect(() => {
-    if (item && token)
-      void fetchStarBalance(token)
-        .then(setBalance)
-        .catch((error: Error) => setMessage(error.message));
-  }, [item, token]);
-
-  const pay = async () => {
-    if (!item || !token) return;
-    const total = Number(item.totalPrice) || 0;
-    if ((balance ?? 0) < total) {
-      setMessage("当前钻石余额不足，请充值后再支付");
-      return;
-    }
-    setPaying(true);
-    try {
-      await payCompanionOrder(Number(item.id), token);
-      settledRef.current = true;
-      onPaid();
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "支付失败";
-      onPaymentFailed(errorMessage);
-      if (!settledRef.current) {
-        settledRef.current = true;
-        onClose();
-      }
-    } finally {
-      setPaying(false);
-    }
-  };
-
-  return (
-    <>
-      <BottomSheet
-        scrollable
-        visible={Boolean(item)}
-        onClose={onClose}
-        contentStyle={[
-          styles.paymentSheet,
-          { paddingBottom: 24 + insets.bottom },
-        ]}
-      >
-        <Text style={styles.paymentTitle}>钻石支付</Text>
-        <Text style={styles.paymentAmount}>
-          支付 {item?.totalPrice ?? 0} 钻石
-        </Text>
-        <Text style={styles.paymentBalance}>
-          当前余额：{balance === null ? "加载中..." : `${balance} 钻石`}
-        </Text>
-        <View style={styles.paymentActions}>
-          <Pressable
-            style={styles.paymentCancel}
-            onPress={onClose}
-          >
-            <Text>取消</Text>
-          </Pressable>
-          <Pressable
-            style={styles.paymentConfirm}
-            disabled={paying || balance === null}
-            onPress={pay}
-          >
-            <Text style={styles.paymentConfirmText}>
-              {paying ? "支付中..." : "确认支付"}
-            </Text>
-          </Pressable>
-        </View>
-      </BottomSheet>
-      <AppPrompt
-        visible={Boolean(message)}
-        title="支付提示"
-        message={message ?? ""}
-        onConfirm={() => setMessage(null)}
-      />
-    </>
   );
 }
 
@@ -859,47 +795,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: "center",
   },
-  paymentSheet: {
-    padding: 24,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    backgroundColor: "#fff",
-  },
-  paymentTitle: {
-    color: "#111",
-    fontSize: 18,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  paymentAmount: {
-    marginTop: 24,
-    color: "#111",
-    fontSize: 22,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  paymentBalance: {
-    marginTop: 12,
-    color: "#777",
-    fontSize: 14,
-    textAlign: "center",
-  },
-  paymentActions: { flexDirection: "row", gap: 12, marginTop: 24 },
-  paymentCancel: {
-    flex: 1,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F5F5F5",
-  },
-  paymentConfirm: {
-    flex: 1,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FF3158",
-  },
-  paymentConfirmText: { color: "#fff", fontWeight: "600" },
+
 });

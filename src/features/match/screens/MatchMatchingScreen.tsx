@@ -26,7 +26,7 @@ import { MatchPaySheet } from "@/features/match/components/MatchPaySheet";
 import { MatchingGrabListView } from "@/features/match/components/MatchingGrabListView";
 import { MatchingWaitingView } from "@/features/match/components/MatchingWaitingView";
 import { useQuickMatchSession } from "@/features/match/hooks/use-quick-match-session";
-import { messageStore } from "@/features/message/message-store";
+import { afterOrderPaidOpenChat } from "@/features/order/notify-order-paid";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { showToast } from "@/shared/ui/app-toast";
 
@@ -133,22 +133,6 @@ export default function MatchMatchingScreen({
     [leaveMatchFlow, session],
   );
 
-  /** 支付成功自动通知陪玩（对齐 PC notifyOrderPaidToCompanions）：IM 未就绪先补初始化，逐个发送、单条失败静默 */
-  const notifyPaidCompanions = useCallback(
-    async (companionUserIds: string[], accessToken: string | null) => {
-      if (messageStore.getState().connectionState !== "ready" && accessToken) {
-        await messageStore.getState().initialize(accessToken).catch(() => {});
-      }
-      for (const uid of companionUserIds) {
-        await messageStore
-          .getState()
-          .sendText(uid, "我已支付订单~")
-          .catch(() => {});
-      }
-    },
-    [],
-  );
-
   // TODO(临时注释): 支付成功关闭试音房
   // const closeAuditionRoom = session.closeAuditionRoom;
   const handlePaid = useCallback(
@@ -170,26 +154,25 @@ export default function MatchMatchingScreen({
         leaveMatchFlow();
         return;
       }
-      notifyPaidCompanions(companionUserIds, token);
       const firstCandidate = session.candidates.find(
         (item) => item.companionUserId === firstCompanionId,
       );
-      // replace：用聊天页替换匹配页，返回键回到进入匹配前的页面；多陪玩时仅打开首位会话，其余只发消息
-      router.replace({
-        pathname: "/chat/[id]",
-        params: {
+      // replace：用聊天页替换匹配页；多陪玩时仅打开首位会话，其余只发消息
+      void afterOrderPaidOpenChat({
+        companionUserIds,
+        token,
+        navigate: "replace",
+        chat: {
           id: firstCompanionId,
           title: firstCandidate?.nickname || "用户聊天",
-          ...(firstCandidate?.headImage
-            ? { avatar: firstCandidate.headImage }
-            : {}),
-          ...(session.detail?.clubId
-            ? { clubId: session.detail.clubId }
-            : {}),
+          avatar: firstCandidate?.headImage,
+          clubId: session.detail?.clubId
+            ? String(session.detail.clubId)
+            : undefined,
         },
       });
     },
-    [leaveMatchFlow, notifyPaidCompanions, session, token],
+    [leaveMatchFlow, session, token],
   );
 
   return (

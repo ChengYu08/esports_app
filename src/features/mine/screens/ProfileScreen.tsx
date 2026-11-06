@@ -17,6 +17,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ComponentProps,
   type ReactElement,
 } from "react";
 import {
@@ -68,6 +69,7 @@ import {
 import { createProfileAvatarPreviewParams } from "@/features/mine/profile-avatar-preview";
 import { createProfileChatParams } from "@/features/mine/profile-chat";
 import { calculateAge } from "@/features/mine/profile-utils";
+import { afterOrderPaidOpenChat } from "@/features/order/notify-order-paid";
 import { invalidateOrderQueries } from "@/features/order/order-query";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
@@ -77,9 +79,8 @@ import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 
 const fallbackAvatar = require("../../../../assets/mine/mine-avatar.png");
-const background = require("../../../../assets/mine/profile-bg.webp");
-const maleIcon = require("../../../../assets/svgs/male.svg");
-const femaleIcon = require("../../../../assets/svgs/mine-female.svg");
+const maleIcon = require("../../../../assets/svgs/gender-male.svg");
+const femaleIcon = require("../../../../assets/svgs/gender-female.svg");
 const backIcon = require("../../../../assets/svgs/icon-back.svg");
 const clubIcon = require("../../../../assets/svgs/profile-club-flag.svg");
 const arrowDownIcon = require("../../../../assets/svgs/intro-toggle.svg");
@@ -245,7 +246,11 @@ export default function ProfileScreen() {
 
   const gameDetail = gameDetailQuery.data;
   const games = useMemo(() => detail?.games ?? [], [detail]);
-  const coverImageUrl = gameDetail?.backgroundUrl?.trim();
+  // 头部封面直接使用本人头像；source 引用稳定，避免列表项重建
+  const coverImageSource = useMemo(
+    () => (profile.headImage ? { uri: profile.headImage } : fallbackAvatar),
+    [profile.headImage],
+  );
   const voicePlayer = useVoicePlayer();
   const stopVoice = voicePlayer.stop;
   const toggleVoice = voicePlayer.toggle;
@@ -389,7 +394,7 @@ export default function ProfileScreen() {
           <ProfileCover
             topInset={insets.top}
             profile={profile}
-            coverImageUrl={coverImageUrl}
+            coverImageSource={coverImageSource}
             isMine={isMine}
             isBlacklisted={
               !isMine &&
@@ -566,7 +571,7 @@ export default function ProfileScreen() {
   }, [
     insets.top,
     profile,
-    coverImageUrl,
+    coverImageSource,
     isMine,
     blacklistStatus,
     openProfileRelation,
@@ -646,8 +651,9 @@ export default function ProfileScreen() {
           ]}
         >
           <Image
-            source={coverImageUrl ? { uri: coverImageUrl } : background}
+            source={coverImageSource}
             contentFit="cover"
+            contentPosition="top"
             style={StyleSheet.absoluteFill}
           />
           <LinearGradient
@@ -873,13 +879,28 @@ export default function ProfileScreen() {
           }}
           onPaid={() => {
             const paidOrderId = paymentOrder.orderId;
+            const companionUserId = String(profile.userId);
+            const chatParams = createProfileChatParams({
+              userId: profile.userId,
+              nickname: profile.nickname,
+              headImage: profile.headImage,
+              clubId: profile.clubId,
+            });
+            const accessToken = useAuthStore.getState().accessToken;
             setPaymentSheetVisible(false);
             setPaymentOrder(null);
             setPaymentError(null);
             void invalidateOrderQueries(paidOrderId);
-            router.push({
-              pathname: "/order/[id]",
-              params: { id: String(paidOrderId) },
+            void afterOrderPaidOpenChat({
+              companionUserIds: [companionUserId],
+              token: accessToken,
+              chat: {
+                id: chatParams.id,
+                title: chatParams.title,
+                avatar: chatParams.avatar || undefined,
+                clubId: chatParams.clubId,
+                fromProfile: chatParams.fromProfile,
+              },
             });
           }}
           onPaymentFailed={(message) => setPaymentError(message)}
@@ -928,7 +949,7 @@ const ProfileTabs = memo(function ProfileTabs({
 const ProfileCover = memo(function ProfileCover({
   topInset,
   profile,
-  coverImageUrl,
+  coverImageSource,
   isMine,
   isBlacklisted,
   onSelectRelation,
@@ -936,7 +957,7 @@ const ProfileCover = memo(function ProfileCover({
 }: {
   topInset: number;
   profile: ProfileDetail;
-  coverImageUrl?: string;
+  coverImageSource: ComponentProps<typeof Image>["source"];
   isMine: boolean;
   isBlacklisted: boolean;
   onSelectRelation: (type: "following" | "fans") => void;
@@ -957,7 +978,7 @@ const ProfileCover = memo(function ProfileCover({
     >
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
         <Image
-          source={coverImageUrl ? { uri: coverImageUrl } : background}
+          source={coverImageSource}
           contentFit="cover"
           style={StyleSheet.absoluteFill}
         />
@@ -1505,7 +1526,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     padding: 24,
   },
-  retryText: { color: "#FF3158", fontSize: 14 },
+  retryText: { color: "#FE1F4C", fontSize: 14 },
   cover: {
     overflow: "hidden",
     backgroundColor: "#617181",
@@ -1964,7 +1985,7 @@ const styles = StyleSheet.create({
     borderRadius: 23,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FF3158",
+    backgroundColor: "#FE1F4C",
   },
   successButtonText: {
     color: "#fff",
@@ -1993,12 +2014,12 @@ const styles = StyleSheet.create({
   },
   serviceMeta: { flexDirection: "row", alignItems: "center", gap: 7 },
   price: {
-    color: "#FF1F4C",
+    color: "#FE1F4C",
     fontSize: 18,
     lineHeight: 22,
     fontWeight: "600",
   },
-  diamond: { color: "#FF3158", fontSize: 14 },
+  diamond: { color: "#FE1F4C", fontSize: 14 },
   metaText: {
     color: "#979799",
     fontSize: 11,
@@ -2009,7 +2030,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: "#FF1F4C",
+    backgroundColor: "#FE1F4C",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2093,7 +2114,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 42,
     borderRadius: 7,
-    backgroundColor: "#FF3158",
+    backgroundColor: "#FE1F4C",
     alignItems: "center",
     justifyContent: "center",
   },

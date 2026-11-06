@@ -124,6 +124,7 @@ export function RealNameVerificationSheet({
             placeholder="请输入真实姓名"
             placeholderTextColor="#B4B7BE"
             style={styles.input}
+            cursorColor="#FE1F4C"
           />
         </View>
         <Text style={styles.fieldLabel}>身份证号</Text>
@@ -156,6 +157,7 @@ export function RealNameVerificationSheet({
             autoCorrect={false}
             returnKeyType="done"
             style={styles.input}
+            cursorColor="#FE1F4C"
           />
           <Text style={styles.inputCount}>{idCard.length}/18</Text>
         </View>
@@ -223,7 +225,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   inputShellFocused: {
-    borderColor: "#FF1F4C",
+    borderColor: "#FE1F4C",
     backgroundColor: "#FFF7F8",
   },
   inputIconWrap: {
@@ -264,7 +266,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FF1F4C",
+    backgroundColor: "#FE1F4C",
   },
   confirmText: { color: "#FFF", fontSize: 15 },
 });

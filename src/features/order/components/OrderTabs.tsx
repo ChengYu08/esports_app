@@ -56,6 +56,8 @@ const styles = StyleSheet.create({
     width: "100%",
     minHeight: 36,
     paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 9,
     backgroundColor: "#FFFFFF",
     flexDirection: "row",
     alignItems: "center",

@@ -104,6 +104,7 @@ export default function EditSignatureScreen() {
               placeholder="请填写简介"
               placeholderTextColor="#CCCCCC"
               style={styles.input}
+              cursorColor="#FE1F4C"
             />
             <View style={styles.counter}>
               <Text

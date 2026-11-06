@@ -411,6 +411,7 @@ function TeenModeScreenSession({
               autoFocus
               caretHidden
               style={styles.hiddenInput}
+              cursorColor="#FE1F4C"
             />
           </Pressable>
           {/* 确认按钮位于输入框正下方（设计稿 274-46247/46328） */}
