@@ -23,6 +23,40 @@ describe("mapRongMessage", () => {
     });
   });
 
+  it("接收的图片消息优先使用远端 URL（localPath 是发送方设备上的路径）", () => {
+    expect(mapRongMessage({
+      messageType: 4,
+      messageUId: "image-received-1",
+      local: "file:///data/user/0/cn.panzhi.esports/cache/Manipulator/sender.jpg",
+      remote: "https://cdn.example.com/chat/image-received-1.jpg",
+      sentTime: new Date("2026-11-06T10:30:00").getTime(),
+      direction: 1,
+    }, { image: 4, send: 0 })).toEqual({
+      id: "image-received-1",
+      kind: "image",
+      imageUrl: "https://cdn.example.com/chat/image-received-1.jpg",
+      time: "10:30",
+      isMine: false,
+    });
+  });
+
+  it("自己发出的图片消息仍优先使用本地路径", () => {
+    expect(mapRongMessage({
+      messageType: 4,
+      messageUId: "image-sent-1",
+      local: "file:///data/user/0/cn.panzhi.esports/cache/Manipulator/mine.jpg",
+      remote: "https://cdn.example.com/chat/image-sent-1.jpg",
+      sentTime: new Date("2026-11-06T10:30:00").getTime(),
+      direction: 0,
+    }, { image: 4, send: 0 })).toEqual({
+      id: "image-sent-1",
+      kind: "image",
+      imageUrl: "file:///data/user/0/cn.panzhi.esports/cache/Manipulator/mine.jpg",
+      time: "10:30",
+      isMine: true,
+    });
+  });
+
   it("maps a received RongCloud text message", () => {
     expect(mapRongMessage({
       messageType: 1,
