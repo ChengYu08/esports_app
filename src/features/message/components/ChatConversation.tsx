@@ -17,6 +17,7 @@ import {
   Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  PixelRatio,
   Platform,
   Pressable,
   StyleSheet,
@@ -673,6 +674,10 @@ export function ChatConversation({
         }
         renderItem={renderChatRow}
         showsVerticalScrollIndicator={false}
+        // 聊天行大多带图，收窄挂载窗口可减少同时挂载、同时解码的图片数量
+        initialNumToRender={8}
+        maxToRenderPerBatch={6}
+        windowSize={7}
         onContentSizeChange={keepLatestVisible}
         onLayout={keepLatestVisible}
         maintainVisibleContentPosition={{
@@ -1212,10 +1217,20 @@ const ChatBubble = memo(function ChatBubble({
   onPreviewImage: (message: ManagedMessage) => void;
 }) {
   const { width: windowWidth } = useWindowDimensions();
-  const [imageRatio, setImageRatio] = useState(1);
+  const knownRatio = item.kind === "image" ? item.imageAspectRatio : undefined;
+  const [loadedRatio, setLoadedRatio] = useState<number | null>(null);
+  // 消息自带宽高比优先用于首帧，避免先按 1:1 排版、解码后再回弹（每张图多一次布局和一次解码）
+  const imageRatio = loadedRatio ?? knownRatio ?? 1;
   const targetImageWidth = item.isMine ? 120 : 160;
   const imageWidth = Math.min(targetImageWidth, windowWidth * 0.58);
   const imageHeight = imageWidth / imageRatio;
+  // 缩略图宽度不足以铺满气泡的物理像素时会被放大发虚，这种消息继续用原图（解码尺寸由图片库按气泡缩小）
+  const isThumbnailSharpEnough = item.kind === "image"
+    && !!item.thumbnailUri
+    && (item.thumbnailWidth ?? 0) >= imageWidth * PixelRatio.get();
+  const bubbleImageUri = item.kind === "image"
+    ? (isThumbnailSharpEnough ? item.thumbnailUri! : item.imageUrl)
+    : "";
 
   return (
     <View
@@ -1262,15 +1277,22 @@ const ChatBubble = memo(function ChatBubble({
           >
             <CachedImage
               contentFit="contain"
-              source={{ uri: item.imageUrl }}
+              // 缩略图够清晰才用，省下原图的解码内存；不够清晰就回退原图，避免气泡发虚
+              source={{ uri: bubbleImageUri }}
               style={[
                 styles.messageImage,
                 { width: imageWidth, height: imageHeight },
               ]}
               onLoad={({ source }) => {
-                if (source.width > 0 && source.height > 0) {
-                  setImageRatio(source.width / source.height);
+                if (source.width <= 0 || source.height <= 0) {
+                  return;
                 }
+                const next = source.width / source.height;
+                // 与消息自带比例相差不到 1% 就沿用，避免为亚像素差异再触发一次布局
+                if (knownRatio && Math.abs(next - knownRatio) / knownRatio < 0.01) {
+                  return;
+                }
+                setLoadedRatio(next);
               }}
             />
           </Pressable>
