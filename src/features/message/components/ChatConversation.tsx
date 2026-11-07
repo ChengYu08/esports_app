@@ -364,7 +364,8 @@ export function ChatConversation({
         navigateWithSheetDismiss(() => {
           router.push({
             pathname: "/image-preview",
-            params: createImagePreviewParams(images, index),
+            // 聊天图片的远端地址需要经融云 SDK 鉴权下载，预览页据此反查消息
+            params: { ...createImagePreviewParams(images, index), conversationId },
           });
         });
       } catch (error) {
@@ -374,7 +375,7 @@ export function ChatConversation({
       });
       }
     },
-    [navigateWithSheetDismiss, resolveImagePreview, visibleMessages],
+    [conversationId, navigateWithSheetDismiss, resolveImagePreview, visibleMessages],
   );
   const openProfile = useCallback(() => {
     setSettingsVisible(false);
