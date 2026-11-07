@@ -1,4 +1,3 @@
-import { Image } from "expo-image";
 import { requireOptionalNativeModule } from "expo";
 import { BlurTargetView, BlurView } from "expo-blur";
 import { memo, useRef } from "react";
@@ -6,9 +5,9 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { VoicePlayButton } from "@/shared/audio/VoicePlayButton";
 import { getDDinProStyle } from "@/shared/theme/typography";
+import { CachedImage } from "@/shared/ui/CachedImage";
 
 const blurAvailable = requireOptionalNativeModule("ExpoBlur") != null;
-const AvatarTarget = blurAvailable ? BlurTargetView : View;
 
 const maleIcon = require("../../../assets/svgs/gender-male.svg");
 const femaleIcon = require("../../../assets/svgs/gender-female.svg");
@@ -68,6 +67,8 @@ export const CompanionCard = memo(function CompanionCard({
   onPress,
 }: CompanionCardProps) {
   const blurTargetRef = useRef<View>(null);
+  // 无语音条时不需要为模糊底图采集内容，用普通 View 避免每张卡多建一个原生视图
+  const AvatarTarget = voiceUrl && blurAvailable ? BlurTargetView : View;
   const online = onlineStatus === 1;
   const busy = gameStatus === 1;
   // 第三行文案：模式 / 等级 / 服务 斜杠分割纯文本，接口未配置时兜底个性签名
@@ -83,7 +84,7 @@ export const CompanionCard = memo(function CompanionCard({
     >
       <View style={styles.cardLeft}>
         <AvatarTarget ref={blurTargetRef} style={styles.avatar}>
-          <Image
+          <CachedImage
             source={avatar ? { uri: avatar } : emptyAvatar}
             style={styles.avatar}
             contentFit="cover"
@@ -113,7 +114,7 @@ export const CompanionCard = memo(function CompanionCard({
               {nickname}
             </Text>
             {sex === 1 || sex === 2 ? (
-              <Image
+              <CachedImage
                 source={sex === 1 ? maleIcon : femaleIcon}
                 style={[
                   styles.genderIcon,
@@ -138,7 +139,7 @@ export const CompanionCard = memo(function CompanionCard({
                   busy ? styles.statusBusyBg : styles.statusIdleBg,
                 ]}
               >
-                <Image
+                <CachedImage
                   source={busy ? statusPlayingIcon : statusIdleIcon}
                   style={[
                     styles.statusTagIcon,
@@ -159,7 +160,7 @@ export const CompanionCard = memo(function CompanionCard({
           {gameName ? (
             <View style={styles.gameTag}>
               {gameIconUrl ? (
-                <Image
+                <CachedImage
                   source={{ uri: gameIconUrl }}
                   style={styles.gameTagIcon}
                   contentFit="cover"
@@ -187,7 +188,7 @@ export const CompanionCard = memo(function CompanionCard({
         <View style={styles.priceRow}>
           <View style={styles.priceWrap}>
             <Text style={styles.price}>{price}</Text>
-            <Image source={diamondIcon} style={styles.diamond} />
+            <CachedImage source={diamondIcon} style={styles.diamond} />
           </View>
           <View style={styles.salesWrap}>
             <Text style={styles.salesLabel}>销量</Text>
