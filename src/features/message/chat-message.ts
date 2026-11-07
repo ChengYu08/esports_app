@@ -21,6 +21,12 @@ export type ChatImageMessage = {
   id: string;
   kind: "image";
   imageUrl: string;
+  /** 融云缩略图 data URI：尺寸够气泡显示时才用，原图仅在点开预览时使用 */
+  thumbnailUri?: string;
+  /** 缩略图宽度（像素），用来判断放大到气泡尺寸后会不会发虚 */
+  thumbnailWidth?: number;
+  /** 融云消息自带的宽高比；气泡首帧按它定尺寸，避免先按 1:1 排版再回弹 */
+  imageAspectRatio?: number;
   time: string;
   isMine: boolean;
 };
@@ -125,6 +131,9 @@ export type RongSdkMessage = {
   local?: string;
   remote?: string;
   mediaUrl?: string;
+  thumWidth?: number;
+  thumHeight?: number;
+  thumbnailBase64String?: string;
   identifier?: string;
   messageIdentifier?: string;
   objectName?: string;
@@ -151,6 +160,14 @@ function mergeCustomPayload(fields: Record<string, unknown>, payload: Record<str
   return { ...businessFields, ...payload };
 }
 
+/** 融云给的是裸 base64，拼成 data URI 供图片组件直接渲染；空值表示该消息没有缩略图 */
+function toThumbnailUri(base64?: string): string | undefined {
+  if (!base64) {
+    return undefined;
+  }
+  return base64.startsWith("data:") ? base64 : `data:image/jpeg;base64,${base64}`;
+}
+
 export function parseRoomInviteLink(text: string): { roomId: string; roomVersion: string } | null {
   const match = text.trim().match(/^https?:\/\/[^/]+\/chat\?type=chat-room&id=(\d+)&v=(\d+)$/);
   if (!match) return null;
@@ -166,7 +183,22 @@ export function mapRongMessage(message: RongSdkMessage, enums: { image: number; 
 
   if (message.messageType === enums.image) {
     const imageUrl = message.local || message.remote || message.mediaUrl;
-    return imageUrl ? { id, kind: "image", imageUrl, time, isMine } : null;
+    if (!imageUrl) {
+      return null;
+    }
+    // 缩略图宽高必定与原图同比，可直接当作气泡宽高比；缺失时交给 onLoad 兜底
+    const hasThumbSize = !!message.thumWidth && !!message.thumHeight
+      && message.thumWidth > 0 && message.thumHeight > 0;
+    return {
+      id,
+      kind: "image",
+      imageUrl,
+      thumbnailUri: toThumbnailUri(message.thumbnailBase64String),
+      thumbnailWidth: hasThumbSize ? message.thumWidth : undefined,
+      imageAspectRatio: hasThumbSize ? message.thumWidth! / message.thumHeight! : undefined,
+      time,
+      isMine,
+    };
   }
 
   // Older native sessions return unregistered custom messages as rawData.
