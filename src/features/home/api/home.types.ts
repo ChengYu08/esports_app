@@ -81,6 +81,7 @@ export type ClubDetailGame = Game & {
 };
 
 export type ClubDetail = {
+  clubCode?: string;
   id: string;
   name: string;
   /** 后台店铺标签，与俱乐部列表图标左上角角标同源；未配置时为空 */

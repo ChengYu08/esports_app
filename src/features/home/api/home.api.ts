@@ -68,7 +68,7 @@ export async function fetchBanners(signal?: AbortSignal): Promise<HomeBannerSlot
 type ApiEnvelope<T> = { success?: boolean; code?: string; info?: string; data?: T };
 type ApiGame = { id: number | string; gameName?: string; iconUrl?: string; backgroundUrl?: string; gameCategory?: number; gameCategoryId?: number | string };
 type ApiGameCategory = { id: number | string; name: string; iconUrl?: string | null; mobileIconUrl?: string | null; mobile_icon_url?: string | null };
-type ApiClub = {
+type ApiClub = { clubNo?: string;
   id: number | string;
   clubName?: string;
   clubTag?: string | null;
@@ -83,7 +83,7 @@ type ApiClub = {
   clubGames?: { gameId: number; gameName?: string; iconUrl?: string; status?: number; companionCount?: number }[];
 };
 type ApiClubPage = { page?: number; totalPages?: number; total?: number; records?: ApiClub[] };
-type ApiClubDetail = {
+type ApiClubDetail = { clubNo?: string;
   id: number | string;
   clubName?: string;
   clubTag?: string | null;
@@ -147,7 +147,7 @@ export async function fetchClubDetail(id: string, signal?: AbortSignal): Promise
   const response = await apiClient<ApiResponse<ApiClubDetail>>(`/client/v1/club/public/detail?id=${encodeURIComponent(id)}`, { signal });
   const data = requireSuccess(response, "俱乐部详情加载失败");
   return {
-    id: String(data.id), name: data.clubName || "未命名俱乐部", clubTag: data.clubTag || undefined, logoUrl: data.logoUrl,
+    id: String(data.id), clubCode: data.clubNo ?? String(data.id), name: data.clubName || "未命名俱乐部", clubTag: data.clubTag || undefined, logoUrl: data.logoUrl,
     intro: data.intro || "暂无俱乐部简介", memberCount: data.memberCount ?? 0, followCount: data.followCount ?? 0,
     pageConfigGroupId: data.pageConfigGroupId,
     games: (data.clubGames ?? []).filter((item) => item.status !== 0).map((item): ClubDetailGame => ({
@@ -250,7 +250,7 @@ export async function fetchClubPage(filters: ClubFilters, page: number, pageSize
       onlineCount: club.onlineCount ?? 0,
       onlineCompanionCount: club.onlineCompanionCount,
       memberCount: club.memberCount ?? 0,
-      clubCode: String(club.id),
+      clubCode: club.clubNo ?? String(club.id),
       isSelfOperated: club.clubNature == null
         ? club.clubName?.includes("自营") ?? false
         : club.clubNature === "SELF_OPERATED",

@@ -619,7 +619,7 @@ export default function ClubDetailScreen() {
               </View>
               <View style={styles.clubMetaItem}>
                 <Text style={styles.clubMetaLabel}>俱乐部ID</Text>
-                <Text style={styles.clubMetaValue}>{club.id}</Text>
+                <Text style={styles.clubMetaValue}>{club.clubCode ?? club.id}</Text>
               </View>
             </View>
           </View>

@@ -2,7 +2,7 @@ import type { Club, GameKey } from "./home.types";
 
 export const demoClubs: Record<GameKey, Club[]> = {
   pc: [
-    { id: "pc-1", name: "盼之电竞自营俱乐部", description: "清一色暖男声线，情绪价值拉满，你的日常陪伴", onlineCount: 21, memberCount: 62, clubCode: "2338820", isSelfOperated: true },
+    { id: "pc-1", name: "盼之电竞自营俱乐部", description: "清一色暖男声线，情绪价值拉满，你的日常陪伴", onlineCount: 21, memberCount: 62, clubCode: "66688", isSelfOperated: true },
     { id: "pc-2", name: "YC电子陪玩俱乐部", description: "清一色暖男声线，情绪价值拉满，你的日常陪伴", onlineCount: 21, memberCount: 62, clubCode: "2338820" },
     { id: "pc-3", name: "二次元萌妹俱乐部", description: "清一色暖男声线，情绪价值拉满，你的日常陪伴", onlineCount: 21, memberCount: 62, clubCode: "2338820" },
     { id: "pc-4", name: "三角洲陪玩俱乐部", description: "清一色暖男声线，情绪价值拉满，你的日常陪伴", onlineCount: 21, memberCount: 62, clubCode: "2338820" },
