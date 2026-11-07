@@ -544,10 +544,11 @@ async function connectRongCloudOnce(accessToken: string, attemptEpoch: number) {
       const { env } = getRuntimeConfig();
       engine = sdk.RCIMIWEngine.create(env.rongCloudAppKey, {
         enablePush: true,
-        // 气泡最宽 160pt，默认缩略图只有 240px，放大到高密度屏会发虚；提到 720px 才够铺满气泡
+        // 气泡最宽 160pt，3 倍屏要 480px；默认缩略图只有 240px，放大到气泡会发虚。
+        // 480px 对最宽气泡刚好 1:1（2 倍屏 1.5 倍超采样），解码不放大且比原图更省内存
         compressOptions: {
-          thumbnailMaxSize: 720,
-          thumbnailQuality: 80,
+          thumbnailMaxSize: 480,
+          thumbnailQuality: 90,
         },
         pushOptions: {
           idMI: env.miPushAppId || undefined,
