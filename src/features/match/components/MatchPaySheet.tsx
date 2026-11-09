@@ -14,6 +14,7 @@ import {
   confirmQuickMatchPay,
   type ConfirmPayState,
 } from "@/features/match/quick-match-confirm-pay";
+import { useStarBalance } from "@/features/mine/hooks/use-star-balance";
 import { getDDinProStyle } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
@@ -62,9 +63,11 @@ export function MatchPaySheet({
     message: string;
   } | null>(null);
 
-  // 余额直接取预览返回的支付方式余额（对齐 PC），不再单独请求 starBalance
+  // 初始余额取预览快照；充值返回后由 useStarBalance 在页面 focus 时刷新
   const method = preview?.paymentMethods[0];
-  const balance = method?.balance ?? null;
+  const balance = useStarBalance(token, visible && Boolean(preview), {
+    initialBalance: method?.balance ?? null,
+  });
   const payDisabled = paying || balance === null;
 
   async function confirmPay() {
