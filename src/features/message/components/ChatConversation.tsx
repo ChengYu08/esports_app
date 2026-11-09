@@ -1019,11 +1019,11 @@ const ChatComposer = memo(function ChatComposer({
     setImageSending(true);
     let failed = 0;
     try {
-      // 逐张发送保持顺序；静态图统一重编码为 JPEG，规避 HEIC 原图与超大原图直接发送。
-      // GIF 重编码会丢动画，动图原样发送
+      // 逐张发送保持顺序；静态图重编码为 JPEG 并把最长边压到 1080（与融云默认压缩后的尺寸一致，
+      // 避免原图上传过大的文件）。GIF 重编码会丢动画，原样发送
       for (const uri of picked) {
         try {
-          const sendUri = isGifImage(uri) ? uri : await convertToJpeg(uri);
+          const sendUri = isGifImage(uri) ? uri : await convertToJpeg(uri, 0.85, 1080);
           await onSendImage(sendUri);
         } catch {
           failed += 1;

@@ -16,6 +16,7 @@ import { loadConversationSnapshot } from './conversation-loader';
 import { parseRongCommand, type RongCommand } from './rongcloud-command';
 import { KNOWN_RONG_COMMAND_NAMES } from './rongcloud-commands';
 import { fetchRongHistoryMessages } from './rong-history';
+import { isGifImage } from '@/shared/media-picker/image-compat';
 
 export type RongConversation = MessageConversation;
 export type RongTextMessage = ManagedMessage;
@@ -816,6 +817,11 @@ export async function sendRongImage(targetId: string, path: string): Promise<Man
   if (!sdk) throw new Error('当前版本暂不支持即时消息');
   const currentEngine = requireConnected();
   const message = await currentEngine.createImageMessage(sdk.RCIMIWConversationType.PRIVATE, getRongConversationTargetId(targetId), '', path);
+  // 安卓 SDK 对 ImageMessage 一律解码重编码成 JPEG，GIF 会变单帧；original=true 走
+  // isFull 路径按原文件拷贝上传（缩略图仍由 SDK 生成），动图才能保留动画
+  if (isGifImage(path)) {
+    message.original = true;
+  }
   return new Promise((resolve, reject) => {
     let settled = false;
     const finish = (error?: Error, sent?: RCIMIWMediaMessage) => {

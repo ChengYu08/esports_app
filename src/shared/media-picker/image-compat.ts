@@ -1,5 +1,5 @@
 import { File, FileMode } from "expo-file-system";
-import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
+import { ImageManipulator, manipulateAsync, SaveFormat, type Action } from "expo-image-manipulator";
 
 export type ImageFormat = { extension: string; mimeType: string };
 
@@ -34,9 +34,30 @@ export function detectImageFormat(uri: string): ImageFormat | null {
   }
 }
 
-/** 用 image-manipulator 把图片重编码为 JPEG 缓存文件，返回新 uri。 */
-export async function convertToJpeg(uri: string, quality = 0.85): Promise<string> {
-  const result = await manipulateAsync(uri, [], {
+/** 读取图片原始宽高；读不到时返回 null（按不缩放处理）。renderAsync 只解码不编码。 */
+async function measureImage(uri: string): Promise<{ width: number; height: number } | null> {
+  try {
+    const rendered = await ImageManipulator.manipulate(uri).renderAsync();
+    return { width: rendered.width, height: rendered.height };
+  } catch {
+    return null;
+  }
+}
+
+/** 用 image-manipulator 把图片重编码为 JPEG 缓存文件；maxSize 限制最长边（等比缩小，不放大小图）。 */
+export async function convertToJpeg(uri: string, quality = 0.85, maxSize?: number): Promise<string> {
+  const actions: Action[] = [];
+  if (maxSize) {
+    const size = await measureImage(uri);
+    if (size && Math.max(size.width, size.height) > maxSize) {
+      actions.push(
+        size.width >= size.height
+          ? { resize: { width: maxSize } }
+          : { resize: { height: maxSize } },
+      );
+    }
+  }
+  const result = await manipulateAsync(uri, actions, {
     compress: quality,
     format: SaveFormat.JPEG,
   });
