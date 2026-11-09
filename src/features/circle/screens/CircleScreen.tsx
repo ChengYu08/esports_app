@@ -229,7 +229,7 @@ export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
         <Pressable
           accessibilityLabel="搜索"
           onPress={() => {
-            router.push({ pathname: "/search", params: { type: "club" } });
+            router.push("/circle/search");
           }}
           style={styles.navSide}
         >
