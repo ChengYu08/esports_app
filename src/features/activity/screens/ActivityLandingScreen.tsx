@@ -28,12 +28,12 @@ import {
   type QuickMatchRequestDetail,
 } from "@/features/match/api/match.types";
 import { openAuditionRoom } from "@/features/match/enter-audition-room";
+import { isExistingDispatchConflictMessage } from "@/features/match/existing-dispatch-hint";
 import { requireLogin } from "@/shared/navigation/require-login";
 import { showToast } from "@/shared/ui/app-toast";
 
 const BG_COLOR = "#0C0C2E";
 const LOADING_COLOR = "#4D8BFF";
-const EXISTING_DISPATCH_HINT = "已有派单";
 const OSS_BASE = "https://djoss.panzhi.com/dj-oss-upload/moblie";
 const ACTIVITY_SECKILL_ASSETS = {
   bg: `${OSS_BASE}/bg_activity_seckill.webp`,
@@ -153,7 +153,7 @@ export default function ActivityLandingScreen({ activityCode }: { activityCode: 
       }
       const message = error instanceof Error ? error.message : "参与活动失败，请重试";
       // 已有未过期派单：查 active → ensure 进试音房；进房失败再回退匹配中页。
-      if (message.includes(EXISTING_DISPATCH_HINT)) {
+      if (isExistingDispatchConflictMessage(message)) {
         try {
           const active = await fetchActiveQuickMatch(token);
           if (active && isQuickMatchActive(active)) {

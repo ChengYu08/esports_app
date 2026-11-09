@@ -36,6 +36,7 @@ import { LightGameOptionChip } from "@/features/match/components/LightGameOption
 import { LightOptionChip } from "@/features/match/components/LightOptionChip";
 import { MatchLinearGradient } from "@/features/match/components/MatchLinearGradient";
 import { openAuditionRoom } from "@/features/match/enter-audition-room";
+import { isExistingDispatchConflictMessage } from "@/features/match/existing-dispatch-hint";
 import {
   MATCH_COMPANION_PREFERENCE_OPTIONS,
   MATCH_GENDER_OPTIONS,
@@ -57,7 +58,6 @@ import { showToast } from "@/shared/ui/app-toast";
 const diamondIcon = require("../../../../assets/mine/star-recharge-diamond-3f6fcf.png");
 
 const PUBLISH_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
-const EXISTING_DISPATCH_HINT = "已有派单";
 
 /** 发布按钮内的三个跳动小点 */
 function PublishingDots() {
@@ -374,7 +374,7 @@ export function ClubQuickMatchSheet({
       const message =
         error instanceof Error ? error.message : "发布失败，请重试";
       // 接待代发撞老板已有派单：保持 Toast，不替老板恢复进房
-      if (!isReception && message.includes(EXISTING_DISPATCH_HINT)) {
+      if (!isReception && isExistingDispatchConflictMessage(message)) {
         try {
           const active = await fetchActiveQuickMatch(form.token);
           if (active && isQuickMatchActive(active)) {
