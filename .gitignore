@@ -9,9 +9,6 @@ dist/
 web-build/
 expo-env.d.ts
 
-# Pushy / react-native-update local credentials
-.update
-
 # Native
 .kotlin/
 *.orig.*
@@ -72,9 +69,6 @@ modules/*/android/.gradle/
 .qoder/
 # Figma 临时渲染产物
 .figma-tmp/
-
-# react-native-update
-.pushy
 
 *.sql
 pzds_ali_h5_one_key.sql

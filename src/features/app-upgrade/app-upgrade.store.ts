@@ -48,7 +48,7 @@ type AppUpgradeState = {
   /** 已下载完成的 APK 文件 uri，重试/授权返回后复用避免重新下载 */
   downloadedApkUri: string | null;
   startupCheck: (options?: { silent?: boolean }) => Promise<boolean>;
-  /** 供 Pushy 热更等待整包检查结果；若检查尚未启动会先触发一次 */
+  /** 等待整包检查结果；若检查尚未启动会先触发一次 */
   whenStartupCheckSettled: () => Promise<boolean>;
   /** 手动检查（关于页），失败时抛出错误由调用方提示 */
   checkNow: () => Promise<boolean>;
@@ -278,7 +278,7 @@ export const useAppUpgradeStore = create<AppUpgradeState>(() => ({
   },
 }));
 
-/** 供 Pushy 热更与宿主挂载点共用的启动检查入口 */
+/** 供宿主挂载点共用的启动检查入口 */
 export function kickOffStartupCheck(): Promise<boolean> {
   return useAppUpgradeStore.getState().whenStartupCheckSettled();
 }

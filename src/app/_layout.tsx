@@ -34,7 +34,6 @@ import {
 import { RongCommandHost } from "@/features/message/rong-command-dispatch/RongCommandHost";
 import { TeenModeGate } from "@/features/mine/components/TeenModeGate";
 import { OrderNotifySyncHost } from "@/features/order/order-notify-sync";
-import { PushyUpdateHost } from "@/features/ota/PushyUpdateHost";
 import { PrivacyConsentGate } from "@/features/privacy/components/PrivacyConsentGate";
 import { readPrivacyConsent } from "@/features/privacy/privacy-consent";
 import { D_DIN_PRO_FONTS } from "@/shared/theme/typography";
@@ -258,8 +257,8 @@ export default function RootLayout() {
             <RootSiblingParent>
               <StatusBar style="dark" />
               {privacyAccepted ? (
-                <PushyUpdateHost>
-                  {/* 网络监控、整包升级检查与热更新均在同意隐私后启动 */}
+                <>
+                  {/* 网络监控与整包升级检查在同意隐私后启动 */}
                   <NetworkRecovery />
                   <AppUpgradeHost />
                   <Stack
@@ -285,7 +284,7 @@ export default function RootLayout() {
                   </Stack>
                   {/* 青少年模式启动门：开启且在服务端配置的锁定时段内整屏锁定，未开启按每日规则弹促销窗 */}
                   <TeenModeGate />
-                </PushyUpdateHost>
+                </>
               ) : (
                 <PrivacyConsentGate
                   onAccepted={() => setPrivacyAccepted(true)}

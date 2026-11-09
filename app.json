@@ -55,7 +55,6 @@
       ],
       "./plugins/withNodeCommandUtf8",
       "./plugins/withAndroidReleaseBuild",
-      "./plugins/withPushyDeepLink",
       "./plugins/withPzOneClickLibs",
       "./plugins/withVoiceRoomBackground",
       "./plugins/withRongCloudPush",
