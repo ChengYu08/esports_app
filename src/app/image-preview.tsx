@@ -9,28 +9,24 @@ export default function ImagePreviewScreen() {
   const params = useLocalSearchParams<{
     images?: string | string[];
     index?: string | string[];
-    conversationId?: string | string[];
+    previewSessionId?: string | string[];
   }>();
   const { images, index } = useMemo(
     () => parseImagePreviewParams({ images: params.images, index: params.index }),
     [params.images, params.index],
   );
-  const conversationId = Array.isArray(params.conversationId)
-    ? params.conversationId[0]
-    : params.conversationId;
+  const previewSessionId = Array.isArray(params.previewSessionId)
+    ? params.previewSessionId[0]
+    : params.previewSessionId;
   useEffect(() => {
-    if (images.length === 0) {
+    // 聊天图片预览只带会话 id，此时 images 必然为空，不能当成空列表直接返回
+    if (!previewSessionId && images.length === 0) {
       router.back();
     }
-  }, [images]);
-  if (conversationId) {
+  }, [images, previewSessionId]);
+  if (previewSessionId) {
     return (
-      <ChatImagePreview
-        conversationId={conversationId}
-        images={images}
-        index={index}
-        onClose={router.back}
-      />
+      <ChatImagePreview sessionId={previewSessionId} onClose={router.back} />
     );
   }
   return <ImagePreview images={images} index={index} onClose={router.back} />;

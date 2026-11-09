@@ -30,7 +30,6 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EmojiKeyboard, type EmojiType } from "rn-emoji-keyboard";
 
-import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import type { AfterSaleCardPayload } from "@/features/order/after-sale-card";
 import { afterSaleCardRows } from "@/features/order/after-sale-card";
 import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
@@ -44,6 +43,7 @@ import { enterRoomFromInvite } from "@/features/voice-room/enter-room-from-invit
 import { CsInviteCard } from "./CsInviteCard";
 import { MarkdownMessage } from "./MarkdownMessage";
 import { OrderNotifyCard } from "./OrderNotifyCard";
+import { openChatImagePreviewSession } from "../chat-image-preview-session";
 import { touchCustomerServiceSession } from "../customer-service.api";
 import { resolveConversationAvatar } from "../message-avatar";
 import type { ManagedMessage } from "../message-state";
@@ -349,23 +349,25 @@ export function ChatConversation({
       try {
         const resolvedUri = await resolveImagePreview(message);
         // 连看列表：当前会话全部图片消息按时间序组装，点开哪张定位到哪张；
-        // 未点开的图片直接用气泡现有地址（远端或本地均可预览），不逐张触发下载
+        // 其余图片滑到前后页时再按消息对象逐张下载（融云远端地址直连会 401）
         const imageMessages = visibleMessages.filter(
           (item): item is Extract<ManagedMessage, { kind: "image" }> =>
             item.kind === "image",
-        );
-        const images = imageMessages.map((item) =>
-          item.id === message.id ? resolvedUri : item.imageUrl,
         );
         const index = Math.max(
           0,
           imageMessages.findIndex((item) => item.id === message.id),
         );
+        // 预览是独立路由页，消息对象经内存会话带过去，不再用 URL 字符串反查
+        const sessionId = openChatImagePreviewSession({
+          messages: imageMessages,
+          index,
+          resolvedUri,
+        });
         navigateWithSheetDismiss(() => {
           router.push({
             pathname: "/image-preview",
-            // 聊天图片的远端地址需要经融云 SDK 鉴权下载，预览页据此反查消息
-            params: { ...createImagePreviewParams(images, index), conversationId },
+            params: { previewSessionId: sessionId },
           });
         });
       } catch (error) {
@@ -375,7 +377,7 @@ export function ChatConversation({
       });
       }
     },
-    [conversationId, navigateWithSheetDismiss, resolveImagePreview, visibleMessages],
+    [navigateWithSheetDismiss, resolveImagePreview, visibleMessages],
   );
   const openProfile = useCallback(() => {
     setSettingsVisible(false);
