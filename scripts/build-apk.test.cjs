@@ -16,7 +16,7 @@ function fixture(t, script) {
   return { root, run };
 }
 
-test('archive uses root config, abi label, local YYYYMMDDHHmm name; overwrites same minute; rejects stale version', (t) => {
+test('archive uses root config, abi label, Beijing YYYYMMDDHHmm name; overwrites same minute; rejects stale version', (t) => {
   const { root, run } = fixture(t, 'archive-apk.cjs');
   const output = path.join(root, 'android/app/build/outputs/apk/release');
   fs.mkdirSync(output, { recursive: true });
