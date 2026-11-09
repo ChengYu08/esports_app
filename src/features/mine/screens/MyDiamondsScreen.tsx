@@ -165,6 +165,8 @@ export default function MyDiamondsScreen() {
         loading={recordsQuery.isFetchingNextPage}
         hasMore={recordsQuery.hasNextPage}
         pageCount={recordsQuery.data?.pages.length}
+        failed={recordsQuery.isFetchNextPageError}
+        onRetry={recordsQuery.fetchNextPage}
       />
     );
   }, [

@@ -63,6 +63,8 @@ export default function RankingScreen({
   const visibleMyRank =
     isAuthenticated && myRank.data?.visible === true ? myRank.data : undefined;
   const topItems = useMemo(() => withRankingGap(top.data ?? emptyRows), [top.data]);
+  /** 游戏列表未返回时复用同一个空数组，避免游戏行 memo 因引用变化失效 */
+  const gameList = useMemo(() => games.data ?? [], [games.data]);
 
   const viewProfile = useCallback((item: RankingItem) => {
     const profileParams = getRankingProfileParams(item);
@@ -85,6 +87,10 @@ export default function RankingScreen({
   const changeBoard = (boardCode: RankingBoard) => {
     setFilters((value) => ({ ...value, boardCode }));
   };
+
+  const selectGame = useCallback((gameId: string) => {
+    setFilters((value) => ({ ...value, gameId }));
+  }, []);
 
   const retryTop = () => {
     top.refetch();
@@ -182,11 +188,9 @@ export default function RankingScreen({
           {board.hasGame ? (
             <>
               <RankingGameFilter
-                games={games.data ?? []}
+                games={gameList}
                 value={filters.gameId}
-                onChange={(gameId) =>
-                  setFilters((value) => ({ ...value, gameId }))
-                }
+                onChange={selectGame}
               />
               {games.isError ? (
                 <RetryNotice message="游戏筛选加载失败" onRetry={retryGames} />

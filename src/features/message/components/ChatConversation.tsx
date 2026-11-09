@@ -4,6 +4,7 @@ import {
   ChevronRight16Regular,
   HeadphonesRegular,
 } from "@fluentui/react-native-icons";
+import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -29,6 +30,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EmojiKeyboard, type EmojiType } from "rn-emoji-keyboard";
+import { colors } from "@/shared/theme/tokens";
 
 import type { AfterSaleCardPayload } from "@/features/order/after-sale-card";
 import { afterSaleCardRows } from "@/features/order/after-sale-card";
@@ -60,6 +62,9 @@ import {
 
 // 聊天单次发送图片数量上限（相册多选防刷屏）
 const CHAT_IMAGE_MAX = 10;
+// 长按文案消息弹出的操作菜单尺寸（贴着按压点上方展示）
+const COPY_MENU_WIDTH = 108;
+const COPY_MENU_HEIGHT = 44;
 /** 输入框行高与最大行数：默认 44（单行 22 + 上下内边距 11），超过 4 行内部滚动 */
 const COMPOSER_LINE_HEIGHT = 22;
 const COMPOSER_MAX_CONTENT_HEIGHT = COMPOSER_LINE_HEIGHT * 4;
@@ -157,6 +162,7 @@ export function ChatConversation({
   const insets = useSafeAreaInsets();
   const accessToken = useAuthStore((state) => state.accessToken);
   const userId = useAuthStore((state) => state.user?.id);
+  const myClubId = useAuthStore((state) => state.user?.clubInfo?.id);
   const myAvatarUrl = useAuthStore((state) => state.user?.headImage);
   const myNickname = useAuthStore((state) => state.user?.nickname);
   const [afterSaleSending, setAfterSaleSending] = useState(false);
@@ -416,6 +422,21 @@ export function ChatConversation({
     isSheet,
     navigateWithSheetDismiss,
   ]);
+  // 右侧自己头像：进入自己的主页，参数与「我的」页 openHomepage 一致
+  const openMyProfile = useCallback(() => {
+    if (!userId) {
+      return;
+    }
+    navigateWithSheetDismiss(() => {
+      router.push({
+        pathname: "/profile" as const,
+        params: {
+          ...(myClubId ? { clubId: String(myClubId) } : {}),
+          userId: String(userId),
+        },
+      });
+    });
+  }, [myClubId, navigateWithSheetDismiss, userId]);
   const renderChatRow = useCallback(
     ({ item }: { item: ChatListRow }) =>
       item.kind === "time" ? (
@@ -437,6 +458,7 @@ export function ChatConversation({
           }}
           onRetry={handleRetryMessage}
           onOpenProfile={canViewProfile ? openProfile : undefined}
+          onOpenMyProfile={openMyProfile}
           onOpenOrder={isOrderAssistant ? openOrderDetail : undefined}
           onPreviewImage={openImagePreview}
         />
@@ -451,6 +473,7 @@ export function ChatConversation({
       myNickname,
       navigateWithSheetDismiss,
       openImagePreview,
+      openMyProfile,
       openOrderDetail,
       openProfile,
       title,
@@ -1206,6 +1229,7 @@ const ChatBubble = memo(function ChatBubble({
   onEnterRoomInvite,
   onRetry,
   onOpenProfile,
+  onOpenMyProfile,
   onOpenOrder,
   onPreviewImage,
 }: {
@@ -1217,10 +1241,22 @@ const ChatBubble = memo(function ChatBubble({
   onEnterRoomInvite: (roomId: string, roomVersion: string) => void;
   onRetry: (clientId: string) => void;
   onOpenProfile?: () => void;
+  onOpenMyProfile?: () => void;
   onOpenOrder?: (orderId: string) => void;
   onPreviewImage: (message: ManagedMessage) => void;
 }) {
   const { width: windowWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  // 长按文案消息弹出的操作菜单位置（按压点的页面坐标）
+  const [copyMenuAt, setCopyMenuAt] = useState<{ x: number; y: number } | null>(null);
+  const copyableText = item.kind === "text" ? item.text : "";
+  const copyMessageText = useCallback(() => {
+    setCopyMenuAt(null);
+    Clipboard.setStringAsync(copyableText).then(
+      () => showToast("已复制"),
+      () => showToast("复制失败，请重试"),
+    );
+  }, [copyableText]);
   const knownRatio = item.kind === "image" ? item.imageAspectRatio : undefined;
   const [loadedRatio, setLoadedRatio] = useState<number | null>(null);
   // 消息自带宽高比优先用于首帧，避免先按 1:1 排版、解码后再回弹（每张图多一次布局和一次解码）
@@ -1239,6 +1275,27 @@ const ChatBubble = memo(function ChatBubble({
   const bubbleImageUri = item.kind === "image"
     ? (isGifMessage ? item.imageUrl : (isThumbnailSharpEnough ? item.thumbnailUri! : item.imageUrl))
     : "";
+  // 大图/GIF 下载解码完成前显示同尺寸灰底转圈占位，避免空白直接跳变成图；
+  // 图片地址变化时在渲染期重置加载态（React 官方推荐写法，避免 effect 内 setState）
+  const [imageLoading, setImageLoading] = useState(true);
+  const [loadedUri, setLoadedUri] = useState(bubbleImageUri);
+  if (loadedUri !== bubbleImageUri) {
+    setLoadedUri(bubbleImageUri);
+    setImageLoading(true);
+  }
+
+  // 菜单贴着按压点上方，左右夹在屏幕内，顶部放不下就落到按压点下方
+  const copyMenuLeft = copyMenuAt
+    ? Math.min(
+        Math.max(copyMenuAt.x - COPY_MENU_WIDTH / 2, 12),
+        windowWidth - COPY_MENU_WIDTH - 12,
+      )
+    : 0;
+  const copyMenuTop = copyMenuAt
+    ? copyMenuAt.y - COPY_MENU_HEIGHT - 12 >= insets.top + 8
+      ? copyMenuAt.y - COPY_MENU_HEIGHT - 12
+      : copyMenuAt.y + 12
+    : 0;
 
   return (
     <View
@@ -1291,6 +1348,7 @@ const ChatBubble = memo(function ChatBubble({
                 styles.messageImage,
                 { width: imageWidth, height: imageHeight },
               ]}
+              transition={120}
               onLoad={({ source }) => {
                 if (source.width <= 0 || source.height <= 0) {
                   return;
@@ -1302,7 +1360,13 @@ const ChatBubble = memo(function ChatBubble({
                 }
                 setLoadedRatio(next);
               }}
+              onLoadEnd={() => setImageLoading(false)}
             />
+            {imageLoading ? (
+              <View pointerEvents="none" style={[styles.imageLoadingPlaceholder, { width: imageWidth, height: imageHeight }]}>
+                <ActivityIndicator size="small" color={colors.textMuted} />
+              </View>
+            ) : null}
           </Pressable>
         ) : item.kind === "roomInvite" ? (
           <Pressable
@@ -1365,15 +1429,35 @@ const ChatBubble = memo(function ChatBubble({
         ) : item.kind === "markdown" ? (
           <MarkdownMessage content={item.text} />
         ) : (
-          <Text style={styles.bubbleText}>{item.text}</Text>
+          // 文案消息长按弹操作菜单（复制），短按不响应，避免误触挡住列表滚动
+          <Pressable
+            accessibilityHint="长按弹出消息菜单"
+            delayLongPress={350}
+            onLongPress={(event) => {
+              setCopyMenuAt({
+                x: event.nativeEvent.pageX,
+                y: event.nativeEvent.pageY,
+              });
+            }}
+          >
+            <Text style={styles.bubbleText}>{item.text}</Text>
+          </Pressable>
         )}
       </View>
       {item.isMine && (
-        <CachedImage
-          contentFit="cover"
-          source={myAvatar}
-          style={styles.messageAvatar}
-        />
+        <Pressable
+          accessibilityLabel="查看我的主页"
+          accessibilityRole="button"
+          disabled={!onOpenMyProfile}
+          hitSlop={6}
+          onPress={onOpenMyProfile}
+        >
+          <CachedImage
+            contentFit="cover"
+            source={myAvatar}
+            style={styles.messageAvatar}
+          />
+        </Pressable>
       )}
       {item.status === "failed" ? (
         <Pressable
@@ -1382,6 +1466,42 @@ const ChatBubble = memo(function ChatBubble({
         >
           <Text style={styles.retryLabel}>重试</Text>
         </Pressable>
+      ) : null}
+      {copyMenuAt ? (
+        <Modal
+          animationType="fade"
+          transparent
+          visible
+          onRequestClose={() => setCopyMenuAt(null)}
+        >
+          <View style={styles.copyMenuLayer}>
+            <Pressable
+              accessibilityLabel="关闭消息菜单"
+              onPress={() => setCopyMenuAt(null)}
+              style={StyleSheet.absoluteFill}
+            />
+            <View
+              style={[
+                styles.copyMenu,
+                {
+                  left: copyMenuLeft,
+                  top: copyMenuTop,
+                  width: COPY_MENU_WIDTH,
+                  height: COPY_MENU_HEIGHT,
+                },
+              ]}
+            >
+              <Pressable
+                accessibilityLabel="复制消息内容"
+                accessibilityRole="button"
+                onPress={copyMessageText}
+                style={styles.copyMenuItem}
+              >
+                <Text style={styles.copyMenuText}>复制</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
       ) : null}
     </View>
   );
@@ -1513,11 +1633,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
   },
+  copyMenuLayer: { flex: 1 },
+  // 深色小浮层菜单，贴着按压点展示；不压暗背景，避免聊天内容看不清
+  copyMenu: {
+    position: "absolute",
+    borderRadius: 8,
+    backgroundColor: "rgba(0,0,0,0.85)",
+    overflow: "hidden",
+    elevation: 6,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 8,
+  },
+  copyMenuItem: { flex: 1, alignItems: "center", justifyContent: "center" },
+  copyMenuText: { color: "#FFFFFF", fontSize: 15, lineHeight: 20 },
   imageBubble: {
     padding: 0,
     overflow: "hidden",
     backgroundColor: "transparent",
     borderWidth: 0,
+  },
+  imageLoadingPlaceholder: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.skeleton,
   },
   roomInviteBubble: {
     maxWidth: "84%",

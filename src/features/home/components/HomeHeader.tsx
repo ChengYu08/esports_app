@@ -12,8 +12,8 @@ import { HomeBannerSections } from "./HomeBannerSections";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import type { ReactNode } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { memo, useCallback, useMemo, type ReactNode } from "react";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
 const allGamesIcon = require("../../../../assets/svgs/god-all-games.svg");
 const searchIcon = require("../../../../assets/svgs/h_search.svg");
@@ -51,6 +51,19 @@ export function HomeHeader({
   onGameChange,
   carouselPaused = false,
 }: HomeHeaderProps) {
+  /** "全部" 与游戏项结构对齐，交给同一个虚拟化行渲染 */
+  const gameTabItems = useMemo<HomeGameTabItem[]>(
+    () => [
+      { id: "", label: "全部", iconUrl: null, category: 0 },
+      ...games.map((item) => ({
+        id: String(item.id),
+        label: item.name,
+        iconUrl: item.iconUrl ?? null,
+        category: item.category ?? 0,
+      })),
+    ],
+    [games],
+  );
   return (
     <>
       {tab === "home" && (
@@ -64,89 +77,111 @@ export function HomeHeader({
               <Text style={styles.filterRetryText}>筛选项加载失败，点击重试</Text>
             </Pressable>
           )}
-          <ScrollView
-            key={category}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.gameTabsContent}
-            style={styles.gameTabs}
-          >
-            <Pressable
-              accessibilityRole="tab"
-              accessibilityState={{ selected: game === "" }}
-              onPress={() => onGameChange("")}
-              style={[styles.gameTab, game === "" && styles.gameTabSelected]}
-            >
-              <Image source={allGamesIcon} style={styles.allGamesIcon} contentFit="contain" />
-              <Text style={[styles.gameLabel, game === "" && styles.gameLabelSelected]}>全部</Text>
-              {game === "" && (
-                <>
-                  <View style={styles.gameIndicator} />
-                  <Image source={tabLeftCorner} style={[styles.tabCorner, styles.tabCornerLeft]} pointerEvents="none" />
-                  <Image source={tabRightCorner} style={[styles.tabCorner, styles.tabCornerRight]} pointerEvents="none" />
-                </>
-              )}
-            </Pressable>
-            {games.map((item) => (
-              <Pressable
-                key={item.id}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: game === String(item.id) }}
-                onPress={() => onGameChange(String(item.id))}
-                style={[
-                  styles.gameTab,
-                  game === String(item.id) && styles.gameTabSelected,
-                ]}
-              >
-                <View
-                  style={[
-                    styles.gameLogo,
-                    {
-                      backgroundColor:
-                        item.category === 1 ? "#3ec8a5" : "#ecb34f",
-                    },
-                  ]}
-                >
-                  {item.iconUrl ? (
-                    <CachedImage
-                      source={{ uri: item.iconUrl }}
-                      style={styles.gameIcon}
-                    />
-                  ) : (
-                    <Text style={styles.gameLogoText}>△</Text>
-                  )}
-                </View>
-                <Text
-                  style={[
-                    styles.gameLabel,
-                    game === String(item.id) && styles.gameLabelSelected,
-                  ]}
-                >
-                  {item.name}
-                </Text>
-                {game === String(item.id) && (
-                  <>
-                    <View style={styles.gameIndicator} />
-                    <Image
-                      source={tabLeftCorner}
-                      style={[styles.tabCorner, styles.tabCornerLeft]}
-                      pointerEvents="none"
-                    />
-                    <Image
-                      source={tabRightCorner}
-                      style={[styles.tabCorner, styles.tabCornerRight]}
-                      pointerEvents="none"
-                    />
-                  </>
-                )}
-              </Pressable>
-            ))}
-          </ScrollView>
+          {/* key 挂分类：切分类时整行重建，横向滚动位置回到起点 */}
+          <HomeGameTabBar key={category} items={gameTabItems} activeKey={game} onSelect={onGameChange} />
         </>
       )}
     </>
   );
 }
+
+type HomeGameTabItem = {
+  id: string;
+  label: string;
+  iconUrl: string | null;
+  category: number;
+};
+
+const homeGameTabKey = (item: HomeGameTabItem) => item.id || "all";
+
+/** 游戏行横向虚拟化：游戏数量增长后只渲染窗口内的 tab */
+const HomeGameTabBar = memo(function HomeGameTabBar({
+  items,
+  activeKey,
+  onSelect,
+}: {
+  items: HomeGameTabItem[];
+  activeKey: GameKey;
+  onSelect: (gameKey: GameKey) => void;
+}) {
+  const renderItem = useCallback(
+    ({ item }: { item: HomeGameTabItem }) => (
+      <HomeGameTab
+        id={item.id}
+        label={item.label}
+        iconUrl={item.iconUrl}
+        category={item.category}
+        active={item.id === activeKey}
+        onSelect={onSelect}
+      />
+    ),
+    [activeKey, onSelect],
+  );
+  return (
+    <FlatList
+      horizontal
+      data={items}
+      keyExtractor={homeGameTabKey}
+      renderItem={renderItem}
+      showsHorizontalScrollIndicator={false}
+      style={styles.gameTabs}
+      contentContainerStyle={styles.gameTabsContent}
+      initialNumToRender={10}
+      maxToRenderPerBatch={10}
+      windowSize={5}
+    />
+  );
+});
+
+const HomeGameTab = memo(function HomeGameTab({
+  id,
+  label,
+  iconUrl,
+  category,
+  active,
+  onSelect,
+}: {
+  id: string;
+  label: string;
+  iconUrl: string | null;
+  category: number;
+  active: boolean;
+  onSelect: (gameKey: GameKey) => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="tab"
+      accessibilityState={{ selected: active }}
+      onPress={() => onSelect(id)}
+      style={[styles.gameTab, active && styles.gameTabSelected]}
+    >
+      {id === "" ? (
+        <Image source={allGamesIcon} style={styles.allGamesIcon} contentFit="contain" />
+      ) : (
+        <View
+          style={[
+            styles.gameLogo,
+            { backgroundColor: category === 1 ? "#3ec8a5" : "#ecb34f" },
+          ]}
+        >
+          {iconUrl ? (
+            <CachedImage source={{ uri: iconUrl }} style={styles.gameIcon} />
+          ) : (
+            <Text style={styles.gameLogoText}>△</Text>
+          )}
+        </View>
+      )}
+      <Text style={[styles.gameLabel, active && styles.gameLabelSelected]}>{label}</Text>
+      {active && (
+        <>
+          <View style={styles.gameIndicator} />
+          <Image source={tabLeftCorner} style={[styles.tabCorner, styles.tabCornerLeft]} pointerEvents="none" />
+          <Image source={tabRightCorner} style={[styles.tabCorner, styles.tabCornerRight]} pointerEvents="none" />
+        </>
+      )}
+    </Pressable>
+  );
+});
 
 export function HomeTopBar({ tab, onTabChange }: Pick<HomeHeaderProps, "tab" | "onTabChange">) {
   return (

@@ -573,6 +573,8 @@ export default function OrderScreen() {
               loading={orders.isFetchingNextPage}
               hasMore={orders.hasNextPage}
               pageCount={orders.data?.pages.length}
+              failed={orders.isFetchNextPageError}
+              onRetry={orders.fetchNextPage}
             />
           ) : null
         }
