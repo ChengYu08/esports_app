@@ -26,6 +26,7 @@ import {
   readAuthSession,
   saveAuthSession,
 } from "@/features/auth/session-persistence";
+import { clearActionCommandAccountState } from "@/features/message/action-command/action-command-handlers";
 import { InAppNotificationBanner } from "@/features/message/components/InAppNotificationBanner";
 import {
   messageStore,
@@ -115,6 +116,7 @@ export default function RootLayout() {
           return;
         }
         clearSession();
+        clearActionCommandAccountState();
         queryClient.clear();
       })();
       authExpiryTask.current = task;

@@ -5,6 +5,8 @@ export const PLATFORM_NOTICE_USER_ID = "50000000";
 
 export type QuickMatchNoticePayload = {
   requestNo: string;
+  /** 通知轮次：1 首轮，后续递增；缺省/非法回落 1 */
+  notifyRound: number;
   buyerNickname: string;
   gameName: string;
   modeName: string;
@@ -59,6 +61,13 @@ function optionalStringField(data: Record<string, unknown>, key: string): string
   return value;
 }
 
+/** 通知轮次：正整数有效，否则回落 1（对齐 PC） */
+function parseNotifyRound(data: Record<string, unknown>): number {
+  const parsed = Number(data.notifyRound);
+  if (Number.isInteger(parsed) && parsed > 0) return parsed;
+  return 1;
+}
+
 export function parseQuickMatchNotice(
   data: Record<string, unknown>,
 ): QuickMatchNoticePayload | null {
@@ -66,6 +75,7 @@ export function parseQuickMatchNotice(
   if (!requestNo) return null;
   return {
     requestNo,
+    notifyRound: parseNotifyRound(data),
     buyerNickname: stringField(data, "buyerNickname"),
     gameName: stringField(data, "gameName"),
     modeName: stringField(data, "modeName"),

@@ -61,7 +61,7 @@ export function handleQuickMatchExpired(
   actions.dismissQuickMatchBar(payload.requestNo);
 }
 
-/** 抢单通知去重：requestNo（条消失时释放，允许同需求极端重推再提示） */
+/** 抢单通知去重：requestNo:notifyRound（账号会话内永久，登出清空） */
 const quickMatchNoticeKeys = new Set<string>();
 /** 支付催单去重：orderNo（条消失时释放，防止关了又弹） */
 const orderPayKeys = new Set<string>();
@@ -125,7 +125,8 @@ export function handleQuickMatchNotice(command: RongCommand, now = Date.now()) {
 
   // 无论是否弹条（重复/已过期/离线重放）都让派单中心失效：可见时立即重拉，否则下次进入再拉
   void refreshDispatchForRemoteChange();
-  if (quickMatchNoticeKeys.has(payload.requestNo)) return;
+  const notifyKey = `${payload.requestNo}:${payload.notifyRound}`;
+  if (quickMatchNoticeKeys.has(notifyKey)) return;
   if (stale) return;
 
   const expireAt = Number.isFinite(payload.expireAtMs)
@@ -133,8 +134,8 @@ export function handleQuickMatchNotice(command: RongCommand, now = Date.now()) {
     : now + MAX_ACTION_NOTICE_DURATION_MS;
   if (expireAt - now <= 0) return;
 
-  const noticeId = `qm:${payload.requestNo}`;
-  quickMatchNoticeKeys.add(payload.requestNo);
+  const noticeId = `qm:${payload.requestNo}:${payload.notifyRound}`;
+  quickMatchNoticeKeys.add(notifyKey);
   // 活动语境文案：仅 activityCode 非空时切换标题；跳转链路与普通通知完全一致
   const text = payload.activityCode
     ? buildActivityQuickMatchMessage(payload)
@@ -153,7 +154,6 @@ export function handleQuickMatchNotice(command: RongCommand, now = Date.now()) {
         const result = await grabQuickMatchAndEnterAudition(payload.requestNo);
         if (result.status === "failed") showToast(result.message);
       },
-      onDisappear: () => releaseQuickMatchNoticeKey(payload.requestNo),
     },
   );
 }
@@ -233,18 +233,19 @@ export function handleOrderNotifyPopup(command: RongCommand, now = Date.now()) {
   );
 }
 
-/** 抢单条消失（到期/忽略/抢单成功）时释放去重键 */
-export function releaseQuickMatchNoticeKey(requestNo: string) {
-  quickMatchNoticeKeys.delete(requestNo);
-}
-
 /** 支付催单条消失（到期/接单成功/挤出）时释放去重键 */
 export function releaseOrderPayKey(orderNo: string) {
   orderPayKeys.delete(orderNo);
 }
 
-/** 测试专用：清空去重键 */
+/** 清空去重键（登出/切账号；测试也可调用） */
 export function resetActionCommandDedupKeys() {
   quickMatchNoticeKeys.clear();
   orderPayKeys.clear();
+}
+
+/** 登出/切账号：清空抢单与催单去重 + 残留通知条（对齐 PC resetAccountState） */
+export function clearActionCommandAccountState() {
+  resetActionCommandDedupKeys();
+  actionNotice.clear();
 }

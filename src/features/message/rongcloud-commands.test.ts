@@ -21,6 +21,7 @@ describe("parseQuickMatchNotice", () => {
     });
     expect(payload).toEqual({
       requestNo: "QM20261020001",
+      notifyRound: 1,
       buyerNickname: "老板A",
       gameName: "王者荣耀",
       modeName: "上分",
@@ -28,6 +29,22 @@ describe("parseQuickMatchNotice", () => {
       serviceName: "陪玩",
       expireAtMs: new Date("2026-10-20T12:30:00").getTime(),
     });
+  });
+
+  it("解析 notifyRound", () => {
+    expect(parseQuickMatchNotice({ requestNo: "QM1", notifyRound: 3 })?.notifyRound).toBe(3);
+  });
+
+  it.each([
+    ["缺失", {}],
+    ["0", { notifyRound: 0 }],
+    ["负数", { notifyRound: -1 }],
+    ["小数", { notifyRound: 1.5 }],
+    ["非数字", { notifyRound: "abc" }],
+  ])("notifyRound %s 回落为 1", (_name, extra) => {
+    expect(
+      parseQuickMatchNotice({ requestNo: "QM1", ...extra })?.notifyRound,
+    ).toBe(1);
   });
 
   it("expireTime 缺失时 expireAtMs 为 NaN", () => {

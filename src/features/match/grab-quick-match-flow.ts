@@ -200,7 +200,7 @@ export function resetGrabQuickMatchPending() {
  * 避免三个抢单入口的状态不一致。取消切房等未发生的抢单不算结算。
  */
 function settleGrab(requestNo: string) {
-  actionNotice.dismiss(`qm:${requestNo}`);
+  actionNotice.dismissByPrefix(`qm:${requestNo}:`);
   void refreshDispatchAfterGrabAttempt();
   void refreshDispatchDetail(requestNo);
 }

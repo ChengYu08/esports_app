@@ -26,7 +26,7 @@ export function registerActionCommandHandlers(): () => void {
       handleQuickMatchExpired(command, {
         notifyEnded: useQuickMatchEndSignals.getState().notifyEnded,
         dismissQuickMatchBar: (requestNo) => {
-          actionNotice.dismiss(`qm:${requestNo}`);
+          actionNotice.dismissByPrefix(`qm:${requestNo}:`);
         },
       });
     },
