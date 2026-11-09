@@ -7,13 +7,13 @@ import { router } from "expo-router";
 import { requiresSelfRealNameVerification } from "@/features/mine/order-real-name";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 
-const SELF_REAL_NAME_REQUIRED_MESSAGE = "进入语聊房需要实名认证";
+const SELF_REAL_NAME_PROMPT_MESSAGE = "请先完成实名认证";
 const GO_REAL_NAME_CONFIRM_TEXT = "去实名";
 const CANCEL_TEXT = "取消";
 
 async function promptGoRealNameVerification(): Promise<void> {
   const confirmed = await useAppConfirm.getState().confirm({
-    message: SELF_REAL_NAME_REQUIRED_MESSAGE,
+    message: SELF_REAL_NAME_PROMPT_MESSAGE,
     confirmText: GO_REAL_NAME_CONFIRM_TEXT,
     cancelText: CANCEL_TEXT,
   });

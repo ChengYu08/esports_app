@@ -41,6 +41,7 @@ describe("ensureRealNameBeforeVoiceRoomEnter", () => {
     await vi.waitFor(() => {
       expect(useAppConfirm.getState().options).not.toBeNull();
     });
+    expect(useAppConfirm.getState().options?.message).toBe("请先完成实名认证");
     expect(useAppConfirm.getState().options?.confirmText).toBe("去实名");
     expect(useAppConfirm.getState().options?.cancelText).toBe("取消");
     useAppConfirm.getState().settle(true);
@@ -70,8 +71,10 @@ describe("promptSelfRealNameIfNeeded", () => {
     await vi.waitFor(() => {
       expect(useAppConfirm.getState().options).not.toBeNull();
     });
+    expect(useAppConfirm.getState().options?.message).toBe("请先完成实名认证");
     useAppConfirm.getState().settle(true);
     await expect(flow).resolves.toBe(true);
     expect(mocks.push).toHaveBeenCalledWith("/real-name-verification");
   });
 });
+

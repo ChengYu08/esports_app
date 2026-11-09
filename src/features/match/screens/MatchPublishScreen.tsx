@@ -238,6 +238,7 @@ export default function MatchPublishScreen() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "发布失败，请重试";
+      // publish 返回未实名：需试音/不试音都弹「去实名」
       if (await promptSelfRealNameIfNeeded(message)) {
         return;
       }
