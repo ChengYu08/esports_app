@@ -4,6 +4,7 @@ import {
   ChevronRight16Regular,
   HeadphonesRegular,
 } from "@fluentui/react-native-icons";
+import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -61,6 +62,9 @@ import {
 
 // 聊天单次发送图片数量上限（相册多选防刷屏）
 const CHAT_IMAGE_MAX = 10;
+// 长按文案消息弹出的操作菜单尺寸（贴着按压点上方展示）
+const COPY_MENU_WIDTH = 108;
+const COPY_MENU_HEIGHT = 44;
 /** 输入框行高与最大行数：默认 44（单行 22 + 上下内边距 11），超过 4 行内部滚动 */
 const COMPOSER_LINE_HEIGHT = 22;
 const COMPOSER_MAX_CONTENT_HEIGHT = COMPOSER_LINE_HEIGHT * 4;
@@ -1242,6 +1246,17 @@ const ChatBubble = memo(function ChatBubble({
   onPreviewImage: (message: ManagedMessage) => void;
 }) {
   const { width: windowWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  // 长按文案消息弹出的操作菜单位置（按压点的页面坐标）
+  const [copyMenuAt, setCopyMenuAt] = useState<{ x: number; y: number } | null>(null);
+  const copyableText = item.kind === "text" ? item.text : "";
+  const copyMessageText = useCallback(() => {
+    setCopyMenuAt(null);
+    Clipboard.setStringAsync(copyableText).then(
+      () => showToast("已复制"),
+      () => showToast("复制失败，请重试"),
+    );
+  }, [copyableText]);
   const knownRatio = item.kind === "image" ? item.imageAspectRatio : undefined;
   const [loadedRatio, setLoadedRatio] = useState<number | null>(null);
   // 消息自带宽高比优先用于首帧，避免先按 1:1 排版、解码后再回弹（每张图多一次布局和一次解码）
@@ -1268,6 +1283,19 @@ const ChatBubble = memo(function ChatBubble({
     setLoadedUri(bubbleImageUri);
     setImageLoading(true);
   }
+
+  // 菜单贴着按压点上方，左右夹在屏幕内，顶部放不下就落到按压点下方
+  const copyMenuLeft = copyMenuAt
+    ? Math.min(
+        Math.max(copyMenuAt.x - COPY_MENU_WIDTH / 2, 12),
+        windowWidth - COPY_MENU_WIDTH - 12,
+      )
+    : 0;
+  const copyMenuTop = copyMenuAt
+    ? copyMenuAt.y - COPY_MENU_HEIGHT - 12 >= insets.top + 8
+      ? copyMenuAt.y - COPY_MENU_HEIGHT - 12
+      : copyMenuAt.y + 12
+    : 0;
 
   return (
     <View
@@ -1401,7 +1429,19 @@ const ChatBubble = memo(function ChatBubble({
         ) : item.kind === "markdown" ? (
           <MarkdownMessage content={item.text} />
         ) : (
-          <Text style={styles.bubbleText}>{item.text}</Text>
+          // 文案消息长按弹操作菜单（复制），短按不响应，避免误触挡住列表滚动
+          <Pressable
+            accessibilityHint="长按弹出消息菜单"
+            delayLongPress={350}
+            onLongPress={(event) => {
+              setCopyMenuAt({
+                x: event.nativeEvent.pageX,
+                y: event.nativeEvent.pageY,
+              });
+            }}
+          >
+            <Text style={styles.bubbleText}>{item.text}</Text>
+          </Pressable>
         )}
       </View>
       {item.isMine && (
@@ -1426,6 +1466,42 @@ const ChatBubble = memo(function ChatBubble({
         >
           <Text style={styles.retryLabel}>重试</Text>
         </Pressable>
+      ) : null}
+      {copyMenuAt ? (
+        <Modal
+          animationType="fade"
+          transparent
+          visible
+          onRequestClose={() => setCopyMenuAt(null)}
+        >
+          <View style={styles.copyMenuLayer}>
+            <Pressable
+              accessibilityLabel="关闭消息菜单"
+              onPress={() => setCopyMenuAt(null)}
+              style={StyleSheet.absoluteFill}
+            />
+            <View
+              style={[
+                styles.copyMenu,
+                {
+                  left: copyMenuLeft,
+                  top: copyMenuTop,
+                  width: COPY_MENU_WIDTH,
+                  height: COPY_MENU_HEIGHT,
+                },
+              ]}
+            >
+              <Pressable
+                accessibilityLabel="复制消息内容"
+                accessibilityRole="button"
+                onPress={copyMessageText}
+                style={styles.copyMenuItem}
+              >
+                <Text style={styles.copyMenuText}>复制</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
       ) : null}
     </View>
   );
@@ -1557,6 +1633,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
   },
+  copyMenuLayer: { flex: 1 },
+  // 深色小浮层菜单，贴着按压点展示；不压暗背景，避免聊天内容看不清
+  copyMenu: {
+    position: "absolute",
+    borderRadius: 8,
+    backgroundColor: "rgba(0,0,0,0.85)",
+    overflow: "hidden",
+    elevation: 6,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 8,
+  },
+  copyMenuItem: { flex: 1, alignItems: "center", justifyContent: "center" },
+  copyMenuText: { color: "#FFFFFF", fontSize: 15, lineHeight: 20 },
   imageBubble: {
     padding: 0,
     overflow: "hidden",
