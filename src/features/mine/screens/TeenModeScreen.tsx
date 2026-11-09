@@ -94,6 +94,16 @@ function TeenModeScreenSession({
   const enabled = status?.enabled === true;
   const passwordSet = status?.passwordSet === true;
 
+  const teenEnabledToastText = (label: string | null) => {
+    if (label === "全天") {
+      return "青少年模式已开启，全天限制核心功能";
+    }
+    if (label) {
+      return `青少年模式已开启，每日 ${label} 期间限制核心功能`;
+    }
+    return "青少年模式已开启";
+  };
+
   const applyStatus = (
     next: TeenModeStatus,
     expectedSession: number,
@@ -195,11 +205,7 @@ function TeenModeScreenSession({
           }
           // 开启成功不停留说明页：直接返回上一页，限制时段文案跟随服务端配置
           router.back();
-          showToast(
-            lockRangeLabel
-              ? `青少年模式已开启，每日 ${lockRangeLabel} 期间限制核心功能`
-              : "青少年模式已开启",
-          );
+          showToast(teenEnabledToastText(lockRangeLabel));
           return;
         }
         if (
@@ -219,11 +225,7 @@ function TeenModeScreenSession({
           }
           // 与首设密码路径一致：开启成功直接返回上一页并提示，不停留说明页
           router.back();
-          showToast(
-            lockRangeLabel
-              ? `青少年模式已开启，每日 ${lockRangeLabel} 期间限制核心功能`
-              : "青少年模式已开启",
-          );
+          showToast(teenEnabledToastText(lockRangeLabel));
           return;
         }
         if (phase === "disable") {
@@ -283,9 +285,11 @@ function TeenModeScreenSession({
               <View style={styles.bulletRow}>
                 <Image source={starIcon} style={styles.bulletIcon} />
                 <Text style={styles.bulletText}>
-                  {lockRangeLabel
-                    ? `为保障未成年人的充足休息与健康作息，开启未成年人模式后，每日${lockRangeLabel}期间无法访问盼之社区`
-                    : "为保障未成年人的充足休息与健康作息，开启未成年人模式后将限制访问盼之社区"}
+                  {lockRangeLabel === "全天"
+                    ? "为保障未成年人的充足休息与健康作息，开启未成年人模式后，全天无法访问盼之社区"
+                    : lockRangeLabel
+                      ? `为保障未成年人的充足休息与健康作息，开启未成年人模式后，每日${lockRangeLabel}期间无法访问盼之社区`
+                      : "为保障未成年人的充足休息与健康作息，开启未成年人模式后将限制访问盼之社区"}
                 </Text>
               </View>
             </>
