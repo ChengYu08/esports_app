@@ -759,6 +759,8 @@ export default function ClubDetailScreen() {
                 loading={companionsQuery.isFetchingNextPage}
                 hasMore={companionsQuery.hasNextPage}
                 pageCount={companionsQuery.data?.pages.length}
+                failed={companionsQuery.isFetchNextPageError}
+                onRetry={companionsQuery.fetchNextPage}
               />
             ) : null
           }

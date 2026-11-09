@@ -321,19 +321,13 @@ export default function ProfileRelationScreen() {
           )
         }
         ListFooterComponent={
-          items.length === 0 ? null : query.isFetchNextPageError &&
-            !query.isFetchingNextPage ? (
-            <Pressable
-              onPress={() => void fetchNextRelations()}
-              style={styles.footer}
-            >
-              <Text style={styles.retryText}>加载失败，点击重试</Text>
-            </Pressable>
-          ) : (
+          items.length === 0 ? null : (
             <PaginationFooter
               loading={query.isFetchingNextPage}
               hasMore={query.hasNextPage}
               pageCount={query.data?.pages.length}
+              failed={query.isFetchNextPageError}
+              onRetry={fetchNextRelations}
             />
           )
         }
@@ -441,6 +435,4 @@ const styles = StyleSheet.create({
   actionTextDone: { color: "#999999" },
   emptyState: { flex: 1 },
   emptyLoading: { flex: 1, alignSelf: "center" },
-  retryText: { color: "#FE1F4C", fontSize: 13 },
-  footer: { alignItems: "center", paddingVertical: 20 },
 });

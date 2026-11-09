@@ -29,6 +29,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EmojiKeyboard, type EmojiType } from "rn-emoji-keyboard";
+import { colors } from "@/shared/theme/tokens";
 
 import type { AfterSaleCardPayload } from "@/features/order/after-sale-card";
 import { afterSaleCardRows } from "@/features/order/after-sale-card";
@@ -157,6 +158,7 @@ export function ChatConversation({
   const insets = useSafeAreaInsets();
   const accessToken = useAuthStore((state) => state.accessToken);
   const userId = useAuthStore((state) => state.user?.id);
+  const myClubId = useAuthStore((state) => state.user?.clubInfo?.id);
   const myAvatarUrl = useAuthStore((state) => state.user?.headImage);
   const myNickname = useAuthStore((state) => state.user?.nickname);
   const [afterSaleSending, setAfterSaleSending] = useState(false);
@@ -416,6 +418,21 @@ export function ChatConversation({
     isSheet,
     navigateWithSheetDismiss,
   ]);
+  // 右侧自己头像：进入自己的主页，参数与「我的」页 openHomepage 一致
+  const openMyProfile = useCallback(() => {
+    if (!userId) {
+      return;
+    }
+    navigateWithSheetDismiss(() => {
+      router.push({
+        pathname: "/profile" as const,
+        params: {
+          ...(myClubId ? { clubId: String(myClubId) } : {}),
+          userId: String(userId),
+        },
+      });
+    });
+  }, [myClubId, navigateWithSheetDismiss, userId]);
   const renderChatRow = useCallback(
     ({ item }: { item: ChatListRow }) =>
       item.kind === "time" ? (
@@ -437,6 +454,7 @@ export function ChatConversation({
           }}
           onRetry={handleRetryMessage}
           onOpenProfile={canViewProfile ? openProfile : undefined}
+          onOpenMyProfile={openMyProfile}
           onOpenOrder={isOrderAssistant ? openOrderDetail : undefined}
           onPreviewImage={openImagePreview}
         />
@@ -451,6 +469,7 @@ export function ChatConversation({
       myNickname,
       navigateWithSheetDismiss,
       openImagePreview,
+      openMyProfile,
       openOrderDetail,
       openProfile,
       title,
@@ -1206,6 +1225,7 @@ const ChatBubble = memo(function ChatBubble({
   onEnterRoomInvite,
   onRetry,
   onOpenProfile,
+  onOpenMyProfile,
   onOpenOrder,
   onPreviewImage,
 }: {
@@ -1217,6 +1237,7 @@ const ChatBubble = memo(function ChatBubble({
   onEnterRoomInvite: (roomId: string, roomVersion: string) => void;
   onRetry: (clientId: string) => void;
   onOpenProfile?: () => void;
+  onOpenMyProfile?: () => void;
   onOpenOrder?: (orderId: string) => void;
   onPreviewImage: (message: ManagedMessage) => void;
 }) {
@@ -1239,6 +1260,14 @@ const ChatBubble = memo(function ChatBubble({
   const bubbleImageUri = item.kind === "image"
     ? (isGifMessage ? item.imageUrl : (isThumbnailSharpEnough ? item.thumbnailUri! : item.imageUrl))
     : "";
+  // 大图/GIF 下载解码完成前显示同尺寸灰底转圈占位，避免空白直接跳变成图；
+  // 图片地址变化时在渲染期重置加载态（React 官方推荐写法，避免 effect 内 setState）
+  const [imageLoading, setImageLoading] = useState(true);
+  const [loadedUri, setLoadedUri] = useState(bubbleImageUri);
+  if (loadedUri !== bubbleImageUri) {
+    setLoadedUri(bubbleImageUri);
+    setImageLoading(true);
+  }
 
   return (
     <View
@@ -1291,6 +1320,7 @@ const ChatBubble = memo(function ChatBubble({
                 styles.messageImage,
                 { width: imageWidth, height: imageHeight },
               ]}
+              transition={120}
               onLoad={({ source }) => {
                 if (source.width <= 0 || source.height <= 0) {
                   return;
@@ -1302,7 +1332,13 @@ const ChatBubble = memo(function ChatBubble({
                 }
                 setLoadedRatio(next);
               }}
+              onLoadEnd={() => setImageLoading(false)}
             />
+            {imageLoading ? (
+              <View pointerEvents="none" style={[styles.imageLoadingPlaceholder, { width: imageWidth, height: imageHeight }]}>
+                <ActivityIndicator size="small" color={colors.textMuted} />
+              </View>
+            ) : null}
           </Pressable>
         ) : item.kind === "roomInvite" ? (
           <Pressable
@@ -1369,11 +1405,19 @@ const ChatBubble = memo(function ChatBubble({
         )}
       </View>
       {item.isMine && (
-        <CachedImage
-          contentFit="cover"
-          source={myAvatar}
-          style={styles.messageAvatar}
-        />
+        <Pressable
+          accessibilityLabel="查看我的主页"
+          accessibilityRole="button"
+          disabled={!onOpenMyProfile}
+          hitSlop={6}
+          onPress={onOpenMyProfile}
+        >
+          <CachedImage
+            contentFit="cover"
+            source={myAvatar}
+            style={styles.messageAvatar}
+          />
+        </Pressable>
       )}
       {item.status === "failed" ? (
         <Pressable
@@ -1518,6 +1562,14 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "transparent",
     borderWidth: 0,
+  },
+  imageLoadingPlaceholder: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.skeleton,
   },
   roomInviteBubble: {
     maxWidth: "84%",

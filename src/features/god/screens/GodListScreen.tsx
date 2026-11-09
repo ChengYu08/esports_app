@@ -378,6 +378,8 @@ export default function GodListScreen({ active = true }: { active?: boolean }) {
                 loading={godList.isFetchingNextPage}
                 hasMore={godList.hasNextPage}
                 pageCount={godList.data?.pages.length}
+                failed={godList.isFetchNextPageError}
+                onRetry={godList.fetchNextPage}
               />
             ) : null
           }
