@@ -29,6 +29,10 @@ import {
 } from "@/features/match/api/match.types";
 import { openAuditionRoom } from "@/features/match/enter-audition-room";
 import { isExistingDispatchConflictMessage } from "@/features/match/existing-dispatch-hint";
+import {
+  ensureRealNameBeforeVoiceRoomEnter,
+  promptSelfRealNameIfNeeded,
+} from "@/features/voice-room/ensure-real-name-before-enter";
 import { requireLogin } from "@/shared/navigation/require-login";
 import { showToast } from "@/shared/ui/app-toast";
 
@@ -139,6 +143,9 @@ export default function ActivityLandingScreen({ activityCode }: { activityCode: 
     if (!requireLogin() || !token) {
       return;
     }
+    if (!(await ensureRealNameBeforeVoiceRoomEnter())) {
+      return;
+    }
     setPublishing(true);
     try {
       const result = await publishActivity(detail.activityId, token);
@@ -152,6 +159,9 @@ export default function ActivityLandingScreen({ activityCode }: { activityCode: 
         return;
       }
       const message = error instanceof Error ? error.message : "参与活动失败，请重试";
+      if (await promptSelfRealNameIfNeeded(message)) {
+        return;
+      }
       // 已有未过期派单：查 active → ensure 进试音房；进房失败再回退匹配中页。
       if (isExistingDispatchConflictMessage(message)) {
         try {

@@ -41,6 +41,10 @@ import {
   useMatchForm,
 } from "@/features/match/hooks/use-match-form";
 import { useRestoreActiveMatch } from "@/features/match/hooks/use-quick-match-session";
+import {
+  ensureRealNameBeforeVoiceRoomEnter,
+  promptSelfRealNameIfNeeded,
+} from "@/features/voice-room/ensure-real-name-before-enter";
 import { exitVoiceRoom } from "@/features/voice-room/exit-voice-room";
 import {
   resolveVoiceRoomId,
@@ -180,6 +184,9 @@ export default function MatchPublishScreen() {
     if (submitting) return;
 
     const needVoice = form.voice === "需试音";
+    if (needVoice && !(await ensureRealNameBeforeVoiceRoomEnter())) {
+      return;
+    }
     setSubmitting(true);
     try {
       const joinedRoom = joinedRoomRef.current;
@@ -231,6 +238,9 @@ export default function MatchPublishScreen() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "发布失败，请重试";
+      if (await promptSelfRealNameIfNeeded(message)) {
+        return;
+      }
       // 已有未过期派单：查 active → ensure 进试音房；进房失败再回退匹配中页。
       if (isExistingDispatchConflictMessage(message)) {
         try {

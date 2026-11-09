@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateA
 
 import { showToast } from "@/shared/ui/app-toast";
 
+import { promptSelfRealNameIfNeeded } from "./ensure-real-name-before-enter";
 import {
   buildMemberChangeMessage,
   memberChangeNoticeKey,
@@ -417,8 +418,12 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
         }
       } catch (cause) {
         await cleanupCancelledJoin();
-        if (active && !kickedRef.current)
-          setError(cause instanceof Error ? cause.message : "进入语聊房失败");
+        if (active && !kickedRef.current) {
+          const message =
+            cause instanceof Error ? cause.message : "进入语聊房失败";
+          await promptSelfRealNameIfNeeded(message);
+          setError(message);
+        }
       } finally {
         if (joining) useVoiceRoomSessionStore.getState().cancelRoomJoin(joining);
         if (active) setLoading(false);

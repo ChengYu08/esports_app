@@ -104,6 +104,8 @@ export async function publishActivity(
     token,
     body: { action: { activityId: Number(activityId) } },
     signal,
+    // 未实名由活动进房流弹「去实名」，不走全局自动跳转
+    suppressRealNameRedirect: true,
   });
   const data = requireSuccess(response, "参与活动失败");
   if (!(data.requestNo || "").trim()) {
