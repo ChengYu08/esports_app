@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { logger } from "@/core/logging/logger";
 import { IMAGE_PREVIEW_ZOOM } from "@/features/mine/image-preview.zoom";
+import { showToast } from "@/shared/ui/app-toast";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 
 // 加载中只做很浅的提示，避免抢画面
@@ -217,13 +218,16 @@ type ImagePreviewProps = {
   mode?: "fit-width";
   /** 需要鉴权的图片才提供：滑到该页时按索引解析成可访问地址（例如经融云 SDK 下载） */
   resolveAtIndex?: (index: number) => Promise<string>;
+  /** 提供后右上角展示「保存」：入参是当前页下标，保存失败请抛带中文文案的 Error，由预览页统一提示 */
+  onSaveImage?: (index: number) => Promise<void>;
 };
 
-export function ImagePreview({ images, index, onClose, mode, resolveAtIndex }: ImagePreviewProps) {
+export function ImagePreview({ images, index, onClose, mode, resolveAtIndex, onSaveImage }: ImagePreviewProps) {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const visibleIndex = useRef(index);
   const [activeIndex, setActiveIndex] = useState(index);
+  const [savingImage, setSavingImage] = useState(false);
 
   const prefetchNearbyImages = useCallback((centerIndex: number) => {
     // 需要鉴权的地址直接请求会失败，交给 resolveAtIndex 按需下载
@@ -254,6 +258,21 @@ export function ImagePreview({ images, index, onClose, mode, resolveAtIndex }: I
     },
     [images.length, prefetchNearbyImages, width],
   );
+
+  const saveCurrentImage = useCallback(async () => {
+    if (!onSaveImage || savingImage) {
+      return;
+    }
+    setSavingImage(true);
+    try {
+      await onSaveImage(activeIndex);
+      showToast("已保存到相册");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "保存失败，请稍后重试");
+    } finally {
+      setSavingImage(false);
+    }
+  }, [activeIndex, onSaveImage, savingImage]);
 
   if (images.length === 0) {
     return <View style={styles.empty}><EmptyState message="暂无图片" /></View>;
@@ -305,6 +324,22 @@ export function ImagePreview({ images, index, onClose, mode, resolveAtIndex }: I
       <Pressable accessibilityLabel="关闭图片预览" hitSlop={12} onPress={onClose} style={[styles.closeButton, { top: insets.top + 8 }]}>
         <Text style={styles.closeText}>×</Text>
       </Pressable>
+      {onSaveImage ? (
+        <Pressable
+          accessibilityLabel="保存图片到相册"
+          accessibilityRole="button"
+          disabled={savingImage}
+          hitSlop={12}
+          onPress={saveCurrentImage}
+          style={[styles.saveButton, { top: insets.top + 8 }]}
+        >
+          {savingImage ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={styles.saveText}>保存</Text>
+          )}
+        </Pressable>
+      ) : null}
     </GestureHandlerRootView>
   );
 }
@@ -328,6 +363,20 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.45)",
   },
   closeText: { color: "#fff", fontSize: 32, fontWeight: "300", lineHeight: 36 },
+  // 与关闭按钮同一高度、同样的半透明底色，靠右对称
+  saveButton: {
+    position: "absolute",
+    top: 8,
+    right: 16,
+    height: 40,
+    minWidth: 40,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  saveText: { color: "#fff", fontSize: 14, fontWeight: "500", lineHeight: 20 },
   imageLoading: { alignItems: "center", justifyContent: "center" },
   loadingLayer: {
     position: "absolute",

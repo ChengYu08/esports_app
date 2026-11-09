@@ -5,6 +5,8 @@ export const colors = {
   textStrong: "#1a1a1a",
   textMuted: "#999",
   textSecondary: "#666",
+  // 设计稿 Gray-08-text 3，用于列表分页等弱提示文案
+  textTertiary: "#979799",
   surface: "#fff",
   border: "#e7e7e7",
   skeleton: "#eeeeee",

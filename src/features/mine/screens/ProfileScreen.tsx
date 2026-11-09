@@ -22,8 +22,8 @@ import {
 } from "react";
 import {
   Animated,
+  FlatList,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -1190,7 +1190,10 @@ function ProfileIdentity({
   );
 }
 
-function GameSelector({
+const profileGameKey = (game: ProfileGame) => String(game.gameId);
+
+/** 技能 tab 的游戏行：横向虚拟化，游戏数量增长后只渲染窗口内的标签 */
+const GameSelector = memo(function GameSelector({
   games,
   selectedGameId,
   onSelect,
@@ -1199,35 +1202,60 @@ function GameSelector({
   selectedGameId: string;
   onSelect: (gameId: string) => void;
 }) {
+  const renderItem = useCallback(
+    ({ item }: { item: ProfileGame }) => (
+      <ProfileGameTag
+        gameId={String(item.gameId)}
+        gameName={item.gameName}
+        iconUrl={item.iconUrl ?? null}
+        active={String(item.gameId) === selectedGameId}
+        onSelect={onSelect}
+      />
+    ),
+    [onSelect, selectedGameId],
+  );
   return (
-    <ScrollView
+    <FlatList
       horizontal
+      data={games}
+      keyExtractor={profileGameKey}
+      renderItem={renderItem}
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.gameTags}
-    >
-      {games.map((game) => {
-        const active = String(game.gameId) === selectedGameId;
-        return (
-          <Pressable
-            key={game.gameId}
-            onPress={() => onSelect(String(game.gameId))}
-            style={[styles.gameTag, active && styles.gameTagActive]}
-          >
-            {game.iconUrl ? (
-              <CachedImage
-                source={{ uri: game.iconUrl }}
-                style={styles.gameTagIcon}
-              />
-            ) : null}
-            <Text style={[styles.gameText, active && styles.gameTextActive]}>
-              {game.gameName}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </ScrollView>
+      initialNumToRender={8}
+      maxToRenderPerBatch={8}
+      windowSize={5}
+    />
   );
-}
+});
+
+const ProfileGameTag = memo(function ProfileGameTag({
+  gameId,
+  gameName,
+  iconUrl,
+  active,
+  onSelect,
+}: {
+  gameId: string;
+  gameName: string;
+  iconUrl: string | null;
+  active: boolean;
+  onSelect: (gameId: string) => void;
+}) {
+  return (
+    <Pressable
+      onPress={() => onSelect(gameId)}
+      style={[styles.gameTag, active && styles.gameTagActive]}
+    >
+      {iconUrl ? (
+        <CachedImage source={{ uri: iconUrl }} style={styles.gameTagIcon} />
+      ) : null}
+      <Text style={[styles.gameText, active && styles.gameTextActive]}>
+        {gameName}
+      </Text>
+    </Pressable>
+  );
+});
 
 function SkillsSummary({
   detail,
@@ -1887,7 +1915,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FE1F4C",
   },
   // paddingBottom 1：部分 Android 屏幕密度下 32dp 取整后最后 1px 物理行落在
-  // 横向 ScrollView 裁剪区外，选中态的圆角边框底部会被裁掉，留 1px 余量兼容
+  // 横向滚动裁剪区外，选中态的圆角边框底部会被裁掉，留 1px 余量兼容
   gameTags: { flexDirection: "row", gap: 10, marginTop: 12, paddingRight: 16, paddingBottom: 1 },
   gameTag: {
     height: 32,

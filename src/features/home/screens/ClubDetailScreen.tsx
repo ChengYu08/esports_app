@@ -39,7 +39,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { fetchCompanionTags } from "../api/home.api";
-import type { Companion, CompanionFilters, GameKey } from "../api/home.types";
+import type { ClubDetailGame, Companion, CompanionFilters, GameKey } from "../api/home.types";
 import {
   useClubCompanions,
   useClubDetail,
@@ -271,7 +271,7 @@ export default function ClubDetailScreen() {
   });
   // 预拉价目表配置：页面被删除/停用时接口降级为空列表，点击价目表时直接弹"暂无价目表"而不是进报错页
   const priceConfigQuery = usePriceList(club?.pageConfigGroupId);
-  const games = club?.games ?? [];
+  const games = useMemo(() => club?.games ?? [], [club?.games]);
   const selectedGame = game || String(games[0]?.id ?? "");
   const selectedGameInfo = games.find(
     (item) => String(item.id) === selectedGame,
@@ -456,12 +456,12 @@ export default function ClubDetailScreen() {
     setSelectedTag(undefined);
   }
 
-  function handleSelectGame(nextGameId: string) {
+  const selectGame = useCallback((nextGameId: string) => {
     setGame(nextGameId);
     // 切换游戏后模式/等级需要重新选择
     setSelectedMode(undefined);
     setSelectedLevel(undefined);
-  }
+  }, []);
   // 是否存在生效中的筛选项：筛选按钮据此显示红色/深色（与面板是否展开无关）
   const hasActiveFilters =
     priceSort !== "DEFAULT" ||
@@ -663,23 +663,7 @@ export default function ClubDetailScreen() {
         </View>
       </View>
       {/* 游戏页签 */}
-      <View style={styles.gameTabBar}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.gameTabBarContent}
-        >
-          {games.map((item) => (
-            <GameTab
-              key={item.id}
-              label={item.name}
-              iconUrl={item.iconUrl}
-              active={selectedGame === String(item.id)}
-              onPress={() => handleSelectGame(String(item.id))}
-            />
-          ))}
-        </ScrollView>
-      </View>
+      <ClubGameTabBar games={games} selectedGame={selectedGame} onSelect={selectGame} />
       {/* 成员列表面板（白色圆角容器：固定筛选栏 + 卡片列表，筛选栏不随列表滚动） */}
       <View style={styles.listWrap}>
         <View style={styles.filterBar}>
@@ -759,6 +743,8 @@ export default function ClubDetailScreen() {
                 loading={companionsQuery.isFetchingNextPage}
                 hasMore={companionsQuery.hasNextPage}
                 pageCount={companionsQuery.data?.pages.length}
+                failed={companionsQuery.isFetchNextPageError}
+                onRetry={companionsQuery.fetchNextPage}
               />
             ) : null
           }
@@ -1189,23 +1175,25 @@ export default function ClubDetailScreen() {
 }
 
 /** 游戏页签：选中为白色圆角块 + 右侧反转角标，未选中透明白字 */
-function GameTab({
+const GameTab = memo(function GameTab({
+  gameId,
   label,
   iconUrl,
   active,
-  onPress,
+  onSelect,
 }: {
+  gameId: string;
   label: string;
   iconUrl?: string;
   active: boolean;
-  onPress: () => void;
+  onSelect: (gameId: string) => void;
 }) {
   return (
     <Pressable
       accessibilityLabel={label}
       accessibilityState={{ selected: active }}
       style={styles.gameTab}
-      onPress={onPress}
+      onPress={() => onSelect(gameId)}
     >
       <View
         style={[styles.gameTabContent, active && styles.gameTabContentActive]}
@@ -1240,7 +1228,46 @@ function GameTab({
       ) : null}
     </Pressable>
   );
-}
+});
+
+const ClubGameTabBar = memo(function ClubGameTabBar({
+  games,
+  selectedGame,
+  onSelect,
+}: {
+  games: ClubDetailGame[];
+  selectedGame: string;
+  onSelect: (gameId: string) => void;
+}) {
+  const renderItem = useCallback(
+    ({ item }: { item: ClubDetailGame }) => (
+      <GameTab
+        gameId={String(item.id)}
+        label={item.name}
+        iconUrl={item.iconUrl}
+        active={selectedGame === String(item.id)}
+        onSelect={onSelect}
+      />
+    ),
+    [onSelect, selectedGame],
+  );
+
+  return (
+    <View style={styles.gameTabBar}>
+      <FlatList
+        horizontal
+        data={games}
+        keyExtractor={(item) => String(item.id)}
+        renderItem={renderItem}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.gameTabBarContent}
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={5}
+      />
+    </View>
+  );
+});
 
 type FilterPillOption = {
   key: string;

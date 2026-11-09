@@ -57,6 +57,7 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreFailed, setLoadMoreFailed] = useState(false);
   const [isReviewer, setIsReviewer] = useState(false);
   const [reviewerStats, setReviewerStats] = useState<{
     todayCount?: number;
@@ -126,6 +127,7 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
           );
         }
         setPage(next);
+        setLoadMoreFailed(false);
       } catch (error) {
         if (requestId !== loadRequestRef.current) {
           return;
@@ -133,6 +135,8 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
         if (!append && !preservePages) {
           setCases([]);
           setTickets([]);
+        } else {
+          setLoadMoreFailed(true);
         }
         showToast(error instanceof Error ? error.message : "加载失败");
       } finally {
@@ -532,7 +536,13 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
         ListFooterComponent={
           <View>
             {data.length > 0 && (
-              <PaginationFooter loading={loadingMore} hasMore={hasMore} pageCount={page} />
+              <PaginationFooter
+                loading={loadingMore}
+                hasMore={hasMore}
+                pageCount={page}
+                failed={loadMoreFailed}
+                onRetry={() => void load(true)}
+              />
             )}
             <View
               style={{ height: (data.length === 0 ? 44 : 60) + bottomInset }}
