@@ -135,6 +135,7 @@ describe("KNOWN_RONG_COMMAND_NAMES", () => {
       "TEXT_NOTIFY_MSG",
       "ORDER_NOTIFY",
       "ROOM_KICKED",
+      "ACTIVITY_ROOM_NOTICE",
     ]) {
       expect(KNOWN_RONG_COMMAND_NAMES.has(name)).toBe(true);
     }

@@ -45,6 +45,7 @@ vi.mock("@/core/logging/logger", () => ({
 }));
 
 const {
+  handleActivityRoomNotice,
   handleOrderNotifyPopup,
   handleQuickMatchExpired,
   handleQuickMatchNotice,
@@ -54,6 +55,7 @@ const { refreshDispatchForRemoteChange } = await import("@/features/order/order-
 const { logger } = await import("@/core/logging/logger");
 const { router } = await import("expo-router");
 const { acceptOrder } = await import("@/features/order/order.api");
+const Toast = (await import("react-native-root-toast")).default;
 
 const NOW = new Date("2026-10-20T12:00:00").getTime();
 const PLATFORM = "50000000";
@@ -500,5 +502,66 @@ describe("handleQuickMatchExpired", () => {
     expect(notifyEnded).not.toHaveBeenCalled();
     expect(dismissQuickMatchBar).not.toHaveBeenCalled();
     expect(refreshDispatchForRemoteChange).not.toHaveBeenCalled();
+  });
+});
+
+describe("handleActivityRoomNotice", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("带 roomId 的活动发布成功 Toast", () => {
+    handleActivityRoomNotice(
+      command("ACTIVITY_ROOM_NOTICE", {
+        commandName: "ACTIVITY_ROOM_NOTICE",
+        requestNo: "QM2119632871408664578",
+        content: "恭喜参与秒杀活动，请尽快在语聊房中选定陪玩并支付，锁定秒杀名额",
+        roomId: 30100020,
+        roomVersion: 25,
+      }),
+    );
+    expect(Toast.show).toHaveBeenCalledWith(
+      "恭喜参与秒杀活动，请尽快在语聊房中选定陪玩并支付，锁定秒杀名额",
+      expect.objectContaining({ duration: 5000 }),
+    );
+  });
+
+  it("不带 roomId 的扩大匹配范围 Toast", () => {
+    handleActivityRoomNotice(
+      command("ACTIVITY_ROOM_NOTICE", {
+        commandName: "ACTIVITY_ROOM_NOTICE",
+        requestNo: "QM2119632871408664578",
+        content: "已为您扩大匹配范围",
+      }),
+    );
+    expect(Toast.show).toHaveBeenCalledWith(
+      "已为您扩大匹配范围",
+      expect.objectContaining({ duration: 5000 }),
+    );
+  });
+
+  it("非平台 sender 忽略", () => {
+    handleActivityRoomNotice(
+      command(
+        "ACTIVITY_ROOM_NOTICE",
+        { content: "已为您扩大匹配范围" },
+        "60000000",
+      ),
+    );
+    expect(Toast.show).not.toHaveBeenCalled();
+  });
+
+  it("空 content 忽略", () => {
+    handleActivityRoomNotice(
+      command("ACTIVITY_ROOM_NOTICE", { content: "   " }),
+    );
+    expect(Toast.show).not.toHaveBeenCalled();
+  });
+
+  it("其它命令名忽略", () => {
+    handleActivityRoomNotice(
+      command("ORDER_NOTIFY", { content: "已为您扩大匹配范围" }),
+    );
+    expect(Toast.show).not.toHaveBeenCalled();
   });
 });

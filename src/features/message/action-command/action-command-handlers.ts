@@ -21,6 +21,9 @@ const QUICK_MATCH_NOTICE = "QUICK_MATCH_NOTICE";
 const QUICK_MATCH_EXPIRED = "QUICK_MATCH_EXPIRED";
 const QUICK_MATCH_CANCELLED = "QUICK_MATCH_CANCELLED";
 const ORDER_NOTIFY = "ORDER_NOTIFY";
+const ACTIVITY_ROOM_NOTICE = "ACTIVITY_ROOM_NOTICE";
+/** 活动房通知 Toast 时长，与 PC MessagePlugin.info duration 对齐 */
+const ACTIVITY_ROOM_NOTICE_TOAST_MS = 5000;
 const MAX_ACTION_NOTICE_DURATION_MS = 15_000;
 /** 离线消息重放门控：命令通知比这更旧视为离线积压，不弹条（超过即为离线重放） */
 const COMMAND_STALE_MAX_MS = 15 * 60_000;
@@ -153,6 +156,20 @@ export function handleQuickMatchNotice(command: RongCommand, now = Date.now()) {
       onDisappear: () => releaseQuickMatchNoticeKey(payload.requestNo),
     },
   );
+}
+
+/**
+ * ACTIVITY_ROOM_NOTICE：活动发布成功 / 扩大匹配范围等 Toast。
+ * 仅展示后端下发的 content 文案；不进房、不消费 roomId/roomVersion。
+ */
+export function handleActivityRoomNotice(command: RongCommand) {
+  if (command.name !== ACTIVITY_ROOM_NOTICE) return;
+  if (command.senderId !== PLATFORM_NOTICE_USER_ID) return;
+
+  const content = String(command.data.content ?? "").trim();
+  if (!content) return;
+
+  showToast(content, { duration: ACTIVITY_ROOM_NOTICE_TOAST_MS });
 }
 
 export function handleOrderNotifyPopup(command: RongCommand, now = Date.now()) {

@@ -41,6 +41,7 @@ export const KNOWN_RONG_COMMAND_NAMES = new Set<string>([
   "TEXT_NOTIFY_MSG",
   "ORDER_NOTIFY",
   "ROOM_KICKED",
+  "ACTIVITY_ROOM_NOTICE",
 ]);
 
 function stringField(data: Record<string, unknown>, key: string): string {
