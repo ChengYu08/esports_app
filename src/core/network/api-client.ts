@@ -74,6 +74,20 @@ async function triggerRealNameRequiredIfNeed(payload: ResponseErrorPayload): Pro
 
 type ResponseErrorPayload = { info?: string; message?: string; code?: string } | null;
 
+const MAX_RESPONSE_LOG_LENGTH = 2000;
+
+function serializeResponseData(data: unknown): string {
+  try {
+    const text = JSON.stringify(data) ?? 'null';
+    if (text.length <= MAX_RESPONSE_LOG_LENGTH) {
+      return text;
+    }
+    return `${text.slice(0, MAX_RESPONSE_LOG_LENGTH)}...[truncated ${text.length}]`;
+  } catch {
+    return '[unserializable]';
+  }
+}
+
 function readErrorPayload(payload: unknown): ResponseErrorPayload {
   if (!payload || typeof payload !== 'object') return null;
   return payload as ResponseErrorPayload;
@@ -140,7 +154,7 @@ export async function apiClient<T>(path: string, options: RequestOptions = {}): 
       timeout: timeoutMs,
       signal: options.signal ?? undefined,
     });
-    logger.debug('api.request', { path, status: response.status, durationMs: Date.now() - startedAt });
+    logger.debug('api.request', { path, status: response.status, durationMs: Date.now() - startedAt, response: serializeResponseData(response.data) });
     return await processResponse<T>(path, response.status, response.data, token, suppressRealNameRedirect);
   } catch (error) {
     // React Query 取消请求时原样抛出，不当作网络失败。
@@ -148,7 +162,7 @@ export async function apiClient<T>(path: string, options: RequestOptions = {}): 
     if (error instanceof ApiError) throw error;
 
     if (isAxiosError(error) && error.response) {
-      logger.debug('api.request', { path, status: error.response.status, durationMs: Date.now() - startedAt });
+      logger.debug('api.request', { path, status: error.response.status, durationMs: Date.now() - startedAt, response: serializeResponseData(error.response.data) });
       return await processResponse<T>(path, error.response.status, error.response.data, token, suppressRealNameRedirect);
     }
 
