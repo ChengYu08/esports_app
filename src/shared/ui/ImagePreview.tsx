@@ -148,7 +148,6 @@ function FitWidthImage({ uri, width }: { uri: string; width: number }) {
   );
 }
 
-export function ImagePreview({ images, index, onClose, mode }: { images: string[]; index: number; onClose: () => void; mode?: "fit-width" }) {
 type ImagePreviewProps = {
   images: string[];
   index: number;
