@@ -11,6 +11,8 @@ type EmptyStateProps = StateProps & {
   messageStyle?: StyleProp<TextStyle>;
   testID?: string;
   illustration?: ReactNode;
+  actionLabel?: string;
+  onAction?: () => void;
 };
 
 const emptyStateIllustration = require("../../../assets/svgs/empty-state-illustration.svg");
@@ -26,12 +28,17 @@ export function LoadingState({ message = "加载中…", style, messageStyle }: 
   );
 }
 
-export function EmptyState({ message = "这里空无一物～", hint, style, messageStyle, testID, illustration }: EmptyStateProps) {
+export function EmptyState({ message = "这里空无一物～", hint, style, messageStyle, testID, illustration, actionLabel, onAction }: EmptyStateProps) {
   return (
     <View testID={testID} style={[styles.emptyState, style]}>
       {illustration ?? <Image accessibilityIgnoresInvertColors contentFit="contain" source={emptyStateIllustration} style={styles.emptyIllustration} />}
       <Text style={[styles.emptyMessage, messageStyle]}>{message}</Text>
       {hint ? <Text style={styles.emptyHint}>{hint}</Text> : null}
+      {actionLabel && onAction ? (
+        <Pressable accessibilityRole="button" onPress={onAction} style={styles.emptyAction}>
+          <Text style={styles.emptyActionText}>{actionLabel}</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -55,6 +62,8 @@ const styles = StyleSheet.create({
   emptyIllustration: { width: 120, height: 120 },
   emptyMessage: { width: "100%", color: colors.textMuted, fontSize: 12, lineHeight: 18, textAlign: "center" },
   emptyHint: { width: "100%", color: colors.textMuted, fontSize: 12, lineHeight: 18, textAlign: "center" },
+  emptyAction: { marginTop: spacing.md, borderRadius: 6, backgroundColor: colors.brand, paddingHorizontal: spacing.lg, paddingVertical: 4 },
+  emptyActionText: { color: "#FFFFFF", fontSize: 14, lineHeight: 22, fontWeight: "500" },
   errorWrap: { alignItems: "center", paddingTop: 60 },
   retry: { marginTop: spacing.md, borderWidth: 1, borderColor: colors.brand, borderRadius: radius.pill, paddingHorizontal: spacing.lg, paddingVertical: 5 },
   retryText: { color: colors.brand, fontSize: 13 },

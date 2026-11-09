@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 type BottomSheetProps = {
   visible: boolean;
   onClose: () => void;
+  onClosed?: () => void;
   /** 安卓返回键的关闭行为，缺省同 onClose；多层弹窗时内层可传自定义处理 */
   onRequestClose?: () => void;
   children: ReactNode;
@@ -37,6 +38,7 @@ type BottomSheetProps = {
 export function BottomSheet({
   visible,
   onClose,
+  onClosed,
   onRequestClose,
   children,
   contentStyle,
@@ -181,11 +183,14 @@ export function BottomSheet({
         useNativeDriver: true,
       }),
     ]).start(({ finished }) => {
-      if (finished) setMounted(false);
+      if (finished) {
+        setMounted(false);
+        onClosed?.();
+      }
     });
   // `mounted` must not restart the entrance animation after it is set.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [backdropOpacity, sheetTranslateY, visible, windowHeight]);
+  }, [backdropOpacity, onClosed, sheetTranslateY, visible, windowHeight]);
 
   if (!mounted) return null;
 

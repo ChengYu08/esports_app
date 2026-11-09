@@ -22,6 +22,7 @@ import {
 } from "react";
 import {
   Animated,
+  Dimensions,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -29,6 +30,11 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import type { ProfileCirclePost } from "@/features/circle/circle.api";
+import { formatCircleCount } from "@/features/circle/circle-data";
+import { CircleCommentHeartIcon } from "@/features/circle/components/CircleActionIcons";
+import { SYSTEM_FONT } from "@/shared/theme/typography";
 
 import {
   getFirstProfileGameId,
@@ -55,6 +61,7 @@ import {
 } from "@/features/mine/components/ProfileSkeleton";
 import { StarPaymentSheet } from "@/features/mine/components/StarPaymentSheet";
 import {
+  useProfileCirclePosts,
   useProfileDetail,
   useProfileGameDetail,
   useProfileReviews,
@@ -89,7 +96,7 @@ const idleStatusIcon = require("../../../../assets/svgs/club-status-idle.svg");
 const playingStatusIcon = require("../../../../assets/svgs/club-status-playing.svg");
 const NAV_BAR_CONTENT_HEIGHT = 44;
 const PROFILE_IDENTITY_TOP_GAP = 12;
-type ProfileTab = "技能" | "评价";
+type ProfileTab = "技能" | "评价" | "盼友圈";
 type ProfileListItem = { key: string; content: ReactElement };
 
 const profileKeyExtractor = (item: ProfileListItem) => item.key;
@@ -99,6 +106,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const focused = useIsFocused();
   const user = useAuthStore((state) => state.user);
+  const isCompanion = useAuthStore((state) => state.isCompanion);
   const route = useLocalSearchParams<{
     clubId?: string | string[];
     userId?: string | string[];
@@ -197,6 +205,17 @@ export default function ProfileScreen() {
       : null,
     focused,
   );
+  // 盼友圈仅在选中 tab 时拉取，避免无谓请求
+  const circleQuery = useProfileCirclePosts(
+    tab === "盼友圈" && routeParams
+      ? {
+          userId: routeParams.userId,
+          isMine,
+          token: user?.id ? useAuthStore.getState().accessToken ?? undefined : undefined,
+        }
+      : null,
+    focused,
+  );
   const gameDetailLoading = gameDetailQuery.isLoading;
   const gameDetailError = gameDetailQuery.isError;
   const refetchGameDetail = gameDetailQuery.refetch;
@@ -204,6 +223,22 @@ export default function ProfileScreen() {
   const reviewError = reviewQuery.isError;
   const reviewItems = reviewQuery.data?.items;
   const refetchReviews = reviewQuery.refetch;
+  const circlePosts = useMemo(
+    () => circleQuery.data?.pages.flatMap((page) => page.list) ?? [],
+    [circleQuery.data],
+  );
+  const circleLoading = circleQuery.isLoading;
+  const circleError = circleQuery.isError;
+  const circleHasMore = circleQuery.hasNextPage;
+  const circleIsFetchingNextPage = circleQuery.isFetchingNextPage;
+  const circleFetchNextPage = circleQuery.fetchNextPage;
+  const refetchCircle = circleQuery.refetch;
+  const loadMoreCircle = useCallback(() => {
+    if (circleIsFetchingNextPage || !circleHasMore) {
+      return;
+    }
+    void circleFetchNextPage();
+  }, [circleIsFetchingNextPage, circleHasMore, circleFetchNextPage]);
   const localProfile = useMemo(() => toLocalProfile(user), [user]);
   const profile = detail ?? localProfile;
   const measureCover = useCallback((height: number) => {
@@ -521,6 +556,59 @@ export default function ProfileScreen() {
           }
         }
       }
+    } else if (tab === "盼友圈") {
+      if (circleLoading && circlePosts.length === 0) {
+        profileListItems.push({
+          key: "circle-loading",
+          content: (
+            <View style={styles.scrollBody}>
+              <ProfileGameSkeleton />
+            </View>
+          ),
+        });
+      } else if (circleError && circlePosts.length === 0) {
+        profileListItems.push({
+          key: "circle-error",
+          content: (
+            <View style={styles.scrollBody}>
+              <InlineState
+                text="盼友圈加载失败"
+                actionLabel="重试"
+                onAction={() => void refetchCircle()}
+              />
+            </View>
+          ),
+        });
+      } else if (circlePosts.length === 0) {
+        profileListItems.push({
+          key: "circle-empty",
+          content: (
+            <View style={styles.scrollBody}>
+              <EmptyState
+                message="暂时没有作品哦～"
+                {...(isMine && isCompanion
+                  ? {
+                      actionLabel: "去发布",
+                      onAction: () => router.push("/circle/search"),
+                    }
+                  : {})}
+              />
+            </View>
+          ),
+        });
+      } else {
+        profileListItems.push({
+          key: "circle-grid",
+          content: (
+            <ProfileCircleGrid
+              posts={circlePosts}
+              isMine={isMine}
+              onEndReached={loadMoreCircle}
+              hasMore={circleHasMore}
+            />
+          ),
+        });
+      }
     } else if (reviewLoading) {
       profileListItems.push({
         key: "reviews-loading",
@@ -589,6 +677,13 @@ export default function ProfileScreen() {
     reviewError,
     reviewItems,
     refetchReviews,
+    circleLoading,
+    circleError,
+    circlePosts,
+    circleHasMore,
+    refetchCircle,
+    loadMoreCircle,
+    isCompanion,
     toggleVoice,
     playingVoiceUrl,
     openOrder,
@@ -918,6 +1013,8 @@ export default function ProfileScreen() {
 }
 
 // 头部标签栏独立组件：滚动阈值切换等无关重渲染时保持元素引用稳定
+const TAB_INDICATOR_WIDTH = 12;
+
 const ProfileTabs = memo(function ProfileTabs({
   tab,
   onSelect,
@@ -925,9 +1022,24 @@ const ProfileTabs = memo(function ProfileTabs({
   tab: ProfileTab;
   onSelect: (tab: ProfileTab) => void;
 }) {
+  const indicatorWidth = useMemo(() => new Animated.Value(TAB_INDICATOR_WIDTH), []);
+  const prevTabRef = useRef(tab);
+
+  useEffect(() => {
+    if (prevTabRef.current !== tab) {
+      indicatorWidth.setValue(0);
+      prevTabRef.current = tab;
+    }
+    Animated.timing(indicatorWidth, {
+      toValue: TAB_INDICATOR_WIDTH,
+      duration: 220,
+      useNativeDriver: false,
+    }).start();
+  }, [tab, indicatorWidth]);
+
   return (
     <View style={styles.tabs}>
-      {(["技能", "评价"] as ProfileTab[]).map((item) => (
+      {(["技能", "评价", "盼友圈"] as ProfileTab[]).map((item) => (
         <Pressable
           key={item}
           accessibilityRole="tab"
@@ -938,7 +1050,14 @@ const ProfileTabs = memo(function ProfileTabs({
           <Text style={[styles.tabText, tab === item && styles.tabTextActive]}>
             {item}
           </Text>
-          {tab === item ? <View style={styles.tabIndicator} /> : null}
+          {tab === item ? (
+            <Animated.View
+              style={[
+                styles.tabIndicator,
+                { width: indicatorWidth },
+              ]}
+            />
+          ) : null}
         </Pressable>
       ))}
     </View>
@@ -1498,6 +1617,241 @@ function formatReviewDate(value?: string) {
   const pad = (number: number) => String(number).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
+
+/** 封面宽高比夹在设计稿两种比例之间（4:3 ≈ 0.6，3:4 ≈ 1.333）。 */
+const MIN_COVER_ASPECT = 0.6;
+const MAX_COVER_ASPECT = 4 / 3;
+const DEFAULT_COVER_ASPECT = 4 / 3;
+const CIRCLE_GRID_GAP = 8;
+const CIRCLE_GRID_PADDING = 8;
+const CIRCLE_CARD_WIDTH = (Dimensions.get("window").width - CIRCLE_GRID_PADDING * 2 - CIRCLE_GRID_GAP) / 2;
+
+function formatDuration(seconds?: number): string {
+  if (!seconds || seconds <= 0) {
+    return "";
+  }
+  const total = Math.round(seconds);
+  const minutes = Math.floor(total / 60);
+  const secs = total % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+}
+
+/** 审核状态标签配色 */
+function getStatusBadge(status: string): { label: string; bg: string } | null {
+  if (status === "REVIEWING") {
+    return { label: "审核中", bg: "rgba(0, 0, 0, 0.7)" };
+  }
+  if (status === "REJECTED") {
+    return { label: "审核不通过", bg: "rgba(0, 0, 0, 0.7)" };
+  }
+  return null;
+}
+
+/** 个人主页盼友圈双列瀑布流卡片 */
+const ProfileCircleCard = memo(function ProfileCircleCard({
+  post,
+  isMine,
+}: {
+  post: ProfileCirclePost;
+  isMine: boolean;
+}) {
+  const [coverAspect, setCoverAspect] = useState(DEFAULT_COVER_ASPECT);
+  const duration = formatDuration(post.likeCount > 0 ? undefined : undefined);
+  const statusBadge = isMine ? getStatusBadge(post.status) : null;
+
+  return (
+    <View style={circleStyles.card}>
+      <View style={circleStyles.coverWrap}>
+        <Image
+          source={post.cover}
+          style={[circleStyles.cover, { aspectRatio: coverAspect }]}
+          contentFit="cover"
+          onLoad={(event) => {
+            const source = event.source as { width?: number; height?: number };
+            if (!source.width || !source.height) {
+              return;
+            }
+            const aspect = source.width / source.height;
+            const next = Math.min(Math.max(aspect, MIN_COVER_ASPECT), MAX_COVER_ASPECT);
+            if (Math.abs(next - coverAspect) > 0.01) {
+              setCoverAspect(next);
+            }
+          }}
+        />
+        {statusBadge ? (
+          <View style={[circleStyles.statusBadge, { backgroundColor: statusBadge.bg }]}>
+            <Text style={circleStyles.statusText}>{statusBadge.label}</Text>
+          </View>
+        ) : null}
+        {duration ? (
+          <View style={circleStyles.durationBadge}>
+            <Text style={circleStyles.durationText}>{duration}</Text>
+          </View>
+        ) : null}
+      </View>
+      <View style={circleStyles.body}>
+        <Text style={circleStyles.title} numberOfLines={2}>
+          {post.title || post.content}
+        </Text>
+        <View style={circleStyles.metaRow}>
+          <View style={circleStyles.likeRow}>
+            <CircleCommentHeartIcon filled={post.liked} color={post.liked ? "#FE1F4C" : "#656566"} />
+            <Text style={circleStyles.likeCount}>{formatCircleCount(post.likeCount)}</Text>
+          </View>
+          <Text style={circleStyles.publishTime}>{post.publishedAt}</Text>
+        </View>
+      </View>
+    </View>
+  );
+});
+
+/** 个人主页盼友圈双列瀑布流 */
+function ProfileCircleGrid({
+  posts,
+  isMine,
+  onEndReached,
+  hasMore,
+}: {
+  posts: ProfileCirclePost[];
+  isMine: boolean;
+  onEndReached: () => void;
+  hasMore: boolean;
+}) {
+  const leftColumn: ProfileCirclePost[] = [];
+  const rightColumn: ProfileCirclePost[] = [];
+  posts.forEach((post, index) => {
+    if (index % 2 === 0) {
+      leftColumn.push(post);
+    } else {
+      rightColumn.push(post);
+    }
+  });
+
+  return (
+    <View style={circleStyles.grid}>
+      <View style={circleStyles.column}>
+        {leftColumn.map((post) => (
+          <ProfileCircleCard key={post.id} post={post} isMine={isMine} />
+        ))}
+      </View>
+      <View style={circleStyles.column}>
+        {rightColumn.map((post) => (
+          <ProfileCircleCard key={post.id} post={post} isMine={isMine} />
+        ))}
+      </View>
+      {hasMore ? (
+        <View style={circleStyles.loadMore}>
+          <Text style={circleStyles.loadMoreText}>加载中...</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+const circleStyles = StyleSheet.create({
+  grid: {
+    flexDirection: "row",
+    paddingHorizontal: CIRCLE_GRID_PADDING,
+    gap: CIRCLE_GRID_GAP,
+  },
+  column: {
+    flex: 1,
+    gap: CIRCLE_GRID_GAP,
+  },
+  card: {
+    width: CIRCLE_CARD_WIDTH,
+    borderRadius: 8,
+    backgroundColor: "#FFFFFF",
+    overflow: "hidden",
+  },
+  coverWrap: {
+    position: "relative",
+  },
+  cover: {
+    width: "100%",
+    backgroundColor: "#F0F1F2",
+  },
+  statusBadge: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingVertical: 4,
+    alignItems: "center",
+  },
+  statusText: {
+    fontFamily: SYSTEM_FONT,
+    color: "#FFFFFF",
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "500",
+    textAlign: "center",
+  },
+  durationBadge: {
+    position: "absolute",
+    right: 6,
+    bottom: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 27,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+  },
+  durationText: {
+    fontFamily: SYSTEM_FONT,
+    color: "#FFFFFF",
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: "400",
+  },
+  body: {
+    padding: 8,
+    gap: 8,
+  },
+  title: {
+    fontFamily: SYSTEM_FONT,
+    color: "#0D0D0F",
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: "400",
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  likeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  likeCount: {
+    fontFamily: SYSTEM_FONT,
+    color: "#656566",
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: "400",
+  },
+  publishTime: {
+    fontFamily: SYSTEM_FONT,
+    color: "#979799",
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: "400",
+  },
+  loadMore: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  loadMoreText: {
+    fontFamily: SYSTEM_FONT,
+    color: "#979799",
+    fontSize: 12,
+  },
+});
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#fff" },

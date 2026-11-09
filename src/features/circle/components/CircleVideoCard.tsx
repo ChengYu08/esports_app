@@ -34,6 +34,8 @@ import {
   CircleHeartIcon,
 } from "@/features/circle/components/CircleActionIcons";
 import { CircleCommentSheet } from "@/features/circle/components/CircleCommentSheet";
+import { CircleTopicLinks, CircleTopicText } from "@/features/circle/components/CircleTopicLinks";
+import { normalizeCircleTopicName, splitCircleTopicText } from "@/features/circle/circle-topic";
 import { CircleVideoPlayer } from "@/features/circle/components/CircleVideoPlayer";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
 import { showToast } from "@/shared/ui/app-toast";
@@ -123,6 +125,8 @@ export function CircleVideoCard({
   });
   const actionBarBottom = TAB_CONTENT_HEIGHT + bottomInset + BOTTOM_INFO_HEIGHT;
   const bottomPadding = TAB_CONTENT_HEIGHT + bottomInset + 12;
+  const contentTopics = new Set(splitCircleTopicText(post.content).flatMap((segment) => segment.topic ? [segment.topic] : []));
+  const extraTags = post.tags.filter((tag) => !contentTopics.has(normalizeCircleTopicName(tag)));
 
   useEffect(() => {
     cancelAnimation(coverOpacity);
@@ -320,8 +324,8 @@ export function CircleVideoCard({
               style={styles.content}
               numberOfLines={expanded ? undefined : 2}
             >
-              {post.content}
-              <Text style={styles.tags}> {post.tags.join(" ")}</Text>
+              <CircleTopicText content={post.content} topicStyle={styles.tags} />
+              <CircleTopicLinks tags={extraTags} prefix=" " style={styles.tags} />
             </Text>
             {needsExpand ? (
               <Pressable
@@ -339,7 +343,7 @@ export function CircleVideoCard({
               style={[styles.content, styles.contentMeasure]}
             >
               {post.content}
-              <Text style={styles.tags}> {post.tags.join(" ")}</Text>
+              <Text style={styles.tags}> {extraTags.join(" ")}</Text>
             </Text>
           </View>
         </View>

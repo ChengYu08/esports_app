@@ -1,11 +1,13 @@
 import { ChevronDown16Regular, Dismiss24Regular } from "@fluentui/react-native-icons";
 import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { EmojiKeyboard, type EmojiType } from "rn-emoji-keyboard";
 import {
   ActivityIndicator,
   FlatList,
+  Keyboard,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -36,6 +38,8 @@ import {
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { CircleCommentHeartIcon } from "@/features/circle/components/CircleActionIcons";
+import { CircleTopicLinks, CircleTopicText } from "@/features/circle/components/CircleTopicLinks";
+import { normalizeCircleTopicName, splitCircleTopicText } from "@/features/circle/circle-topic";
 import { showToast } from "@/shared/ui/app-toast";
 import { requireLogin } from "@/shared/navigation/require-login";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
@@ -87,9 +91,34 @@ export function CircleCommentSheet({
   const [sending, setSending] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [focused, setFocused] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionedUsers, setMentionedUsers] = useState<CircleMentionUser[]>([]);
   const inputRef = useRef<TextInput>(null);
+  const pendingProfileUserIdRef = useRef<string | null>(null);
+  const handleClosed = useCallback(() => {
+    const userId = pendingProfileUserIdRef.current;
+    pendingProfileUserIdRef.current = null;
+    if (userId) {
+      requestAnimationFrame(() => {
+        router.push({ pathname: "/profile", params: { userId } });
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener("keyboardDidShow", () => {
+      setKeyboardVisible(true);
+    });
+    const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardVisible(false);
+    });
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   const commentsQuery = useInfiniteQuery({
     // 评论列表游客可看（后端支持免登录），仅关注/点赞/发布需要登录态
@@ -155,8 +184,12 @@ export function CircleCommentSheet({
   };
 
   const handleClose = () => {
+    Keyboard.dismiss();
     setReplyTarget(null);
     setInput("");
+    setFocused(false);
+    setKeyboardVisible(false);
+    setEmojiPickerOpen(false);
     setMentionOpen(false);
     setMentionedUsers([]);
     setExpandedIds(new Set());
@@ -187,6 +220,7 @@ export function CircleCommentSheet({
 
   const handleReplyPress = (comment: CircleComment, parentCommentId?: string) => {
     setReplyTarget({ comment, parentCommentId });
+    setEmojiPickerOpen(false);
     setMentionOpen(false);
     inputRef.current?.focus();
   };
@@ -195,6 +229,8 @@ export function CircleCommentSheet({
     if (!requireLogin() || !token) {
       return;
     }
+    setEmojiPickerOpen(false);
+    setFocused(true);
     setMentionOpen(true);
     setInput((current) => (current.endsWith("@") ? current : `${current}@`));
     inputRef.current?.focus();
@@ -216,13 +252,35 @@ export function CircleCommentSheet({
     inputRef.current?.focus();
   };
 
+  // 与聊天输入一致：选中表情只追加草稿，面板保持展开，便于连续选择。
+  const handleEmojiSelect = useCallback((emoji: EmojiType) => {
+    setInput((current) => {
+      if (current.length + emoji.emoji.length > 500) {
+        return current;
+      }
+      return `${current}${emoji.emoji}`;
+    });
+  }, []);
+
+  const handleEmojiPress = () => {
+    setMentionOpen(false);
+    if (emojiPickerOpen) {
+      setEmojiPickerOpen(false);
+      inputRef.current?.focus();
+      return;
+    }
+    setFocused(true);
+    setEmojiPickerOpen(true);
+    Keyboard.dismiss();
+  };
+
   /** 点击评论者头像跳转主页；先关弹窗收起键盘，避免返回时残留输入态。 */
   const handleOpenProfile = (comment: CircleComment) => {
     if (!comment.userId) {
       return;
     }
+    pendingProfileUserIdRef.current = comment.userId;
     handleClose();
-    router.push({ pathname: "/profile", params: { userId: comment.userId } });
   };
 
   const handleSend = async () => {
@@ -264,6 +322,9 @@ export function CircleCommentSheet({
       setReplyTarget(null);
       setMentionOpen(false);
       setMentionedUsers([]);
+      setEmojiPickerOpen(false);
+      setFocused(false);
+      Keyboard.dismiss();
     } catch (error) {
       showToast(error instanceof Error ? error.message : "评论发布失败");
     } finally {
@@ -284,6 +345,9 @@ export function CircleCommentSheet({
   };
 
   const nickname = useMemo(() => post.author.replace(/^@/, ""), [post.author]);
+  const inputActive = focused || emojiPickerOpen;
+  const contentTopics = new Set(splitCircleTopicText(post.content).flatMap((segment) => segment.topic ? [segment.topic] : []));
+  const extraTags = post.tags.filter((tag) => !contentTopics.has(normalizeCircleTopicName(tag)));
 
   const renderItem = ({ item }: { item: CircleComment }) => (
     <CommentRow
@@ -293,6 +357,7 @@ export function CircleCommentSheet({
       onLike={handleLike}
       onReply={handleReplyPress}
       onOpenProfile={handleOpenProfile}
+      onOpenTopic={handleClose}
     />
   );
 
@@ -300,6 +365,14 @@ export function CircleCommentSheet({
     <BottomSheet
       visible={visible}
       onClose={handleClose}
+      onClosed={handleClosed}
+      onRequestClose={() => {
+        if (emojiPickerOpen) {
+          setEmojiPickerOpen(false);
+          return;
+        }
+        handleClose();
+      }}
       keyboardAvoiding
       contentStyle={styles.sheet}
     >
@@ -340,9 +413,16 @@ export function CircleCommentSheet({
             {/* 帖子正文必须属于同一个滚动容器，超长正文不能挤掉评论列表的可视高度。 */}
             <View style={styles.postBlock}>
               {post.headline ? <Text style={styles.postTitle}>{post.headline}</Text> : null}
-              {post.content ? <Text style={styles.postContent}>{post.content}</Text> : null}
-              {post.tags.length > 0 ? (
-                <Text style={styles.postTags}>{post.tags.join("  ")}</Text>
+              {post.content ? (
+                <CircleTopicText content={post.content} style={styles.postContent} topicStyle={styles.postTags} onBeforeNavigate={handleClose} />
+              ) : null}
+              {extraTags.length > 0 ? (
+                <CircleTopicLinks
+                  tags={extraTags}
+                  separator="  "
+                  style={styles.postTags}
+                  onBeforeNavigate={handleClose}
+                />
               ) : null}
               <Text style={styles.postMeta}>{post.publishedAt}</Text>
             </View>
@@ -384,11 +464,13 @@ export function CircleCommentSheet({
       <View
         style={[
           styles.inputBar,
-          focused && styles.inputBarFocused,
-          { paddingBottom: Math.max(insets.bottom, 12) },
+          inputActive && styles.inputBarFocused,
+          {
+            paddingBottom: emojiPickerOpen || keyboardVisible ? 12 : Math.max(insets.bottom, 12),
+          },
         ]}
       >
-        {focused && mentionOpen ? (
+        {inputActive && mentionOpen ? (
           <MentionUserList
             users={mentionUsers}
             loading={
@@ -398,7 +480,7 @@ export function CircleCommentSheet({
           />
         ) : null}
         {/* 聚焦/失焦共用同一个 TextInput，仅切换容器样式，避免重新挂载导致键盘收起 */}
-        <View style={focused ? styles.inputTextArea : styles.inputPill}>
+        <View style={inputActive ? styles.inputTextArea : styles.inputPill}>
           <TextInput
             ref={inputRef}
             value={input}
@@ -413,31 +495,37 @@ export function CircleCommentSheet({
             }}
             placeholder={replyTarget ? `回复 ${replyTarget.comment.nickname}` : "友善评论，理性发言"}
             placeholderTextColor="#CACACC"
-            style={focused ? styles.inputExpanded : styles.input}
+            style={inputActive ? styles.inputExpanded : styles.input}
             maxLength={500}
             multiline
             blurOnSubmit
             returnKeyType="send"
             onSubmitEditing={handleSend}
             onFocus={() => {
+              setEmojiPickerOpen(false);
               setFocused(true);
             }}
-            onBlur={() => {
-              setFocused(false);
-            }}
           />
-          {focused ? null : (
-            <CommentInputActions style={styles.inputActions} onMention={handleMentionPress} />
+          {inputActive ? null : (
+            <CommentInputActions
+              style={styles.inputActions}
+              onMention={handleMentionPress}
+              onEmoji={handleEmojiPress}
+            />
           )}
         </View>
-        {focused ? (
+        {inputActive ? (
           <View style={styles.inputToolbar}>
-            <CommentInputActions style={styles.inputToolbarIcons} onMention={handleMentionPress} />
+            <CommentInputActions
+              style={styles.inputToolbarIcons}
+              onMention={handleMentionPress}
+              onEmoji={handleEmojiPress}
+            />
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="发送评论"
               disabled={!input.trim() || sending}
-              onPress={handleSend}
+              onPressIn={handleSend}
               style={({ pressed }) => [
                 styles.sendButtonSmall,
                 (!input.trim() || sending) && styles.sendButtonDisabled,
@@ -452,13 +540,37 @@ export function CircleCommentSheet({
             accessibilityRole="button"
             accessibilityLabel="发送评论"
             disabled={sending}
-            onPress={handleSend}
+            onPressIn={handleSend}
             style={({ pressed }) => [styles.sendButton, pressed && styles.sendButtonPressed]}
           >
             <Text style={styles.sendButtonText}>{sending ? "发送中" : "发送"}</Text>
           </Pressable>
         ) : null}
       </View>
+      {emojiPickerOpen ? (
+        <View style={[styles.emojiPanel, { height: 340 + insets.bottom + 10 }]}>
+          <EmojiKeyboard
+            categoryPosition="bottom"
+            disableSafeArea
+            enableRecentlyUsed
+            hideHeader
+            onEmojiSelected={handleEmojiSelect}
+            styles={{
+              container: {
+                paddingBottom: insets.bottom + 10,
+                borderRadius: 0,
+                elevation: 0,
+                shadowOpacity: 0,
+              },
+            }}
+            theme={{
+              container: "#FFFFFF",
+              header: "#333333",
+              category: { icon: "#999999", iconActive: "#FE1F4C" },
+            }}
+          />
+        </View>
+      ) : null}
     </BottomSheet>
   );
 }
@@ -467,25 +579,25 @@ export function CircleCommentSheet({
 function CommentInputActions({
   style,
   onMention,
+  onEmoji,
 }: {
   style?: StyleProp<ViewStyle>;
   onMention: () => void;
+  onEmoji: () => void;
 }) {
   return (
     <View style={style}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="提及用户"
-        onPress={onMention}
+        onPressIn={onMention}
       >
         <Image source={atIcon} style={styles.inputIcon} />
       </Pressable>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="表情"
-        onPress={() => {
-          showToast("表情功能开发中");
-        }}
+        onPressIn={onEmoji}
       >
         <Image source={emojiIcon} style={styles.inputIcon} />
       </Pressable>
@@ -550,6 +662,7 @@ function CommentRow({
   onLike,
   onReply,
   onOpenProfile,
+  onOpenTopic,
 }: {
   comment: CircleComment;
   expanded: boolean;
@@ -557,6 +670,7 @@ function CommentRow({
   onLike: (comment: CircleComment) => void;
   onReply: (comment: CircleComment, parentCommentId?: string) => void;
   onOpenProfile: (comment: CircleComment) => void;
+  onOpenTopic: () => void;
 }) {
   const hiddenReplyCount = comment.replies.length - VISIBLE_REPLY_COUNT;
   const visibleReplies = expanded
@@ -588,7 +702,9 @@ function CommentRow({
             ) : null}
           </View>
           <Text style={styles.commentContent}>
-            {comment.deleted ? "该评论已删除" : comment.content}
+            {comment.deleted ? "该评论已删除" : (
+              <CircleTopicText content={comment.content} topicStyle={styles.postTags} onBeforeNavigate={onOpenTopic} />
+            )}
           </Text>
           <View style={styles.commentMetaRow}>
             <View style={styles.commentMetaLeft}>
@@ -639,6 +755,7 @@ function CommentRow({
           onLike={onLike}
           onReply={onReply}
           onOpenProfile={onOpenProfile}
+          onOpenTopic={onOpenTopic}
         />
       ))}
       {hiddenReplyCount > 0 && !expanded ? (
@@ -678,12 +795,14 @@ function ReplyRow({
   onLike,
   onReply,
   onOpenProfile,
+  onOpenTopic,
 }: {
   reply: CircleComment;
   parent: CircleComment;
   onLike: (comment: CircleComment) => void;
   onReply: (comment: CircleComment, parentCommentId?: string) => void;
   onOpenProfile: (comment: CircleComment) => void;
+  onOpenTopic: () => void;
 }) {
   return (
     <View style={styles.replyRow}>
@@ -714,7 +833,7 @@ function ReplyRow({
               回复 {reply.replyNickname}：
             </Text>
           ) : null}
-          {reply.content}
+          <CircleTopicText content={reply.content} topicStyle={styles.postTags} onBeforeNavigate={onOpenTopic} />
         </Text>
         <View style={styles.commentMetaRow}>
           <View style={styles.commentMetaLeft}>
@@ -832,6 +951,10 @@ const styles = StyleSheet.create({
   // 列表必须 flex:1 吸收弹窗高度压缩（键盘抬起时 72% 高度骤减），
   // 否则内容把输入栏挤出弹窗底边、被键盘盖住
   commentList: { flex: 1 },
+  emojiPanel: {
+    flexShrink: 0,
+    backgroundColor: "#FFFFFF",
+  },
   commentCard: { paddingVertical: 8 },
   commentRow: { flexDirection: "row", padding: 8, paddingHorizontal: 16, gap: 8 },
   commentAvatar: {

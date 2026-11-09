@@ -42,7 +42,7 @@ type ApiCircleComment = {
   commentId?: string | number;
   id?: string | number;
   userId?: string | number;
-  userInfo?: { id?: string | number; nickname?: string; headImage?: string };
+  userInfo?: { id?: string | number; userId?: string | number; nickname?: string; headImage?: string };
   nickname?: string;
   headImage?: string;
   content?: string;
@@ -65,18 +65,14 @@ const FALLBACK_AVATAR = require("../../../assets/images/radar-avatar-1.png");
 
 function toCircleComment(item: ApiCircleComment): CircleComment {
   const id = String(item.commentId ?? item.id ?? "");
+  const userId = item.userId ?? item.userInfo?.userId ?? item.userInfo?.id;
   const nickname = item.userInfo?.nickname ?? item.nickname ?? "";
   const headImage = item.userInfo?.headImage ?? item.headImage;
   const location = item.ipLocation ?? item.ipTerritory;
   const time = item.publishTime ?? item.createTime ?? "";
   return {
     id,
-    userId:
-      item.userInfo?.id != null
-        ? String(item.userInfo.id)
-        : item.userId != null
-          ? String(item.userId)
-          : undefined,
+    userId: userId != null ? String(userId) : undefined,
     nickname: nickname || "盼友",
     avatar: headImage ? { uri: headImage } : FALLBACK_AVATAR,
     content: item.content ?? "",

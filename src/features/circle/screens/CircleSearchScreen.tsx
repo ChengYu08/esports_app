@@ -1,6 +1,6 @@
 import { ChevronLeft24Regular, Delete20Regular, DismissCircle16Filled, Search20Regular } from "@fluentui/react-native-icons";
 import { StatusBar } from "expo-status-bar";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -21,6 +21,7 @@ import { fetchCircleHotTopics, fetchCircleSearchPage, type CircleHotTopic } from
 import type { CircleVideoPost } from "@/features/circle/circle-data";
 import { CircleSearchCard } from "@/features/circle/components/CircleSearchCard";
 import { CircleTopicIcon } from "@/features/circle/components/CircleActionIcons";
+import { normalizeCircleTopicName } from "@/features/circle/circle-topic";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
 
@@ -48,11 +49,15 @@ async function readHistory(): Promise<string[]> {
 }
 
 export default function CircleSearchScreen() {
+  const { topic } = useLocalSearchParams<{ topic?: string }>();
+  const initialTopic = normalizeCircleTopicName(topic ?? "");
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
-  const [input, setInput] = useState("");
-  const [search, setSearch] = useState<CircleSearchState | null>(null);
+  const [input, setInput] = useState(initialTopic ? "#" + initialTopic : "");
+  const [search, setSearch] = useState<CircleSearchState | null>(
+    initialTopic ? { keyword: initialTopic, isTopic: true } : null,
+  );
   const inputRef = useRef<TextInput>(null);
 
   const historyQuery = useQuery({

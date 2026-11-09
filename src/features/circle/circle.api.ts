@@ -225,3 +225,130 @@ export async function reportCircleVideoPlay({
     // 播放统计是弱依赖，网络或鉴权失败不影响视频体验。
   }
 }
+
+/** 用户视频作品审核状态（仅自己主页可见全部状态，他人主页只返回 APPROVED）。 */
+export type CircleVideoStatus = "REVIEWING" | "APPROVED" | "REJECTED" | "DELETED";
+
+type ApiMyVideoItem = {
+  id?: number | string;
+  vid?: string;
+  title?: string;
+  coverUrl?: string;
+  url?: string;
+  content?: string;
+  status?: CircleVideoStatus;
+  violationTypes?: string[];
+  extraDesc?: string;
+  likeCount?: number;
+  liked?: boolean;
+  commentCount?: number;
+  playCount?: number;
+  createTime?: string | null;
+  publishTime?: string | null;
+};
+
+export type ProfileCirclePost = {
+  id: string;
+  videoUrl: string;
+  cover: { uri: string } | number;
+  durationSec?: number;
+  title: string;
+  content: string;
+  likeCount: number;
+  commentCount: number;
+  playCount: number;
+  liked: boolean;
+  publishedAt: string;
+  status: CircleVideoStatus;
+  violationTypes: string[];
+  extraDesc: string;
+};
+
+export type ProfileCirclePage = {
+  list: ProfileCirclePost[];
+  page: number;
+  total: number;
+  hasMore: boolean;
+};
+
+function toProfileCirclePost(item: ApiMyVideoItem): ProfileCirclePost {
+  return {
+    id: String(item.id ?? item.vid ?? ""),
+    videoUrl: item.url ?? "",
+    cover: item.coverUrl ? { uri: item.coverUrl } : require("../../../assets/images/bg_publish_dark.webp"),
+    title: item.title ?? "",
+    content: item.content ?? "",
+    likeCount: item.likeCount ?? 0,
+    commentCount: item.commentCount ?? 0,
+    playCount: item.playCount ?? 0,
+    liked: item.liked ?? false,
+    publishedAt: formatRelativeTime(item.publishTime ?? item.createTime ?? undefined),
+    status: item.status ?? "APPROVED",
+    violationTypes: item.violationTypes ?? [],
+    extraDesc: item.extraDesc ?? "",
+  };
+}
+
+/** 拉取他人主页盼友圈作品列表（免登录，仅审核通过）。 */
+export async function fetchUserCirclePage({
+  userId,
+  page,
+  pageSize,
+  token,
+  signal,
+}: {
+  userId: string;
+  page: number;
+  pageSize: number;
+  token?: string;
+  signal?: AbortSignal;
+}): Promise<ProfileCirclePage> {
+  const response = await apiClient<CircleApiResponse<{ page?: number; total?: number; records?: ApiMyVideoItem[] }>>(
+    "/client/v1/moments/video/user/page",
+    {
+      method: "POST",
+      token,
+      signal,
+      body: { page, pageSize, action: { userId: Number(userId) } },
+    },
+  );
+  const data = unwrap(response, "盼友圈加载失败");
+  const records = data.records ?? [];
+  return {
+    list: records.map(toProfileCirclePost),
+    page: data.page ?? page,
+    total: data.total ?? 0,
+    hasMore: records.length >= pageSize,
+  };
+}
+
+/** 拉取自己主页盼友圈作品列表（需登录，含全部审核状态）。 */
+export async function fetchMyCirclePage({
+  page,
+  pageSize,
+  token,
+  signal,
+}: {
+  page: number;
+  pageSize: number;
+  token: string;
+  signal?: AbortSignal;
+}): Promise<ProfileCirclePage> {
+  const response = await apiClient<CircleApiResponse<{ page?: number; total?: number; records?: ApiMyVideoItem[] }>>(
+    "/client/v1/moments/video/myList",
+    {
+      method: "POST",
+      token,
+      signal,
+      body: { page, pageSize, action: { status: "" } },
+    },
+  );
+  const data = unwrap(response, "盼友圈加载失败");
+  const records = data.records ?? [];
+  return {
+    list: records.map(toProfileCirclePost),
+    page: data.page ?? page,
+    total: data.total ?? 0,
+    hasMore: records.length >= pageSize,
+  };
+}
