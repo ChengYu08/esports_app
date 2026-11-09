@@ -369,7 +369,13 @@ export async function publishQuickMatch(
 ): Promise<QuickMatchPublishResult> {
   const response = await apiClient<ApiEnvelope<QuickMatchPublishResult>>(
     "/client/v1/quickMatch/publish",
-    { method: "POST", token, body: { action: payload } },
+    {
+      method: "POST",
+      token,
+      body: { action: payload },
+      // 未实名由进房业务流弹「去实名」，不走全局自动跳转
+      suppressRealNameRedirect: true,
+    },
   );
   const data = requireSuccess(response, "发布失败，请重试");
   return {
@@ -537,7 +543,13 @@ export async function ensureAuditionRoom(
 ): Promise<QuickMatchAuditionRoom> {
   const response = await apiClient<ApiEnvelope<Record<string, unknown>>>(
     "/client/v1/quickMatch/auditionRoom/ensure",
-    { method: "POST", token, body: { action: { requestNo } } },
+    {
+      method: "POST",
+      token,
+      body: { action: { requestNo } },
+      // 未实名由进房业务流弹「去实名」，不走全局自动跳转
+      suppressRealNameRedirect: true,
+    },
   );
   const data = requireSuccess(response, "试音房创建失败");
   const id =

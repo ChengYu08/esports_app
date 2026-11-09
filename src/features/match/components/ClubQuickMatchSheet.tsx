@@ -36,6 +36,7 @@ import { LightGameOptionChip } from "@/features/match/components/LightGameOption
 import { LightOptionChip } from "@/features/match/components/LightOptionChip";
 import { MatchLinearGradient } from "@/features/match/components/MatchLinearGradient";
 import { openAuditionRoom } from "@/features/match/enter-audition-room";
+import { isExistingDispatchConflictMessage } from "@/features/match/existing-dispatch-hint";
 import {
   MATCH_COMPANION_PREFERENCE_OPTIONS,
   MATCH_GENDER_OPTIONS,
@@ -43,6 +44,10 @@ import {
   MATCH_VOICE_OPTIONS,
   useMatchForm,
 } from "@/features/match/hooks/use-match-form";
+import {
+  ensureRealNameBeforeVoiceRoomEnter,
+  promptSelfRealNameIfNeeded,
+} from "@/features/voice-room/ensure-real-name-before-enter";
 import { exitVoiceRoom } from "@/features/voice-room/exit-voice-room";
 import {
   resolveVoiceRoomId,
@@ -57,7 +62,6 @@ import { showToast } from "@/shared/ui/app-toast";
 const diamondIcon = require("../../../../assets/mine/star-recharge-diamond-3f6fcf.png");
 
 const PUBLISH_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
-const EXISTING_DISPATCH_HINT = "已有派单";
 
 /** 发布按钮内的三个跳动小点 */
 function PublishingDots() {
@@ -316,6 +320,10 @@ export function ClubQuickMatchSheet({
 
     // 接待代发固定需试音，由老板端接管进房；老板自发仍按表单选择
     const needVoice = isReception ? true : form.voice === "需试音";
+    // 仅「会进试音房」的老板自发路径拦实名；接待纯代发不进房
+    if (!isReception && needVoice && !(await ensureRealNameBeforeVoiceRoomEnter())) {
+      return;
+    }
     setSubmitting(true);
     try {
       // 仅老板自发试音需退出当前房；接待代发在老板房间发起，不能退散老板房间
@@ -373,8 +381,11 @@ export function ClubQuickMatchSheet({
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "发布失败，请重试";
+      if (await promptSelfRealNameIfNeeded(message)) {
+        return;
+      }
       // 接待代发撞老板已有派单：保持 Toast，不替老板恢复进房
-      if (!isReception && message.includes(EXISTING_DISPATCH_HINT)) {
+      if (!isReception && isExistingDispatchConflictMessage(message)) {
         try {
           const active = await fetchActiveQuickMatch(form.token);
           if (active && isQuickMatchActive(active)) {

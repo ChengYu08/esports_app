@@ -28,12 +28,16 @@ import {
   type QuickMatchRequestDetail,
 } from "@/features/match/api/match.types";
 import { openAuditionRoom } from "@/features/match/enter-audition-room";
+import { isExistingDispatchConflictMessage } from "@/features/match/existing-dispatch-hint";
+import {
+  ensureRealNameBeforeVoiceRoomEnter,
+  promptSelfRealNameIfNeeded,
+} from "@/features/voice-room/ensure-real-name-before-enter";
 import { requireLogin } from "@/shared/navigation/require-login";
 import { showToast } from "@/shared/ui/app-toast";
 
 const BG_COLOR = "#0C0C2E";
 const LOADING_COLOR = "#4D8BFF";
-const EXISTING_DISPATCH_HINT = "已有派单";
 const OSS_BASE = "https://djoss.panzhi.com/dj-oss-upload/moblie";
 const ACTIVITY_SECKILL_ASSETS = {
   bg: `${OSS_BASE}/bg_activity_seckill.webp`,
@@ -41,7 +45,7 @@ const ACTIVITY_SECKILL_ASSETS = {
   title: `${OSS_BASE}/activity_seckill_title.png`,
   price: `${OSS_BASE}/activity_seckill_price.png`,
   btnBg: `${OSS_BASE}/activity_seckill_btn_bg.png`,
-  countdownBg: `${OSS_BASE}/activity_seckill_countdown_bg.png`,
+  countdownBg: `${OSS_BASE}/activity_seckill_countdown_bg2.png`,
   btnText: `${OSS_BASE}/activity_seckill_btn_text.png`,
 } as const;
 
@@ -139,6 +143,9 @@ export default function ActivityLandingScreen({ activityCode }: { activityCode: 
     if (!requireLogin() || !token) {
       return;
     }
+    if (!(await ensureRealNameBeforeVoiceRoomEnter())) {
+      return;
+    }
     setPublishing(true);
     try {
       const result = await publishActivity(detail.activityId, token);
@@ -152,8 +159,11 @@ export default function ActivityLandingScreen({ activityCode }: { activityCode: 
         return;
       }
       const message = error instanceof Error ? error.message : "参与活动失败，请重试";
+      if (await promptSelfRealNameIfNeeded(message)) {
+        return;
+      }
       // 已有未过期派单：查 active → ensure 进试音房；进房失败再回退匹配中页。
-      if (message.includes(EXISTING_DISPATCH_HINT)) {
+      if (isExistingDispatchConflictMessage(message)) {
         try {
           const active = await fetchActiveQuickMatch(token);
           if (active && isQuickMatchActive(active)) {
@@ -406,23 +416,23 @@ const styles = StyleSheet.create({
   countdownWrap: {
     zIndex: 1,
     marginBottom: -COUNTDOWN_OVERLAP,
-    minWidth: 134,
-    height: 27,
-    paddingHorizontal: 13,
+    // 资源 550×160 @3x，再缩放到 75%
+    width: (550 / 3) * 0.80,
+    height: (160 / 3) * 0.80,
+    paddingHorizontal: 16,
     alignItems: "center",
     justifyContent: "center",
-    transform: [{ translateX: 80 }, { translateY: -5 }],
+    transform: [{ translateX: 75 }, { translateY: -5 }],
   },
   countdownBg: {
     ...StyleSheet.absoluteFill,
   },
   countdownText: {
-    fontSize: 10,
+    fontSize: 11,
     lineHeight: 14,
     fontWeight: "600",
-    color: "#FFFFFF",
-    // 气泡尖在底部，文案相对几何中心略上移
-    transform: [{ translateY: -3 }],
+    color: "#000000",
+    transform: [{ translateX: 4 },{ translateY: -1 }],
   },
   joinButton: {
     width: "100%",

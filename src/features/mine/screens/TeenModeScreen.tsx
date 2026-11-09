@@ -20,7 +20,6 @@ import {
 } from "@/features/mine/teen-mode";
 import {
   teenModeApi,
-  fetchTeenModeConfig,
 } from "@/features/mine/api/teen-mode.api";
 import type { TeenModeStatus } from "@/features/mine/api/teen-mode.contract";
 import {
@@ -28,10 +27,6 @@ import {
   saveLastTeenEnabled,
 } from "@/features/mine/teen-mode-store";
 import { createTeenRequestGuard } from "@/features/mine/teen-request-guard";
-import {
-  resolveTeenLockConfig,
-  teenLockWindowLabel,
-} from "@/features/mine/utils/teen-lock-window";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { colors } from "@/shared/theme/tokens";
 
@@ -87,8 +82,6 @@ function TeenModeScreenSession({
   const [code, setCode] = useState("");
   const [firstPassword, setFirstPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  // 时段只认服务端配置；lockEnabled=false 或拉取失败时为 null，文案不展示具体时段
-  const [lockRangeLabel, setLockRangeLabel] = useState<string | null>(null);
   const requestGuardRef = useRef(createTeenRequestGuard());
 
   const enabled = status?.enabled === true;
@@ -117,20 +110,6 @@ function TeenModeScreenSession({
       return;
     }
     const snapshot = guard.snapshot();
-    // 锁定时段文案只认服务端配置（/youth/config），客户端不设兜底时段
-    void (async () => {
-      try {
-        const lockConfig = resolveTeenLockConfig(await fetchTeenModeConfig(token));
-        if (!guard.isSessionCurrent(session)) {
-          return;
-        }
-        setLockRangeLabel(
-          typeof lockConfig === "object" ? teenLockWindowLabel(lockConfig) : null,
-        );
-      } catch {
-        // 配置拉取失败不展示具体时段，避免展示与生效口径不一致的文案
-      }
-    })();
     void (async () => {
       try {
         const next = await teenModeApi.status(token);
@@ -193,13 +172,9 @@ function TeenModeScreenSession({
           if (!applyMutationStatus(next)) {
             return;
           }
-          // 开启成功不停留说明页：直接返回上一页，限制时段文案跟随服务端配置
+          // 开启成功不停留说明页：直接返回上一页
           router.back();
-          showToast(
-            lockRangeLabel
-              ? `青少年模式已开启，每日 ${lockRangeLabel} 期间限制核心功能`
-              : "青少年模式已开启",
-          );
+          showToast("青少年模式已开启");
           return;
         }
         if (
@@ -219,11 +194,7 @@ function TeenModeScreenSession({
           }
           // 与首设密码路径一致：开启成功直接返回上一页并提示，不停留说明页
           router.back();
-          showToast(
-            lockRangeLabel
-              ? `青少年模式已开启，每日 ${lockRangeLabel} 期间限制核心功能`
-              : "青少年模式已开启",
-          );
+          showToast("青少年模式已开启");
           return;
         }
         if (phase === "disable") {
@@ -283,9 +254,7 @@ function TeenModeScreenSession({
               <View style={styles.bulletRow}>
                 <Image source={starIcon} style={styles.bulletIcon} />
                 <Text style={styles.bulletText}>
-                  {lockRangeLabel
-                    ? `为保障未成年人的充足休息与健康作息，开启未成年人模式后，每日${lockRangeLabel}期间无法访问盼之社区`
-                    : "为保障未成年人的充足休息与健康作息，开启未成年人模式后将限制访问盼之社区"}
+                  为保障未成年人的充足休息与健康作息，开启未成年人模式后将限制访问盼之社区
                 </Text>
               </View>
             </>

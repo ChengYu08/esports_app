@@ -15,8 +15,18 @@ function unwrap<T>(response: Envelope<T> | T): T {
   return response as T;
 }
 
-async function post<T>(path: string, token: string, body?: unknown) {
-  const response = await apiClient<Envelope<T> | T>(path, { method: 'POST', token, body });
+async function post<T>(
+  path: string,
+  token: string,
+  body?: unknown,
+  options?: { suppressRealNameRedirect?: boolean },
+) {
+  const response = await apiClient<Envelope<T> | T>(path, {
+    method: 'POST',
+    token,
+    body,
+    suppressRealNameRedirect: options?.suppressRealNameRedirect,
+  });
   return unwrap(response);
 }
 
@@ -41,9 +51,14 @@ export const voiceRoomApi = {
     return post<VoiceRoomDetail | null>('/client/v1/voiceRoom/joined/current', token, {});
   },
   createRoom(roomName: string, token: string, clubId?: string | number) {
-    return post<VoiceRoomDetail>('/client/v1/voiceRoom/create', token, {
-      action: { roomName, ...(clubId ? { clubId } : {}) },
-    });
+    return post<VoiceRoomDetail>(
+      '/client/v1/voiceRoom/create',
+      token,
+      {
+        action: { roomName, ...(clubId ? { clubId } : {}) },
+      },
+      { suppressRealNameRedirect: true },
+    );
   },
   getDetail(roomId: string, token: string) {
     return post<VoiceRoomDetail>(`/client/v1/voiceRoom/${encodeURIComponent(roomId)}/detail`, token);
@@ -52,6 +67,8 @@ export const voiceRoomApi = {
     return post<VoiceRoomJoinPrepare>(
       `/client/v1/voiceRoom/${encodeURIComponent(roomId)}/join/prepare?roomVersion=${encodeURIComponent(String(roomVersion))}`,
       token,
+      undefined,
+      { suppressRealNameRedirect: true },
     );
   },
   getRtcToken(roomId: string, roomVersion: string | number, token: string) {
@@ -95,6 +112,7 @@ export const voiceRoomApi = {
       '/client/v1/voiceRoom/claimClubService',
       token,
       { action: data },
+      { suppressRealNameRedirect: true },
     );
   },
 };

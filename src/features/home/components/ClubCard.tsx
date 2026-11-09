@@ -93,7 +93,7 @@ export const ClubCard = memo(function ClubCard({
           {shownGames.length > 0 ? (
             <View style={[styles.gameIcons, { width: gamesLayout.totalWidth }]}>
               {shownGames.map((game, index) => (
-                <Image
+                <CachedImage
                   key={`${game.iconUrl}-${index}`}
                   source={{ uri: game.iconUrl }}
                   style={[styles.gameIcon, { left: index * gamesLayout.step }]}

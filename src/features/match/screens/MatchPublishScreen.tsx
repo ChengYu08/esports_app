@@ -32,6 +32,7 @@ import { MatchLinearGradient } from "@/features/match/components/MatchLinearGrad
 import { MatchOptionChip } from "@/features/match/components/MatchOptionChip";
 import { MatchStepper } from "@/features/match/components/MatchStepper";
 import { openAuditionRoom } from "@/features/match/enter-audition-room";
+import { isExistingDispatchConflictMessage } from "@/features/match/existing-dispatch-hint";
 import {
   MATCH_COMPANION_PREFERENCE_OPTIONS,
   MATCH_GENDER_OPTIONS,
@@ -40,6 +41,10 @@ import {
   useMatchForm,
 } from "@/features/match/hooks/use-match-form";
 import { useRestoreActiveMatch } from "@/features/match/hooks/use-quick-match-session";
+import {
+  ensureRealNameBeforeVoiceRoomEnter,
+  promptSelfRealNameIfNeeded,
+} from "@/features/voice-room/ensure-real-name-before-enter";
 import { exitVoiceRoom } from "@/features/voice-room/exit-voice-room";
 import {
   resolveVoiceRoomId,
@@ -51,7 +56,6 @@ import { AppPrompt } from "@/shared/ui/AppPrompt";
 
 const diamondIcon = require("../../../../assets/mine/star-recharge-diamond-3f6fcf.png");
 const bgPublishDark = require("../../../../assets/images/bg_publish_dark.webp");
-const EXISTING_DISPATCH_HINT = "已有派单";
 
 const PUBLISH_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
 const FOOTER_CONTENT_BOTTOM = 22;
@@ -180,6 +184,9 @@ export default function MatchPublishScreen() {
     if (submitting) return;
 
     const needVoice = form.voice === "需试音";
+    if (needVoice && !(await ensureRealNameBeforeVoiceRoomEnter())) {
+      return;
+    }
     setSubmitting(true);
     try {
       const joinedRoom = joinedRoomRef.current;
@@ -231,8 +238,12 @@ export default function MatchPublishScreen() {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "发布失败，请重试";
+      // publish 返回未实名：需试音/不试音都弹「去实名」
+      if (await promptSelfRealNameIfNeeded(message)) {
+        return;
+      }
       // 已有未过期派单：查 active → ensure 进试音房；进房失败再回退匹配中页。
-      if (message.includes(EXISTING_DISPATCH_HINT)) {
+      if (isExistingDispatchConflictMessage(message)) {
         try {
           const active = await fetchActiveQuickMatch(form.token);
           if (active && isQuickMatchActive(active)) {

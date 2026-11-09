@@ -42,3 +42,12 @@ export async function convertToJpeg(uri: string, quality = 0.85): Promise<string
   });
   return result.uri;
 }
+
+/** 是否为动图 GIF（按文件魔数判断）；读不到文件时按非动图处理。 */
+export function isGifImage(uri: string): boolean {
+  try {
+    return detectImageFormat(uri)?.mimeType === "image/gif";
+  } catch {
+    return false;
+  }
+}

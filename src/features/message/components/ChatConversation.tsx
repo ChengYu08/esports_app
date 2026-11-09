@@ -17,6 +17,7 @@ import {
   Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  PixelRatio,
   Platform,
   Pressable,
   StyleSheet,
@@ -29,11 +30,10 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EmojiKeyboard, type EmojiType } from "rn-emoji-keyboard";
 
-import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import type { AfterSaleCardPayload } from "@/features/order/after-sale-card";
 import { afterSaleCardRows } from "@/features/order/after-sale-card";
 import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
-import { convertToJpeg } from "@/shared/media-picker/image-compat";
+import { convertToJpeg, isGifImage } from "@/shared/media-picker/image-compat";
 import { showToast } from "@/shared/ui/app-toast";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { EmptyState } from "@/shared/ui/AsyncStates";
@@ -43,6 +43,7 @@ import { enterRoomFromInvite } from "@/features/voice-room/enter-room-from-invit
 import { CsInviteCard } from "./CsInviteCard";
 import { MarkdownMessage } from "./MarkdownMessage";
 import { OrderNotifyCard } from "./OrderNotifyCard";
+import { openChatImagePreviewSession } from "../chat-image-preview-session";
 import { touchCustomerServiceSession } from "../customer-service.api";
 import { resolveConversationAvatar } from "../message-avatar";
 import type { ManagedMessage } from "../message-state";
@@ -348,22 +349,25 @@ export function ChatConversation({
       try {
         const resolvedUri = await resolveImagePreview(message);
         // 连看列表：当前会话全部图片消息按时间序组装，点开哪张定位到哪张；
-        // 未点开的图片直接用气泡现有地址（远端或本地均可预览），不逐张触发下载
+        // 其余图片滑到前后页时再按消息对象逐张下载（融云远端地址直连会 401）
         const imageMessages = visibleMessages.filter(
           (item): item is Extract<ManagedMessage, { kind: "image" }> =>
             item.kind === "image",
-        );
-        const images = imageMessages.map((item) =>
-          item.id === message.id ? resolvedUri : item.imageUrl,
         );
         const index = Math.max(
           0,
           imageMessages.findIndex((item) => item.id === message.id),
         );
+        // 预览是独立路由页，消息对象经内存会话带过去，不再用 URL 字符串反查
+        const sessionId = openChatImagePreviewSession({
+          messages: imageMessages,
+          index,
+          resolvedUri,
+        });
         navigateWithSheetDismiss(() => {
           router.push({
             pathname: "/image-preview",
-            params: createImagePreviewParams(images, index),
+            params: { previewSessionId: sessionId },
           });
         });
       } catch (error) {
@@ -673,6 +677,10 @@ export function ChatConversation({
         }
         renderItem={renderChatRow}
         showsVerticalScrollIndicator={false}
+        // 聊天行大多带图，收窄挂载窗口可减少同时挂载、同时解码的图片数量
+        initialNumToRender={8}
+        maxToRenderPerBatch={6}
+        windowSize={7}
         onContentSizeChange={keepLatestVisible}
         onLayout={keepLatestVisible}
         maintainVisibleContentPosition={{
@@ -1011,10 +1019,11 @@ const ChatComposer = memo(function ChatComposer({
     setImageSending(true);
     let failed = 0;
     try {
-      // 逐张发送保持顺序；沿用旧照片选择器的行为：统一重编码为 JPEG，规避 HEIC 原图与超大原图直接发送
+      // 逐张发送保持顺序；静态图统一重编码为 JPEG，规避 HEIC 原图与超大原图直接发送。
+      // GIF 重编码会丢动画，动图原样发送
       for (const uri of picked) {
         try {
-          const sendUri = await convertToJpeg(uri);
+          const sendUri = isGifImage(uri) ? uri : await convertToJpeg(uri);
           await onSendImage(sendUri);
         } catch {
           failed += 1;
@@ -1212,10 +1221,28 @@ const ChatBubble = memo(function ChatBubble({
   onPreviewImage: (message: ManagedMessage) => void;
 }) {
   const { width: windowWidth } = useWindowDimensions();
-  const [imageRatio, setImageRatio] = useState(1);
+  const knownRatio = item.kind === "image" ? item.imageAspectRatio : undefined;
+  const [loadedRatio, setLoadedRatio] = useState<number | null>(null);
+  // 消息自带宽高比优先用于首帧，避免先按 1:1 排版、解码后再回弹（每张图多一次布局和一次解码）
+  const imageRatio = loadedRatio ?? knownRatio ?? 1;
   const targetImageWidth = item.isMine ? 120 : 160;
   const imageWidth = Math.min(targetImageWidth, windowWidth * 0.58);
   const imageHeight = imageWidth / imageRatio;
+  // 本会话自己发出的 GIF 原图是本地文件，用原图播放动效；融云缩略图是静态 JPEG，用了就不动了。
+  // 远端 GIF（对方发的）拿不到本地文件，仍先用缩略图，点开预览再看动图
+  const [animatedImageUri] = useState(() => {
+    if (item.kind !== "image" || !/^(?:file|content):\/\//i.test(item.imageUrl)) {
+      return null;
+    }
+    return isGifImage(item.imageUrl) ? item.imageUrl : null;
+  });
+  // 缩略图宽度不足以铺满气泡的物理像素时会被放大发虚，这种消息继续用原图（解码尺寸由图片库按气泡缩小）
+  const isThumbnailSharpEnough = item.kind === "image"
+    && !!item.thumbnailUri
+    && (item.thumbnailWidth ?? 0) >= imageWidth * PixelRatio.get();
+  const bubbleImageUri = item.kind === "image"
+    ? (animatedImageUri ?? (isThumbnailSharpEnough ? item.thumbnailUri! : item.imageUrl))
+    : "";
 
   return (
     <View
@@ -1262,15 +1289,22 @@ const ChatBubble = memo(function ChatBubble({
           >
             <CachedImage
               contentFit="contain"
-              source={{ uri: item.imageUrl }}
+              // 缩略图够清晰才用，省下原图的解码内存；不够清晰就回退原图，避免气泡发虚
+              source={{ uri: bubbleImageUri }}
               style={[
                 styles.messageImage,
                 { width: imageWidth, height: imageHeight },
               ]}
               onLoad={({ source }) => {
-                if (source.width > 0 && source.height > 0) {
-                  setImageRatio(source.width / source.height);
+                if (source.width <= 0 || source.height <= 0) {
+                  return;
                 }
+                const next = source.width / source.height;
+                // 与消息自带比例相差不到 1% 就沿用，避免为亚像素差异再触发一次布局
+                if (knownRatio && Math.abs(next - knownRatio) / knownRatio < 0.01) {
+                  return;
+                }
+                setLoadedRatio(next);
               }}
             />
           </Pressable>

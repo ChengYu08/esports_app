@@ -165,7 +165,11 @@ export async function grabDispatchRequest(
   token: string,
 ): Promise<DispatchRequest> {
   const response = await apiClient<ApiEnvelope<DispatchRequest>>("/client/v1/quickMatch/grab", {
-    method: "POST", token, body: { action: { requestNo } },
+    method: "POST",
+    token,
+    body: { action: { requestNo } },
+    // 未实名由抢单进房流弹「去实名」，不走全局自动跳转
+    suppressRealNameRedirect: true,
   });
   if (response.code !== "SUCCESS") throw new Error(response.info || "抢单失败");
   if (!response.data?.requestNo) {
