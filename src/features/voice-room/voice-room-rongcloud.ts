@@ -33,6 +33,10 @@ const roomMessageListeners = new Set<(chatroomId: string, message: RoomMessage) 
 const roomMemberListeners = new Set<(targetId: string, actions: { userId?: string; actionType?: number }[]) => void>();
 let listenersInstalled = false;
 const joinedChatroomIds = new Set<string>();
+// 融云聊天室成员事件不存离线：屏内无人订阅期间（最小化/首屏未挂载）先缓冲，
+// 首个订阅者挂载时冲刷，避免已加入/已离开的成员丢失
+const MAX_BUFFERED_MEMBER_ACTIONS = 100;
+const bufferedMemberActions = new Map<string, { userId?: string; actionType?: number }[]>();
 
 function loadSdk(): RongSdk | null {
   try {
@@ -46,9 +50,20 @@ function loadSdk(): RongSdk | null {
 function installRoomListeners() {
   if (listenersInstalled) return;
   const engine = getRongCloudEngine();
-  if (!engine || !loadSdk()) return;
+  // 转发链路不依赖 SDK 枚举（normalizeRoomMessage 内部自行 loadSdk），
+  // 引擎就绪即可安装；SDK 不可用时成员/连接事件仍需照常转发
+  if (!engine) return;
   listenersInstalled = true;
   subscribeRongChatRoomMembers((targetId, actions) => {
+    if (joinedChatroomIds.has(targetId) && roomMemberListeners.size === 0) {
+      const buffer = bufferedMemberActions.get(targetId) ?? [];
+      buffer.push(...actions);
+      if (buffer.length > MAX_BUFFERED_MEMBER_ACTIONS) {
+        buffer.splice(0, buffer.length - MAX_BUFFERED_MEMBER_ACTIONS);
+      }
+      bufferedMemberActions.set(targetId, buffer);
+      return;
+    }
     roomMemberListeners.forEach((listener) => listener(targetId, actions));
   });
   subscribeRongChatRoomMessages((_targetId, message: RCIMIWMessage) => {
@@ -110,6 +125,7 @@ export async function leaveVoiceChatRoom(chatroomId: string) {
   // A kicked user may already be absent on the server; always discard the
   // local joined marker so a later permitted join actually reaches the SDK.
   joinedChatroomIds.delete(chatroomId);
+  bufferedMemberActions.delete(chatroomId);
   // 真正退房才清消息缓存；最小化只卸载屏组件、不退房，记录保留供重进恢复
   clearVoiceChatMessageCache(chatroomId);
   if (engine) await engine.leaveChatRoom(chatroomId);
@@ -212,6 +228,10 @@ export function subscribeVoiceChatMessages(listener: (chatroomId: string, messag
 }
 
 export function subscribeVoiceChatMembers(listener: (targetId: string, actions: { userId?: string; actionType?: number }[]) => void) {
+  if (roomMemberListeners.size === 0) {
+    bufferedMemberActions.forEach((actions, targetId) => listener(targetId, actions));
+    bufferedMemberActions.clear();
+  }
   roomMemberListeners.add(listener);
   return () => roomMemberListeners.delete(listener);
 }

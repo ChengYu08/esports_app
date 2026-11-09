@@ -1,5 +1,12 @@
 import { apiClient } from '@/core/network/api-client';
-import type { VoiceRoomDetail, VoiceRoomJoinPrepare, VoiceRoomRtcToken } from './voice-room.types';
+import type {
+  VoiceRoomDetail,
+  VoiceRoomJoinPrepare,
+  VoiceRoomMember,
+  VoiceRoomMemberRole,
+  VoiceRoomMembersSnapshot,
+  VoiceRoomRtcToken,
+} from './voice-room.types';
 
 type Envelope<T> = { success?: boolean; code?: string; info?: string; data?: T };
 
@@ -50,6 +57,7 @@ export const voiceRoomApi = {
   getJoinedRoom(token: string) {
     return post<VoiceRoomDetail | null>('/client/v1/voiceRoom/joined/current', token, {});
   },
+  
   createRoom(roomName: string, token: string, clubId?: string | number) {
     return post<VoiceRoomDetail>(
       '/client/v1/voiceRoom/create',
@@ -60,9 +68,43 @@ export const voiceRoomApi = {
       { suppressRealNameRedirect: true },
     );
   },
+
   getDetail(roomId: string, token: string) {
     return post<VoiceRoomDetail>(`/client/v1/voiceRoom/${encodeURIComponent(roomId)}/detail`, token);
   },
+
+  /**
+   * 语音房实时成员快照（融云实时成员为准）。detail 不含成员数据，
+   * 成员对账专用此端点；后端 headImage 映射为 avatar。
+   */
+  async getRoomMembers(
+    roomId: string,
+    roomVersion: string | number,
+    token: string,
+  ): Promise<VoiceRoomMembersSnapshot> {
+    const wire = await post<{
+      roomVersion?: string | number;
+      members?: {
+        userId?: string | number;
+        role?: string;
+        nickname?: string;
+        headImage?: string;
+      }[];
+    }>(
+      `/client/v1/voiceRoom/${encodeURIComponent(roomId)}/members?roomVersion=${encodeURIComponent(String(roomVersion))}`,
+      token,
+    );
+    const members: VoiceRoomMember[] = (wire?.members || []).map((member) => ({
+      userId: member.userId == null ? '' : String(member.userId),
+      nickname: member.nickname || '',
+      ...(member.headImage ? { avatar: member.headImage } : {}),
+      ...(member.role
+        ? { role: member.role as VoiceRoomMemberRole }
+        : {}),
+    }));
+    return { roomVersion: wire?.roomVersion ?? roomVersion, members };
+  },
+
   prepareJoin(roomId: string, roomVersion: string | number, token: string) {
     return post<VoiceRoomJoinPrepare>(
       `/client/v1/voiceRoom/${encodeURIComponent(roomId)}/join/prepare?roomVersion=${encodeURIComponent(String(roomVersion))}`,
@@ -71,24 +113,28 @@ export const voiceRoomApi = {
       { suppressRealNameRedirect: true },
     );
   },
+
   getRtcToken(roomId: string, roomVersion: string | number, token: string) {
     return post<VoiceRoomRtcToken>(
       `/client/v1/voiceRoom/${encodeURIComponent(roomId)}/rtc/token?roomVersion=${encodeURIComponent(String(roomVersion))}`,
       token,
     );
   },
+
   leave(roomId: string, roomVersion: string | number, token: string) {
     return post<unknown>(
       `/client/v1/voiceRoom/${encodeURIComponent(roomId)}/leave?roomVersion=${encodeURIComponent(String(roomVersion))}`,
       token,
     );
   },
+
   destroy(roomId: string, roomVersion: string | number, token: string) {
     return post<unknown>(
       `/client/v1/voiceRoom/${encodeURIComponent(roomId)}/destroy?roomVersion=${encodeURIComponent(String(roomVersion))}`,
       token,
     );
   },
+
   async kickMember(roomId: string, roomVersion: string | number, userId: string, token: string) {
     const response = await apiClient<Envelope<null>>(
       `/client/v1/voiceRoom/${encodeURIComponent(roomId)}/kickOut`,
@@ -98,11 +144,13 @@ export const voiceRoomApi = {
       throw new Error(response.info || '踢出失败，请稍后重试');
     }
   },
+
   inviteClubService(roomId: string, roomVersion: string | number, clubId: string | number, token: string) {
     return post<unknown>('/client/v1/voiceRoom/inviteClubService', token, {
       action: { roomId, roomVersion, clubId },
     });
   },
+
   /** 俱乐部接待抢单（对齐 PC claimClubService） */
   claimClubService(
     data: { roomId: string; clubId: string; roomVersion: string },

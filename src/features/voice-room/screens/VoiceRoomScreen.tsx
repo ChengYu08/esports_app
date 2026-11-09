@@ -55,7 +55,10 @@ import {
   shouldSkipMemberChangeNotice,
   type MemberChangeAction,
 } from "../member-change-notice";
-import { inviteMember, normalizeMembers } from "../member-normalize";
+import {
+  applyChatRoomMemberActions,
+  normalizeMembers,
+} from "../member-normalize";
 import { useCustomerServiceCall } from "../use-customer-service-call";
 import { useSelectCompanionGrabCount } from "../use-select-companion-grab-count";
 import { useVoiceRoomMessages } from "../use-voice-room-messages";
@@ -943,33 +946,11 @@ export default function VoiceRoomScreen() {
       }
 
       setMembers((items) =>
-        actions.reduce<VoiceRoomMember[]>((next, action) => {
-          const userId = action.userId == null ? "" : String(action.userId);
-          if (!userId || userId === "invite" || userId === currentUser?.id)
-            return next;
-          if (action.actionType === 2)
-            return next.filter((member) => member.userId !== userId);
-          if (
-            action.actionType === 1 &&
-            !next.some((member) => member.userId === userId)
-          ) {
-            return [
-              ...next.filter((member) => member.userId !== "invite"),
-              {
-                userId,
-                nickname: `用户${userId}`,
-                role:
-                  String(room?.creatorUserId ?? "") === userId
-                    ? ("owner" as const)
-                    : String(room?.serviceUserId ?? "") === userId
-                      ? ("service" as const)
-                      : ("guest" as const),
-              },
-              inviteMember,
-            ].slice(0, 8);
-          }
-          return next;
-        }, items),
+        applyChatRoomMemberActions(items, actions, {
+          selfId: currentUser?.id,
+          creatorUserId: room?.creatorUserId,
+          serviceUserId: room?.serviceUserId,
+        }),
       );
     });
     return () => {
