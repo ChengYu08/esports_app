@@ -1,14 +1,15 @@
 /**
  * 青少年模式启动锁定页的生效时间窗：
  * 时段只以服务端配置（/youth/config，Nacos 下发）为准，客户端不设任何兜底时段。
- * 形态由服务端 mode 显式声明：same-day 本日锁定（start < end）、cross-day 跨日锁定（start > end）。
+ * 形态由服务端 mode 显式声明：always 全天锁定（开启即锁定）、same-day 本日锁定（start < end）、
+ * cross-day 跨日锁定（start > end）。
  * 服务端返回 lockEnabled=false 或配置非法时锁定解除（disabled）；请求失败保持 unknown（fail-closed）。
  *
  * 判定输入为 epoch 毫秒（由调用方用服务端时间校准后的「当前时间」传入），
  * 时区固定按 UTC+8 换算，不使用设备时区——防止改设备时区绕过；口径与后端
  * YouthModeLockWindow / YouthModeSchedule（Asia/Shanghai）保持一致。
  */
-export type TeenLockMode = "same-day" | "cross-day";
+export type TeenLockMode = "always" | "same-day" | "cross-day";
 
 export type TeenLockWindow = {
   mode: TeenLockMode;
@@ -49,11 +50,15 @@ export function resolveTeenLockConfig(
     return "disabled";
   }
   const mode = config.mode;
-  const startHour = Number(config.lockStartHour);
-  const endHour = Number(config.lockEndHour);
-  if (mode !== "same-day" && mode !== "cross-day") {
+  if (mode !== "always" && mode !== "same-day" && mode !== "cross-day") {
     return "disabled";
   }
+  // 全天形态与服务端口径一致：不依赖小时，残留或越界的小时配置一律忽略
+  if (mode === "always") {
+    return { mode, startHour: 0, endHour: 0 };
+  }
+  const startHour = Number(config.lockStartHour);
+  const endHour = Number(config.lockEndHour);
   if (
     !Number.isInteger(startHour) || startHour < 0 || startHour > 23
     || !Number.isInteger(endHour) || endHour < 0 || endHour > 23
@@ -70,6 +75,10 @@ export function resolveTeenLockConfig(
 }
 
 export function isTeenLockWindow(nowMs: number, window: TeenLockWindow): boolean {
+  // 全天形态与时刻无关，恒为锁定时段
+  if (window.mode === "always") {
+    return true;
+  }
   const hour = Math.floor(beijingMsIntoDay(nowMs) / HOUR_MS);
   if (window.mode === "cross-day") {
     return hour >= window.startHour || hour < window.endHour;
@@ -117,11 +126,15 @@ export function shouldLockTeenMode(
   return calibratedNow === null || isTeenLockWindow(calibratedNow, config);
 }
 
-/** 距下一个时间窗边界的毫秒数，用于 App 长时间停留时跨边界重新判定。 */
+/** 距下一个时间窗边界的毫秒数，用于 App 长时间停留时跨边界重新判定；全天形态无边界返回 Infinity。 */
 export function msUntilTeenLockBoundary(
   nowMs: number,
   window: TeenLockWindow,
 ): number {
+  // 全天形态没有时段边界，调用方应跳过边界定时器
+  if (window.mode === "always") {
+    return Number.POSITIVE_INFINITY;
+  }
   const intoDay = beijingMsIntoDay(nowMs);
   const boundaries = [window.startHour * HOUR_MS, window.endHour * HOUR_MS];
   let next = Infinity;
@@ -136,8 +149,11 @@ export function msUntilTeenLockBoundary(
   return DAY_MS - intoDay + Math.min(...boundaries);
 }
 
-/** 锁定时段展示文案（如 "9:00-18:00"、"22:00-次日6:00"），开启成功 toast 与说明页共用。 */
+/** 锁定时段展示文案（如 "9:00-18:00"、"22:00-次日6:00"、"全天"），开启成功 toast 与说明页共用。 */
 export function teenLockWindowLabel(window: TeenLockWindow): string {
+  if (window.mode === "always") {
+    return "全天";
+  }
   if (window.mode === "cross-day") {
     return `${window.startHour}:00-次日${window.endHour}:00`;
   }

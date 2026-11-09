@@ -223,8 +223,12 @@ function TeenModeGateSession({
       }
       const now = calibratedNow();
       setServerNow(now);
-      // 未取得有效时段（unknown/disabled）时无需边界定时器，配置或状态回调会触发重判
-      if (lockConfig === "unknown" || lockConfig === "disabled") {
+      // 未取得有效时段（unknown/disabled）或全天形态（无边界）时无需边界定时器，配置或状态回调会触发重判
+      if (
+        lockConfig === "unknown"
+        || lockConfig === "disabled"
+        || lockConfig.mode === "always"
+      ) {
         return;
       }
       timer = setTimeout(

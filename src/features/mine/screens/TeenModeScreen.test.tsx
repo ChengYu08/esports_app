@@ -189,6 +189,43 @@ describe("TeenModeScreen 状态恢复与同步", () => {
     );
   });
 
+  it("服务端配置全天形态时开启成功 toast 不带时段字样", async () => {
+    const { showToast } = await import("@/shared/ui/app-toast");
+    apiMock.fetchTeenModeConfig.mockResolvedValue({
+      lockEnabled: true,
+      mode: "always",
+    });
+    apiMock.status.mockResolvedValue({
+      enabled: false,
+      passwordSet: false,
+      remainingAttempts: 10,
+      serverTime: 1,
+    });
+    apiMock.open.mockResolvedValue({
+      enabled: true,
+      passwordSet: true,
+      remainingAttempts: 10,
+      serverTime: 2,
+    });
+    await renderScreen();
+
+    const openButton = renderer?.root
+      .findAllByType(PressableHost)
+      .find((node) => node.props.accessibilityLabel === "开启青少年模式");
+    await act(async () => openButton?.props.onPress());
+    const input = renderer?.root.findByType(TextInputHost);
+    await act(async () => input?.props.onChangeText("1234"));
+    // setFirst 输满 4 位自动进入 setConfirm，再输一次并确认
+    await act(async () => input?.props.onChangeText("1234"));
+    const confirmButton = renderer?.root
+      .findAllByType(PressableHost)
+      .find((node) => node.props.accessibilityLabel === "确认");
+    await act(async () => confirmButton?.props.onPress());
+
+    expect(apiMock.open).toHaveBeenCalledWith("token-a", "1234", "1234");
+    expect(showToast).toHaveBeenCalledWith("青少年模式已开启，全天限制核心功能");
+  });
+
   it("服务端未配置锁定时段时开启成功 toast 不展示时段", async () => {
     const { showToast } = await import("@/shared/ui/app-toast");
     apiMock.fetchTeenModeConfig.mockResolvedValue({ lockEnabled: false });
