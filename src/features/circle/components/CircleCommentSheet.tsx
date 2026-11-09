@@ -233,7 +233,9 @@ export function CircleCommentSheet({
     setFocused(true);
     setMentionOpen(true);
     setInput((current) => (current.endsWith("@") ? current : `${current}@`));
-    inputRef.current?.focus();
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
     void refreshConversations(token);
   };
 
@@ -266,7 +268,9 @@ export function CircleCommentSheet({
     setMentionOpen(false);
     if (emojiPickerOpen) {
       setEmojiPickerOpen(false);
-      inputRef.current?.focus();
+      requestAnimationFrame(() => {
+        inputRef.current?.focus();
+      });
       return;
     }
     setFocused(true);
