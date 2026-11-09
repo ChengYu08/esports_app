@@ -221,6 +221,7 @@ describe("shouldLockTeenMode（三态）", () => {
   it("全天形态任意时刻均锁定", () => {
     expect(shouldLockTeenMode(true, beijingAt(12, 0), ALWAYS)).toBe(true);
     expect(shouldLockTeenMode(true, beijingAt(23, 0), ALWAYS)).toBe(true);
+    expect(shouldLockTeenMode(true, null, ALWAYS)).toBe(true);
   });
 });
 

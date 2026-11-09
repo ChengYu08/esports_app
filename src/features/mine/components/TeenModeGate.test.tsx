@@ -223,6 +223,31 @@ describe("TeenModeGate 独立设置页状态同步", () => {
     expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Function), 30_000);
   });
 
+  it("全天形态（mode=always）不产生边界定时器", async () => {
+    vi.spyOn(performance, "now").mockReturnValue(1_000);
+    const timeoutSpy = vi.spyOn(globalThis, "setTimeout");
+    apiMock.fetchTeenModeConfig.mockResolvedValue({
+      lockEnabled: true,
+      mode: "always",
+    });
+    apiMock.status.mockResolvedValue({
+      enabled: true,
+      passwordSet: true,
+      remainingAttempts: 10,
+      serverTime: Date.parse("2026-11-03T12:00:00+08:00"),
+    } satisfies TeenModeStatus);
+
+    await act(async () => {
+      renderer = create(<TeenModeGate />);
+    });
+
+    // 全天无边界：任何以有限毫秒 delay 注册的定时器都是 setTimeout(Infinity) 风暴的回归信号
+    const finiteDelays = timeoutSpy.mock.calls
+      .map((call) => call[1])
+      .filter((delay) => typeof delay === "number" && Number.isFinite(delay));
+    expect(finiteDelays).toEqual([]);
+  });
+
   it("新装登录当次启动：走真实 completeClientLogin 登录后未开启且无弹窗记录时立即弹介绍弹窗", async () => {
     authState.accessToken = null as unknown as string;
     authState.user.id = null;
