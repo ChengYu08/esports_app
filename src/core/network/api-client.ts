@@ -85,6 +85,7 @@ async function processResponse<T>(
   payload: unknown,
   token?: string,
   suppressRealNameRedirect?: boolean,
+  skipAuthSideEffects = false,
 ): Promise<T> {
   const errorPayload = readErrorPayload(payload);
   const requestError = new ApiError(
@@ -95,6 +96,7 @@ async function processResponse<T>(
 
   if (isAuthExpiredResponse(status, errorPayload?.code)) {
     const shouldHandleAuthExpiry = Boolean(token)
+      && !skipAuthSideEffects
       && !AUTH_EXPIRY_IGNORED_PATHS.some((ignoredPath) => path.includes(ignoredPath));
     if (shouldHandleAuthExpiry) {
       try {
@@ -107,8 +109,9 @@ async function processResponse<T>(
   }
 
   // 全局「未进行实名认证」拦截：info 精确命中时引导去实名（对齐 Web 端行为），错误仍正常抛出。
-  // 调用方声明 suppressRealNameRedirect 时改由其在弹窗中自行引导（如「去实名」按钮）
-  if (!suppressRealNameRedirect) {
+  // 调用方声明 suppressRealNameRedirect 时改由其在弹窗中自行引导（如「去实名」按钮）；
+  // skipAuthSideEffects 供弱依赖请求（如播放统计）一并跳过。
+  if (!suppressRealNameRedirect && !skipAuthSideEffects) {
     await triggerRealNameRequiredIfNeed(errorPayload);
   }
   if (status < 200 || status >= 300) throw requestError;
@@ -122,10 +125,12 @@ export type RequestOptions = Omit<RequestInit, 'body'> & {
   token?: string;
   /** 命中「未进行实名认证」时不做全局自动跳转，由调用方在失败弹窗中自行引导去实名。 */
   suppressRealNameRedirect?: boolean;
+  /** 弱依赖请求（如播放统计）失败时跳过全局登录和实名引导。 */
+  skipAuthSideEffects?: boolean;
 };
 
 export async function apiClient<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { token, timeoutMs, body, method, suppressRealNameRedirect } = options;
+  const { token, timeoutMs, body, method, suppressRealNameRedirect, skipAuthSideEffects } = options;
   const startedAt = Date.now();
 
   try {
@@ -141,7 +146,7 @@ export async function apiClient<T>(path: string, options: RequestOptions = {}): 
       signal: options.signal ?? undefined,
     });
     logger.debug('api.request', { path, status: response.status, durationMs: Date.now() - startedAt });
-    return await processResponse<T>(path, response.status, response.data, token, suppressRealNameRedirect);
+    return await processResponse<T>(path, response.status, response.data, token, suppressRealNameRedirect, skipAuthSideEffects);
   } catch (error) {
     // React Query 取消请求时原样抛出，不当作网络失败。
     if (isCancel(error)) throw error;
@@ -149,7 +154,7 @@ export async function apiClient<T>(path: string, options: RequestOptions = {}): 
 
     if (isAxiosError(error) && error.response) {
       logger.debug('api.request', { path, status: error.response.status, durationMs: Date.now() - startedAt });
-      return await processResponse<T>(path, error.response.status, error.response.data, token, suppressRealNameRedirect);
+      return await processResponse<T>(path, error.response.status, error.response.data, token, suppressRealNameRedirect, skipAuthSideEffects);
     }
 
     logger.warn('api.network_error', { path, durationMs: Date.now() - startedAt });

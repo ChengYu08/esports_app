@@ -26,6 +26,7 @@ module.exports = ({ config }) => {
 
   return {
     ...config,
+    plugins: [...(config.plugins ?? []), "react-native-video"],
     ...(appVersion ? { version: appVersion } : {}),
     ...(versionCode != null
       ? { android: { ...config.android, versionCode } }
