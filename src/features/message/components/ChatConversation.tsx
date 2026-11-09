@@ -33,7 +33,7 @@ import { EmojiKeyboard, type EmojiType } from "rn-emoji-keyboard";
 import type { AfterSaleCardPayload } from "@/features/order/after-sale-card";
 import { afterSaleCardRows } from "@/features/order/after-sale-card";
 import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
-import { convertToJpeg, isGifImage } from "@/shared/media-picker/image-compat";
+import { convertToJpeg, isGifImage, isGifMessageImage } from "@/shared/media-picker/image-compat";
 import { showToast } from "@/shared/ui/app-toast";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { EmptyState } from "@/shared/ui/AsyncStates";
@@ -1228,20 +1228,16 @@ const ChatBubble = memo(function ChatBubble({
   const targetImageWidth = item.isMine ? 120 : 160;
   const imageWidth = Math.min(targetImageWidth, windowWidth * 0.58);
   const imageHeight = imageWidth / imageRatio;
-  // 本会话自己发出的 GIF 原图是本地文件，用原图播放动效；融云缩略图是静态 JPEG，用了就不动了。
-  // 远端 GIF（对方发的）拿不到本地文件，仍先用缩略图，点开预览再看动图
-  const [animatedImageUri] = useState(() => {
-    if (item.kind !== "image" || !/^(?:file|content):\/\//i.test(item.imageUrl)) {
-      return null;
-    }
-    return isGifImage(item.imageUrl) ? item.imageUrl : null;
-  });
+  // GIF 不走融云缩略图（静态 JPEG 会丢动画）：本地原文件按魔数识别，远端 URL 是
+  // OSS 上的原图（发送时保留真实扩展名），直接用 imageUrl，图片库按气泡尺寸解码播放
+  const isGifMessage = item.kind === "image" && isGifMessageImage(item.imageUrl);
   // 缩略图宽度不足以铺满气泡的物理像素时会被放大发虚，这种消息继续用原图（解码尺寸由图片库按气泡缩小）
   const isThumbnailSharpEnough = item.kind === "image"
+    && !isGifMessage
     && !!item.thumbnailUri
     && (item.thumbnailWidth ?? 0) >= imageWidth * PixelRatio.get();
   const bubbleImageUri = item.kind === "image"
-    ? (animatedImageUri ?? (isThumbnailSharpEnough ? item.thumbnailUri! : item.imageUrl))
+    ? (isGifMessage ? item.imageUrl : (isThumbnailSharpEnough ? item.thumbnailUri! : item.imageUrl))
     : "";
 
   return (

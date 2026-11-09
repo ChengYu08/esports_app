@@ -72,3 +72,14 @@ export function isGifImage(uri: string): boolean {
     return false;
   }
 }
+
+/** 消息图片是否 GIF：本地文件按魔数，远端按 URL 后缀（OSS 上传保留真实扩展名）。 */
+export function isGifMessageImage(uri: string): boolean {
+  if (/\.gif(?:[?#]|$)/i.test(uri)) {
+    return true;
+  }
+  if (/^(?:file|content):\/\//i.test(uri)) {
+    return isGifImage(uri);
+  }
+  return false;
+}
