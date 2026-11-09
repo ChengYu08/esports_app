@@ -352,6 +352,8 @@ export default function HomeScreen() {
                       loading={clubs.isFetchingNextPage}
                       hasMore={clubs.hasNextPage}
                       pageCount={clubs.data?.pages.length}
+                      failed={clubs.isFetchNextPageError}
+                      onRetry={clubs.fetchNextPage}
                     />
                   ) : null
                 }
