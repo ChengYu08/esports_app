@@ -1,6 +1,11 @@
 import { router } from "expo-router";
 
 import { messageStore } from "@/features/message/message-store";
+import { sendRongText } from "@/features/message/rongcloud-im";
+import { resolveVoiceRoomId, voiceRoomApi } from "@/features/voice-room/voice-room.api";
+import { navigateToVoiceRoom } from "@/features/voice-room/navigate-voice-room";
+import { showToast } from "@/shared/ui/app-toast";
+import { useAuthStore } from "@esports/auth";
 
 /** 支付成功后发给陪玩的固定文案（对齐 PC / 匹配页） */
 export const ORDER_PAID_NOTIFY_TEXT = "我已支付订单~";
@@ -34,6 +39,46 @@ async function waitUntilMessageReady(
     await new Promise((resolve) => setTimeout(resolve, READY_POLL_INTERVAL_MS));
   }
   return messageStore.getState().connectionState === "ready";
+}
+
+/** 不试音订单支付后复用或创建房间，并向已支付的陪玩发送邀请。 */
+export async function afterQuickMatchPaidOpenRoom(options: {
+  companionUserIds: string[];
+  token: string;
+  clubId?: string;
+}): Promise<void> {
+  try {
+    const user = useAuthStore.getState().user;
+    let room = await voiceRoomApi.getJoinedRoom(options.token);
+    if (!resolveVoiceRoomId(room)) {
+      room = await voiceRoomApi.createRoom(
+        `${user?.nickname || "我"}的语聊房`,
+        options.token,
+        options.clubId,
+      );
+    }
+    const roomId = resolveVoiceRoomId(room);
+    if (!roomId || room?.roomVersion == null) {
+      throw new Error("房间信息不完整");
+    }
+    const version = String(room.roomVersion);
+    const link = `https://djpc.jlgkj.top/chat?type=chat-room&id=${encodeURIComponent(roomId)}&v=${encodeURIComponent(version)}`;
+    const ids = [...new Set(options.companionUserIds.filter((id) => id && id !== "0"))];
+    let failed = ids.length === 0;
+    if (ids.length && await waitUntilMessageReady(options.token)) {
+      await notifyOrderPaidToCompanions(ids, options.token);
+      const results = await Promise.allSettled(ids.map((id) => sendRongText(id, link)));
+      failed = results.some((result) => result.status === "rejected");
+    } else if (ids.length) {
+      failed = true;
+    }
+    navigateToVoiceRoom({ id: roomId, v: version });
+    if (failed) {
+      showToast("部分邀请未发送成功，请在语聊房中手动邀请陪玩");
+    }
+  } catch (error) {
+    showToast(`支付成功，但${error instanceof Error ? error.message : "无法创建语聊房"}，请手动进入语聊房邀请陪玩`);
+  }
 }
 
 /**
