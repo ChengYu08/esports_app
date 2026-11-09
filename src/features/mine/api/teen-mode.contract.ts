@@ -11,11 +11,11 @@ export type TeenModeStatus = {
 export type TeenModeConfig = {
   /** 锁定是否生效：false 表示时段未配置/非法，锁定解除；客户端不得自行兜底时段 */
   lockEnabled: boolean;
-  /** 锁定形态：same-day 本日 / cross-day 跨日；lockEnabled=false 时为空 */
-  mode?: "same-day" | "cross-day";
-  /** 锁定时段起始小时（含），北京时间 0-23；lockEnabled=false 时为空 */
+  /** 锁定形态：always 全天 / same-day 本日 / cross-day 跨日；lockEnabled=false 时为空 */
+  mode?: "always" | "same-day" | "cross-day";
+  /** 锁定时段起始小时（含），北京时间 0-23；lockEnabled=false 或 always 时为空 */
   lockStartHour?: number;
-  /** 锁定时段结束小时（不含），北京时间 0-23；lockEnabled=false 时为空 */
+  /** 锁定时段结束小时（不含），北京时间 0-23；lockEnabled=false 或 always 时为空 */
   lockEndHour?: number;
 };
 
