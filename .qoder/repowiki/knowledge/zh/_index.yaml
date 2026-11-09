@@ -1,9 +1,9 @@
 # 知识卡导出索引文件
 schema_version: 1
 locale: zh-CN
-commit: 542dca34683500b6626fde883eee0ea583878cae
+commit: 08336856363b79634260673ed32223dfdbe6511f
 branch: prod_ios_second_phase
-exported_at: "2026-11-09T02:49:27Z"
+exported_at: "2026-11-09T03:17:06Z"
 modules:
     agent_skills:
         dir_name: React Native Update OTA 集成 Agent Skill
@@ -14,9 +14,7 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to:
-            - path: src_features/app_upgrade_ota_iap
-              reason: app-upgrade 与 ota 模块使用 Pushy/Cresc 热更新能力，与 .agents/ 下的 OTA 集成指南和静态检查脚本共同维护同一套热更新机制。
+        related_to: []
     build_scripts:
         dir_name: Android_iOS 构建与 CI 脚本
         title: Android/iOS 构建与 CI 脚本
@@ -78,7 +76,7 @@ modules:
         depends_on: []
         related_to:
             - path: src_features/app_upgrade_ota_iap
-              reason: app_upgrade_ota_iap 中的整包升级逻辑调用 app_toolkit 的 installUnknownApp 授权检查与文件 MD5 校验以完成 APK 安装。
+              reason: apk-installer.ts 通过 ExpoAppToolkit.canRequestPackageInstalls() 与 md5File() 完成未知包安装授权校验与 APK MD5 流式计算
     native_modules/pz_one_click:
         dir_name: 阿里云一键登录 Expo 原生模块
         title: 阿里云一键登录 Expo 原生模块
@@ -98,8 +96,8 @@ modules:
         depends_on: []
         related_to: []
     root:
-        dir_name: EsportsApp React Native 应用根项目
-        title: EsportsApp React Native 应用根项目
+        dir_name: EsportsApp React Native 应用根工程
+        title: EsportsApp React Native 应用根工程
         scope:
             - README.md
             - AGENTS.md
@@ -147,8 +145,8 @@ modules:
         children: []
         depends_on: []
         related_to:
-            - path: src_app/account_profile_settings/auth_flows
-              reason: 登录、忘记密码等路由页面通过 createAuthSsoAdapter 与 ForgotPasswordScreen 消费 shared_packages 中的 SSO SDK 与认证状态。
+            - path: native_modules/pz_one_click
+              reason: packages/sso-sdk/src/native-quick-login.ts 引入 PzOneClickModule，通过 onStateChange 事件订阅阿里云一键登录状态
     src_app:
         dir_name: App 路由门面层（Expo Router _ Next.js App Router 聚合）
         title: App 路由门面层（Expo Router / Next.js App Router 聚合）
@@ -204,7 +202,9 @@ modules:
             - src_app/account_profile_settings/activity_club_court/activity_club
             - src_app/account_profile_settings/activity_club_court/court_management
         depends_on: []
-        related_to: []
+        related_to:
+            - path: src_features/home
+              reason: activity/club/court 路由文件将 URL 路径解析后委派给 features/activity、features/home（俱乐部）、features/court 的 Screen 组件
     src_app/account_profile_settings/activity_club_court/activity_club:
         dir_name: 活动与俱乐部路由入口
         title: 活动与俱乐部路由入口
@@ -214,9 +214,7 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to:
-            - path: src_features/activity
-              reason: activity_club 路由入口聚合 activity、club 页面，将 URL 参数委派给 features/activity 与 home 模块的 Screen 组件。
+        related_to: []
     src_app/account_profile_settings/activity_club_court/court_management:
         dir_name: 球场管理路由层
         title: 球场管理路由层
@@ -238,9 +236,7 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to:
-            - path: native_modules/pz_one_click
-              reason: 运营商一键登录流程在 app/login.tsx 中通过 pz-one-click 原生模块的 onStateChange 事件驱动登录状态。
+        related_to: []
     src_app/account_profile_settings/companion_pages:
         dir_name: Companion 伴播主页面路由入口
         title: Companion 伴播主页面路由入口
@@ -268,7 +264,7 @@ modules:
         depends_on: []
         related_to:
             - path: src_features/match
-              reason: match_order_voice_chat 路由入口将 /match URL 映射到 features/match 的 MatchPublishScreen 等屏幕组件。
+              reason: match/order/voice-room/chat 路由文件将 URL 参数解析后委派给 features/match、features/order、features/voice-room 中的对应 Screen 组件
     src_app/account_profile_settings/misc_utilities:
         dir_name: 应用路由入口与轻量桥接页面
         title: 应用路由入口与轻量桥接页面
@@ -285,10 +281,8 @@ modules:
         children: []
         depends_on: []
         related_to:
-            - path: src_features/search
-              reason: search 功能模块为 misc_utilities 提供的 /search 路由页面实现俱乐部与用户关键词搜索能力。
             - path: src_features/mine/profile_account_settings/notification_report_about
-              reason: misc_utilities 提供 report/protocol/search 等扁平路由入口，重定向到 features/mine 的 ReportScreen 及 shared 层的搜索能力。
+              reason: search/report/protocol/about 路由文件重定向到 features/mine/screens 中的 ReportScreen、AboutScreen 以及 shared 层页面
     src_app/account_profile_settings/profile_editing:
         dir_name: 用户资料编辑路由适配层
         title: 用户资料编辑路由适配层
@@ -313,7 +307,7 @@ modules:
         depends_on: []
         related_to:
             - path: src_app/tabs_shell
-              reason: tabs_shell 底部标签页容器承载首页、排行榜、订单、消息、我的五个受保护 Tab，与 src_app/(tabs) 路由组协作定义权限控制。
+              reason: tabs_shell 底部标签 Shell 聚合 src/app/(tabs) 路由组，定义首页、排行榜、订单、消息、我的五个 Tab 并处理 Android 硬件返回退出逻辑
     src_app/court:
         dir_name: 法庭路由层（Next.js App Router）
         title: 法庭路由层（Next.js App Router）
@@ -331,7 +325,9 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to: []
+        related_to:
+            - path: src_features/match
+              reason: match/route 层将 /match 与 /match/matching/[requestNo] URL 映射到 features/match/screens 中的 MatchPublishScreen、MatchMatchingScreen 屏幕组件
     src_app/tabs_shell:
         dir_name: 底部标签页 Shell（App Tab Shell）
         title: 底部标签页 Shell（App Tab Shell）
@@ -342,8 +338,8 @@ modules:
         depends_on: []
         related_to: []
     src_features:
-        dir_name: 业务功能特性集（src_features）
-        title: 业务功能特性集（src/features）
+        dir_name: 业务功能域集合（src_features）
+        title: 业务功能域集合（src/features）
         scope:
             - src/features/
         source_files: []
@@ -351,6 +347,7 @@ modules:
             - src_features/activity
             - src_features/app_upgrade_ota_iap
             - src_features/auth
+            - src_features/circle
             - src_features/court
             - src_features/home
             - src_features/match
@@ -382,8 +379,8 @@ modules:
         children: []
         depends_on: []
         related_to:
-            - path: native_modules/voice_room_background
-              reason: app_upgrade_ota_iap 中的整包升级逻辑与 Pushy/Cresc 热更新门禁分别对应原生 APK/App Store 跳转和 OTA 热更两种版本分发方案，共同构成应用升级能力。
+            - path: native_modules/alipay_payment
+              reason: StarRechargeAndroidScreen 直接调用 AlipayPayment.registerAppAsync 与 payAsync，将 Android 钻石充值路由到支付宝原生模块
     src_features/auth:
         dir_name: 客户端认证与会话管理
         title: 客户端认证与会话管理
@@ -393,8 +390,40 @@ modules:
         children: []
         depends_on: []
         related_to:
-            - path: shared_packages
-              reason: features/auth 中的客户端认证逻辑通过 @esports/auth 包提供的 useAuthStore、createAuthSsoAdapter 等能力实现登录与会话管理。
+            - path: src_app/account_profile_settings/auth_flows
+              reason: login/forgot-password/change-password 路由文件渲染 src/features/auth 下的认证屏幕组件，完成登录与忘记密码业务流程
+    src_features/circle:
+        dir_name: 盼友圈（Circle）短视频信息流模块
+        title: 盼友圈（Circle）短视频信息流模块
+        scope:
+            - src/features/circle/
+        source_files: []
+        children:
+            - src_features/circle/circle_components
+            - src_features/circle/circle_screen_and_data
+        depends_on: []
+        related_to: []
+    src_features/circle/circle_components:
+        dir_name: 盼友圈视频卡片与评论面板组件
+        title: 盼友圈视频卡片与评论面板组件
+        scope:
+            - src/features/circle/components/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    src_features/circle/circle_screen_and_data:
+        dir_name: 盼友圈（Circle）视频流与数据层
+        title: 盼友圈（Circle）视频流与数据层
+        scope:
+            - src/features/circle/screens/
+            - src/features/circle/circle.api.ts
+            - src/features/circle/circle-comments.api.ts
+            - src/features/circle/circle-data.ts
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
     src_features/court:
         dir_name: 小法庭与平台工单业务模块
         title: 小法庭与平台工单业务模块
@@ -404,21 +433,19 @@ modules:
         children: []
         depends_on: []
         related_to:
+            - path: src_app/court
+              reason: court 路由层将 Next.js 路径映射到 features/court/screens 下的法庭与工单屏幕组件，作为 court 业务域的统一入口
             - path: src_app/account_profile_settings/activity_club_court/court_management
-              reason: court_management 路由层将球场管理 URL 映射到 features/court/screens 中的 CourtHome/CourtTargetPicker 等屏幕组件。
+              reason: activity/club/court 路由文件将 court 路径映射到 features/court/screens 下的法庭与工单屏幕组件
     src_features/home:
-        dir_name: 首页聚合与俱乐部频道
-        title: 首页聚合与俱乐部频道
+        dir_name: 首页与俱乐部频道聚合层
+        title: 首页与俱乐部频道聚合层
         scope:
             - src/features/home/
         source_files: []
         children: []
         depends_on: []
-        related_to:
-            - path: src_features/voice_room
-              reason: home 模块的俱乐部详情页面通过 useCustomerDispatch hook 调用语音客服接待流程，进入语聊房进行陪玩服务对接。
-            - path: src_app/account_profile_settings/activity_club_court/activity_club
-              reason: activity_club 路由入口将俱乐部 URL 路径委派给 features/home 的 ClubDetailScreen 等屏幕组件。
+        related_to: []
     src_features/match:
         dir_name: 快速匹配（Quick Match）业务模块
         title: 快速匹配（Quick Match）业务模块
@@ -440,7 +467,9 @@ modules:
             - src_features/message/message_state_store
             - src_features/message/rongcloud_im_integration
         depends_on: []
-        related_to: []
+        related_to:
+            - path: src_features/voice_room/reception_command_handlers
+              reason: reception-command-handlers.ts 注册 CUSTOMER_SERVICE_INVITE、QUICK_MATCH_CREATED 融云命令并调用 claimAndEnterCustomerServiceRoom，消费 message/rongcloud-commands 自定义消息类型
     src_features/message/action_command_dispatch:
         dir_name: 操作型命令信令分发与处理
         title: 操作型命令信令分发与处理
@@ -451,7 +480,7 @@ modules:
         depends_on: []
         related_to:
             - path: src_features/match
-              reason: 操作型命令处理器处理 QUICK_MATCH_NOTICE 信令，将平台推送的抢单通知转换为 ActionNotice 驱动 match 业务流。
+              reason: action-command-handlers.ts 解析 QUICK_MATCH_NOTICE/QUICK_MATCH_EXPIRED/QUICK_MATCH_CANCELLED 后调用 match/grab-quick-match-flow.grabQuickMatchAndEnterAudition，驱动抢单流程
     src_features/message/chat_ui:
         dir_name: 消息聊天 UI 层
         title: 消息聊天 UI 层
@@ -472,7 +501,9 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to: []
+        related_to:
+            - path: src_features/message/rongcloud_im_integration
+              reason: message-state-store 基于 Zustand 管理消息会话状态并通过 MessageAdapter 抽象封装融云 IM SDK，是 message/rongcloud_im_integration 的上层适配器
     src_features/message/rongcloud_im_integration:
         dir_name: 融云 IM 集成与命令分发
         title: 融云 IM 集成与命令分发
@@ -508,9 +539,7 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to:
-            - path: src_features/mine/profile_account_settings/companion_dashboard
-              reason: mine/companion_management 的音频选取与 OSS 直传能力为 companion_dashboard 的伴生体技能介绍编辑与截图画廊提供媒体上传支撑。
+        related_to: []
     src_features/mine/mine_shell_and_menu:
         dir_name: 我的页菜单与本地状态管理
         title: 我的页菜单与本地状态管理
@@ -521,9 +550,7 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to:
-            - path: src_features/mine/profile_account_settings
-              reason: mine/mine_shell_and_menu 提供的菜单解析与黑名单本地镜像被 profile_account_settings 各页面消费以渲染 Mine 页面布局与设置项。
+        related_to: []
     src_features/mine/profile_account_settings:
         dir_name: Mine_Profile 个人中心功能域
         title: Mine/Profile 个人中心功能域
@@ -553,7 +580,10 @@ modules:
         depends_on: []
         related_to:
             - path: src_app/account_profile_settings/account_settings
-              reason: account_settings 路由门面为 account_security_settings 的账号安全、青少年模式、黑名单等页面提供 app 层路由入口，统一暴露 Screen 组件。
+              reason: account-security/basic-settings/teen-mode/blacklist 路由文件映射到 features/mine/screens 中 AccountSecurityScreen/AccountCancellationScreen 等设置页面
+        similar_to:
+            - path: src_features/mine/profile_account_settings/profile_editing
+              reason: profile_editing 与 account_security_settings 均采用 Mine 子功能页面的相同组合模式：入口解析 + 表单校验 + 认证 API 更新，但分别服务于个人资料编辑与账号安全注销两类业务
     src_features/mine/profile_account_settings/companion_dashboard:
         dir_name: 陪玩中心仪表盘与编辑页面
         title: 陪玩中心仪表盘与编辑页面
@@ -565,7 +595,9 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to: []
+        related_to:
+            - path: src_app/account_profile_settings/companion_pages
+              reason: companion-dashboard/intro/gallery 路由文件映射到 features/mine/screens 中 CompanionDashboardScreen/CompanionIntroScreen/CompanionGalleryScreen 陪玩中心页面
     src_features/mine/profile_account_settings/diamonds_recharge_payment:
         dir_name: 钻石余额与充值支付页面
         title: 钻石余额与充值支付页面
@@ -576,9 +608,7 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to:
-            - path: native_modules/alipay_payment
-              reason: StarRechargeAndroidScreen 直接调用 AlipayPayment.registerAppAsync 与 payAsync 完成 Android 端支付宝充值流程。
+        related_to: []
     src_features/mine/profile_account_settings/mine_shell_profile_relation:
         dir_name: Mine_Profile 关系页导航壳
         title: Mine/Profile 关系页导航壳
@@ -600,7 +630,9 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to: []
+        related_to:
+            - path: src_features/app_upgrade_ota_iap
+              reason: AboutScreen.tsx 中的 checkForUpdate 调用 app-upgrade.store.kickOffStartupCheck，触发整包升级检查流程，与 app_upgrade_ota_iap 模块协作完成版本检测
     src_features/mine/profile_account_settings/profile_editing:
         dir_name: 个人资料编辑页面集
         title: 个人资料编辑页面集
@@ -613,7 +645,7 @@ modules:
         depends_on: []
         related_to:
             - path: src_app/account_profile_settings/profile_editing
-              reason: profile_editing 路由适配层将 Next.js 路由映射到 profile_account_settings/profile_editing 中的 EditProfile/EditNickname/EditSignature 屏幕组件。
+              reason: profile/edit-profile/avatar-crop 等路由文件映射到 features/mine/screens 中的 EditProfileScreen/EditNicknameScreen/EditSignatureScreen 屏幕组件
     src_features/mine/profile_account_settings/teen_mode:
         dir_name: 青少年模式（Teen Mode）功能入口与设置页
         title: 青少年模式（Teen Mode）功能入口与设置页
@@ -644,9 +676,7 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to:
-            - path: src_features/mine/profile_account_settings/teen_mode
-              reason: mine/profile_account_settings/teen_mode 功能入口与 teen_mode_privacy 核心能力通过 TeenModeGate、TeenModeScreen 等组件协作实现青少年模式门禁与密码设置。
+        related_to: []
     src_features/order:
         dir_name: 订单功能模块（陪玩_玩家双视角）
         title: 订单功能模块（陪玩/玩家双视角）
@@ -656,8 +686,10 @@ modules:
         children: []
         depends_on: []
         related_to:
-            - path: src_features/message/action_command_dispatch
-              reason: ORDER_NOTIFY（RC:CmdMsg）支付催单信令由 action-command 分发为全局条，驱动 order 模块的接单/催单业务流程。
+            - path: src_features/activity
+              reason: activity 秒杀活动通过 order API 参与派单流程，与 order 模块共同构成「发布需求→支付→派单」的业务闭环
+            - path: src_features/match
+              reason: grab-quick-match-flow.ts 调用 order/dispatch.api 的 grabDispatchRequest/fetchDispatchDetail，完成抢单与派单详情刷新，是匹配→订单的关键业务链路
     src_features/ranking:
         dir_name: 排行榜功能模块
         title: 排行榜功能模块
@@ -690,10 +722,8 @@ modules:
             - src_features/voice_room/ui_components_and_screens
         depends_on: []
         related_to:
-            - path: src_features/activity
-              reason: activity 模块的秒杀活动落地页在用户参与派单时调用 voiceRoomApi.getJoinedRoom 与 navigateToVoiceRoom，将活动流程编排到语聊房。
-            - path: src_features/match
-              reason: 快速匹配抢单流程调用 voiceRoomApi.getDetail/getJoinedRoom 并导航到语聊房（navigateToVoiceRoom），实现从抢单到进房的跨模块编排。
+            - path: native_modules/voice_room_background
+              reason: voice-room-rtc.ts 导入并调用 startVoiceRoomBackground/stopVoiceRoomBackground/updateVoiceRoomMicrophone，驱动语聊房后台音频会话
     src_features/voice_room/api_types_and_shared_utils:
         dir_name: 语聊房 API 类型与消息展示
         title: 语聊房 API 类型与消息展示
@@ -704,9 +734,7 @@ modules:
         source_files: []
         children: []
         depends_on: []
-        related_to:
-            - path: src_features/message/message_state_store
-              reason: message_state_store 与 voice_room/api_types_and_shared_utils 均封装融云 IM SDK，但前者处理站内信会话/历史消息，后者仅负责语聊房业务类型与 HTTP 接口。
+        related_to: []
     src_features/voice_room/reception_command_handlers:
         dir_name: 语聊房融云命令处理与会话状态
         title: 语聊房融云命令处理与会话状态
@@ -718,10 +746,8 @@ modules:
         children: []
         depends_on: []
         related_to:
-            - path: src_features/message/action_command_dispatch
-              reason: voice_room/reception_command_handlers 与 message/action_command_dispatch 都注册并处理平台推送命令（融云自定义 vs RC:CmdMsg），但前者针对语聊房邀请/踢出，后者驱动抢单/订单通知。
-            - path: src_features/voice_room/ui_components_and_screens
-              reason: 融云自定义命令（客服接待邀请、快速匹配创建、踢出）处理后通过 UI 层组件展示对话抽屉与成员面板等界面反馈。
+            - path: src_features/voice_room/room_lifecycle_navigation
+              reason: voice-room/enter-room-from-invite.ts 调用 voice-room/navigate-voice-room.ts 与 exit-voice-room.ts，编排语聊房邀请进房、退出销毁与路由单实例导航
     src_features/voice_room/rongcloud_rtc_integration:
         dir_name: 融云 IM + 声网 RTC 语聊房集成层
         title: 融云 IM + 声网 RTC 语聊房集成层
@@ -733,8 +759,8 @@ modules:
         children: []
         depends_on: []
         related_to:
-            - path: native_modules/voice_room_background
-              reason: 语音通话层调用 startVoiceRoomBackground/updateVoiceRoomMicrophone/stopVoiceRoomBackground 维持后台音频会话与通知。
+            - path: src_features/voice_room/ui_components_and_screens
+              reason: voice-room/voice-room-rtc.ts 导入 use-voice-room-rtc Hook 并调用 voice-room-rongcloud.ts 提供的融云聊天室与声网 RTC 统一接入能力
     src_features/voice_room/room_lifecycle_navigation:
         dir_name: 语聊房生命周期与导航编排
         title: 语聊房生命周期与导航编排
@@ -756,6 +782,9 @@ modules:
         children: []
         depends_on: []
         related_to: []
+        similar_to:
+            - path: src_features/circle/circle_components
+              reason: 两者均实现全屏媒体播放 UI 组件：voice-room 组件负责语聊房音视频界面（成员面板、麦克风状态、对话抽屉），circle 组件负责短视频竖滑信息流（播放器、评论弹窗、骨架屏）
     src_shared:
         dir_name: 跨页面共享资源与通用 UI 组件库
         title: 跨页面共享资源与通用 UI 组件库

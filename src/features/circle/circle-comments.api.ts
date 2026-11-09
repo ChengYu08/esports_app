@@ -3,6 +3,7 @@ import {
   unwrap,
   type CircleApiResponse,
 } from "@/features/circle/circle.api";
+import { formatRelativeTime } from "@/shared/time/relative-time";
 
 const COMMENT_PAGE_SIZE = 10;
 
@@ -81,7 +82,7 @@ function toCircleComment(item: ApiCircleComment): CircleComment {
     content: item.content ?? "",
     likeCount: item.likeCount ?? 0,
     liked: item.liked ?? false,
-    publishTime: time,
+    publishTime: formatRelativeTime(time),
     ipLocation: location && location !== "未知" ? location : undefined,
     isAuthor: Boolean(item.isAuthor ?? item.authorFlag),
     authorLiked: Boolean(item.authorLiked ?? item.authorLike),

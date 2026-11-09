@@ -1,5 +1,6 @@
 import { apiClient } from "@/core/network/api-client";
 import { followUser, unfollowUser } from "@/features/mine/api/user-follow.api";
+import { formatRelativeTime } from "@/shared/time/relative-time";
 import type { CircleFeedKind, CircleVideoPost } from "@/features/circle/circle-data";
 
 const FEED_PAGE_SIZE = 10;
@@ -67,7 +68,7 @@ function toCirclePost(item: CircleFeedItem): CircleVideoPost {
     headline: content && title ? title : undefined,
     content: content || title,
     tags: topicNames.map((name) => `#${name}`),
-    publishedAt: item.publishTime || "",
+    publishedAt: formatRelativeTime(item.publishTime),
     likeCount: item.likeCount ?? 0,
     commentCount: item.commentCount ?? 0,
     liked: item.liked ?? false,
@@ -132,6 +133,74 @@ export async function setCircleAuthorFollowed({
 }): Promise<boolean> {
   const state = await (followed ? followUser : unfollowUser)(authorId, token);
   return state.followed;
+}
+
+/** C 端热榜话题（运营配置，无热度字段），对齐 PC useCommunityTopic。 */
+export type CircleHotTopic = {
+  topicId: string;
+  topicName: string;
+  sort: number;
+};
+
+type ApiHotRankTopic = {
+  topicId?: string | number;
+  topicName?: string;
+  sort?: number;
+};
+
+/** 热榜免鉴权；失败或空榜返回空数组，前端空态兜底。 */
+export async function fetchCircleHotTopics(signal?: AbortSignal): Promise<CircleHotTopic[]> {
+  const response = await apiClient<CircleApiResponse<ApiHotRankTopic[]>>(
+    "/client/v1/moments/topic/hotRank/list",
+    { method: "GET", signal },
+  );
+  if (response.code !== "SUCCESS" || !Array.isArray(response.data)) {
+    return [];
+  }
+  return response.data
+    .filter((item) => item.topicName)
+    .map((item) => ({
+      topicId: String(item.topicId ?? ""),
+      topicName: item.topicName ?? "",
+      sort: item.sort ?? 0,
+    }))
+    .sort((a, b) => a.sort - b.sort);
+}
+
+/** 关键词/话题搜索，对齐后端 moments/video/search：keywordType=1 话题精确，缺省跨字段模糊。 */
+export async function fetchCircleSearchPage({
+  keyword,
+  keywordType,
+  cursor,
+  token,
+  signal,
+}: {
+  keyword: string;
+  keywordType?: 1;
+  cursor: string | null;
+  token?: string;
+  signal?: AbortSignal;
+}): Promise<CircleFeedPage> {
+  const response = await apiClient<CircleApiResponse<ApiCursorPage<CircleFeedItem>>>(
+    "/client/v1/moments/video/search",
+    {
+      method: "POST",
+      token,
+      signal,
+      body: {
+        keyword,
+        keywordType: keywordType ?? "",
+        cursor: cursor ?? "",
+        size: FEED_PAGE_SIZE,
+      },
+    },
+  );
+  const data = unwrap(response, "搜索失败");
+  return {
+    list: (data.list ?? []).filter((item) => Boolean(item.url)).map(toCirclePost),
+    nextCursor: data.nextCursor ?? null,
+    hasMore: data.hasMore ?? false,
+  };
 }
 
 /** 播放上报按产品约定静默失败，不触发登录/实名流程。 */

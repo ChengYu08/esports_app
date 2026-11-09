@@ -262,7 +262,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 16,
   },
-  navTab: { alignItems: "center", paddingHorizontal: 8, position: "relative" },
+  navTab: {
+    height: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    position: "relative",
+  },
   navTabText: {
     fontFamily: SYSTEM_FONT,
     color: "rgba(255, 255, 255, 0.6)",
@@ -272,7 +278,8 @@ const styles = StyleSheet.create({
   },
   navTabTextSelected: { color: "#FFFFFF", fontWeight: "600" },
   navTabIndicator: {
-    marginTop: 2,
+    position: "absolute",
+    bottom: 0,
     width: 12,
     height: 2,
     borderRadius: 1,
