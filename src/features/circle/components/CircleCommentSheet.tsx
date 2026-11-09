@@ -1,4 +1,5 @@
 import { ChevronDown16Regular, Dismiss24Regular } from "@fluentui/react-native-icons";
+import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
@@ -6,10 +7,13 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
+  type StyleProp,
+  type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -23,6 +27,12 @@ import {
   type CircleComment,
   type CircleCommentPage,
 } from "@/features/circle/circle-comments.api";
+import { useMessageStore } from "@/features/message/message-store";
+import { getConversationDisplayTitle } from "@/features/message/message-title";
+import {
+  isSelfConversationId,
+  isSystemConversationId,
+} from "@/features/message/system-conversations";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { CircleCommentHeartIcon } from "@/features/circle/components/CircleActionIcons";
@@ -50,6 +60,12 @@ type ReplyTarget = {
   parentCommentId?: string;
 };
 
+type CircleMentionUser = {
+  id: string;
+  nickname: string;
+  avatar?: string;
+};
+
 export function CircleCommentSheet({
   visible,
   onClose,
@@ -60,16 +76,25 @@ export function CircleCommentSheet({
 }: CircleCommentSheetProps) {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const viewerUserId = useAuthStore((state) => state.user?.id);
+  const conversations = useMessageStore((state) => state.conversations);
+  const blacklistedUserIds = useMessageStore((state) => state.blacklistedUserIds);
+  const messageConnectionState = useMessageStore((state) => state.connectionState);
+  const refreshConversations = useMessageStore((state) => state.refreshConversations);
   const [totalCount, setTotalCount] = useState(post.commentCount);
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [focused, setFocused] = useState(false);
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionedUsers, setMentionedUsers] = useState<CircleMentionUser[]>([]);
   const inputRef = useRef<TextInput>(null);
 
   const commentsQuery = useInfiniteQuery({
+    // 评论列表游客可看（后端支持免登录），仅关注/点赞/发布需要登录态
     queryKey: ["circle-comments", post.id, token ?? "guest"],
-    enabled: visible && Boolean(token),
+    enabled: visible,
     initialPageParam: null as string | null,
     queryFn: ({ pageParam, signal }) =>
       fetchCircleCommentPage({ videoId: post.id, cursor: pageParam, token, signal }),
@@ -81,6 +106,27 @@ export function CircleCommentSheet({
   const comments = useMemo(
     () => commentsQuery.data?.pages.flatMap((page) => page.list) ?? [],
     [commentsQuery.data],
+  );
+
+  const mentionUsers = useMemo<CircleMentionUser[]>(
+    () =>
+      conversations
+        .filter(
+          (conversation) =>
+            !isSystemConversationId(conversation.id) &&
+            !isSelfConversationId(conversation.id, viewerUserId) &&
+            !blacklistedUserIds.includes(conversation.id),
+        )
+        .map((conversation) => ({
+          id: conversation.id,
+          nickname: getConversationDisplayTitle(
+            conversation.id,
+            conversation.title,
+            conversation.note,
+          ),
+          avatar: conversation.avatar,
+        })),
+    [blacklistedUserIds, conversations, viewerUserId],
   );
 
   const mutateComments = (updater: (list: CircleComment[]) => CircleComment[]) => {
@@ -111,6 +157,8 @@ export function CircleCommentSheet({
   const handleClose = () => {
     setReplyTarget(null);
     setInput("");
+    setMentionOpen(false);
+    setMentionedUsers([]);
     setExpandedIds(new Set());
     setTotalCount(post.commentCount);
     onClose();
@@ -139,6 +187,32 @@ export function CircleCommentSheet({
 
   const handleReplyPress = (comment: CircleComment, parentCommentId?: string) => {
     setReplyTarget({ comment, parentCommentId });
+    setMentionOpen(false);
+    inputRef.current?.focus();
+  };
+
+  const handleMentionPress = () => {
+    if (!requireLogin() || !token) {
+      return;
+    }
+    setMentionOpen(true);
+    setInput((current) => (current.endsWith("@") ? current : `${current}@`));
+    inputRef.current?.focus();
+    void refreshConversations(token);
+  };
+
+  const handleMentionSelect = (user: CircleMentionUser) => {
+    setMentionedUsers((current) => {
+      if (current.some((item) => item.id === user.id)) {
+        return current;
+      }
+      return [...current, user];
+    });
+    setInput((current) => {
+      const prefix = current.endsWith("@") ? current : `${current}@`;
+      return `${prefix}${user.nickname} `;
+    });
+    setMentionOpen(false);
     inputRef.current?.focus();
   };
 
@@ -166,6 +240,7 @@ export function CircleCommentSheet({
         content,
         parentCommentId: replyTarget?.parentCommentId ?? replyTarget?.comment.id,
         replyCommentId: replyTarget?.parentCommentId ? replyTarget.comment.id : undefined,
+        mentionUserIds: mentionedUsers.map((user) => user.id),
         token,
       });
       mutateComments((current) => {
@@ -187,6 +262,8 @@ export function CircleCommentSheet({
       setTotalCount((count) => count + 1);
       setInput("");
       setReplyTarget(null);
+      setMentionOpen(false);
+      setMentionedUsers([]);
     } catch (error) {
       showToast(error instanceof Error ? error.message : "评论发布失败");
     } finally {
@@ -252,41 +329,47 @@ export function CircleCommentSheet({
         </Pressable>
       </View>
 
-      <View style={styles.postBlock}>
-        {post.headline ? <Text style={styles.postTitle}>{post.headline}</Text> : null}
-        {post.content ? <Text style={styles.postContent}>{post.content}</Text> : null}
-        {post.tags.length > 0 ? (
-          <Text style={styles.postTags}>{post.tags.join("  ")}</Text>
-        ) : null}
-        <Text style={styles.postMeta}>{post.publishedAt}</Text>
-      </View>
-
-      <Text style={styles.commentCountTitle}>共 {totalCount} 条评论</Text>
-
-      {commentsQuery.isLoading ? (
-        <View style={styles.centerFill}>
-          <ActivityIndicator color="#999999" />
-        </View>
-      ) : comments.length === 0 ? (
-        <View style={styles.centerFill}>
-          <EmptyState message="还没有评论，快来抢沙发吧" />
-        </View>
-      ) : (
-        <FlatList
-          data={comments}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          onEndReached={() => {
-            if (
-              commentsQuery.hasNextPage &&
-              !commentsQuery.isFetchingNextPage &&
-              !commentsQuery.isLoading
-            ) {
-              void commentsQuery.fetchNextPage();
-            }
-          }}
-          onEndReachedThreshold={0.6}
-          ListFooterComponent={
+      <FlatList
+        data={comments}
+        style={styles.commentList}
+        keyboardShouldPersistTaps="handled"
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        ListHeaderComponent={
+          <>
+            {/* 帖子正文必须属于同一个滚动容器，超长正文不能挤掉评论列表的可视高度。 */}
+            <View style={styles.postBlock}>
+              {post.headline ? <Text style={styles.postTitle}>{post.headline}</Text> : null}
+              {post.content ? <Text style={styles.postContent}>{post.content}</Text> : null}
+              {post.tags.length > 0 ? (
+                <Text style={styles.postTags}>{post.tags.join("  ")}</Text>
+              ) : null}
+              <Text style={styles.postMeta}>{post.publishedAt}</Text>
+            </View>
+            <Text style={styles.commentCountTitle}>共 {totalCount} 条评论</Text>
+          </>
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            {commentsQuery.isLoading ? (
+              <ActivityIndicator color="#999999" />
+            ) : (
+              <EmptyState message="还没有评论，快来抢沙发吧" />
+            )}
+          </View>
+        }
+        onEndReached={() => {
+          if (
+            commentsQuery.hasNextPage &&
+            !commentsQuery.isFetchingNextPage &&
+            !commentsQuery.isLoading
+          ) {
+            void commentsQuery.fetchNextPage();
+          }
+        }}
+        onEndReachedThreshold={0.6}
+        ListFooterComponent={
+          comments.length > 0 ? (
             <View style={styles.listFooter}>
               {commentsQuery.isFetchingNextPage ? (
                 <ActivityIndicator color="#999999" size="small" />
@@ -294,57 +377,169 @@ export function CircleCommentSheet({
                 <Text style={styles.footerText}>- 到底了 -</Text>
               )}
             </View>
-          }
-        />
-      )}
+          ) : null
+        }
+      />
 
-      <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-        <View style={styles.inputPill}>
+      <View
+        style={[
+          styles.inputBar,
+          focused && styles.inputBarFocused,
+          { paddingBottom: Math.max(insets.bottom, 12) },
+        ]}
+      >
+        {focused && mentionOpen ? (
+          <MentionUserList
+            users={mentionUsers}
+            loading={
+              messageConnectionState === "idle" || messageConnectionState === "connecting"
+            }
+            onSelect={handleMentionSelect}
+          />
+        ) : null}
+        {/* 聚焦/失焦共用同一个 TextInput，仅切换容器样式，避免重新挂载导致键盘收起 */}
+        <View style={focused ? styles.inputTextArea : styles.inputPill}>
           <TextInput
             ref={inputRef}
             value={input}
-            onChangeText={setInput}
+            onChangeText={(value) => {
+              setInput(value);
+              setMentionedUsers((current) =>
+                current.filter((user) => value.includes(`@${user.nickname}`)),
+              );
+              if (!value.includes("@")) {
+                setMentionOpen(false);
+              }
+            }}
             placeholder={replyTarget ? `回复 ${replyTarget.comment.nickname}` : "友善评论，理性发言"}
             placeholderTextColor="#CACACC"
-            style={styles.input}
+            style={focused ? styles.inputExpanded : styles.input}
             maxLength={500}
+            multiline
+            blurOnSubmit
             returnKeyType="send"
             onSubmitEditing={handleSend}
+            onFocus={() => {
+              setFocused(true);
+            }}
+            onBlur={() => {
+              setFocused(false);
+            }}
           />
+          {focused ? null : (
+            <CommentInputActions style={styles.inputActions} onMention={handleMentionPress} />
+          )}
         </View>
-        {input.trim().length > 0 ? (
+        {focused ? (
+          <View style={styles.inputToolbar}>
+            <CommentInputActions style={styles.inputToolbarIcons} onMention={handleMentionPress} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="发送评论"
+              disabled={!input.trim() || sending}
+              onPress={handleSend}
+              style={({ pressed }) => [
+                styles.sendButtonSmall,
+                (!input.trim() || sending) && styles.sendButtonDisabled,
+                pressed && styles.sendButtonPressed,
+              ]}
+            >
+              <Text style={styles.sendButtonSmallText}>{sending ? "发送中" : "发送"}</Text>
+            </Pressable>
+          </View>
+        ) : input.trim().length > 0 ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="发送评论"
             disabled={sending}
             onPress={handleSend}
+            style={({ pressed }) => [styles.sendButton, pressed && styles.sendButtonPressed]}
           >
-            <Text style={styles.sendText}>{sending ? "发送中" : "发送"}</Text>
+            <Text style={styles.sendButtonText}>{sending ? "发送中" : "发送"}</Text>
           </Pressable>
-        ) : (
-          <View style={styles.inputActions}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="提及用户"
-              onPress={() => {
-                showToast("@ 功能开发中");
-              }}
-            >
-              <Image source={atIcon} style={styles.inputIcon} />
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="表情"
-              onPress={() => {
-                showToast("表情功能开发中");
-              }}
-            >
-              <Image source={emojiIcon} style={styles.inputIcon} />
-            </Pressable>
-          </View>
-        )}
+        ) : null}
       </View>
     </BottomSheet>
+  );
+}
+
+/** 输入栏右侧的 @ / 表情图标组，胶囊内与聚焦工具行共用。 */
+function CommentInputActions({
+  style,
+  onMention,
+}: {
+  style?: StyleProp<ViewStyle>;
+  onMention: () => void;
+}) {
+  return (
+    <View style={style}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="提及用户"
+        onPress={onMention}
+      >
+        <Image source={atIcon} style={styles.inputIcon} />
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="表情"
+        onPress={() => {
+          showToast("表情功能开发中");
+        }}
+      >
+        <Image source={emojiIcon} style={styles.inputIcon} />
+      </Pressable>
+    </View>
+  );
+}
+
+function MentionUserList({
+  users,
+  loading,
+  onSelect,
+}: {
+  users: CircleMentionUser[];
+  loading: boolean;
+  onSelect: (user: CircleMentionUser) => void;
+}) {
+  return (
+    <View style={styles.mentionRow}>
+      {loading && users.length === 0 ? (
+        <ActivityIndicator color="#999999" size="small" style={styles.mentionLoading} />
+      ) : users.length === 0 ? (
+        <Text style={styles.mentionEmpty}>暂无可@用户</Text>
+      ) : (
+        <ScrollView
+          horizontal
+          keyboardShouldPersistTaps="always"
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.mentionContent}
+        >
+          {users.map((user) => (
+            <Pressable
+              key={user.id}
+              accessibilityRole="button"
+              accessibilityLabel={`@${user.nickname}`}
+              onPress={() => {
+                onSelect(user);
+              }}
+              style={({ pressed }) => [styles.mentionUser, pressed && styles.mentionUserPressed]}
+            >
+              <View style={styles.mentionAvatar}>
+                {user.avatar ? (
+                  <Image source={{ uri: user.avatar }} style={styles.mentionAvatarImage} contentFit="cover" />
+                ) : (
+                  <Text style={styles.mentionAvatarFallback}>{user.nickname.slice(0, 1)}</Text>
+                )}
+              </View>
+              <Text numberOfLines={1} style={styles.mentionNickname}>
+                {user.nickname}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+    </View>
   );
 }
 
@@ -633,7 +828,10 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 8,
   },
-  centerFill: { flex: 1, justifyContent: "center" },
+  emptyState: { minHeight: 160, justifyContent: "center" },
+  // 列表必须 flex:1 吸收弹窗高度压缩（键盘抬起时 72% 高度骤减），
+  // 否则内容把输入栏挤出弹窗底边、被键盘盖住
+  commentList: { flex: 1 },
   commentCard: { paddingVertical: 8 },
   commentRow: { flexDirection: "row", padding: 8, paddingHorizontal: 16, gap: 8 },
   commentAvatar: {
@@ -762,28 +960,132 @@ const styles = StyleSheet.create({
     borderTopColor: "#E9E9EB",
     backgroundColor: "#FFFFFF",
   },
+  inputBarFocused: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+  },
+  mentionRow: {
+    minHeight: 50,
+    marginHorizontal: -12,
+    marginTop: -12,
+    paddingTop: 12,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    backgroundColor: "#FFFFFF",
+  },
+  mentionContent: { paddingHorizontal: 12, gap: 12 },
+  mentionLoading: { marginLeft: 12, alignSelf: "center" },
+  mentionEmpty: {
+    marginLeft: 12,
+    color: "#999999",
+    fontFamily: SYSTEM_FONT,
+    fontSize: 12,
+    lineHeight: 32,
+  },
+  mentionUser: { width: 56, alignItems: "center", gap: 2 },
+  mentionUserPressed: { opacity: 0.7 },
+  mentionAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F0F1F2",
+  },
+  mentionAvatarImage: { width: "100%", height: "100%" },
+  mentionAvatarFallback: {
+    color: "#7F7F80",
+    fontFamily: SYSTEM_FONT,
+    fontSize: 12,
+  },
+  mentionNickname: {
+    width: "100%",
+    color: "#333333",
+    fontFamily: SYSTEM_FONT,
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: "center",
+  },
   inputPill: {
     flex: 1,
-    height: 36,
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: 36,
     borderRadius: 999,
     backgroundColor: "#F5F6F7",
     paddingHorizontal: 12,
-    justifyContent: "center",
+    paddingVertical: 4,
+    gap: 12,
   },
   input: {
+    flex: 1,
     fontFamily: SYSTEM_FONT,
     color: "#0D0D0F",
     fontSize: 14,
-    lineHeight: 20,
+    lineHeight: 22,
     padding: 0,
   },
-  inputActions: { flexDirection: "row", alignItems: "center", gap: 16 },
-  inputIcon: { width: 24, height: 24 },
-  sendText: {
+  inputTextArea: {
+    minHeight: 60,
+    borderRadius: 8,
+    backgroundColor: "#F7F7F7",
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 12,
+  },
+  inputExpanded: {
     fontFamily: SYSTEM_FONT,
-    color: "#FE1F4C",
+    color: "#0D0D0F",
     fontSize: 14,
     lineHeight: 22,
-    fontWeight: "600",
+    minHeight: 40,
+    padding: 0,
+    textAlignVertical: "top",
   },
+  inputActions: { flexDirection: "row", alignItems: "center", gap: 16 },
+  inputToolbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 24,
+  },
+  inputToolbarIcons: { flexDirection: "row", alignItems: "center", gap: 24 },
+  inputIcon: { width: 24, height: 24 },
+  sendButton: {
+    height: 36,
+    borderRadius: 999,
+    backgroundColor: "#FE1F4C",
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sendButtonText: {
+    fontFamily: SYSTEM_FONT,
+    color: "#FFFFFF",
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: "500",
+  },
+  sendButtonSmall: {
+    minHeight: 26,
+    borderRadius: 999,
+    backgroundColor: "#FE1F4C",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sendButtonSmallText: {
+    fontFamily: SYSTEM_FONT,
+    color: "#FFFFFF",
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "500",
+  },
+  sendButtonDisabled: { opacity: 0.5 },
+  sendButtonPressed: { opacity: 0.8 },
 });

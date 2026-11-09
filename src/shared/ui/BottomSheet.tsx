@@ -56,9 +56,9 @@ export function BottomSheet({
   // Dimensions 全部停留在旧值，任何用「布局高度」推 pad 的公式都会失真。
   // 实测（调试浮层）：键盘事件 screenY（eY）是准确的键盘顶边；
   // measureInWindow 走原生窗口坐标，返回的是真实的可视底边。
-  // 所以用反馈收敛：初始 pad = 键盘高度，之后每轮 pad += (sheet 实测底边 − eY)，
-  // 底边贴住键盘顶边后差值为 0 自然停止；未缩窗的设备上 pad = eH 即稳定。
-  const keyboardHeightRef = useRef(0);
+  // 所以用反馈收敛：初始 pad 取「窗口底边到键盘顶边」与键盘高度的较大值，
+  // 之后每轮 pad += (sheet 实测底边 − eY)，底边贴住键盘顶边后自然停止。
+  // 部分安卓设备的键盘 height 不包含底部导航区，不能把修正值限制在 height 内。
   const keyboardTopRef = useRef<number | null>(null);
   const sheetRef = useRef<View>(null);
   // padding 的镜像 ref：measureInWindow 异步回调里读最新值，state 读到的是旧闭包
@@ -101,7 +101,7 @@ export function BottomSheet({
         }
         const next = Math.min(
           Math.max(keyboardPaddingRef.current + delta, 0),
-          keyboardHeightRef.current,
+          windowHeight,
         );
         if (Math.abs(next - keyboardPaddingRef.current) <= 1) {
           return;
@@ -110,7 +110,7 @@ export function BottomSheet({
       });
     });
     return () => cancelAnimationFrame(rafId);
-  }, [alignNonce, androidKeyboardPadding, applyKeyboardPadding, keyboardAvoiding]);
+  }, [alignNonce, androidKeyboardPadding, applyKeyboardPadding, keyboardAvoiding, windowHeight]);
 
   useEffect(() => {
     if (!keyboardAvoiding || Platform.OS !== "android") {
@@ -119,10 +119,14 @@ export function BottomSheet({
     const showSubscription = Keyboard.addListener(
       "keyboardDidShow",
       (event) => {
-        keyboardHeightRef.current = event.endCoordinates.height;
         keyboardTopRef.current = event.endCoordinates.screenY;
         alignAttemptsRef.current = 0;
-        applyKeyboardPadding(event.endCoordinates.height);
+        const keyboardPadding = Math.max(
+          event.endCoordinates.height,
+          windowHeight - event.endCoordinates.screenY,
+          0,
+        );
+        applyKeyboardPadding(keyboardPadding);
         setAlignNonce((n) => n + 1);
       },
     );
@@ -134,7 +138,7 @@ export function BottomSheet({
       showSubscription.remove();
       hideSubscription.remove();
     };
-  }, [keyboardAvoiding, applyKeyboardPadding]);
+  }, [keyboardAvoiding, applyKeyboardPadding, windowHeight]);
 
   useEffect(() => {
     if (visible) {

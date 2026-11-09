@@ -1,35 +1,42 @@
-import {
-  Add16Filled,
-} from "@fluentui/react-native-icons";
+import { requireLogin } from "@/shared/navigation/require-login";
+import { useAuthStore } from "@esports/auth";
+import { Add16Filled } from "@fluentui/react-native-icons";
+import { useRecyclingState } from "@shopify/flash-list";
+import { useMutation } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { Pressable, StyleSheet, Text, TextLayoutEvent, View } from "react-native";
 import { router } from "expo-router";
 import { useCallback, useEffect, useRef } from "react";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  TextLayoutEvent,
+  View,
+} from "react-native";
 import Animated, {
   cancelAnimation,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { useMutation } from "@tanstack/react-query";
-import { useRecyclingState } from "@shopify/flash-list";
-import { useAuthStore } from "@esports/auth";
-import { requireLogin } from "@/shared/navigation/require-login";
 
 import {
   formatCircleCount,
   type CircleVideoPost,
 } from "@/features/circle/circle-data";
-import { showToast } from "@/shared/ui/app-toast";
-import { SYSTEM_FONT } from "@/shared/theme/typography";
-import { setCircleVideoLiked, setCircleAuthorFollowed } from "@/features/circle/circle.api";
-import { CircleVideoPlayer } from "@/features/circle/components/CircleVideoPlayer";
-import { CircleCommentSheet } from "@/features/circle/components/CircleCommentSheet";
+import {
+  setCircleAuthorFollowed,
+  setCircleVideoLiked,
+} from "@/features/circle/circle.api";
 import {
   CircleCommentIcon,
   CircleHeartIcon,
 } from "@/features/circle/components/CircleActionIcons";
+import { CircleCommentSheet } from "@/features/circle/components/CircleCommentSheet";
+import { CircleVideoPlayer } from "@/features/circle/components/CircleVideoPlayer";
+import { SYSTEM_FONT } from "@/shared/theme/typography";
+import { showToast } from "@/shared/ui/app-toast";
 
 /** 底部信息区的大致占位高度，右侧操作栏以此为基准向上排布。 */
 const BOTTOM_INFO_HEIGHT = 190;
@@ -60,16 +67,27 @@ export function CircleVideoCard({
   shouldRetain,
 }: CircleVideoCardProps) {
   const token = useAuthStore((state) => state.accessToken);
-  const [liked, setLiked] = useRecyclingState(post.liked ?? false, [post.id, post.liked]);
-  const [followed, setFollowed] = useRecyclingState(post.followed ?? false, [post.id, post.followed]);
+  const [liked, setLiked] = useRecyclingState(post.liked ?? false, [
+    post.id,
+    post.liked,
+  ]);
+  const [followed, setFollowed] = useRecyclingState(post.followed ?? false, [
+    post.id,
+    post.followed,
+  ]);
   const [expanded, setExpanded] = useRecyclingState(false, [post.id]);
   const [needsExpand, setNeedsExpand] = useRecyclingState(false, [post.id]);
-  const [commentSheetVisible, setCommentSheetVisible] = useRecyclingState(false, [post.id]);
+  const [commentSheetVisible, setCommentSheetVisible] = useRecyclingState(
+    false,
+    [post.id],
+  );
   const [playError, setPlayError] = useRecyclingState(false, [post.id, active]);
   const [playerAttempt, setPlayerAttempt] = useRecyclingState(0, [post.id]);
   const coverOpacity = useSharedValue(1);
   const frameReadyRef = useRef(false);
-  const coverAnimatedStyle = useAnimatedStyle(() => ({ opacity: coverOpacity.get() }));
+  const coverAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: coverOpacity.get(),
+  }));
   const likeMutation = useMutation({
     mutationFn: (nextLiked: boolean) => {
       if (!token) {
@@ -115,7 +133,14 @@ export function CircleVideoCard({
     if (!active && !shouldPreload && !shouldRetain) {
       frameReadyRef.current = false;
     }
-  }, [active, coverOpacity, playerAttempt, post.id, shouldPreload, shouldRetain]);
+  }, [
+    active,
+    coverOpacity,
+    playerAttempt,
+    post.id,
+    shouldPreload,
+    shouldRetain,
+  ]);
 
   const handlePlayerReady = useCallback(() => {
     frameReadyRef.current = true;
@@ -179,9 +204,17 @@ export function CircleVideoCard({
       ) : null}
       <Animated.View
         pointerEvents="none"
-        style={[StyleSheet.absoluteFill, styles.coverOverlay, coverAnimatedStyle]}
+        style={[
+          StyleSheet.absoluteFill,
+          styles.coverOverlay,
+          coverAnimatedStyle,
+        ]}
       >
-        <Image source={post.cover} style={StyleSheet.absoluteFill} contentFit="cover" />
+        <Image
+          source={post.cover}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+        />
       </Animated.View>
       {active ? (
         <Pressable
@@ -211,10 +244,17 @@ export function CircleVideoCard({
                 return;
               }
               onPlaybackChange(false);
-              router.push({ pathname: "/profile", params: { userId: post.authorId } });
+              router.push({
+                pathname: "/profile",
+                params: { userId: post.authorId },
+              });
             }}
           >
-            <Image source={post.avatar} style={styles.avatar} contentFit="cover" />
+            <Image
+              source={post.avatar}
+              style={styles.avatar}
+              contentFit="cover"
+            />
           </Pressable>
           {!followed ? (
             <Pressable
@@ -230,15 +270,25 @@ export function CircleVideoCard({
             </Pressable>
           ) : null}
         </View>
-        <Pressable accessibilityLabel="点赞" style={styles.actionItem} onPress={handleLike}>
+        <Pressable
+          accessibilityLabel="点赞"
+          style={styles.actionItem}
+          onPress={handleLike}
+        >
           <CircleHeartIcon color={liked ? "#FE4267" : "#FFFFFF"} />
           <Text style={styles.actionCount}>
             {formatCircleCount(post.likeCount + (liked ? 1 : 0))}
           </Text>
         </Pressable>
-        <Pressable accessibilityLabel="评论" style={styles.actionItem} onPress={handleComment}>
+        <Pressable
+          accessibilityLabel="评论"
+          style={styles.actionItem}
+          onPress={handleComment}
+        >
           <CircleCommentIcon color="#FFFFFF" />
-          <Text style={styles.actionCount}>{formatCircleCount(post.commentCount)}</Text>
+          <Text style={styles.actionCount}>
+            {formatCircleCount(post.commentCount)}
+          </Text>
         </Pressable>
       </View>
 
@@ -262,9 +312,14 @@ export function CircleVideoCard({
             </Pressable>
           ) : null}
           <Text style={styles.title}>{post.author}</Text>
-          {post.headline ? <Text style={styles.headline}>{post.headline}</Text> : null}
+          {post.headline ? (
+            <Text style={styles.headline}>{post.headline}</Text>
+          ) : null}
           <View style={styles.contentRow}>
-            <Text style={styles.content} numberOfLines={expanded ? undefined : 2}>
+            <Text
+              style={styles.content}
+              numberOfLines={expanded ? undefined : 2}
+            >
               {post.content}
               <Text style={styles.tags}> {post.tags.join(" ")}</Text>
             </Text>
@@ -290,7 +345,7 @@ export function CircleVideoCard({
         </View>
         <View style={styles.metaRow}>
           <Text style={styles.meta}>{post.publishedAt}</Text>
-          <Text style={styles.meta}>作者声明：内容为个人观念或见解</Text>
+          {/* <Text style={styles.meta}>作者声明：内容为个人观念或见解</Text> */}
         </View>
       </View>
 

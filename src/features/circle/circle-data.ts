@@ -9,6 +9,8 @@ export type CircleVideoPost = {
   authorId?: string;
   /** 视频封面，接口接入后为远端 URL。 */
   cover: number | { uri: string };
+  /** 视频时长（秒），搜索结果卡片展示角标。 */
+  durationSec?: number;
   avatar: number | { uri: string };
   /** 作者昵称，如“@小非-认证野王”。 */
   author: string;

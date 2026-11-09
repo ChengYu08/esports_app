@@ -6,6 +6,7 @@ import { StatusBar } from "expo-status-bar";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { FlashListRef, ListRenderItemInfo } from "@shopify/flash-list";
 import { useAuthStore } from "@esports/auth";
 
@@ -18,6 +19,7 @@ import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-sessi
 import { SYSTEM_FONT } from "@/shared/theme/typography";
 
 export default function CircleSearchResultsScreen() {
+  const insets = useSafeAreaInsets();
   const { kw, topic } = useLocalSearchParams<{ kw?: string; topic?: string }>();
   const keyword = (kw ?? "").trim() || (topic ?? "").trim();
   const isTopicSearch = !kw && Boolean(topic);
@@ -168,10 +170,11 @@ export default function CircleSearchResultsScreen() {
 
       <LinearGradient
         colors={["rgba(0, 0, 0, 0.7)", "rgba(0, 0, 0, 0)"]}
-        style={styles.topMask}
+        // 渐变从物理屏顶铺起（盖住状态栏），总高同步加 insets.top，导航行处的明暗与主盼友圈一致。
+        style={[styles.topMask, { height: insets.top + 120 }]}
         pointerEvents="none"
       />
-      <View style={styles.navBar} pointerEvents="box-none">
+      <View style={[styles.navBar, { top: insets.top }]} pointerEvents="box-none">
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="返回"

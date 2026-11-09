@@ -59,6 +59,7 @@ function toCirclePost(item: CircleFeedItem): CircleVideoPost {
     videoUrl: item.url ?? "",
     videoSourceType: item.streamType?.toLowerCase() === "hls" ? "m3u8" : "mp4",
     cover: item.coverUrl ? { uri: item.coverUrl } : require("../../../assets/images/bg_publish_dark.webp"),
+    durationSec: item.duration ?? undefined,
     avatar: item.authorInfo?.headImage
       ? { uri: item.authorInfo.headImage }
       : require("../../../assets/images/radar-avatar-1.png"),
