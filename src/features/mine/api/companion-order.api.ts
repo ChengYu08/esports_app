@@ -71,6 +71,8 @@ export async function createCompanionOrder(
     method: "POST",
     token,
     body: { action },
+    // 未实名时由 CompanionOrderSheet 弹窗「去实名」按钮引导，不走全局自动跳转
+    suppressRealNameRedirect: true,
   });
   return requireSuccess(response, "创建订单失败");
 }

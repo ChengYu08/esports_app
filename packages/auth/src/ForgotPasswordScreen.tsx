@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   sanitizeCode,
+  sanitizePassword,
   sanitizePhone,
   validateForgotPasswordForm,
   validatePhone,
@@ -207,7 +208,7 @@ export function ForgotPasswordScreen({
                 accessibilityLabel="新密码"
                 value={password}
                 onChangeText={(value) => {
-                  setPassword(value);
+                  setPassword(sanitizePassword(value));
                   setValidationMessage(null);
                 }}
                 autoCapitalize="none"
@@ -236,7 +237,7 @@ export function ForgotPasswordScreen({
                 accessibilityLabel="确认新密码"
                 value={confirmation}
                 onChangeText={(value) => {
-                  setConfirmation(value);
+                  setConfirmation(sanitizePassword(value));
                   setValidationMessage(null);
                 }}
                 autoCapitalize="none"

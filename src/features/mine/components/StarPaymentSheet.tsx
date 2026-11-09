@@ -1,15 +1,13 @@
 import { Dismiss16Regular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MatchLinearGradient } from "@/features/match/components/MatchLinearGradient";
-import {
-  fetchStarBalance,
-  payCompanionOrder,
-} from "@/features/mine/api/companion-order.api";
+import { payCompanionOrder } from "@/features/mine/api/companion-order.api";
+import { useStarBalance } from "@/features/mine/hooks/use-star-balance";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 
@@ -34,22 +32,16 @@ export function StarPaymentSheet({
   onPaymentFailed,
 }: StarPaymentSheetProps) {
   const insets = useSafeAreaInsets();
-  const [balance, setBalance] = useState<number | null>(null);
   const [paying, setPaying] = useState(false);
   const settledRef = useRef(false);
   const [prompt, setPrompt] = useState<{
     title?: string;
     message: string;
   } | null>(null);
+  const balance = useStarBalance(token, visible, {
+    onError: (error) => setPrompt({ message: error.message }),
+  });
   const payDisabled = paying || balance === null;
-
-  useEffect(() => {
-    if (!visible || !token) return;
-    setBalance(null);
-    void fetchStarBalance(token)
-      .then(setBalance)
-      .catch((error: Error) => setPrompt({ message: error.message }));
-  }, [token, visible]);
 
   async function pay() {
     if (!token) return setPrompt({ message: "请先登录" });

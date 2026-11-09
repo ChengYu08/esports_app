@@ -21,7 +21,7 @@ export function HomeBannerCard({ banner, label, style }: HomeBannerCardProps) {
     // 排查跳转问题：无论是否配置了跳转都打印 Banner 原始下发数据（含 linkConfig 按端协议）。
     logger.info("[home-banner] banner clicked", { banner: JSON.stringify(banner) });
     if (action.type === "image") {
-      router.push({ pathname: "/image-preview", params: createImagePreviewParams([action.url], 0) });
+      router.push({ pathname: "/image-preview", params: { ...createImagePreviewParams([action.url], 0), mode: "fit-width" } });
     } else if (action.type === "route") {
       // 按端跳转协议的 App 内路由（如活动落地页）。
       router.push({ pathname: action.path as never, params: action.params });

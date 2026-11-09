@@ -6,6 +6,7 @@ import { showToast } from "@/shared/ui/app-toast";
 
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 
+import { ensureRealNameBeforeVoiceRoomEnter, promptSelfRealNameIfNeeded } from "./ensure-real-name-before-enter";
 import { exitVoiceRoom } from "./exit-voice-room";
 import { navigateToVoiceRoom } from "./navigate-voice-room";
 import { resolveVoiceRoomId, voiceRoomApi } from "./voice-room.api";
@@ -113,6 +114,9 @@ export async function claimAndEnterCustomerServiceRoom(
     if (!accessToken) {
       return { status: "failed", message: "请先登录" };
     }
+    if (!(await ensureRealNameBeforeVoiceRoomEnter())) {
+      return { status: "cancelled" };
+    }
 
     const current = await voiceRoomApi.getJoinedRoom(accessToken);
     const targetRef = { id: params.roomId, roomVersion: params.roomVersion };
@@ -132,9 +136,12 @@ export async function claimAndEnterCustomerServiceRoom(
     try {
       claimed = await voiceRoomApi.claimClubService(params, accessToken);
     } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "接单失败，请稍后重试";
+      await promptSelfRealNameIfNeeded(message);
       return {
         status: "failed",
-        message: error instanceof Error ? error.message : "接单失败，请稍后重试",
+        message,
       };
     }
 

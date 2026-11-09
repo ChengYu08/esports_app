@@ -1,7 +1,7 @@
 import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { showToast, toastDurations } from "@/shared/ui/app-toast";
+import { showToast } from "@/shared/ui/app-toast";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -161,7 +161,7 @@ export default function AccountCancellationScreen() {
       clearSession();
       showToast(
         `已进入${coolingDays}天冷静期，账号将于 ${formatCoolEndTime(record.coolEndTime)} 完成注销`,
-        { duration: toastDurations.LONG },
+        { duration: 5000 },
       );
       router.replace("/");
     } catch (error) {

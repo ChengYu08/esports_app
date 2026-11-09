@@ -22,6 +22,7 @@ import {
   getSmsCodeActionLabel,
   isLoginFormReady,
   sanitizeCode,
+  sanitizePassword,
   sanitizePhone,
 } from "./password-validation";
 import { PasswordVisibilityIcon } from "./PasswordVisibilityIcon";
@@ -215,7 +216,7 @@ export function LoginScreen({
                   editable={!isSubmitting}
                   onChangeText={
                     isPasswordMode
-                      ? setPassword
+                      ? (value) => setPassword(sanitizePassword(value))
                       : (value) => setCode(sanitizeCode(value))
                   }
                   keyboardType={isPasswordMode ? "default" : "number-pad"}

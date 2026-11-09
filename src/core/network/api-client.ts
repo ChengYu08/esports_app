@@ -74,6 +74,20 @@ async function triggerRealNameRequiredIfNeed(payload: ResponseErrorPayload): Pro
 
 type ResponseErrorPayload = { info?: string; message?: string; code?: string } | null;
 
+const MAX_RESPONSE_LOG_LENGTH = 2000;
+
+function serializeResponseData(data: unknown): string {
+  try {
+    const text = JSON.stringify(data) ?? 'null';
+    if (text.length <= MAX_RESPONSE_LOG_LENGTH) {
+      return text;
+    }
+    return `${text.slice(0, MAX_RESPONSE_LOG_LENGTH)}...[truncated ${text.length}]`;
+  } catch {
+    return '[unserializable]';
+  }
+}
+
 function readErrorPayload(payload: unknown): ResponseErrorPayload {
   if (!payload || typeof payload !== 'object') return null;
   return payload as ResponseErrorPayload;
@@ -84,6 +98,7 @@ async function processResponse<T>(
   status: number,
   payload: unknown,
   token?: string,
+  suppressRealNameRedirect?: boolean,
 ): Promise<T> {
   const errorPayload = readErrorPayload(payload);
   const requestError = new ApiError(
@@ -105,8 +120,11 @@ async function processResponse<T>(
     throw requestError;
   }
 
-  // 全局「未进行实名认证」拦截：info 精确命中时引导去实名（对齐 Web 端行为），错误仍正常抛出
-  await triggerRealNameRequiredIfNeed(errorPayload);
+  // 全局「未进行实名认证」拦截：info 精确命中时引导去实名（对齐 Web 端行为），错误仍正常抛出。
+  // 调用方声明 suppressRealNameRedirect 时改由其在弹窗中自行引导（如「去实名」按钮）
+  if (!suppressRealNameRedirect) {
+    await triggerRealNameRequiredIfNeed(errorPayload);
+  }
   if (status < 200 || status >= 300) throw requestError;
   return payload as T;
 }
@@ -116,10 +134,12 @@ export type RequestOptions = Omit<RequestInit, 'body'> & {
   timeoutMs?: number;
   /** C 端业务 token，后端约定请求头名称为 `token`。 */
   token?: string;
+  /** 命中「未进行实名认证」时不做全局自动跳转，由调用方在失败弹窗中自行引导去实名。 */
+  suppressRealNameRedirect?: boolean;
 };
 
 export async function apiClient<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { token, timeoutMs, body, method } = options;
+  const { token, timeoutMs, body, method, suppressRealNameRedirect } = options;
   const startedAt = Date.now();
 
   try {
@@ -134,16 +154,16 @@ export async function apiClient<T>(path: string, options: RequestOptions = {}): 
       timeout: timeoutMs,
       signal: options.signal ?? undefined,
     });
-    logger.debug('api.request', { path, status: response.status, durationMs: Date.now() - startedAt });
-    return await processResponse<T>(path, response.status, response.data, token);
+    logger.debug('api.request', { path, status: response.status, durationMs: Date.now() - startedAt, response: serializeResponseData(response.data) });
+    return await processResponse<T>(path, response.status, response.data, token, suppressRealNameRedirect);
   } catch (error) {
     // React Query 取消请求时原样抛出，不当作网络失败。
     if (isCancel(error)) throw error;
     if (error instanceof ApiError) throw error;
 
     if (isAxiosError(error) && error.response) {
-      logger.debug('api.request', { path, status: error.response.status, durationMs: Date.now() - startedAt });
-      return await processResponse<T>(path, error.response.status, error.response.data, token);
+      logger.debug('api.request', { path, status: error.response.status, durationMs: Date.now() - startedAt, response: serializeResponseData(error.response.data) });
+      return await processResponse<T>(path, error.response.status, error.response.data, token, suppressRealNameRedirect);
     }
 
     logger.warn('api.network_error', { path, durationMs: Date.now() - startedAt });

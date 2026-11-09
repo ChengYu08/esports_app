@@ -31,6 +31,10 @@ import { calculateAge } from "@/features/mine/profile-utils";
 import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
 import { useUserFollowCount } from "@/features/mine/hooks/use-user-follow";
 import {
+  ensureRealNameBeforeVoiceRoomEnter,
+  promptSelfRealNameIfNeeded,
+} from "@/features/voice-room/ensure-real-name-before-enter";
+import {
   resolveVoiceRoomId,
   voiceRoomApi,
 } from "@/features/voice-room/voice-room.api";
@@ -155,6 +159,7 @@ export default function MineScreen() {
   };
   const openMyRoom = async () => {
     if (!requireLogin() || !accessToken || openingVoiceRoom) return;
+    if (!(await ensureRealNameBeforeVoiceRoomEnter())) return;
     setOpeningVoiceRoom(true);
     try {
       let room = await voiceRoomApi
@@ -166,9 +171,12 @@ export default function MineScreen() {
       if (!roomId) throw new Error("房间信息不完整，请稍后重试");
       navigateToVoiceRoom({ id: roomId });
     } catch (error) {
-      showToast(
-        error instanceof Error ? error.message : "进入语聊房失败，请稍后重试",
-      );
+      const message =
+        error instanceof Error ? error.message : "进入语聊房失败，请稍后重试";
+      if (await promptSelfRealNameIfNeeded(message)) {
+        return;
+      }
+      showToast(message);
     } finally {
       setOpeningVoiceRoom(false);
     }

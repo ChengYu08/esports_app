@@ -9,6 +9,7 @@ export default function ImagePreviewScreen() {
   const params = useLocalSearchParams<{
     images?: string | string[];
     index?: string | string[];
+    mode?: string;
     previewSessionId?: string | string[];
   }>();
   const { images, index } = useMemo(
@@ -29,5 +30,12 @@ export default function ImagePreviewScreen() {
       <ChatImagePreview sessionId={previewSessionId} onClose={router.back} />
     );
   }
-  return <ImagePreview images={images} index={index} onClose={router.back} />;
+  return (
+    <ImagePreview
+      images={images}
+      index={index}
+      onClose={router.back}
+      mode={params.mode === "fit-width" ? "fit-width" : undefined}
+    />
+  );
 }

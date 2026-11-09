@@ -70,6 +70,14 @@ function getClientAuthApi() {
   return require('../auth/client-auth.api').clientAuthApi as typeof import('../auth/client-auth.api').clientAuthApi;
 }
 
+// chat-image-upload 静态依赖 react-native（client-auth.api），这里保持 require
+// 惰性加载，避免污染本模块的纯 JS 测试导入链（与 getClientAuthApi 同一处理方式）
+function uploadChatImageForIm(token: string, uri: string): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { uploadChatImage } = require('./chat-image-upload') as typeof import('./chat-image-upload');
+  return uploadChatImage(token, uri);
+}
+
 function loadSdk(): RongSdk | null {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -816,7 +824,11 @@ export async function sendRongImage(targetId: string, path: string): Promise<Man
   const sdk = loadSdk();
   if (!sdk) throw new Error('当前版本暂不支持即时消息');
   const currentEngine = requireConnected();
+  // 融云私有存储的媒体 URL 直接访问会 401：先上传自家 OSS，把公网地址预置到
+  // remote 后用 sendMessage 直发（与语聊房、PC 端 Web SDK 行为一致）
+  const imageUrl = await uploadChatImageForIm(businessToken, path);
   const message = await currentEngine.createImageMessage(sdk.RCIMIWConversationType.PRIVATE, getRongConversationTargetId(targetId), '', path);
+  message.remote = imageUrl;
   // 安卓 SDK 对 ImageMessage 一律解码重编码成 JPEG，GIF 会变单帧；original=true 走
   // isFull 路径按原文件拷贝上传（缩略图仍由 SDK 生成），动图才能保留动画
   if (isGifImage(path)) {
@@ -824,7 +836,7 @@ export async function sendRongImage(targetId: string, path: string): Promise<Man
   }
   return new Promise((resolve, reject) => {
     let settled = false;
-    const finish = (error?: Error, sent?: RCIMIWMediaMessage) => {
+    const finish = (error?: Error, sent?: RCIMIWMessage) => {
       if (settled) return;
       settled = true;
       if (error) { reject(error); return; }
@@ -832,7 +844,7 @@ export async function sendRongImage(targetId: string, path: string): Promise<Man
       if (managed) resolve({ ...managed, isMine: true });
       else reject(new Error('发送图片失败'));
     };
-    void currentEngine.sendMediaMessage(message, { onMediaMessageSent: (code, sent) => code === 0 ? finish(undefined, sent) : finish(new Error(`发送图片失败（${code}）`)) }).then((code) => { if (code !== 0) finish(new Error(`发送图片失败（${code}）`)); }).catch((error) => finish(error instanceof Error ? error : new Error('发送图片失败')));
+    void currentEngine.sendMessage(message, { onMessageSent: (code, sent) => code === 0 ? finish(undefined, sent) : finish(new Error(`发送图片失败（${code}）`)) }).then((code) => { if (code !== 0) finish(new Error(`发送图片失败（${code}）`)); }).catch((error) => finish(error instanceof Error ? error : new Error('发送图片失败')));
   });
 }
 

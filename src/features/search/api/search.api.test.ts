@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { apiClient } from "@/core/network/api-client";
 import { calculateAge } from "@/features/mine/profile-utils";
 import { getSearchUserStatus } from "../search-user-status";
-import { searchUsers } from "./search.api";
+import { searchClubs, searchUsers } from "./search.api";
 
 vi.mock("@/core/network/api-client", () => ({ apiClient: vi.fn() }));
 
@@ -61,4 +61,18 @@ describe("companion search metadata", () => {
     expect(getSearchUserStatus(1, undefined)).toBeNull();
     expect(getSearchUserStatus()).toBeNull();
   });
+});
+
+it("靓号搜索展示对外号码并保留跳转使用的内部ID", async () => {
+  vi.mocked(apiClient).mockResolvedValue({ code: "SUCCESS", data: {
+    page: 1, totalPages: 1, records: [{ id: 50002, clubNo: "66688", clubName: "测试俱乐部" }],
+  } });
+  const result = await searchClubs("66688");
+  expect(result.items[0]).toMatchObject({ id: "50002", clubCode: "66688" });
+  expect(apiClient).toHaveBeenCalledWith(expect.stringContaining("keyword=66688"), { signal: undefined });
+});
+
+it("兼容尚未返回clubNo的服务端响应", async () => {
+  vi.mocked(apiClient).mockResolvedValue({ code: "SUCCESS", data: { records: [{ id: 50002 }] } });
+  expect((await searchClubs("50002")).items[0]).toMatchObject({ id: "50002", clubCode: "50002" });
 });

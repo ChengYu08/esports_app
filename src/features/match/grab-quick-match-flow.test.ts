@@ -5,7 +5,7 @@ import { useAppConfirm } from "@/shared/ui/app-confirm";
 const mocks = vi.hoisted(() => ({
   authState: {
     accessToken: "token" as string | null,
-    user: { id: "user-1" },
+    user: { id: "user-1", isRealName: 1 },
   },
   detail: null as Record<string, unknown> | null,
   grabResult: null as Record<string, unknown> | null,
@@ -128,7 +128,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetGrabQuickMatchPending();
   mocks.authState.accessToken = "token";
-  mocks.authState.user = { id: "user-1" };
+  mocks.authState.user = { id: "user-1", isRealName: 1 };
   mocks.detail = noVoiceDetail();
   mocks.grabResult = noVoiceDetail();
   mocks.grabError = null;

@@ -70,7 +70,9 @@ public class PzOneClickModule: Module {
         var didFinish = false
         // 返回键、「暂不登录，先去逛逛」是 customViewBlock 自绘控件，不在 SDK 控件体系内，
         // 点击时直接按对应取消语义结束本次授权请求（与 SDK 取消码 700000/700001 的分叉一致）。
+        let authPageSize = controller.view.window?.bounds.size ?? controller.view.bounds.size
         let model = self.makeAuthPageModel(
+          screenSize: authPageSize,
           onUserExit: {
             guard !didFinish else { return }
             didFinish = true
@@ -150,15 +152,15 @@ public class PzOneClickModule: Module {
     return result?["resultCode"] as? String ?? "unknown"
   }
 
-  /// Figma 授权页设计稿（375x812 基准）的内容纵坐标，均相对导航栏底部：
+  /// Figma 授权页设计稿（375x812 基准）的内容纵坐标，均相对屏幕顶部：
   /// 顶部背景图 208pt 高（卡片上叠 12pt），卡片内 padding-top 64，
   /// slogan → 间距 12 → 号码 → 间距 56 → 登录按钮（高 42）。
-  private static let sloganTopY: CGFloat = 260
-  private static let numberTopY: CGFloat = 294
-  private static let loginTopY: CGFloat = 388
+  private static let sloganScreenTopY: CGFloat = 260
+  private static let numberScreenTopY: CGFloat = 294
+  private static let loginScreenTopY: CGFloat = 388
+  private static let authNavHeight: CGFloat = 44
 
   /// 自绘控件的 tag，customViewLayoutBlock 里按 tag 取回设置 frame
-  private static let topBgTag = 901
   private static let skipBtnTag = 902
   private static let otherWayTag = 903
 
@@ -173,7 +175,11 @@ public class PzOneClickModule: Module {
     return UIFont(name: "MiSans-Bold", size: 32)
   }()
 
-  private func makeAuthPageModel(onUserExit: @escaping () -> Void, onUserSwitch: @escaping () -> Void) -> TXCustomModel {
+  private func makeAuthPageModel(
+    screenSize: CGSize,
+    onUserExit: @escaping () -> Void,
+    onUserSwitch: @escaping () -> Void
+  ) -> TXCustomModel {
     // Figma 设计稿颜色常量
     let brandPrimary = UIColor(red: 254.0 / 255, green: 31.0 / 255, blue: 76.0 / 255, alpha: 1) // #FE1F4C
     let gray1 = UIColor(red: 26.0 / 255, green: 26.0 / 255, blue: 26.0 / 255, alpha: 1)         // #1A1A1A
@@ -183,6 +189,7 @@ public class PzOneClickModule: Module {
     let gray11 = UIColor(red: 51.0 / 255, green: 51.0 / 255, blue: 51.0 / 255, alpha: 1)       // #333333
     let grayBorder = UIColor(red: 235.0 / 255, green: 235.0 / 255, blue: 235.0 / 255, alpha: 1) // #EBEBEB
     let linkBlue = UIColor(red: 27.0 / 255, green: 106.0 / 255, blue: 224.0 / 255, alpha: 1)   // #1B6AE0
+    let authBodyTop = Self.currentStatusBarHeight() + Self.authNavHeight
 
     let model = TXCustomModel()
     // 授权页进出不做动画：退出时 RN 侧会立即盖一层全屏加载遮罩，
@@ -190,12 +197,16 @@ public class PzOneClickModule: Module {
     model.animationDuration = 0
     model.navIsHidden = false
     model.prefersStatusBarHidden = false
-    // 状态栏由系统绘制不干预；导航栏白底，与顶部背景图顶部白色自然衔接
-    model.navColor = .white
+    // 顶部图作为整页背景绘制，导航栏只承载返回按钮并透明悬浮，不占图片布局高度。
+    model.navColor = .clear
     model.navBackImage = Self.makeBackArrowImage(color: gray1)
     // Figma 导航栏无标题（返回箭头 + 空白）
     model.navTitle = NSAttributedString(string: "")
     model.backgroundColor = .white
+    if let backgroundImage = Self.makeAuthPageBackground(screenSize: screenSize) {
+      model.backgroundImage = backgroundImage
+    }
+    model.backgroundImageContentMode = .scaleToFill
     model.logoIsHidden = true
 
     // slogan：「中国xx提供认证服务」，按当前 SIM 运营商生成文案
@@ -211,14 +222,24 @@ public class PzOneClickModule: Module {
       ]
     )
     model.sloganFrameBlock = { _, _, frame in
-      CGRect(x: frame.minX, y: Self.sloganTopY, width: frame.width, height: frame.height)
+      CGRect(
+        x: frame.minX,
+        y: Self.sloganScreenTopY - authBodyTop,
+        width: frame.width,
+        height: frame.height
+      )
     }
 
     // 号码：MiSans Bold 32pt，加载失败退回系统字体
     model.numberColor = gray1
     model.numberFont = Self.miSansNumberFont ?? .systemFont(ofSize: 32, weight: .semibold)
     model.numberFrameBlock = { _, _, frame in
-      CGRect(x: frame.minX, y: Self.numberTopY, width: frame.width, height: frame.height)
+      CGRect(
+        x: frame.minX,
+        y: Self.numberScreenTopY - authBodyTop,
+        width: frame.width,
+        height: frame.height
+      )
     }
 
     // 登录按钮：高 42、圆角 8、左右边距 32
@@ -236,25 +257,22 @@ public class PzOneClickModule: Module {
     }.resizableImage(withCapInsets: UIEdgeInsets(top: 0, left: 8, bottom: 0, right: 8), resizingMode: .stretch)
     model.loginBtnBgImgs = [buttonImage, buttonImage, buttonImage]
     model.loginBtnFrameBlock = { screenSize, _, _ in
-      CGRect(x: 32, y: Self.loginTopY, width: screenSize.width - 64, height: 42)
+      CGRect(
+        x: 32,
+        y: Self.loginScreenTopY - authBodyTop,
+        width: screenSize.width - 64,
+        height: 42
+      )
     }
 
-    // 自绘控件：顶部背景图、「暂不登录，先去逛逛」、底部「验证码」切换入口。
+    // 自绘控件：「暂不登录，先去逛逛」、底部「验证码」切换入口。
     // frame 在 customViewLayoutBlock 里参照 SDK 给出的 loginFrame/privacyFrame 定位。
     final class CustomViewBox {
-      weak var topBg: UIView?
       weak var skipBtn: UIControl?
       weak var otherWay: UIControl?
     }
     let box = CustomViewBox()
     model.customViewBlock = { superView in
-      let topBg = UIImageView(image: UIImage(named: "pz_login_top_bg"))
-      topBg.tag = Self.topBgTag
-      topBg.contentMode = .scaleAspectFill
-      topBg.clipsToBounds = true
-      superView.addSubview(topBg)
-      box.topBg = topBg
-
       let skipBtn = UIButton(type: .system)
       skipBtn.tag = Self.skipBtnTag
       skipBtn.setTitle("暂不登录，先去逛逛", for: .normal)
@@ -265,7 +283,10 @@ public class PzOneClickModule: Module {
       box.skipBtn = skipBtn
 
       var config = UIButton.Configuration.plain()
-      config.image = UIImage(named: "pz_login_other_way")
+      config.image = Self.resizeImage(
+        UIImage(named: "pz_login_other_way"),
+        to: CGSize(width: 40, height: 40)
+      )
       config.imagePlacement = .top
       config.imagePadding = 8
       config.baseForegroundColor = gray9
@@ -280,11 +301,9 @@ public class PzOneClickModule: Module {
       box.otherWay = otherWay
     }
     model.customViewLayoutBlock = { screenSize, _, _, _, _, _, _, loginFrame, _, privacyFrame in
-      let bgHeight = screenSize.width * 208.0 / 375.0
-      box.topBg?.frame = CGRect(x: 0, y: 0, width: screenSize.width, height: bgHeight)
       box.skipBtn?.frame = CGRect(x: 0, y: loginFrame.maxY + 16, width: screenSize.width, height: 20)
-      // 「验证码」入口：图标 40 + 间距 8 + 文字 16，整组在协议区上方 40pt
-      let otherWaySize = CGSize(width: 64, height: 64)
+      // 「验证码」入口：图标 40 + 间距 8 + 文字 18，整组在协议区上方 40pt
+      let otherWaySize = CGSize(width: 64, height: 66)
       box.otherWay?.frame = CGRect(
         x: (screenSize.width - otherWaySize.width) / 2,
         y: privacyFrame.minY - 40 - otherWaySize.height,
@@ -323,8 +342,11 @@ public class PzOneClickModule: Module {
     model.privacyAlertTitleFont = .systemFont(ofSize: 16, weight: .semibold)
     model.privacyAlertTitleColor = gray11
     model.privacyAlertContentFont = .systemFont(ofSize: 14)
-    // contentColors: [正文基础色, 运营商协议, 协议1, 协议2]（与 privacyOperator + privacyOne + privacyTwo 顺序对应）
-    model.privacyAlertContentColors = [gray10, linkBlue, linkBlue, linkBlue]
+    model.privacyAlertLineSpaceDp = 5
+    model.privacyAlertContentColors = [gray10, linkBlue]
+    model.privacyAlertOperatorColor = linkBlue
+    model.privacyAlertOneColor = linkBlue
+    model.privacyAlertTwoColor = linkBlue
     model.privacyAlertContentAlignment = .left
     model.privacyAlertPreText = "已阅读并同意"
     model.privacyAlertSufText = "，未注册用户在登录成功后自动创建账号"
@@ -341,15 +363,31 @@ public class PzOneClickModule: Module {
     }.resizableImage(withCapInsets: UIEdgeInsets(top: 8, left: 8, bottom: 8, right: 8), resizingMode: .stretch)
     model.privacyAlertBtnBackgroundImages = [alertBtnImage, alertBtnImage, alertBtnImage]
     model.privacyAlertBtnCornerRadius = 8
-    // 按钮行：距弹窗底 16、高 36、左右边距 16、两按钮间距 12 → 右按钮 x = W/2+6
+    // Figma 弹窗固定为 295×174，避免 SDK 默认内容区在 iOS 上被拉伸到大半屏。
+    model.privacyAlertFrameBlock = { _, superViewSize, _ in
+      let width = min(295, superViewSize.width - 32)
+      let height: CGFloat = 174
+      return CGRect(
+        x: (superViewSize.width - width) / 2,
+        y: (superViewSize.height - height) / 2,
+        width: width,
+        height: height
+      )
+    }
+    model.privacyAlertTitleFrameBlock = { _, superViewSize, _ in
+      CGRect(x: 16, y: 16, width: superViewSize.width - 32, height: 24)
+    }
+    model.privacyAlertPrivacyContentFrameBlock = { _, superViewSize, _ in
+      CGRect(x: 16, y: 52, width: superViewSize.width - 32, height: 66)
+    }
+    // 按钮行：左按钮 86、间距 12、右按钮占满剩余宽度，距底部 16。
     model.privacyAlertButtonFrameBlock = { _, superViewSize, _ in
-      let width = superViewSize.width / 2 - 22
-      return CGRect(x: superViewSize.width / 2 + 6, y: superViewSize.height - 52, width: width, height: 36)
+      CGRect(x: 114, y: superViewSize.height - 52, width: superViewSize.width - 130, height: 36)
     }
     // 弹窗四角圆角 [左上, 左下, 右下, 右上]
     model.privacyAlertCornerRadiusArray = [NSNumber(value: 12), NSNumber(value: 12), NSNumber(value: 12), NSNumber(value: 12)]
     model.privacyAlertCloseButtonIsNeedShow = false
-    model.tapPrivacyAlertMaskCloseAlert = true
+    model.tapPrivacyAlertMaskCloseAlert = false
     model.privacyAlertMaskAlpha = 0.6
     final class AlertViewBox {
       weak var disagree: UIControl?
@@ -371,8 +409,7 @@ public class PzOneClickModule: Module {
       alertBox.disagree = disagree
     }
     model.privacyAlertCustomViewLayoutBlock = { _, _, _, buttonFrame, _ in
-      // 左按钮与 SDK 右按钮同高同宽，左边距 16
-      alertBox.disagree?.frame = CGRect(x: 16, y: buttonFrame.minY, width: buttonFrame.width, height: buttonFrame.height)
+      alertBox.disagree?.frame = CGRect(x: 16, y: buttonFrame.minY, width: 86, height: buttonFrame.height)
     }
 
     // 协议 WebView 的安全区：白底 + 深色返回箭头 + 黑色标题，与一键登录页保持一致
@@ -413,6 +450,60 @@ public class PzOneClickModule: Module {
         circle.stroke()
       }
     }
+  }
+
+  /// 将无 @3x 后缀的位图按设计稿 pt 尺寸重绘，避免 UIKit 把 120px 当成 120pt。
+  private static func resizeImage(_ image: UIImage?, to size: CGSize) -> UIImage? {
+    guard let image else {
+      return nil
+    }
+    let renderer = UIGraphicsImageRenderer(size: size)
+    return renderer.image { _ in
+      image.draw(in: CGRect(origin: .zero, size: size))
+    }
+  }
+
+  /// 将顶部装饰图和白色圆角内容区合成整页背景，避免 SDK 导航栏下方的自绘容器裁剪图片。
+  private static func makeAuthPageBackground(screenSize: CGSize) -> UIImage? {
+    guard screenSize.width > 0,
+          screenSize.height > 0,
+          let topImage = UIImage(named: "pz_login_top_bg") else {
+      return nil
+    }
+
+    let topHeight = screenSize.width * 208.0 / 375.0
+    let cardTop = screenSize.width * 196.0 / 375.0
+    let renderer = UIGraphicsImageRenderer(size: screenSize)
+    return renderer.image { _ in
+      UIColor.white.setFill()
+      UIRectFill(CGRect(origin: .zero, size: screenSize))
+      topImage.draw(in: CGRect(x: 0, y: 0, width: screenSize.width, height: topHeight))
+
+      let cardRect = CGRect(
+        x: 0,
+        y: cardTop,
+        width: screenSize.width,
+        height: screenSize.height - cardTop
+      )
+      let cardPath = UIBezierPath(
+        roundedRect: cardRect,
+        byRoundingCorners: [.topLeft, .topRight],
+        cornerRadii: CGSize(width: 12, height: 12)
+      )
+      UIColor.white.setFill()
+      cardPath.fill()
+    }
+  }
+
+  /// SDK 的主体坐标从导航栏底部开始，设计稿坐标从屏幕顶部开始。
+  private static func currentStatusBarHeight() -> CGFloat {
+    let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+    for scene in scenes where scene.activationState == .foregroundActive {
+      if let height = scene.statusBarManager?.statusBarFrame.height, height > 0 {
+        return height
+      }
+    }
+    return 44
   }
 
   /// 24×24 左箭头（ChevronLeft），与二级页面 `@fluentui/react-native-icons` 的 ChevronLeft24Regular 视觉一致。

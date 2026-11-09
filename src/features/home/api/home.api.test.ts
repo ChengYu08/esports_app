@@ -392,3 +392,22 @@ describe("首页在线陪玩人数", () => {
     await expect(fetchClubOnlineCount("1000004", [14, 15])).rejects.toThrow("游戏数据加载失败");
   });
 });
+
+describe("俱乐部对外号码", () => {
+  it("列表展示靓号，业务ID仍为内部主键", async () => {
+    vi.mocked(apiClient).mockResolvedValue({ code: "SUCCESS", data: {
+      page: 1, totalPages: 1, records: [{ id: 50002, clubNo: "66688", clubName: "测试俱乐部" }],
+    } });
+    const result = await fetchClubPage({}, 1);
+    expect(result.items[0]).toMatchObject({ id: "50002", clubCode: "66688" });
+  });
+
+  it("详情保留20位号码字符串且兼容旧响应", async () => {
+    vi.mocked(apiClient).mockResolvedValueOnce({ code: "SUCCESS", data: {
+      id: 50002, clubNo: "88888888888888888888", clubName: "测试俱乐部",
+    } });
+    expect(await fetchClubDetail("50002")).toMatchObject({ id: "50002", clubCode: "88888888888888888888" });
+    vi.mocked(apiClient).mockResolvedValueOnce({ code: "SUCCESS", data: { id: 50002 } });
+    expect(await fetchClubDetail("50002")).toMatchObject({ id: "50002", clubCode: "50002" });
+  });
+});
