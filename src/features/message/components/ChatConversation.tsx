@@ -33,7 +33,7 @@ import { EmojiKeyboard, type EmojiType } from "rn-emoji-keyboard";
 import type { AfterSaleCardPayload } from "@/features/order/after-sale-card";
 import { afterSaleCardRows } from "@/features/order/after-sale-card";
 import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
-import { convertToJpeg } from "@/shared/media-picker/image-compat";
+import { convertToJpeg, isGifImage } from "@/shared/media-picker/image-compat";
 import { showToast } from "@/shared/ui/app-toast";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { EmptyState } from "@/shared/ui/AsyncStates";
@@ -1019,10 +1019,11 @@ const ChatComposer = memo(function ChatComposer({
     setImageSending(true);
     let failed = 0;
     try {
-      // 逐张发送保持顺序；沿用旧照片选择器的行为：统一重编码为 JPEG，规避 HEIC 原图与超大原图直接发送
+      // 逐张发送保持顺序；静态图统一重编码为 JPEG，规避 HEIC 原图与超大原图直接发送。
+      // GIF 重编码会丢动画，动图原样发送
       for (const uri of picked) {
         try {
-          const sendUri = await convertToJpeg(uri);
+          const sendUri = isGifImage(uri) ? uri : await convertToJpeg(uri);
           await onSendImage(sendUri);
         } catch {
           failed += 1;
@@ -1227,12 +1228,20 @@ const ChatBubble = memo(function ChatBubble({
   const targetImageWidth = item.isMine ? 120 : 160;
   const imageWidth = Math.min(targetImageWidth, windowWidth * 0.58);
   const imageHeight = imageWidth / imageRatio;
+  // 本会话自己发出的 GIF 原图是本地文件，用原图播放动效；融云缩略图是静态 JPEG，用了就不动了。
+  // 远端 GIF（对方发的）拿不到本地文件，仍先用缩略图，点开预览再看动图
+  const [animatedImageUri] = useState(() => {
+    if (item.kind !== "image" || !/^(?:file|content):\/\//i.test(item.imageUrl)) {
+      return null;
+    }
+    return isGifImage(item.imageUrl) ? item.imageUrl : null;
+  });
   // 缩略图宽度不足以铺满气泡的物理像素时会被放大发虚，这种消息继续用原图（解码尺寸由图片库按气泡缩小）
   const isThumbnailSharpEnough = item.kind === "image"
     && !!item.thumbnailUri
     && (item.thumbnailWidth ?? 0) >= imageWidth * PixelRatio.get();
   const bubbleImageUri = item.kind === "image"
-    ? (isThumbnailSharpEnough ? item.thumbnailUri! : item.imageUrl)
+    ? (animatedImageUri ?? (isThumbnailSharpEnough ? item.thumbnailUri! : item.imageUrl))
     : "";
 
   return (

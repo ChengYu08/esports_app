@@ -20,6 +20,7 @@ const HOUR_MS = 60 * 60 * 1000;
 
 const SAME_DAY: TeenLockWindow = { mode: "same-day", startHour: 9, endHour: 18 };
 const CROSS_DAY: TeenLockWindow = { mode: "cross-day", startHour: 22, endHour: 6 };
+const ALWAYS: TeenLockWindow = { mode: "always", startHour: 0, endHour: 0 };
 
 describe("resolveTeenLockConfig", () => {
   it("服务端配置有效时解析出时段", () => {
@@ -35,6 +36,25 @@ describe("resolveTeenLockConfig", () => {
       lockStartHour: 22,
       lockEndHour: 6,
     })).toEqual(CROSS_DAY);
+  });
+
+  it("mode=always 全天锁定，无需起止小时", () => {
+    expect(resolveTeenLockConfig({ lockEnabled: true, mode: "always" })).toEqual(ALWAYS);
+  });
+
+  it("mode=always 忽略残留或越界的小时配置", () => {
+    expect(resolveTeenLockConfig({
+      lockEnabled: true,
+      mode: "always",
+      lockStartHour: 22,
+      lockEndHour: 6,
+    })).toEqual(ALWAYS);
+    expect(resolveTeenLockConfig({
+      lockEnabled: true,
+      mode: "always",
+      lockStartHour: 24,
+      lockEndHour: -1,
+    })).toEqual(ALWAYS);
   });
 
   it("lockEnabled=false 或缺失时视为未配置（锁定解除）", () => {
@@ -137,6 +157,15 @@ describe("isTeenLockWindow（跨日形态 22-6）", () => {
   });
 });
 
+describe("isTeenLockWindow（全天形态）", () => {
+  it("任意时刻均锁定，与小时无关", () => {
+    for (const hour of [0, 6, 12, 18, 23]) {
+      expect(isTeenLockWindow(beijingAt(hour, 30), ALWAYS)).toBe(true);
+    }
+    expect(isTeenLockWindow(-1, ALWAYS)).toBe(true);
+  });
+});
+
 describe("isTeenLockWindow（口径）", () => {
   it("判定与设备时区无关：同一 epoch 在任何时区结果一致（固定 UTC+8 换算）", () => {
     // 北京 9:00 = UTC 01:00 = 纽约 20:00；即便设备时区是纽约也必须判锁定
@@ -188,6 +217,11 @@ describe("shouldLockTeenMode（三态）", () => {
     expect(shouldLockTeenMode(true, beijingAt(0, 30), CROSS_DAY)).toBe(true);
     expect(shouldLockTeenMode(true, beijingAt(12, 0), CROSS_DAY)).toBe(false);
   });
+
+  it("全天形态任意时刻均锁定", () => {
+    expect(shouldLockTeenMode(true, beijingAt(12, 0), ALWAYS)).toBe(true);
+    expect(shouldLockTeenMode(true, beijingAt(23, 0), ALWAYS)).toBe(true);
+  });
 });
 
 describe("msUntilTeenLockBoundary（本日形态 9-18）", () => {
@@ -236,6 +270,14 @@ describe("msUntilTeenLockBoundary（跨日形态 22-6）", () => {
   });
 });
 
+describe("msUntilTeenLockBoundary（全天形态）", () => {
+  it("无边界，返回 Infinity（调用方据此不设定时器）", () => {
+    expect(msUntilTeenLockBoundary(beijingAt(12, 0), ALWAYS)).toBe(
+      Number.POSITIVE_INFINITY,
+    );
+  });
+});
+
 describe("teenLockWindowLabel", () => {
   it("本日形态不带次日字样", () => {
     expect(teenLockWindowLabel(SAME_DAY)).toBe("9:00-18:00");
@@ -243,5 +285,9 @@ describe("teenLockWindowLabel", () => {
 
   it("跨日形态带次日字样", () => {
     expect(teenLockWindowLabel(CROSS_DAY)).toBe("22:00-次日6:00");
+  });
+
+  it("全天形态不展示时段", () => {
+    expect(teenLockWindowLabel(ALWAYS)).toBe("全天");
   });
 });
