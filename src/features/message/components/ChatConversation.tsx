@@ -62,9 +62,11 @@ import {
 
 // 聊天单次发送图片数量上限（相册多选防刷屏）
 const CHAT_IMAGE_MAX = 10;
-// 长按文案消息弹出的操作菜单尺寸（贴着按压点上方展示）
+// 长按文案消息弹出的操作菜单：尺寸、与气泡的间距、指向气泡的箭头宽度（三角形高取一半）
 const COPY_MENU_WIDTH = 108;
 const COPY_MENU_HEIGHT = 44;
+const COPY_MENU_GAP = 8;
+const COPY_MENU_ARROW = 12;
 /** 输入框行高与最大行数：默认 44（单行 22 + 上下内边距 11），超过 4 行内部滚动 */
 const COMPOSER_LINE_HEIGHT = 22;
 const COMPOSER_MAX_CONTENT_HEIGHT = COMPOSER_LINE_HEIGHT * 4;
@@ -1247,16 +1249,27 @@ const ChatBubble = memo(function ChatBubble({
 }) {
   const { width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  // 长按文案消息弹出的操作菜单位置（按压点的页面坐标）
-  const [copyMenuAt, setCopyMenuAt] = useState<{ x: number; y: number } | null>(null);
+  const bubbleRef = useRef<View | null>(null);
+  // 长按文案消息后菜单锚定的气泡位置（窗口坐标），菜单要挂在气泡正上方
+  const [copyMenuAnchor, setCopyMenuAnchor] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const copyableText = item.kind === "text" ? item.text : "";
   const copyMessageText = useCallback(() => {
-    setCopyMenuAt(null);
+    setCopyMenuAnchor(null);
     Clipboard.setStringAsync(copyableText).then(
       () => showToast("已复制"),
       () => showToast("复制失败，请重试"),
     );
   }, [copyableText]);
+  const openCopyMenu = useCallback(() => {
+    bubbleRef.current?.measureInWindow((x, y, width, height) => {
+      setCopyMenuAnchor({ x, y, width, height });
+    });
+  }, []);
   const knownRatio = item.kind === "image" ? item.imageAspectRatio : undefined;
   const [loadedRatio, setLoadedRatio] = useState<number | null>(null);
   // 消息自带宽高比优先用于首帧，避免先按 1:1 排版、解码后再回弹（每张图多一次布局和一次解码）
@@ -1284,18 +1297,38 @@ const ChatBubble = memo(function ChatBubble({
     setImageLoading(true);
   }
 
-  // 菜单贴着按压点上方，左右夹在屏幕内，顶部放不下就落到按压点下方
-  const copyMenuLeft = copyMenuAt
+  // 菜单挂在气泡正上方并留出箭头和间距，水平居中对齐气泡；顶部放不下就翻到气泡下方
+  const copyMenuLeft = copyMenuAnchor
     ? Math.min(
-        Math.max(copyMenuAt.x - COPY_MENU_WIDTH / 2, 12),
+        Math.max(
+          copyMenuAnchor.x + copyMenuAnchor.width / 2 - COPY_MENU_WIDTH / 2,
+          12,
+        ),
         windowWidth - COPY_MENU_WIDTH - 12,
       )
     : 0;
-  const copyMenuTop = copyMenuAt
-    ? copyMenuAt.y - COPY_MENU_HEIGHT - 12 >= insets.top + 8
-      ? copyMenuAt.y - COPY_MENU_HEIGHT - 12
-      : copyMenuAt.y + 12
+  const copyMenuAbove = copyMenuAnchor
+    ? copyMenuAnchor.y - COPY_MENU_HEIGHT - COPY_MENU_ARROW / 2 - COPY_MENU_GAP
+      >= insets.top + 8
+    : true;
+  const copyMenuTop = copyMenuAnchor
+    ? copyMenuAbove
+      ? copyMenuAnchor.y - COPY_MENU_HEIGHT - COPY_MENU_ARROW / 2 - COPY_MENU_GAP
+      : copyMenuAnchor.y + copyMenuAnchor.height + COPY_MENU_ARROW / 2 + COPY_MENU_GAP
     : 0;
+  // 箭头对准气泡中心，同时夹在菜单圆角内侧，避免压到边角
+  const copyMenuArrowLeft = copyMenuAnchor
+    ? Math.min(
+        Math.max(
+          copyMenuAnchor.x + copyMenuAnchor.width / 2 - copyMenuLeft - COPY_MENU_ARROW / 2,
+          14,
+        ),
+        COPY_MENU_WIDTH - COPY_MENU_ARROW - 14,
+      )
+    : 0;
+  const copyMenuArrowTop = copyMenuAbove
+    ? copyMenuTop + COPY_MENU_HEIGHT
+    : copyMenuTop - COPY_MENU_ARROW / 2;
 
   return (
     <View
@@ -1323,6 +1356,7 @@ const ChatBubble = memo(function ChatBubble({
         </Pressable>
       )}
       <View
+        ref={bubbleRef}
         style={[
           styles.bubble,
           item.isMine ? styles.mineBubble : styles.theirBubble,
@@ -1429,16 +1463,13 @@ const ChatBubble = memo(function ChatBubble({
         ) : item.kind === "markdown" ? (
           <MarkdownMessage content={item.text} />
         ) : (
-          // 文案消息长按弹操作菜单（复制），短按不响应，避免误触挡住列表滚动
+          // 文案消息长按弹操作菜单（复制）；热区铺满整个气泡（用负外边距抵消内边距），
+          // 短按不响应，避免误触挡住列表滚动
           <Pressable
             accessibilityHint="长按弹出消息菜单"
             delayLongPress={350}
-            onLongPress={(event) => {
-              setCopyMenuAt({
-                x: event.nativeEvent.pageX,
-                y: event.nativeEvent.pageY,
-              });
-            }}
+            onLongPress={openCopyMenu}
+            style={styles.bubbleTextPressable}
           >
             <Text style={styles.bubbleText}>{item.text}</Text>
           </Pressable>
@@ -1467,17 +1498,17 @@ const ChatBubble = memo(function ChatBubble({
           <Text style={styles.retryLabel}>重试</Text>
         </Pressable>
       ) : null}
-      {copyMenuAt ? (
+      {copyMenuAnchor ? (
         <Modal
           animationType="fade"
           transparent
           visible
-          onRequestClose={() => setCopyMenuAt(null)}
+          onRequestClose={() => setCopyMenuAnchor(null)}
         >
           <View style={styles.copyMenuLayer}>
             <Pressable
               accessibilityLabel="关闭消息菜单"
-              onPress={() => setCopyMenuAt(null)}
+              onPress={() => setCopyMenuAnchor(null)}
               style={StyleSheet.absoluteFill}
             />
             <View
@@ -1500,6 +1531,13 @@ const ChatBubble = memo(function ChatBubble({
                 <Text style={styles.copyMenuText}>复制</Text>
               </Pressable>
             </View>
+            <View
+              style={[
+                styles.copyMenuArrow,
+                copyMenuAbove ? styles.copyMenuArrowDown : styles.copyMenuArrowUp,
+                { left: copyMenuLeft + copyMenuArrowLeft, top: copyMenuArrowTop },
+              ]}
+            />
           </View>
         </Modal>
       ) : null}
@@ -1633,21 +1671,47 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
   },
+  // 负外边距抵消气泡内边距、再用同值内边距补回，文案位置不变但热区覆盖整个气泡
+  bubbleTextPressable: {
+    marginHorizontal: -12,
+    marginVertical: -8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
   copyMenuLayer: { flex: 1 },
-  // 深色小浮层菜单，贴着按压点展示；不压暗背景，避免聊天内容看不清
+  // 浅色气泡菜单：白色浮层 + 大圆角 + 柔和投影，避免深色菜单压在聊天背景上过重
   copyMenu: {
     position: "absolute",
-    borderRadius: 8,
-    backgroundColor: "rgba(0,0,0,0.85)",
+    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
     overflow: "hidden",
-    elevation: 6,
+    elevation: 10,
     shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
+    shadowOpacity: 0.16,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 14,
   },
   copyMenuItem: { flex: 1, alignItems: "center", justifyContent: "center" },
-  copyMenuText: { color: "#FFFFFF", fontSize: 15, lineHeight: 20 },
+  copyMenuText: { color: "#1A1A1A", fontSize: 15, lineHeight: 20 },
+  // 指向被选中气泡的三角箭头，与菜单同色
+  copyMenuArrow: {
+    position: "absolute",
+    width: 0,
+    height: 0,
+    borderLeftWidth: COPY_MENU_ARROW / 2,
+    borderRightWidth: COPY_MENU_ARROW / 2,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+  },
+  // 菜单在气泡上方时箭头朝下，在下方时箭头朝上
+  copyMenuArrowDown: {
+    borderTopWidth: COPY_MENU_ARROW / 2,
+    borderTopColor: "#FFFFFF",
+  },
+  copyMenuArrowUp: {
+    borderBottomWidth: COPY_MENU_ARROW / 2,
+    borderBottomColor: "#FFFFFF",
+  },
   imageBubble: {
     padding: 0,
     overflow: "hidden",
