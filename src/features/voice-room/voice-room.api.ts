@@ -75,7 +75,7 @@ export const voiceRoomApi = {
 
   /**
    * 语音房实时成员快照（融云实时成员为准）。detail 不含成员数据，
-   * 成员对账专用此端点；后端 headImage 映射为 avatar。
+   * 成员对账专用此端点；只返回 userId/role，昵称头像由前端资料缓存补全。
    */
   async getRoomMembers(
     roomId: string,
@@ -87,21 +87,21 @@ export const voiceRoomApi = {
       members?: {
         userId?: string | number;
         role?: string;
-        nickname?: string;
-        headImage?: string;
       }[];
     }>(
       `/client/v1/voiceRoom/${encodeURIComponent(roomId)}/members?roomVersion=${encodeURIComponent(String(roomVersion))}`,
       token,
     );
-    const members: VoiceRoomMember[] = (wire?.members || []).map((member) => ({
-      userId: member.userId == null ? '' : String(member.userId),
-      nickname: member.nickname || '',
-      ...(member.headImage ? { avatar: member.headImage } : {}),
-      ...(member.role
-        ? { role: member.role as VoiceRoomMemberRole }
-        : {}),
-    }));
+    const members: VoiceRoomMember[] = (wire?.members || []).map((member) => {
+      const userId = member.userId == null ? '' : String(member.userId);
+      return {
+        userId,
+        nickname: `用户${userId}`,
+        ...(member.role
+          ? { role: member.role as VoiceRoomMemberRole }
+          : {}),
+      };
+    });
     return { roomVersion: wire?.roomVersion ?? roomVersion, members };
   },
 

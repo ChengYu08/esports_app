@@ -7,7 +7,7 @@ import {
 } from "@/features/match/api/match.types";
 import { useQuickMatchEndSignals } from "@/features/match/quick-match-end-signals";
 import { ClubQuickMatchSheet } from "@/features/match/components/ClubQuickMatchSheet";
-import { clientAuthApi } from "@/features/auth/client-auth.api";
+import { useUserProfileStore } from "@/features/auth/user-profile-store";
 import { messageStore } from "@/features/message/message-store";
 import { useAuthStore } from "@esports/auth";
 import {
@@ -371,7 +371,7 @@ export default function VoiceRoomScreen() {
     setMicState,
     setRtcReadyRoomId,
     speakingUserIds,
-    hydrateMemberProfile,
+    hydrateMemberProfiles,
     roomRef,
   } = useVoiceRoomRtc({
     roomId,
@@ -409,7 +409,7 @@ export default function VoiceRoomScreen() {
     currentUser,
     roomRef,
     kickedRef,
-    hydrateMemberProfile,
+    hydrateMemberProfiles,
     setMembers,
   });
 
@@ -881,7 +881,7 @@ export default function VoiceRoomScreen() {
       actions.forEach((action) => {
         const userId = action.userId == null ? "" : String(action.userId);
         if (action.actionType === 1) {
-          hydrateMemberProfile(userId, accessToken || "");
+          hydrateMemberProfiles([userId], accessToken || "");
           // 呼叫接待期间成员加入 → 反查是否为接单接待
           if (serviceCalling) void refreshServiceUserId(userId);
         }
@@ -928,21 +928,29 @@ export default function VoiceRoomScreen() {
       if (tips.length > 0) {
         setMessages((items) => [...items, ...tips].slice(-80));
       }
-      for (const tip of placeholderTips) {
-        if (!accessToken) continue;
-        void clientAuthApi
-          .getUserProfile(accessToken, tip.userId)
-          .then((profile) => {
-            if (!profile.nickname) return;
-            setMessages((items) =>
-              items.map((item) =>
-                item.id === tip.messageId
-                  ? { ...item, nickname: profile.nickname }
-                  : item,
-              ),
+      if (placeholderTips.length > 0 && accessToken) {
+        // 占位昵称统一走全局资料缓存批量补全，避免逐条 N+1 直查
+        const userIds = Array.from(new Set(placeholderTips.map((tip) => tip.userId)));
+        void useUserProfileStore
+          .getState()
+          .hydrateProfiles(userIds, accessToken)
+          .then((profiles) => {
+            if (profiles.length === 0) return;
+            const nicknameById = new Map(
+              profiles
+                .filter((profile) => profile.nickname)
+                .map((profile) => [profile.id, profile.nickname]),
             );
-          })
-          .catch(() => undefined);
+            if (nicknameById.size === 0) return;
+            setMessages((items) =>
+              items.map((item) => {
+                const tip = placeholderTips.find((entry) => entry.messageId === item.id);
+                if (!tip) return item;
+                const nickname = nicknameById.get(tip.userId);
+                return nickname ? { ...item, nickname } : item;
+              }),
+            );
+          });
       }
 
       setMembers((items) =>
@@ -961,7 +969,7 @@ export default function VoiceRoomScreen() {
     accessToken,
     chatroomId,
     currentUser,
-    hydrateMemberProfile,
+    hydrateMemberProfiles,
     invitedRoomVersion,
     refreshServiceUserId,
     room?.creatorUserId,

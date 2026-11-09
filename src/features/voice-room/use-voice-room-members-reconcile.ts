@@ -32,7 +32,7 @@ type VoiceRoomMembersReconcileOptions = {
   currentUser?: ReconcileCurrentUser | null;
   roomRef: ReconcileRoomRef;
   kickedRef: { current: boolean };
-  hydrateMemberProfile: (userId: string, token: string) => void;
+  hydrateMemberProfiles: (userIds: string[], token: string) => void;
   setMembers: (updater: (items: VoiceRoomMember[]) => VoiceRoomMember[]) => void;
 };
 
@@ -47,7 +47,7 @@ export function useVoiceRoomMembersReconcile({
   currentUser,
   roomRef,
   kickedRef,
-  hydrateMemberProfile,
+  hydrateMemberProfiles,
   setMembers,
 }: VoiceRoomMembersReconcileOptions) {
   const lastAttemptAtRef = useRef<number | null>(null);
@@ -98,12 +98,12 @@ export function useVoiceRoomMembersReconcile({
             currentUser ?? undefined,
           ),
         );
-        snapshot.members.forEach((member) => {
-          const userId = member.userId == null ? "" : String(member.userId);
-          if (userId && userId !== currentUser?.id) {
-            hydrateMemberProfile(userId, token);
-          }
-        });
+        hydrateMemberProfiles(
+          snapshot.members
+            .map((member) => (member.userId == null ? "" : String(member.userId)))
+            .filter((userId) => userId && userId !== currentUser?.id),
+          token,
+        );
       } catch (cause) {
         console.warn("[voice-room] member reconcile failed", cause);
       } finally {
@@ -113,7 +113,7 @@ export function useVoiceRoomMembersReconcile({
   }, [
     accessToken,
     currentUser,
-    hydrateMemberProfile,
+    hydrateMemberProfiles,
     kickedRef,
     roomId,
     roomRef,

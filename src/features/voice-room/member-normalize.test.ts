@@ -45,6 +45,33 @@ describe('reconcileMembers', () => {
     expect(next.find((member) => member.userId === '20')?.micOpen).toBeUndefined();
   });
 
+  it('keeps local hydrated profile when the snapshot only carries placeholder nicknames', () => {
+    // members 端点已瘦身：快照条目只剩 userId/role，昵称为「用户{userId}」占位
+    const slim = {
+      roomVersion: '3',
+      creatorUserId: '10',
+      serviceUserId: '20',
+      members: [
+        { userId: 10, role: 'owner' },
+        { userId: 88, role: 'guest' },
+      ],
+    } as never;
+    const current: VoiceRoomMember[] = [
+      { userId: '10', nickname: '房主', role: 'owner', avatar: 'h10.png' },
+      { userId: '88', nickname: '盼友_88', role: 'guest', avatar: 'h88.png' },
+      inviteMember,
+    ];
+    const next = reconcileMembers(current, slim, currentUser);
+    expect(next.find((member) => member.userId === '10')).toMatchObject({
+      nickname: '房主',
+      avatar: 'h10.png',
+    });
+    expect(next.find((member) => member.userId === '88')).toMatchObject({
+      nickname: '盼友_88',
+      avatar: 'h88.png',
+    });
+  });
+
   it('falls back to the normalized baseline when the detail carries no members', () => {
     const current: VoiceRoomMember[] = [
       { userId: '99', nickname: '残留用户', role: 'guest' },

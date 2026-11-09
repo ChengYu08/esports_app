@@ -107,8 +107,16 @@ export function reconcileMembers(
     if (!local) {
       return member;
     }
+    // members 端点已瘦身（只剩 userId/role，昵称由资料缓存补全），
+    // 快照条目的昵称是「用户{userId}」占位时视为缺失，保留本地已补全的资料
+    const snapshotNickname =
+      member.nickname && member.nickname !== `用户${member.userId}`
+        ? member.nickname
+        : undefined;
     return {
       ...member,
+      ...(snapshotNickname ? { nickname: snapshotNickname } : local.nickname ? { nickname: local.nickname } : {}),
+      ...(member.avatar ? {} : local.avatar ? { avatar: local.avatar } : {}),
       ...(local.micOpen != null ? { micOpen: local.micOpen } : {}),
       ...(local.speaking != null ? { speaking: local.speaking } : {}),
     };

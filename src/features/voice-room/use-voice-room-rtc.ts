@@ -1,6 +1,6 @@
-import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
+import { useUserProfileStore, type CachedUserProfile } from "@/features/auth/user-profile-store";
 import { showToast } from "@/shared/ui/app-toast";
 
 import { promptSelfRealNameIfNeeded } from "./ensure-real-name-before-enter";
@@ -38,8 +38,21 @@ import type {
   VoiceRoomMessage,
 } from "./voice-room.types";
 
-export interface UseVoiceRoomRtcOptions {
-  roomId: string | undefined;
+const mergeMemberProfiles = (items: VoiceRoomMember[], profiles: CachedUserProfile[]) => {
+  if (profiles.length === 0) return items;
+  const byId = new Map(profiles.map((profile) => [profile.id, profile]));
+  return items.map((member) => {
+    const profile = byId.get(member.userId);
+    if (!profile) return member;
+    return {
+      ...member,
+      nickname: profile.nickname || member.nickname,
+      avatar: profile.headImage || member.avatar,
+    };
+  });
+};
+
+export interface UseVoiceRoomRtcOptions {  roomId: string | undefined;
   accessToken: string | null;
   currentUser: { id: string; nickname?: string; headImage?: string } | null;
   room: VoiceRoomDetail | null;
@@ -91,39 +104,30 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
   const [error, setError] = useState<string | null>(() =>
     !roomId ? "语聊房不存在" : !accessToken ? "请先登录后进入语聊房" : null,
   );
-  const profileRequests = useRef(new Set<string>());
   const roomRef = useRef(room);
   useEffect(() => {
     roomRef.current = room;
   }, [room]);
 
-  const hydrateMemberProfile = useCallback(
-    (userId: string, token: string) => {
-      if (
-        !userId ||
-        !token ||
-        userId === currentUser?.id ||
-        profileRequests.current.has(userId)
-      )
-        return;
-      profileRequests.current.add(userId);
-      void clientAuthApi
-        .getUserProfile(token, userId)
-        .then((profile) => {
-          setMembers((items) =>
-            items.map((member) =>
-              member.userId === userId
-                ? {
-                    ...member,
-                    nickname: profile.nickname || member.nickname,
-                    avatar: profile.headImage || member.avatar,
-                  }
-                : member,
-            ),
-          );
-        })
-        .catch(() => undefined)
-        .finally(() => profileRequests.current.delete(userId));
+  const hydrateMemberProfiles = useCallback(
+    (userIds: string[], token: string) => {
+      if (!token) return;
+      const ids = userIds.filter((id) => id && id !== currentUser?.id);
+      if (ids.length === 0) return;
+      // 已缓存条目立即合并（消首帧占位闪烁），缺失部分走批量接口后合并
+      const { cached, missing } = useUserProfileStore.getState().splitByCache(ids);
+      if (cached.length > 0) {
+        setMembers((items) => mergeMemberProfiles(items, cached));
+      }
+      if (missing.length === 0) return;
+      void useUserProfileStore
+        .getState()
+        .hydrateProfiles(missing, token)
+        .then((fetched) => {
+          if (fetched.length > 0) {
+            setMembers((items) => mergeMemberProfiles(items, fetched));
+          }
+        });
     },
     [currentUser?.id, setMembers],
   );
@@ -153,9 +157,9 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
           inviteMember,
         ];
       });
-      hydrateMemberProfile(userId, accessToken || "");
+      hydrateMemberProfiles([userId], accessToken || "");
     },
-    [accessToken, currentUser?.id, hydrateMemberProfile, setMembers],
+    [accessToken, currentUser?.id, hydrateMemberProfiles, setMembers],
   );
 
   // 对齐 PC（onImRoomReady → getChatRoomInfo 全量快照）：进房 detail 不含成员，
@@ -201,12 +205,10 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
               },
             ),
           );
-          snapshot.members.forEach((member) => {
-            const userId = member.userId == null ? "" : String(member.userId);
-            if (userId && userId !== selfId) {
-              hydrateMemberProfile(userId, accessToken);
-            }
-          });
+          const memberIds = snapshot.members
+            .map((member) => (member.userId == null ? "" : String(member.userId)))
+            .filter((userId) => userId && userId !== selfId);
+          hydrateMemberProfiles(memberIds, accessToken);
         } catch (cause) {
           console.warn("[voice-room] post-join member reconcile failed", cause);
         } finally {
@@ -214,7 +216,7 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
         }
       })();
     },
-    [accessToken, currentUser, hydrateMemberProfile, kickedRef, roomId, setMembers],
+    [accessToken, currentUser, hydrateMemberProfiles, kickedRef, roomId, setMembers],
   );
 
   useEffect(() => () => clearVoiceRtcCallbacks(), []);
@@ -317,8 +319,9 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
           currentUser || undefined,
         );
         setMembers(preparedMembers);
-        preparedMembers.forEach((member) =>
-          hydrateMemberProfile(member.userId, accessToken),
+        hydrateMemberProfiles(
+          preparedMembers.map((member) => member.userId),
+          accessToken,
         );
         await joinVoiceChatRoom(accessToken, prepared.rongChatroomId);
         if (!isCurrentJoin()) { await cleanupCancelledJoin(); return; }
@@ -508,7 +511,7 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
     accessToken,
     currentUser,
     ensureRtcMember,
-    hydrateMemberProfile,
+    hydrateMemberProfiles,
     invitedRoomVersion,
     kickedRef,
     reconcileMembersAfterJoin,
@@ -530,7 +533,7 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
     setMicState,
     setRtcReadyRoomId,
     speakingUserIds,
-    hydrateMemberProfile,
+    hydrateMemberProfiles,
     roomRef,
   };
 }
