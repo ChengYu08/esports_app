@@ -52,4 +52,37 @@ describe("client auth contract unwrap", () => {
 
     await expect(api.fetchCurrentUser("token")).rejects.toThrow("令牌已过期");
   });
+
+  it("getUserProfiles 占位实现循环调用单个资料接口", async () => {
+    const requester = vi.fn(async (path: string) => {
+      if (path === "/client/v1/user/profile/1") {
+        return { success: true, code: "SUCCESS", data: { id: "1", nickname: "玩家一", headImage: "https://h/1.png" } };
+      }
+      return { success: true, code: "SUCCESS", data: { id: "2", nickname: "玩家二", headImage: "https://h/2.png" } };
+    }) as unknown as AuthRequester;
+    const api = createClientAuthContract(requester);
+
+    const profiles = await api.getUserProfiles("token", ["1", "2"]);
+
+    expect(profiles).toEqual([
+      { id: "1", nickname: "玩家一", headImage: "https://h/1.png" },
+      { id: "2", nickname: "玩家二", headImage: "https://h/2.png" },
+    ]);
+    expect(requester).toHaveBeenCalledWith("/client/v1/user/profile/1", { method: "POST", token: "token" });
+    expect(requester).toHaveBeenCalledWith("/client/v1/user/profile/2", { method: "POST", token: "token" });
+  });
+
+  it("getUserProfiles 单个用户失败不影响其余用户", async () => {
+    const requester = vi.fn(async (path: string) => {
+      if (path === "/client/v1/user/profile/1") {
+        return { success: false, code: "FAIL", info: "用户不存在" };
+      }
+      return { success: true, code: "SUCCESS", data: { id: "2", nickname: "玩家二", headImage: "" } };
+    }) as unknown as AuthRequester;
+    const api = createClientAuthContract(requester);
+
+    await expect(api.getUserProfiles("token", ["1", "2"])).resolves.toEqual([
+      { id: "2", nickname: "玩家二", headImage: "" },
+    ]);
+  });
 });

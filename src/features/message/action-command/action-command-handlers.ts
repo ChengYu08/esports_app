@@ -21,6 +21,9 @@ const QUICK_MATCH_NOTICE = "QUICK_MATCH_NOTICE";
 const QUICK_MATCH_EXPIRED = "QUICK_MATCH_EXPIRED";
 const QUICK_MATCH_CANCELLED = "QUICK_MATCH_CANCELLED";
 const ORDER_NOTIFY = "ORDER_NOTIFY";
+const ACTIVITY_ROOM_NOTICE = "ACTIVITY_ROOM_NOTICE";
+/** 活动房通知 Toast 时长，与 PC MessagePlugin.info duration 对齐 */
+const ACTIVITY_ROOM_NOTICE_TOAST_MS = 10000;
 const MAX_ACTION_NOTICE_DURATION_MS = 15_000;
 /** 离线消息重放门控：命令通知比这更旧视为离线积压，不弹条（超过即为离线重放） */
 const COMMAND_STALE_MAX_MS = 15 * 60_000;
@@ -58,7 +61,7 @@ export function handleQuickMatchExpired(
   actions.dismissQuickMatchBar(payload.requestNo);
 }
 
-/** 抢单通知去重：requestNo（条消失时释放，允许同需求极端重推再提示） */
+/** 抢单通知去重：requestNo:notifyRound（账号会话内永久，登出清空） */
 const quickMatchNoticeKeys = new Set<string>();
 /** 支付催单去重：orderNo（条消失时释放，防止关了又弹） */
 const orderPayKeys = new Set<string>();
@@ -122,7 +125,8 @@ export function handleQuickMatchNotice(command: RongCommand, now = Date.now()) {
 
   // 无论是否弹条（重复/已过期/离线重放）都让派单中心失效：可见时立即重拉，否则下次进入再拉
   void refreshDispatchForRemoteChange();
-  if (quickMatchNoticeKeys.has(payload.requestNo)) return;
+  const notifyKey = `${payload.requestNo}:${payload.notifyRound}`;
+  if (quickMatchNoticeKeys.has(notifyKey)) return;
   if (stale) return;
 
   const expireAt = Number.isFinite(payload.expireAtMs)
@@ -130,8 +134,8 @@ export function handleQuickMatchNotice(command: RongCommand, now = Date.now()) {
     : now + MAX_ACTION_NOTICE_DURATION_MS;
   if (expireAt - now <= 0) return;
 
-  const noticeId = `qm:${payload.requestNo}`;
-  quickMatchNoticeKeys.add(payload.requestNo);
+  const noticeId = `qm:${payload.requestNo}:${payload.notifyRound}`;
+  quickMatchNoticeKeys.add(notifyKey);
   // 活动语境文案：仅 activityCode 非空时切换标题；跳转链路与普通通知完全一致
   const text = payload.activityCode
     ? buildActivityQuickMatchMessage(payload)
@@ -150,9 +154,34 @@ export function handleQuickMatchNotice(command: RongCommand, now = Date.now()) {
         const result = await grabQuickMatchAndEnterAudition(payload.requestNo);
         if (result.status === "failed") showToast(result.message);
       },
-      onDisappear: () => releaseQuickMatchNoticeKey(payload.requestNo),
     },
   );
+}
+
+/**
+ * ACTIVITY_ROOM_NOTICE：活动发布成功 / 扩大匹配范围等 Toast。
+ * 仅展示后端下发的 content 文案；不进房、不消费 roomId/roomVersion。
+ * 无业务过期字段，按 sentTime 门控离线重放（对齐 ORDER_NOTIFY）。
+ */
+export function handleActivityRoomNotice(command: RongCommand, now = Date.now()) {
+  if (command.name !== ACTIVITY_ROOM_NOTICE) return;
+  if (command.senderId !== PLATFORM_NOTICE_USER_ID) return;
+
+  const content = String(command.data.content ?? "").trim();
+  if (!content) return;
+
+  const stale =
+    command.sentTime != null &&
+    now - command.sentTime > COMMAND_STALE_MAX_MS;
+  if (stale) {
+    logger.warn("activity_room_notice.stale_dropped", {
+      sentTime: formatServerDateTime(command.sentTime ?? now),
+      skewMs: now - (command.sentTime ?? now),
+    });
+    return;
+  }
+
+  showToast(content, { duration: ACTIVITY_ROOM_NOTICE_TOAST_MS });
 }
 
 export function handleOrderNotifyPopup(command: RongCommand, now = Date.now()) {
@@ -216,18 +245,19 @@ export function handleOrderNotifyPopup(command: RongCommand, now = Date.now()) {
   );
 }
 
-/** 抢单条消失（到期/忽略/抢单成功）时释放去重键 */
-export function releaseQuickMatchNoticeKey(requestNo: string) {
-  quickMatchNoticeKeys.delete(requestNo);
-}
-
 /** 支付催单条消失（到期/接单成功/挤出）时释放去重键 */
 export function releaseOrderPayKey(orderNo: string) {
   orderPayKeys.delete(orderNo);
 }
 
-/** 测试专用：清空去重键 */
+/** 清空去重键（登出/切账号；测试也可调用） */
 export function resetActionCommandDedupKeys() {
   quickMatchNoticeKeys.clear();
   orderPayKeys.clear();
+}
+
+/** 登出/切账号：清空抢单与催单去重 + 残留通知条（对齐 PC resetAccountState） */
+export function clearActionCommandAccountState() {
+  resetActionCommandDedupKeys();
+  actionNotice.clear();
 }
