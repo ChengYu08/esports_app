@@ -23,7 +23,7 @@ const QUICK_MATCH_CANCELLED = "QUICK_MATCH_CANCELLED";
 const ORDER_NOTIFY = "ORDER_NOTIFY";
 const ACTIVITY_ROOM_NOTICE = "ACTIVITY_ROOM_NOTICE";
 /** 活动房通知 Toast 时长，与 PC MessagePlugin.info duration 对齐 */
-const ACTIVITY_ROOM_NOTICE_TOAST_MS = 5000;
+const ACTIVITY_ROOM_NOTICE_TOAST_MS = 10000;
 const MAX_ACTION_NOTICE_DURATION_MS = 15_000;
 /** 离线消息重放门控：命令通知比这更旧视为离线积压，不弹条（超过即为离线重放） */
 const COMMAND_STALE_MAX_MS = 15 * 60_000;
