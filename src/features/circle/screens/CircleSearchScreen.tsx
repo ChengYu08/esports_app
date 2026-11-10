@@ -167,10 +167,16 @@ export default function CircleSearchScreen() {
       return;
     }
     if (search.isTopic) {
-      router.push({ pathname: "/circle/search-results", params: { topic: search.keyword } });
+      router.push({
+        pathname: "/circle/search-results",
+        params: { topic: search.keyword, videoId: post.id },
+      });
       return;
     }
-    router.push({ pathname: "/circle/search-results", params: { kw: search.keyword } });
+    router.push({
+      pathname: "/circle/search-results",
+      params: { kw: search.keyword, videoId: post.id },
+    });
   };
 
   const handleEndReached = ({ nativeEvent }: { nativeEvent: { contentOffset: { y: number }; layoutMeasurement: { height: number }; contentSize: { height: number } } }) => {

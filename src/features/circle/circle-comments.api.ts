@@ -38,11 +38,17 @@ export type CircleCommentPage = {
 };
 
 /** CommentVO 后端字段名未定型，多种候选形状都做映射。 */
+type ApiCircleUser = { id?: string | number; userId?: string | number; nickname?: string; headImage?: string };
+
 type ApiCircleComment = {
   commentId?: string | number;
   id?: string | number;
   userId?: string | number;
-  userInfo?: { id?: string | number; userId?: string | number; nickname?: string; headImage?: string };
+  /** 后端 CommentVO 实际字段：评论人信息。 */
+  authorInfo?: ApiCircleUser;
+  /** 后端 CommentVO 实际字段：被回复人信息（二级评论）。 */
+  targetAuthorInfo?: ApiCircleUser;
+  userInfo?: ApiCircleUser;
   nickname?: string;
   headImage?: string;
   content?: string;
@@ -65,9 +71,10 @@ const FALLBACK_AVATAR = require("../../../assets/images/radar-avatar-1.png");
 
 function toCircleComment(item: ApiCircleComment): CircleComment {
   const id = String(item.commentId ?? item.id ?? "");
-  const userId = item.userId ?? item.userInfo?.userId ?? item.userInfo?.id;
-  const nickname = item.userInfo?.nickname ?? item.nickname ?? "";
-  const headImage = item.userInfo?.headImage ?? item.headImage;
+  const author = item.authorInfo ?? item.userInfo;
+  const userId = item.userId ?? author?.userId ?? author?.id;
+  const nickname = author?.nickname ?? item.nickname ?? "";
+  const headImage = author?.headImage ?? item.headImage;
   const location = item.ipLocation ?? item.ipTerritory;
   const time = item.publishTime ?? item.createTime ?? "";
   return {
@@ -83,7 +90,7 @@ function toCircleComment(item: ApiCircleComment): CircleComment {
     isAuthor: Boolean(item.isAuthor ?? item.authorFlag),
     authorLiked: Boolean(item.authorLiked ?? item.authorLike),
     deleted: (item.status ?? "").toUpperCase() === "DELETED",
-    replyNickname: item.replyNickname || undefined,
+    replyNickname: (item.replyNickname ?? item.targetAuthorInfo?.nickname) || undefined,
     replies: (item.childComments ?? []).map(toCircleComment),
   };
 }
@@ -137,6 +144,57 @@ export async function setCircleCommentLiked({
   );
   const data = unwrap(response, "点赞操作失败");
   return data.liked;
+}
+
+/** 举报类型枚举项（后端 Nacos 配置下发，对齐 PC 的 ReportTypeVO）。 */
+export type CircleCommentReportType = {
+  code: string;
+  name: string;
+  desc?: string;
+};
+
+/** 举报类型列表免鉴权（@IgnoreToken）；失败或空返回空数组兜底。 */
+export async function fetchCircleCommentReportTypes(
+  signal?: AbortSignal,
+): Promise<CircleCommentReportType[]> {
+  const response = await apiClient<CircleApiResponse<CircleCommentReportType[]>>(
+    "/client/v1/moments/comment/reportType/list",
+    { method: "GET", signal },
+  );
+  if (response.code !== "SUCCESS" || !Array.isArray(response.data)) {
+    return [];
+  }
+  return response.data.filter((item) => item.code && item.name);
+}
+
+/** 提交评论举报，对齐 PC：commentId + reportType，补充说明选填。 */
+export async function reportCircleComment({
+  commentId,
+  reportType,
+  reportDesc,
+  token,
+}: {
+  commentId: string;
+  reportType: string;
+  reportDesc?: string;
+  token: string;
+}): Promise<void> {
+  const response = await apiClient<CircleApiResponse<unknown>>(
+    "/client/v1/moments/comment/report",
+    {
+      method: "POST",
+      token,
+      body: {
+        commentId,
+        reportType,
+        ...(reportDesc?.trim() ? { reportDesc: reportDesc.trim() } : {}),
+      },
+    },
+  );
+  // R<Void> 成功时 data 为空，仅以 code 判定成功
+  if (response.code !== "SUCCESS") {
+    throw new Error(response.info || "举报提交失败");
+  }
 }
 
 /** 发布评论：回复一级传 parentCommentId，回复二级再带 replyCommentId。 */

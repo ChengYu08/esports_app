@@ -2,8 +2,10 @@ import {
   CaretDown16Regular,
   Dismiss24Regular,
   Checkmark24Regular,
+  Play48Regular,
 } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
+import { File } from "expo-file-system";
 import * as MediaLibrary from "expo-media-library/legacy";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -20,7 +22,9 @@ import { showToast } from "@/shared/ui/app-toast";
 
 import {
   completeMediaPick,
+  completeVideoPick,
   isMediaPickActive,
+  isVideoPickActive,
 } from "@/shared/media-picker/media-picker-session";
 
 type MediaAsset = MediaLibrary.Asset;
@@ -32,6 +36,11 @@ type AlbumOption = {
 
 const PAGE_SIZE = 60;
 
+/** 视频发布限制（与 PC 端校验一致）。 */
+const VIDEO_MAX_DURATION_SEC = 300;
+const VIDEO_MAX_FILE_SIZE = 200 * 1024 * 1024;
+const VIDEO_ALLOWED_EXTENSIONS = ["mp4", "mkv", "mov"];
+
 /** iOS 的 ph:// 无法直接读取/裁剪，先换取本地文件路径 */
 async function resolveLocalUri(asset: MediaAsset): Promise<string> {
   if (!asset.uri.startsWith("ph://")) {
@@ -41,15 +50,33 @@ async function resolveLocalUri(asset: MediaAsset): Promise<string> {
   return info.localUri ?? asset.uri;
 }
 
+/** 视频选择前置校验：格式 / 时长 / 大小（与 PC 端文案对齐）。 */
+function validateVideoAsset(asset: MediaAsset): string | null {
+  const extension = asset.filename.split(".").pop()?.toLowerCase() ?? "";
+  if (!VIDEO_ALLOWED_EXTENSIONS.includes(extension)) {
+    return "仅支持 mp4 / mkv / mov 格式";
+  }
+  if (asset.duration > VIDEO_MAX_DURATION_SEC) {
+    return "视频时长不能超过 5 分钟";
+  }
+  return null;
+}
+
 export default function MediaPickerScreen() {
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ max?: string; crop?: string }>();
+  const params = useLocalSearchParams<{ max?: string; crop?: string; media?: string }>();
+  // 视频模式：仅单选（发布视频限定一个），且不走头像裁剪链路
+  const videoMode = (Array.isArray(params.media) ? params.media[0] : params.media) === "video";
   const maxCount = useMemo(() => {
+    if (videoMode) {
+      return 1;
+    }
     const parsed = Number(Array.isArray(params.max) ? params.max[0] : params.max);
     return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 1;
-  }, [params.max]);
+  }, [params.max, videoMode]);
   // 头像流程：单选后进入裁剪页，由裁剪页回传结果
   const cropEnabled =
+    !videoMode &&
     maxCount === 1 &&
     (Array.isArray(params.crop) ? params.crop[0] : params.crop) === "1";
 
@@ -72,20 +99,21 @@ export default function MediaPickerScreen() {
   const completingRef = useRef(false);
 
   const requestPermission = useCallback(async () => {
-    // 只申请图片粒度权限（不申请音频/视频，保持权限最小化）
+    // 权限粒度按媒体类型申请，保持权限最小化（视频模式只申请视频）
+    const granularity = videoMode ? (["video"] as const) : (["photo"] as const);
     const response = await MediaLibrary.requestPermissionsAsync(false, [
-      "photo",
+      ...granularity,
     ]);
     setPermission(response);
     return response.granted;
-  }, []);
+  }, [videoMode]);
 
   const loadPage = useCallback(async (album: AlbumOption, after?: string) => {
     const seq = ++requestSeq.current;
     setLoading(true);
     try {
       const page = await MediaLibrary.getAssetsAsync({
-        mediaType: ["photo"],
+        mediaType: videoMode ? (["video"] as const) : (["photo"] as const),
         first: PAGE_SIZE,
         sortBy: [["creationTime", false]],
         ...(album.id ? { album: album.id } : {}),
@@ -107,7 +135,7 @@ export default function MediaPickerScreen() {
         setLoading(false);
       }
     }
-  }, []);
+  }, [videoMode]);
 
   // 初始化：权限 → 最近项目 + 相册下拉数据
   useEffect(() => {
@@ -142,13 +170,16 @@ export default function MediaPickerScreen() {
       if (isMediaPickActive()) {
         completeMediaPick(null);
       }
+      if (isVideoPickActive()) {
+        completeVideoPick(null);
+      }
     };
   }, []);
 
   // 裁剪页被手势/物理返回键关闭时，会话已被裁剪页兜底终结；本页恢复可交互状态
   useFocusEffect(
     useCallback(() => {
-      if (!isMediaPickActive()) {
+      if (!isMediaPickActive() && !isVideoPickActive()) {
         completingRef.current = false;
       }
     }, []),
@@ -172,6 +203,7 @@ export default function MediaPickerScreen() {
     }
     completingRef.current = true;
     completeMediaPick(null);
+    completeVideoPick(null);
     router.back();
   };
 
@@ -182,10 +214,26 @@ export default function MediaPickerScreen() {
     completingRef.current = true;
     try {
       const uris = await Promise.all(picked.map((asset) => resolveLocalUri(asset)));
-      completeMediaPick(uris);
+      if (videoMode) {
+        const asset = picked[0];
+        const fileSize = new File(uris[0]).size;
+        if (fileSize > VIDEO_MAX_FILE_SIZE) {
+          completingRef.current = false;
+          showToast("文件大小不能超过 200M");
+          return;
+        }
+        completeVideoPick({
+          uri: uris[0],
+          durationSec: asset.duration,
+          fileSize,
+          filename: asset.filename,
+        });
+      } else {
+        completeMediaPick(uris);
+      }
     } catch {
       completingRef.current = false;
-      showToast("照片读取失败，请稍后重试");
+      showToast("读取失败，请稍后重试");
       return;
     }
     router.back();
@@ -216,6 +264,13 @@ export default function MediaPickerScreen() {
   const toggleSelect = (asset: MediaAsset) => {
     if (completingRef.current) {
       return;
+    }
+    if (videoMode && !selectedIds.has(asset.id)) {
+      const error = validateVideoAsset(asset);
+      if (error) {
+        showToast(error);
+        return;
+      }
     }
     setSelectedIds((current) => {
       const next = new Set(current);
@@ -367,18 +422,25 @@ export default function MediaPickerScreen() {
           return (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="选择照片"
+              accessibilityLabel={videoMode ? "选择视频" : "选择照片"}
               disabled={disabled}
               onPress={() => toggleSelect(item)}
               style={styles.gridItem}
             >
-              <Image
-                source={{ uri: item.uri }}
-                style={[styles.thumb, disabled && styles.thumbDisabled]}
-                contentFit="cover"
-                transition={0}
-                recyclingKey={item.id}
-              />
+              {videoMode ? (
+                // 视频帧无法直接解码渲染，占位底 + 播放图标；选中态沿用红色遮罩
+                <View style={[styles.videoThumb, disabled && styles.thumbDisabled]}>
+                  <Play48Regular color="#FFFFFF" width={28} height={28} />
+                </View>
+              ) : (
+                <Image
+                  source={{ uri: item.uri }}
+                  style={[styles.thumb, disabled && styles.thumbDisabled]}
+                  contentFit="cover"
+                  transition={0}
+                  recyclingKey={item.id}
+                />
+              )}
               {selected ? (
                 <View style={styles.checkOverlay}>
                   <Checkmark24Regular color="#FFFFFF" width={18} height={18} />
@@ -490,6 +552,13 @@ const styles = StyleSheet.create({
     padding: 0.5,
   },
   thumb: { width: "100%", height: "100%", backgroundColor: "#F0F0F0" },
+  videoThumb: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#1A1A1A",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   thumbDisabled: { opacity: 0.4 },
   checkOverlay: {
     position: "absolute",

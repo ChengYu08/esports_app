@@ -31,6 +31,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useQueryClient } from "@tanstack/react-query";
+
+import { deleteMyCircleVideo } from "@/features/circle/circle.api";
 import type { ProfileCirclePost } from "@/features/circle/circle.api";
 import { formatCircleCount } from "@/features/circle/circle-data";
 import { CircleCommentHeartIcon } from "@/features/circle/components/CircleActionIcons";
@@ -169,6 +172,12 @@ export default function ProfileScreen() {
   const [paymentSheetVisible, setPaymentSheetVisible] = useState(false);
   const [profileActionsVisible, setProfileActionsVisible] = useState(false);
   const [blacklistPromptVisible, setBlacklistPromptVisible] = useState(false);
+  const [circleDeleteTarget, setCircleDeleteTarget] = useState<{
+    post: ProfileCirclePost;
+    rect: { x: number; y: number; width: number; height: number };
+  } | null>(null);
+  const [circleDeletePost, setCircleDeletePost] = useState<ProfileCirclePost | null>(null);
+  const [circleDeleting, setCircleDeleting] = useState(false);
   const [blacklistStatus, setBlacklistStatus] = useState({
     userId: "",
     isBlacklisted: false,
@@ -239,6 +248,59 @@ export default function ProfileScreen() {
     }
     void circleFetchNextPage();
   }, [circleIsFetchingNextPage, circleHasMore, circleFetchNextPage]);
+  const circleTargetUserId = routeParams?.userId ?? String(user?.id ?? "");
+  const handleCircleCardPress = useCallback(
+    (post: ProfileCirclePost) => {
+      if (isMine && post.status !== "APPROVED") {
+        return;
+      }
+      router.push({
+        pathname: "/circle/user-videos",
+        params: {
+          userId: circleTargetUserId,
+          postId: post.id,
+          nickname: detail?.nickname ?? "",
+          avatar: detail?.headImage ?? "",
+        },
+      });
+    },
+    [isMine, circleTargetUserId, detail?.nickname, detail?.headImage],
+  );
+  const handleCircleCardLongPress = useCallback(
+    (
+      post: ProfileCirclePost,
+      rect: { x: number; y: number; width: number; height: number },
+    ) => {
+      setCircleDeleteTarget({ post, rect });
+    },
+    [],
+  );
+  const queryClient = useQueryClient();
+  const handleCircleDeleteConfirm = useCallback(async () => {
+    const post = circleDeletePost;
+    if (!post || circleDeleting) {
+      return;
+    }
+    const token = useAuthStore.getState().accessToken;
+    if (!token) {
+      setCircleDeletePost(null);
+      return;
+    }
+    setCircleDeleting(true);
+    try {
+      await deleteMyCircleVideo({ videoId: post.id, token });
+      setCircleDeletePost(null);
+      showToast("已删除");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["profile-circle"] }),
+        queryClient.invalidateQueries({ queryKey: ["circle-user-videos"] }),
+      ]);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "删除失败");
+    } finally {
+      setCircleDeleting(false);
+    }
+  }, [circleDeletePost, circleDeleting, queryClient]);
   const localProfile = useMemo(() => toLocalProfile(user), [user]);
   const profile = detail ?? localProfile;
   const measureCover = useCallback((height: number) => {
@@ -603,6 +665,8 @@ export default function ProfileScreen() {
             <ProfileCircleGrid
               posts={circlePosts}
               isMine={isMine}
+              onPress={handleCircleCardPress}
+              onLongPress={isMine ? handleCircleCardLongPress : undefined}
               onEndReached={loadMoreCircle}
               hasMore={circleHasMore}
             />
@@ -683,6 +747,8 @@ export default function ProfileScreen() {
     circleHasMore,
     refetchCircle,
     loadMoreCircle,
+    handleCircleCardPress,
+    handleCircleCardLongPress,
     isCompanion,
     toggleVoice,
     playingVoiceUrl,
@@ -861,6 +927,27 @@ export default function ProfileScreen() {
           </>
         )}
       </View>
+      {circleDeleteTarget ? (
+        <CircleDeletePopover
+          target={circleDeleteTarget}
+          onClose={() => setCircleDeleteTarget(null)}
+          onSelect={() => {
+            setCircleDeletePost(circleDeleteTarget.post);
+            setCircleDeleteTarget(null);
+          }}
+        />
+      ) : null}
+      <AppPrompt
+        visible={circleDeletePost !== null}
+        title="删除视频"
+        message="删除后将不展示这条视频，确定删除吗？"
+        cancelText="取消"
+        confirmText="确定"
+        onCancel={() => setCircleDeletePost(null)}
+        onConfirm={() => {
+          void handleCircleDeleteConfirm();
+        }}
+      />
       {!isMine ? (
         <ProfileActionsSheet
           visible={profileActionsVisible}
@@ -1625,6 +1712,8 @@ const DEFAULT_COVER_ASPECT = 4 / 3;
 const CIRCLE_GRID_GAP = 8;
 const CIRCLE_GRID_PADDING = 8;
 const CIRCLE_CARD_WIDTH = (Dimensions.get("window").width - CIRCLE_GRID_PADDING * 2 - CIRCLE_GRID_GAP) / 2;
+const CIRCLE_DELETE_POPOVER_WIDTH = 96;
+const CIRCLE_DELETE_POPOVER_HEIGHT = 44;
 
 function formatDuration(seconds?: number): string {
   if (!seconds || seconds <= 0) {
@@ -1647,20 +1736,95 @@ function getStatusBadge(status: string): { label: string; bg: string } | null {
   return null;
 }
 
+/** 长按卡片弹出的删除气泡（含指向卡片的小三角），点击空白处关闭。 */
+function CircleDeletePopover({
+  target,
+  onClose,
+  onSelect,
+}: {
+  target: {
+    post: ProfileCirclePost;
+    rect: { x: number; y: number; width: number; height: number };
+  };
+  onClose: () => void;
+  onSelect: () => void;
+}) {
+  const windowWidth = Dimensions.get("window").width;
+  const centerX = target.rect.x + target.rect.width / 2;
+  const left = Math.min(
+    Math.max(centerX - CIRCLE_DELETE_POPOVER_WIDTH / 2, 8),
+    windowWidth - CIRCLE_DELETE_POPOVER_WIDTH - 8,
+  );
+  // 卡片离顶部太近（被导航栏遮挡）时气泡改放卡片下方，三角朝上
+  const above = target.rect.y - CIRCLE_DELETE_POPOVER_HEIGHT - 4 > 64;
+  const top = above
+    ? target.rect.y - CIRCLE_DELETE_POPOVER_HEIGHT - 4
+    : target.rect.y + target.rect.height + 4;
+
+  return (
+    <Pressable
+      accessibilityLabel="关闭删除菜单"
+      style={circleStyles.deleteOverlay}
+      onPress={onClose}
+    >
+      <View style={[circleStyles.deletePopover, { left, top }]}>
+        {above ? null : <View style={circleStyles.deleteTriangleUp} />}
+        <Pressable
+          accessibilityRole="menuitem"
+          accessibilityLabel="删除视频"
+          style={circleStyles.deleteMenuItem}
+          onPress={onSelect}
+        >
+          <Text style={circleStyles.deleteMenuText}>删除</Text>
+        </Pressable>
+        {above ? <View style={circleStyles.deleteTriangleDown} /> : null}
+      </View>
+    </Pressable>
+  );
+}
+
 /** 个人主页盼友圈双列瀑布流卡片 */
 const ProfileCircleCard = memo(function ProfileCircleCard({
   post,
   isMine,
+  onPress,
+  onLongPress,
 }: {
   post: ProfileCirclePost;
   isMine: boolean;
+  onPress: (post: ProfileCirclePost) => void;
+  onLongPress?: (
+    post: ProfileCirclePost,
+    rect: { x: number; y: number; width: number; height: number },
+  ) => void;
 }) {
   const [coverAspect, setCoverAspect] = useState(DEFAULT_COVER_ASPECT);
   const duration = formatDuration(post.likeCount > 0 ? undefined : undefined);
   const statusBadge = isMine ? getStatusBadge(post.status) : null;
+  // 自己主页里审核中/审核不通过的作品不进播放页
+  const pressDisabled = isMine && post.status !== "APPROVED";
+  const cardRef = useRef<View>(null);
+  const handleLongPress = useCallback(() => {
+    if (!onLongPress) {
+      return;
+    }
+    cardRef.current?.measureInWindow((x, y, width, height) => {
+      onLongPress(post, { x, y, width, height });
+    });
+  }, [onLongPress, post]);
 
   return (
-    <View style={circleStyles.card}>
+    <Pressable
+      ref={cardRef}
+      accessibilityRole="button"
+      // disabled 会同时屏蔽 onLongPress，未过审卡片仍需支持长按删除，故只断开 onPress
+      disabled={pressDisabled && !onLongPress}
+      onLongPress={onLongPress ? handleLongPress : undefined}
+      onPress={pressDisabled ? undefined : () => {
+        onPress(post);
+      }}
+      style={circleStyles.card}
+    >
       <View style={circleStyles.coverWrap}>
         <Image
           source={post.cover}
@@ -1701,7 +1865,7 @@ const ProfileCircleCard = memo(function ProfileCircleCard({
           <Text style={circleStyles.publishTime}>{post.publishedAt}</Text>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 });
 
@@ -1709,11 +1873,18 @@ const ProfileCircleCard = memo(function ProfileCircleCard({
 function ProfileCircleGrid({
   posts,
   isMine,
+  onPress,
+  onLongPress,
   onEndReached,
   hasMore,
 }: {
   posts: ProfileCirclePost[];
   isMine: boolean;
+  onPress: (post: ProfileCirclePost) => void;
+  onLongPress?: (
+    post: ProfileCirclePost,
+    rect: { x: number; y: number; width: number; height: number },
+  ) => void;
   onEndReached: () => void;
   hasMore: boolean;
 }) {
@@ -1731,12 +1902,12 @@ function ProfileCircleGrid({
     <View style={circleStyles.grid}>
       <View style={circleStyles.column}>
         {leftColumn.map((post) => (
-          <ProfileCircleCard key={post.id} post={post} isMine={isMine} />
+          <ProfileCircleCard key={post.id} post={post} isMine={isMine} onPress={onPress} onLongPress={onLongPress} />
         ))}
       </View>
       <View style={circleStyles.column}>
         {rightColumn.map((post) => (
-          <ProfileCircleCard key={post.id} post={post} isMine={isMine} />
+          <ProfileCircleCard key={post.id} post={post} isMine={isMine} onPress={onPress} onLongPress={onLongPress} />
         ))}
       </View>
       {hasMore ? (
@@ -1850,6 +2021,58 @@ const circleStyles = StyleSheet.create({
     fontFamily: SYSTEM_FONT,
     color: "#979799",
     fontSize: 12,
+  },
+  deleteOverlay: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 20,
+  },
+  deletePopover: {
+    position: "absolute",
+    width: CIRCLE_DELETE_POPOVER_WIDTH,
+    padding: 4,
+    borderRadius: 8,
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
+  deleteMenuItem: {
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  deleteMenuText: {
+    fontFamily: SYSTEM_FONT,
+    color: "#0A0A0A",
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "400",
+  },
+  deleteTriangleDown: {
+    alignSelf: "center",
+    marginBottom: -4,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 6,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: "#FFFFFF",
+  },
+  deleteTriangleUp: {
+    alignSelf: "center",
+    marginTop: -4,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderBottomWidth: 6,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderBottomColor: "#FFFFFF",
   },
 });
 

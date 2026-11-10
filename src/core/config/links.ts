@@ -26,4 +26,6 @@ export const APP_LINKS = {
   rechargeAgreement: `${protocolBaseUrl}/public/protocols?code=${protocolCode("user_recharge")}`,
   // 注销协议（注销流程页《注销协议》入口）
   accountCancellation: `${protocolBaseUrl}/public/protocols?code=${protocolCode("user_cancellation")}`,
+  // 盼之电竞社区公约（发视频页协议勾选链接）
+  communityAgreement: `${protocolBaseUrl}/public/protocols?code=${protocolCode("community_agreement")}`,
 } as const;

@@ -289,6 +289,33 @@ function toProfileCirclePost(item: ApiMyVideoItem): ProfileCirclePost {
   };
 }
 
+/** 个人主页作品转全屏播放页卡片数据；user/myList 接口不返回作者信息，由跳转方补充。 */
+export function profileCirclePostToFeedPost(
+  post: ProfileCirclePost,
+  author: { userId?: string; nickname?: string; avatar?: string },
+): CircleVideoPost {
+  const content = post.content;
+  const title = post.title;
+  return {
+    id: post.id,
+    videoUrl: post.videoUrl,
+    cover: post.cover,
+    avatar: author.avatar
+      ? { uri: author.avatar }
+      : require("../../../assets/images/radar-avatar-1.png"),
+    author: author.nickname || "盼友",
+    authorId: author.userId,
+    orderEnabled: false,
+    headline: content && title ? title : undefined,
+    content: content || title,
+    tags: [],
+    publishedAt: post.publishedAt,
+    likeCount: post.likeCount,
+    commentCount: post.commentCount,
+    liked: post.liked,
+  };
+}
+
 /** 拉取他人主页盼友圈作品列表（免登录，仅审核通过）。 */
 export async function fetchUserCirclePage({
   userId,
@@ -320,6 +347,25 @@ export async function fetchUserCirclePage({
     total: data.total ?? 0,
     hasMore: records.length >= pageSize,
   };
+}
+
+/** 删除自己发布的视频作品（需登录）。 */
+export async function deleteMyCircleVideo({
+  videoId,
+  token,
+}: {
+  videoId: string;
+  token: string;
+}): Promise<void> {
+  const response = await apiClient<CircleApiResponse<null>>(
+    "/client/v1/moments/video/delete",
+    {
+      method: "POST",
+      token,
+      body: { videoId: Number(videoId) },
+    },
+  );
+  unwrap(response, "删除视频失败");
 }
 
 /** 拉取自己主页盼友圈作品列表（需登录，含全部审核状态）。 */

@@ -1,8 +1,12 @@
-import { ChevronDown16Regular, Dismiss24Regular } from "@fluentui/react-native-icons";
+import {
+  ChevronDown16Regular,
+  Dismiss24Regular,
+  MoreHorizontal16Regular,
+} from "@fluentui/react-native-icons";
 import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useInfiniteQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { EmojiKeyboard, type EmojiType } from "rn-emoji-keyboard";
 import {
   ActivityIndicator,
@@ -24,7 +28,9 @@ import type { CircleVideoPost } from "@/features/circle/circle-data";
 import { formatCircleCount } from "@/features/circle/circle-data";
 import {
   fetchCircleCommentPage,
+  fetchCircleCommentReportTypes,
   publishCircleComment,
+  reportCircleComment,
   setCircleCommentLiked,
   type CircleComment,
   type CircleCommentPage,
@@ -95,6 +101,8 @@ export function CircleCommentSheet({
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionedUsers, setMentionedUsers] = useState<CircleMentionUser[]>([]);
+  /** 当前正在举报的评论；非空时展示举报弹层。 */
+  const [reportTarget, setReportTarget] = useState<CircleComment | null>(null);
   const inputRef = useRef<TextInput>(null);
   const pendingProfileUserIdRef = useRef<string | null>(null);
   const handleClosed = useCallback(() => {
@@ -194,6 +202,7 @@ export function CircleCommentSheet({
     setMentionedUsers([]);
     setExpandedIds(new Set());
     setTotalCount(post.commentCount);
+    setReportTarget(null);
     onClose();
   };
 
@@ -287,6 +296,20 @@ export function CircleCommentSheet({
     handleClose();
   };
 
+  /** 点三个点打开举报弹层，与点赞一致需要登录态。 */
+  const handleOpenReport = (comment: CircleComment) => {
+    if (comment.deleted) {
+      return;
+    }
+    if (!requireLogin() || !token) {
+      return;
+    }
+    setReplyTarget(null);
+    setEmojiPickerOpen(false);
+    setMentionOpen(false);
+    setReportTarget(comment);
+  };
+
   const handleSend = async () => {
     const content = input.trim();
     if (!content || sending) {
@@ -361,6 +384,7 @@ export function CircleCommentSheet({
       onLike={handleLike}
       onReply={handleReplyPress}
       onOpenProfile={handleOpenProfile}
+      onOpenReport={handleOpenReport}
       onOpenTopic={handleClose}
     />
   );
@@ -575,6 +599,143 @@ export function CircleCommentSheet({
           />
         </View>
       ) : null}
+      {reportTarget ? (
+        <CommentReportSheet
+          key={reportTarget.id}
+          comment={reportTarget}
+          token={token ?? ""}
+          onClose={() => {
+            setReportTarget(null);
+          }}
+        />
+      ) : null}
+    </BottomSheet>
+  );
+}
+
+/** 评论举报弹层：类型枚举动态下发（对齐 PC ReportDialog）+ 选填补充说明。 */
+function CommentReportSheet({
+  comment,
+  token,
+  onClose,
+}: {
+  comment: CircleComment;
+  token: string;
+  onClose: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const [visible, setVisible] = useState(true);
+  const [selected, setSelected] = useState("");
+  const [description, setDescription] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const reportTypesQuery = useQuery({
+    queryKey: ["circle-comment-report-types"],
+    queryFn: ({ signal }) => fetchCircleCommentReportTypes(signal),
+    staleTime: 5 * 60_000,
+  });
+  const reportTypes = reportTypesQuery.data ?? [];
+  /** 退场动画播完后才卸载，交给父级清理目标评论。 */
+  const close = () => {
+    setVisible(false);
+  };
+
+  const handleSubmit = async () => {
+    if (!selected) {
+      showToast("请选择举报类型");
+      return;
+    }
+    if (submitting) {
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await reportCircleComment({
+        commentId: comment.id,
+        reportType: selected,
+        reportDesc: description,
+        token,
+      });
+      showToast("举报成功，我们将尽快处理");
+      close();
+    } catch (error) {
+      setSubmitting(false);
+      showToast(error instanceof Error ? error.message : "举报提交失败");
+    }
+  };
+
+  return (
+    <BottomSheet
+      visible={visible}
+      onClose={close}
+      onClosed={onClose}
+      keyboardAvoiding
+      scrollable
+      contentStyle={styles.reportSheet}
+    >
+      <View style={styles.reportHeader}>
+        <Text style={styles.reportTitle}>举报评论</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="关闭举报"
+          onPress={close}
+          style={styles.closeButton}
+        >
+          <Dismiss24Regular color="#333333" style={styles.closeIcon} />
+        </Pressable>
+      </View>
+      <Text style={styles.reportHint}>请选择举报类型</Text>
+      {reportTypesQuery.isLoading ? (
+        <ActivityIndicator color="#999999" style={styles.reportLoading} />
+      ) : (
+        <View style={styles.reportTypes}>
+          {reportTypes.map((type) => {
+            const active = selected === type.code;
+            return (
+              <Pressable
+                key={type.code}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: active }}
+                accessibilityLabel={type.name}
+                disabled={submitting}
+                onPress={() => {
+                  setSelected(type.code);
+                }}
+                style={[styles.reportType, active && styles.reportTypeActive]}
+              >
+                <Text style={[styles.reportTypeText, active && styles.reportTypeTextActive]}>
+                  {type.name}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+      <TextInput
+        accessibilityLabel="举报补充说明"
+        editable={!submitting}
+        maxLength={200}
+        multiline
+        onChangeText={setDescription}
+        placeholder="补充说明（选填，最多200字）"
+        placeholderTextColor="#CACACC"
+        style={styles.reportDescInput}
+        textAlignVertical="top"
+        cursorColor="#FE1F4C"
+      />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="提交举报"
+        disabled={submitting}
+        onPress={handleSubmit}
+        style={({ pressed }) => [
+          styles.reportSubmit,
+          submitting && styles.reportSubmitDisabled,
+          pressed && !submitting && styles.reportSubmitPressed,
+        ]}
+      >
+        <Text style={styles.reportSubmitText}>{submitting ? "提交中" : "提交"}</Text>
+      </Pressable>
+      <View style={{ height: Math.max(insets.bottom, 16) }} />
     </BottomSheet>
   );
 }
@@ -659,6 +820,32 @@ function MentionUserList({
   );
 }
 
+/** 一级评论与二级评论共用的三个点入口，点击打开举报弹层；已删除评论不展示。 */
+function CommentMoreButton({
+  comment,
+  onOpenReport,
+}: {
+  comment: CircleComment;
+  onOpenReport: (comment: CircleComment) => void;
+}) {
+  if (comment.deleted) {
+    return null;
+  }
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`举报${comment.nickname}的评论`}
+      hitSlop={8}
+      onPress={() => {
+        onOpenReport(comment);
+      }}
+      style={styles.commentMore}
+    >
+      <MoreHorizontal16Regular color="#999999" style={styles.commentMoreIcon} />
+    </Pressable>
+  );
+}
+
 function CommentRow({
   comment,
   expanded,
@@ -666,6 +853,7 @@ function CommentRow({
   onLike,
   onReply,
   onOpenProfile,
+  onOpenReport,
   onOpenTopic,
 }: {
   comment: CircleComment;
@@ -674,6 +862,7 @@ function CommentRow({
   onLike: (comment: CircleComment) => void;
   onReply: (comment: CircleComment, parentCommentId?: string) => void;
   onOpenProfile: (comment: CircleComment) => void;
+  onOpenReport: (comment: CircleComment) => void;
   onOpenTopic: () => void;
 }) {
   const hiddenReplyCount = comment.replies.length - VISIBLE_REPLY_COUNT;
@@ -704,6 +893,7 @@ function CommentRow({
                 <Text style={styles.authorTagText}>作者</Text>
               </View>
             ) : null}
+            <CommentMoreButton comment={comment} onOpenReport={onOpenReport} />
           </View>
           <Text style={styles.commentContent}>
             {comment.deleted ? "该评论已删除" : (
@@ -759,6 +949,7 @@ function CommentRow({
           onLike={onLike}
           onReply={onReply}
           onOpenProfile={onOpenProfile}
+          onOpenReport={onOpenReport}
           onOpenTopic={onOpenTopic}
         />
       ))}
@@ -799,6 +990,7 @@ function ReplyRow({
   onLike,
   onReply,
   onOpenProfile,
+  onOpenReport,
   onOpenTopic,
 }: {
   reply: CircleComment;
@@ -806,6 +998,7 @@ function ReplyRow({
   onLike: (comment: CircleComment) => void;
   onReply: (comment: CircleComment, parentCommentId?: string) => void;
   onOpenProfile: (comment: CircleComment) => void;
+  onOpenReport: (comment: CircleComment) => void;
   onOpenTopic: () => void;
 }) {
   return (
@@ -830,6 +1023,7 @@ function ReplyRow({
               <Text style={styles.authorTagText}>作者</Text>
             </View>
           ) : null}
+          <CommentMoreButton comment={reply} onOpenReport={onOpenReport} />
         </View>
         <Text style={styles.commentContent}>
           {reply.replyNickname ? (
@@ -991,6 +1185,14 @@ const styles = StyleSheet.create({
     lineHeight: 14,
     fontWeight: "400",
   },
+  commentMore: {
+    marginLeft: "auto",
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  commentMoreIcon: { width: 16, height: 16 },
   commentContent: {
     fontFamily: SYSTEM_FONT,
     color: "#0D0D0F",
@@ -1182,6 +1384,94 @@ const styles = StyleSheet.create({
   },
   inputToolbarIcons: { flexDirection: "row", alignItems: "center", gap: 24 },
   inputIcon: { width: 24, height: 24 },
+  reportSheet: {
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    maxHeight: "70%",
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+  reportHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingBottom: 12,
+  },
+  reportTitle: {
+    flex: 1,
+    fontFamily: SYSTEM_FONT,
+    color: "#0D0D0F",
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  reportHint: {
+    fontFamily: SYSTEM_FONT,
+    color: "#656566",
+    fontSize: 13,
+    lineHeight: 20,
+    fontWeight: "400",
+    paddingBottom: 12,
+  },
+  reportLoading: { marginVertical: 24 },
+  reportTypes: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    paddingBottom: 4,
+  },
+  reportType: {
+    borderRadius: 6,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "#EBEBEB",
+    backgroundColor: "#F5F6F7",
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  reportTypeActive: {
+    borderColor: "#FE1F4C",
+    backgroundColor: "#FFE5EB",
+  },
+  reportTypeText: {
+    fontFamily: SYSTEM_FONT,
+    color: "#0D0D0F",
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "400",
+  },
+  reportTypeTextActive: {
+    color: "#FE1F4C",
+    fontWeight: "500",
+  },
+  reportDescInput: {
+    borderRadius: 8,
+    backgroundColor: "#F7F7F7",
+    color: "#0D0D0F",
+    fontFamily: SYSTEM_FONT,
+    fontSize: 14,
+    lineHeight: 22,
+    minHeight: 88,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+  },
+  reportSubmit: {
+    height: 44,
+    borderRadius: 999,
+    backgroundColor: "#FE1F4C",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 16,
+  },
+  reportSubmitDisabled: { opacity: 0.5 },
+  reportSubmitPressed: { opacity: 0.82 },
+  reportSubmitText: {
+    fontFamily: SYSTEM_FONT,
+    color: "#FFFFFF",
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: "500",
+  },
   sendButton: {
     height: 36,
     borderRadius: 999,

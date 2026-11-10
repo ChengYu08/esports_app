@@ -27,3 +27,35 @@ export function completeMediaPick(uris: string[] | null): void {
 export function isMediaPickActive(): boolean {
   return resolver !== null;
 }
+
+/** 视频选择结果：发布视频需要时长/大小/文件名做校验与直传。 */
+export type VideoPickResult = {
+  /** 本地文件路径（iOS 已把 ph:// 换成可读路径）。 */
+  uri: string;
+  durationSec: number;
+  fileSize: number;
+  filename: string;
+};
+
+type VideoPickResolver = ((result: VideoPickResult | null) => void) | null;
+
+/** 视频会话与图片会话独立互不干扰；同一时刻也只允许一个 pending。 */
+let videoResolver: VideoPickResolver = null;
+
+export function beginVideoPick(): Promise<VideoPickResult | null> {
+  const previous = videoResolver;
+  return new Promise<VideoPickResult | null>((resolve) => {
+    videoResolver = resolve;
+    previous?.(null);
+  });
+}
+
+export function completeVideoPick(result: VideoPickResult | null): void {
+  const current = videoResolver;
+  videoResolver = null;
+  current?.(result);
+}
+
+export function isVideoPickActive(): boolean {
+  return videoResolver !== null;
+}
