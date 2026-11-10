@@ -3,7 +3,7 @@ import { FlashList } from "@shopify/flash-list";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useIsFocused, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -12,6 +12,7 @@ import { useAuthStore } from "@esports/auth";
 
 import { fetchCircleSearchPage } from "@/features/circle/circle.api";
 import type { CircleVideoPost } from "@/features/circle/circle-data";
+import { circlePlayerPool } from "@/features/circle/circle-player-pool";
 import { CircleVideoCard } from "@/features/circle/components/CircleVideoCard";
 import { CircleFeedSkeleton } from "@/features/circle/components/CircleFeedSkeleton";
 import { EmptyState } from "@/shared/ui/AsyncStates";
@@ -20,9 +21,10 @@ import { SYSTEM_FONT } from "@/shared/theme/typography";
 
 export default function CircleSearchResultsScreen() {
   const insets = useSafeAreaInsets();
-  const { kw, topic } = useLocalSearchParams<{ kw?: string; topic?: string }>();
+  const { kw, topic, videoId } = useLocalSearchParams<{ kw?: string; topic?: string; videoId?: string }>();
   const keyword = (kw ?? "").trim() || (topic ?? "").trim();
   const isTopicSearch = !kw && Boolean(topic);
+  const targetVideoId = (videoId ?? "").trim();
   const [activeIndex, setActiveIndex] = useState(0);
   const [hasSwiped, setHasSwiped] = useState(false);
   const [manualPlayback, setManualPlayback] = useState<{
@@ -36,6 +38,20 @@ export default function CircleSearchResultsScreen() {
   const activeRoom = useVoiceRoomSessionStore((state) => state.activeRoom);
   const joiningRoom = useVoiceRoomSessionStore((state) => state.joiningRoom);
   const shouldPlay = appIsActive && !activeRoom && !joiningRoom;
+  const focused = useIsFocused();
+  // 播放资格 = 自身条件 AND 路由焦点：上层再压路由时让出全局播放器池
+  const feedActive = shouldPlay && focused;
+  const feedId = useMemo(() => `circle-search:${keyword}`, [keyword]);
+
+  // 焦点仲裁：聚焦时接管播放器池，失焦时条件释放（仅当自己仍持仲裁权）
+  useFocusEffect(
+    useCallback(() => {
+      circlePlayerPool.activateFeed(feedId);
+      return () => {
+        circlePlayerPool.conditionalRelease(feedId);
+      };
+    }, [feedId]),
+  );
 
   const searchQuery = useInfiniteQuery({
     queryKey: ["circle-search", keyword, isTopicSearch, accessToken ?? "guest"],
@@ -76,6 +92,25 @@ export default function CircleSearchResultsScreen() {
     return () => subscription.remove();
   }, []);
 
+  // 从瀑布流点进的场景：定位到被点击的那条视频（数据分页到达后生效，只定位一次）
+  const positionedRef = useRef(false);
+  useEffect(() => {
+    if (!targetVideoId || positionedRef.current || feedHeight <= 0 || posts.length === 0) {
+      return;
+    }
+    const index = posts.findIndex((post) => post.id === targetVideoId);
+    if (index < 0) {
+      return;
+    }
+    positionedRef.current = true;
+    requestAnimationFrame(() => {
+      if (index > 0) {
+        listRef.current?.scrollToIndex({ index, animated: false });
+      }
+      setActiveIndex(index);
+    });
+  }, [targetVideoId, feedHeight, posts]);
+
   const renderPost = useCallback(
     ({ item, index }: ListRenderItemInfo<CircleVideoPost>) => {
       const autoPlay = hasSwiped || index > 0;
@@ -84,20 +119,21 @@ export default function CircleSearchResultsScreen() {
         : autoPlay;
       return (
         <CircleVideoCard
+          feedId={feedId}
           post={item}
           bottomInset={0}
           height={feedHeight}
-          active={shouldPlay && index === activeIndex}
+          active={feedActive && index === activeIndex}
           playing={isPlaying}
           onPlaybackChange={(nextPlaying) => {
             setManualPlayback({ videoId: item.id, isPlaying: nextPlaying });
           }}
-          shouldPreload={shouldPlay && index === activeIndex + 1}
-          shouldRetain={shouldPlay && index === activeIndex - 1}
+          shouldPreload={feedActive && index === activeIndex + 1}
+          shouldRetain={feedActive && index === activeIndex - 1}
         />
       );
     },
-    [activeIndex, feedHeight, hasSwiped, manualPlayback, shouldPlay],
+    [activeIndex, feedId, feedHeight, hasSwiped, manualPlayback, feedActive],
   );
 
   const handleEndReached = useCallback(() => {

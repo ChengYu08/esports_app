@@ -382,7 +382,7 @@ export default function HomeScreen() {
         )}
         {mountedTabs.circle && (
           <View style={[styles.pane, topTab !== "circle" && styles.paneHidden]}>
-            <CircleScreen active={topTab === "circle"} bottomInset={insets.bottom} />
+            <CircleScreen active={topTab === "circle" && focused} bottomInset={insets.bottom} />
           </View>
         )}
       </View>

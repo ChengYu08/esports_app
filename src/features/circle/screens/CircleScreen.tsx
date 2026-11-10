@@ -11,12 +11,12 @@ import { useAuthStore } from "@esports/auth";
 
 import { fetchCircleFeedPage } from "@/features/circle/circle.api";
 import type { CircleFeedKind, CircleVideoPost } from "@/features/circle/circle-data";
+import { CIRCLE_HOME_FEED_ID, circlePlayerPool } from "@/features/circle/circle-player-pool";
 import { CircleVideoCard } from "@/features/circle/components/CircleVideoCard";
 import { CircleFeedSkeleton } from "@/features/circle/components/CircleFeedSkeleton";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
 import { requireLogin } from "@/shared/navigation/require-login";
-import { showToast } from "@/shared/ui/app-toast";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
 
 const FEED_KINDS: { key: CircleFeedKind; label: string }[] = [
@@ -84,6 +84,15 @@ export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
     return () => subscription.remove();
   }, []);
 
+  // 路由焦点仲裁：active 含 HomeScreen 的 topTab 与路由 focus，push 话题页/作品页时让出播放权
+  useEffect(() => {
+    if (active) {
+      circlePlayerPool.activateFeed(CIRCLE_HOME_FEED_ID);
+    } else {
+      circlePlayerPool.conditionalRelease(CIRCLE_HOME_FEED_ID);
+    }
+  }, [active]);
+
   useEffect(() => {
     listRef.current?.scrollToOffset({ offset: 0, animated: false });
   }, [feedKind]);
@@ -106,6 +115,7 @@ export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
         : autoPlay;
       return (
         <CircleVideoCard
+          feedId={CIRCLE_HOME_FEED_ID}
           post={item}
           bottomInset={bottomInset}
           height={feedHeight}
@@ -200,7 +210,7 @@ export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
           accessibilityLabel="发布视频"
           onPress={() => {
             if (requireLogin()) {
-              showToast("视频发布功能即将开放");
+              router.push("/circle/publish");
             }
           }}
           style={styles.navSide}

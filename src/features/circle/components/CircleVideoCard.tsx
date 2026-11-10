@@ -36,6 +36,7 @@ import {
 import { CircleCommentSheet } from "@/features/circle/components/CircleCommentSheet";
 import { CircleTopicLinks, CircleTopicText } from "@/features/circle/components/CircleTopicLinks";
 import { normalizeCircleTopicName, splitCircleTopicText } from "@/features/circle/circle-topic";
+import { usePooledCirclePlayer } from "@/features/circle/circle-player-pool";
 import { CircleVideoPlayer } from "@/features/circle/components/CircleVideoPlayer";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
 import { showToast } from "@/shared/ui/app-toast";
@@ -46,6 +47,8 @@ const BOTTOM_INFO_HEIGHT = 190;
 const TAB_CONTENT_HEIGHT = 58;
 
 type CircleVideoCardProps = {
+  /** 所属 feed 标识，用于全局播放器池的焦点仲裁。 */
+  feedId: string;
   post: CircleVideoPost;
   bottomInset: number;
   /** 信息流可视高度，翻页依赖整屏高度定位。 */
@@ -59,6 +62,7 @@ type CircleVideoCardProps = {
 };
 
 export function CircleVideoCard({
+  feedId,
   post,
   bottomInset,
   height,
@@ -85,6 +89,13 @@ export function CircleVideoCard({
   );
   const [playError, setPlayError] = useRecyclingState(false, [post.id, active]);
   const [playerAttempt, setPlayerAttempt] = useRecyclingState(0, [post.id]);
+  const { slot: poolSlot, player: poolPlayer } = usePooledCirclePlayer({
+    feedId,
+    post,
+    inWindow: Boolean(post.videoUrl) && (active || shouldPreload || shouldRetain),
+    preload: shouldPreload,
+    forceReload: playerAttempt,
+  });
   const coverOpacity = useSharedValue(1);
   const frameReadyRef = useRef(false);
   const coverAnimatedStyle = useAnimatedStyle(() => ({
@@ -194,13 +205,14 @@ export function CircleVideoCard({
 
   return (
     <View style={[styles.card, { height }]}>
-      {post.videoUrl && (active || shouldPreload || shouldRetain) ? (
+      {poolPlayer && poolSlot !== null ? (
         <CircleVideoPlayer
-          key={`${post.id}:${playerAttempt}`}
+          key={`${post.id}:${poolSlot}:${playerAttempt}`}
+          player={poolPlayer}
+          slot={poolSlot}
           post={post}
           active={active}
           shouldPlay={active && playing}
-          shouldPreload={shouldPreload}
           token={token ?? undefined}
           onFirstFrame={handlePlayerReady}
           onError={handlePlayerError}

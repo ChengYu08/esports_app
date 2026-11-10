@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useEffect, useRef } from "react";
 import type { VideoPlayer } from "react-native-video";
 import { VideoPlayer as VideoPlayerClass } from "react-native-video";
 
@@ -215,3 +216,66 @@ export class CirclePlayerPool<Player extends PoolableVideoPlayer> {
 export const circlePlayerPool = new CirclePlayerPool<VideoPlayer>(
   (source) => new VideoPlayerClass(source),
 );
+
+type UsePooledCirclePlayerOptions = {
+  feedId: string;
+  /** 与 CircleVideoPost 对齐：videoUrl 可能为空，认领前需自行保证 inWindow 已过滤。 */
+  post: { id: string; videoUrl?: string };
+  /** 卡片是否在播放窗口内（active / preload / retain 之一）。 */
+  inWindow: boolean;
+  /** 是否预加载（下一页）。 */
+  preload: boolean;
+  /** 重试计数，变化时强制换源重载。 */
+  forceReload?: number;
+};
+
+type PooledPlayerBinding = {
+  slot: CirclePoolSlot | null;
+  player: VideoPlayer | null;
+};
+
+/**
+ * 卡片向全局播放器池认领播放器。slot 不走本地 state，而是从 store 的 holders 派生：
+ * 认领/释放更新 holders 后订阅方自动重渲染，避免 effect 内 setState 的级联渲染。
+ * feed 失焦或离开窗口时由 effect cleanup 释放认领。
+ */
+export function usePooledCirclePlayer(options: UsePooledCirclePlayerOptions): PooledPlayerBinding {
+  const { feedId, post, inWindow, preload, forceReload } = options;
+  const feedActive = useCirclePlayerPoolStore((state) => state.activeFeedId === feedId);
+  const slot = useCirclePlayerPoolStore((state) => {
+    const index = state.holders.findIndex(
+      (holder) => holder?.feedId === feedId && holder.postId === post.id,
+    );
+    return index >= 0 ? (index as CirclePoolSlot) : null;
+  });
+  const forceCount = forceReload ?? 0;
+  // force 只在计数增长的那一次生效，避免后续每次重认领都强制换源
+  const prevForceRef = useRef(0);
+
+  useEffect(() => {
+    const force = forceCount > prevForceRef.current;
+    prevForceRef.current = forceCount;
+    if (!inWindow || !feedActive) {
+      return;
+    }
+    const claimed = circlePlayerPool.claim(
+      feedId,
+      { id: post.id, videoUrl: post.videoUrl ?? "" },
+      { force },
+    );
+    return () => {
+      if (claimed !== null) {
+        circlePlayerPool.release(claimed, feedId, post.id);
+      }
+    };
+  }, [feedId, post.id, post.videoUrl, inWindow, feedActive, forceCount]);
+
+  useEffect(() => {
+    if (slot !== null && preload) {
+      circlePlayerPool.ensurePreload(slot);
+    }
+  }, [slot, preload]);
+
+  const player = slot !== null ? circlePlayerPool.getPlayer(slot) : null;
+  return { slot, player };
+}

@@ -1,14 +1,12 @@
 import { create } from "zustand";
 import { describe, expect, it, vi } from "vitest";
 
+import { CirclePlayerPool, type PoolableVideoPlayer } from "./circle-player-pool";
+
 // 生产单例顶层导入了 react-native-video 的 VideoPlayer 类，node 环境无法解析其平台产物，这里用桩替换
 vi.mock("react-native-video", () => ({
-  VideoPlayer: class MockVideoPlayer {
-    constructor(_source: unknown) {}
-  },
+  VideoPlayer: class MockVideoPlayer {},
 }));
-
-import { CirclePlayerPool, type PoolableVideoPlayer } from "./circle-player-pool";
 
 class FakePlayer implements PoolableVideoPlayer {
   loop = false;
