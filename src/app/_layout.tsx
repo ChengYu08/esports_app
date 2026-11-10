@@ -38,6 +38,7 @@ import { OrderNotifySyncHost } from "@/features/order/order-notify-sync";
 import { PushyUpdateHost } from "@/features/ota/PushyUpdateHost";
 import { PrivacyConsentGate } from "@/features/privacy/components/PrivacyConsentGate";
 import { readPrivacyConsent } from "@/features/privacy/privacy-consent";
+import ExpoAppToolkit from "../../modules/expo-app-toolkit";
 import { D_DIN_PRO_FONTS } from "@/shared/theme/typography";
 import { VoiceRoomKickListener } from "@/features/voice-room/components/VoiceRoomKickListener";
 import { VoiceRoomMiniPlayer } from "@/features/voice-room/components/VoiceRoomMiniPlayer";
@@ -203,6 +204,8 @@ export default function RootLayout() {
         if (active) setSessionReady(true);
         return;
       }
+      // 老版本用户仅在 JS 侧留有同意记录：补写原生标记并初始化推送 SDK（进程内幂等）
+      ExpoAppToolkit?.markPrivacyConsentAccepted();
       const session = await withStartupTimeout(readAuthSession(), null);
       if (!session) {
         if (active) setSessionReady(true);
