@@ -21,13 +21,21 @@ import {
   type ReactElement,
 } from "react";
 import {
-  Animated,
+  FlatList,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import Animated, {
+  Extrapolation,
+  interpolate,
+  runOnJS,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  type SharedValue,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -95,6 +103,32 @@ type ProfileListItem = { key: string; content: ReactElement };
 const profileKeyExtractor = (item: ProfileListItem) => item.key;
 const profileRenderItem = ({ item }: { item: ProfileListItem }) => item.content;
 
+// 阈值淡入淡出的 animated 样式：每个使用处独立一份（不共享同一 animated style 对象）。
+// inverse=true 用于列表内标签行：封面未布局时默认头部淡入值恒为 0，其反向值恒为 1。
+function useHeaderFade(
+  scrollY: SharedValue<number>,
+  coverHeight: number,
+  topInset: number,
+  inverse: boolean,
+) {
+  return useAnimatedStyle(
+    () => {
+      if (coverHeight === 0) {
+        return { opacity: inverse ? 1 : 0 };
+      }
+      const fadeStart = coverHeight - topInset - NAV_BAR_CONTENT_HEIGHT;
+      const progress = interpolate(
+        scrollY.value,
+        [fadeStart - 1, fadeStart],
+        [0, 1],
+        Extrapolation.CLAMP,
+      );
+      return { opacity: inverse ? 1 - progress : progress };
+    },
+    [coverHeight, inverse, scrollY, topInset],
+  );
+}
+
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const focused = useIsFocused();
@@ -116,38 +150,38 @@ export default function ProfileScreen() {
     [routeClubId, routeUserId],
   );
   const isMine = !routeParams || String(user?.id ?? "") === routeParams.userId;
+  // 订单/支付弹层的 token：正规 selector 订阅；JSX 里直接写 useAuthStore.getState() 会被 React Compiler
+  // 视为「hook 被当普通值引用」而放弃优化整个组件
+  const accessToken = useAuthStore((state) => state.accessToken);
   const [tab, setTab] = useState<ProfileTab>("技能");
   const [coverHeight, setCoverHeight] = useState(0);
   const [compactActive, setCompactActive] = useState(false);
-  const scrollY = useMemo(() => new Animated.Value(0), []);
+  const [navBgShown, setNavBgShown] = useState(false);
+  // 滚动偏移与「上次阈值翻转结果」放 UI 线程共享值：每帧只在工作线程比对，
+  // 仅跨越阈值时才回 JS 线程 setState 一次（原先每帧经原生驱动回调 JS listener）
+  const scrollY = useSharedValue(0);
+  const compactFlipped = useSharedValue(false);
   // 紧凑头部切换阈值：列表内标签行（两侧圆角的技能/评价栏）与固定标签行对齐时立刻切换。
-  // 用 1px 行程做原生驱动的阶跃淡入淡出，达到阈值即默认头部马上隐藏、紧凑头部马上出现，
-  // 不做渐变过渡（渐变会在两头部间产生同屏叠显）。封面未布局完成前恒为 0，防止闪现。
+  // 用 1px 行程做阶跃淡入淡出，达到阈值即默认头部马上隐藏、紧凑头部马上出现，
+  // 不做渐变过渡（渐变会在两头部间产生同屏叠显）。封面未布局完成前不淡入，防止闪现。
   const fadeStart = coverHeight - insets.top - NAV_BAR_CONTENT_HEIGHT;
-  const headerFade = useMemo(
-    () =>
-      coverHeight === 0
-        ? new Animated.Value(0)
-        : scrollY.interpolate({
-            inputRange: [fadeStart - 1, fadeStart],
-            outputRange: [0, 1],
-            extrapolate: "clamp",
-          }),
-    [scrollY, coverHeight, fadeStart],
-  );
-  // 滚动走原生驱动；JS 侧仅在跨越紧凑头部阈值时 setState 一次（同值自动豁免）。
-  const handleScroll = useMemo(
-    () =>
-      Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-        useNativeDriver: true,
-        listener: (event: {
-          nativeEvent: { contentOffset: { y: number } };
-        }) => {
-          const active = event.nativeEvent.contentOffset.y >= fadeStart;
-          setCompactActive((prev) => (prev === active ? prev : active));
-        },
-      }),
-    [scrollY, fadeStart],
+  const handleCompactFlip = useCallback((active: boolean) => {
+    setCompactActive(active);
+    // 导航栏封面副本懒挂载：首次翻过阈值才挂载，之后常驻避免来回挂卸
+    if (active) {
+      setNavBgShown(true);
+    }
+  }, []);
+  const handleScroll = useAnimatedScrollHandler(
+    (event) => {
+      scrollY.value = event.contentOffset.y;
+      const active = event.contentOffset.y >= fadeStart;
+      if (active !== compactFlipped.value) {
+        compactFlipped.value = active;
+        runOnJS(handleCompactFlip)(active);
+      }
+    },
+    [compactFlipped, fadeStart, handleCompactFlip, scrollY],
   );
   const [selectedGameId, setSelectedGameId] = useState("");
   const [orderCard, setOrderCard] = useState<ProfileSkillCard | null>(null);
@@ -199,6 +233,8 @@ export default function ProfileScreen() {
   );
   const gameDetailLoading = gameDetailQuery.isLoading;
   const gameDetailError = gameDetailQuery.isError;
+  // 切换游戏时的占位数据（keepPreviousData，内容还是上一个游戏的）：降透明度并禁用下单防误购
+  const gameDetailStale = gameDetailQuery.isPlaceholderData === true;
   const refetchGameDetail = gameDetailQuery.refetch;
   const reviewLoading = reviewQuery.isLoading;
   const reviewError = reviewQuery.isError;
@@ -284,16 +320,27 @@ export default function ProfileScreen() {
     const session = useAuthStore.getState();
     if (!session.accessToken || !session.user) return;
 
+    // try 块里不写可选链/逻辑表达式：React Compiler 当前是 Todo，会让整个组件跳过编译优化
+    const currentlyFollowed = followStateQuery.data?.followed ?? false;
     try {
       const state = await followMutation.mutateAsync({
         followUserId: String(detail.userId),
-        currentlyFollowed: followStateQuery.data?.followed ?? false,
+        currentlyFollowed,
         token: session.accessToken,
         viewerUserId: session.user.id,
       });
-      showToast(state.followed ? "关注成功" : "已取消关注");
+      // try/catch 块内不用三元/逻辑表达式，原因同上（React Compiler Todo）
+      if (state.followed) {
+        showToast("关注成功");
+      } else {
+        showToast("已取消关注");
+      }
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "操作失败");
+      if (error instanceof Error) {
+        showToast(error.message);
+      } else {
+        showToast("操作失败");
+      }
     }
   };
 
@@ -301,9 +348,11 @@ export default function ProfileScreen() {
     if (!requireLogin() || chatCheckPendingRef.current) return;
     chatCheckPendingRef.current = true;
 
+    // 不用 try/finally：React Compiler 当前不支持带 finally 的 try，会让整个组件跳过编译优化
     try {
       if (await isUserBlacklisted(profile.userId)) {
         showToast("该用户已在黑名单中，无法发起聊天");
+        chatCheckPendingRef.current = false;
         return;
       }
 
@@ -317,10 +366,10 @@ export default function ProfileScreen() {
           clubId: profile.clubId,
         }),
       });
-    } catch {
-      showToast("黑名单状态读取失败，请稍后重试");
-    } finally {
       chatCheckPendingRef.current = false;
+    } catch {
+      chatCheckPendingRef.current = false;
+      showToast("黑名单状态读取失败，请稍后重试");
     }
   };
 
@@ -376,177 +425,217 @@ export default function ProfileScreen() {
       openOrder(cards[0]);
     });
   }, [activeGameId, detail, gameDetail, gameDetailQuery.isError, openOrder, route.reorderGame, route.reorderLevel, route.reorderMode, route.reorderService]);
+  const navbarBgFadeStyle = useHeaderFade(scrollY, coverHeight, insets.top, false);
+  const compactIdentityFadeStyle = useHeaderFade(scrollY, coverHeight, insets.top, false);
+  const navTabsFadeStyle = useHeaderFade(scrollY, coverHeight, insets.top, false);
   // 默认头部中的标签栏:紧凑头部淡入时反向淡出
-  const tabsInverseFade = useMemo(
-    () =>
-      headerFade.interpolate({
-        inputRange: [0, 1],
-        outputRange: [1, 0],
-      }),
-    [headerFade],
+  const listTabsInverseFadeStyle = useHeaderFade(scrollY, coverHeight, insets.top, true);
+
+  // 列表项拆成独立 memo：item 对象引用跨无关 state 变化保持稳定，FlatList cell 才能整体 bail out。
+  // 旧写法一整个 useMemo，compactActive/playingVoiceUrl/blacklistStatus 任一变化都会整份重建所有 item。
+  const coverItem = useMemo<ProfileListItem>(
+    () => ({
+      key: "profile-cover",
+      content: (
+        <ProfileCover
+          topInset={insets.top}
+          profile={profile}
+          coverImageSource={coverImageSource}
+          isMine={isMine}
+          isBlacklisted={
+            !isMine &&
+            blacklistStatus.userId === String(profile.userId) &&
+            blacklistStatus.isBlacklisted
+          }
+          onSelectRelation={openProfileRelation}
+          onMeasure={measureCover}
+        />
+      ),
+    }),
+    [
+      insets.top,
+      profile,
+      coverImageSource,
+      isMine,
+      blacklistStatus,
+      openProfileRelation,
+      measureCover,
+    ],
   );
 
-  const profileListItems = useMemo<ProfileListItem[]>(() => {
-    const profileListItems: ProfileListItem[] = [
-      {
-        key: "profile-cover",
-        content: (
-          <ProfileCover
-            topInset={insets.top}
-            profile={profile}
-            coverImageSource={coverImageSource}
-            isMine={isMine}
-            isBlacklisted={
-              !isMine &&
-              blacklistStatus.userId === String(profile.userId) &&
-              blacklistStatus.isBlacklisted
-            }
-            onSelectRelation={openProfileRelation}
-            onMeasure={measureCover}
-          />
-        ),
-      },
-      {
-        key: "profile-tabs",
-        content: (
-          <View style={styles.tabsBackdrop}>
-            <Animated.View
-              pointerEvents={compactActive ? "none" : "box-none"}
-              style={[styles.tabsBar, { opacity: tabsInverseFade }]}
-            >
-              <ProfileTabs tab={tab} onSelect={setTab} />
-            </Animated.View>
-          </View>
-        ),
-      },
-    ];
+  const tabsItem = useMemo<ProfileListItem>(
+    () => ({
+      key: "profile-tabs",
+      content: (
+        <View style={styles.tabsBackdrop}>
+          <Animated.View
+            pointerEvents={compactActive ? "none" : "box-none"}
+            style={[styles.tabsBar, listTabsInverseFadeStyle]}
+          >
+            <ProfileTabs tab={tab} onSelect={setTab} />
+          </Animated.View>
+        </View>
+      ),
+    }),
+    [compactActive, listTabsInverseFadeStyle, tab],
+  );
 
-    // 游戏筛选栏仅服务技能 tab；评价 tab 拉取陪玩师全部评价，不按游戏分类
-    if (tab === "技能") {
-      if (games.length === 0) {
-        profileListItems.push({
+  const skillItems = useMemo<ProfileListItem[]>(() => {
+    if (games.length === 0) {
+      return [
+        {
           key: "games-empty",
           content: (
             <View style={styles.scrollBody}>
               <EmptyState message="暂无支持的游戏" />
             </View>
           ),
-        });
-      } else {
-        profileListItems.push({
-          key: "game-selector",
-          content: (
-            <View style={styles.scrollBody}>
-              <GameSelector
-                games={games}
-                selectedGameId={activeGameId}
-                onSelect={setSelectedGameId}
-              />
-            </View>
-          ),
-        });
+        },
+      ];
+    }
 
-        if (gameDetailLoading) {
-          profileListItems.push({
-            key: "skills-loading",
-            content: (
-              <View style={styles.scrollBody}>
-                <ProfileGameSkeleton />
-              </View>
-            ),
-          });
-        } else if (gameDetailError || !gameDetail) {
-          profileListItems.push({
-            key: "skills-error",
-            content: (
-              <View style={styles.scrollBody}>
-                <InlineState
-                  text="游戏技能加载失败"
-                  actionLabel="重试"
-                  onAction={() => void refetchGameDetail()}
-                />
-              </View>
-            ),
-          });
-        } else {
-          profileListItems.push(
-            {
-              key: "skills-summary",
-              content: (
-                <View style={styles.scrollBody}>
-                  <SkillsSummary
-                    detail={gameDetail}
-                    onToggleVoice={toggleVoice}
-                    playingUrl={playingVoiceUrl}
-                  />
-                </View>
-              ),
-            },
-            {
-              key: "services-title",
-              content: (
-                <View style={styles.scrollBody}>
-                  <Text style={[styles.sectionTitle, styles.serviceTitle]}>
-                    陪玩服务
-                  </Text>
-                </View>
-              ),
-            },
-          );
-
-          if (gameDetail.skillCards.length > 0) {
-            profileListItems.push(
-              ...gameDetail.skillCards.map((card, index) => ({
-                key: `service-${card.companionServiceId}-${card.gameLevelId}`,
-                content: (
-                  <View style={styles.scrollBody}>
-                    <ServiceCard
-                      card={card}
-                      first={index === 0}
-                      onOrder={openOrder}
-                    />
-                  </View>
-                ),
-              })),
-            );
-          } else {
-            profileListItems.push({
-              key: "services-empty",
-              content: (
-                <View style={styles.scrollBody}>
-                  <EmptyState message="暂无大神服务" />
-                </View>
-              ),
-            });
-          }
-        }
-      }
-    } else if (reviewLoading) {
-      profileListItems.push({
-        key: "reviews-loading",
+    const items: ProfileListItem[] = [
+      {
+        key: "game-selector",
         content: (
           <View style={styles.scrollBody}>
-            <ProfileGameSkeleton reviews />
+            <GameSelector
+              games={games}
+              selectedGameId={activeGameId}
+              onSelect={setSelectedGameId}
+            />
+          </View>
+        ),
+      },
+    ];
+
+    if (gameDetailLoading) {
+      items.push({
+        key: "skills-loading",
+        content: (
+          <View style={styles.scrollBody}>
+            <ProfileGameSkeleton />
           </View>
         ),
       });
-    } else if (reviewError) {
-      profileListItems.push({
-        key: "reviews-error",
+      return items;
+    }
+    if (gameDetailError || !gameDetail) {
+      items.push({
+        key: "skills-error",
         content: (
           <View style={styles.scrollBody}>
             <InlineState
-              text="评价加载失败"
+              text="游戏技能加载失败"
               actionLabel="重试"
-              onAction={() => void refetchReviews()}
+              onAction={() => void refetchGameDetail()}
             />
           </View>
         ),
       });
+      return items;
+    }
+
+    // 占位数据（上一个游戏）期间整体降透明度，让"内容与所选游戏不符"可感知
+    const dimStyle = gameDetailStale ? styles.bodyDimmed : null;
+    items.push(
+      {
+        key: "skills-summary",
+        content: (
+          <View style={[styles.scrollBody, dimStyle]}>
+            <SkillsSummary
+              detail={gameDetail}
+              onToggleVoice={toggleVoice}
+              playingUrl={playingVoiceUrl}
+            />
+          </View>
+        ),
+      },
+      {
+        key: "services-title",
+        content: (
+          <View style={[styles.scrollBody, dimStyle]}>
+            <Text style={[styles.sectionTitle, styles.serviceTitle]}>
+              陪玩服务
+            </Text>
+          </View>
+        ),
+      },
+    );
+
+    if (gameDetail.skillCards.length > 0) {
+      items.push(
+        ...gameDetail.skillCards.map((card, index) => ({
+          key: `service-${card.companionServiceId}-${card.gameLevelId}`,
+          content: (
+            <View style={[styles.scrollBody, dimStyle]}>
+              <ServiceCard
+                card={card}
+                first={index === 0}
+                orderDisabled={gameDetailStale}
+                onOrder={openOrder}
+              />
+            </View>
+          ),
+        })),
+      );
     } else {
-      const reviews = reviewItems ?? [];
-      if (reviews.length === 0) {
-        profileListItems.push({
+      items.push({
+        key: "services-empty",
+        content: (
+          <View style={[styles.scrollBody, dimStyle]}>
+            <EmptyState message="暂无大神服务" />
+          </View>
+        ),
+      });
+    }
+    return items;
+  }, [
+    games,
+    activeGameId,
+    gameDetailLoading,
+    gameDetailError,
+    gameDetail,
+    gameDetailStale,
+    refetchGameDetail,
+    toggleVoice,
+    playingVoiceUrl,
+    openOrder,
+  ]);
+
+  const reviewListItems = useMemo<ProfileListItem[]>(() => {
+    if (reviewLoading) {
+      return [
+        {
+          key: "reviews-loading",
+          content: (
+            <View style={styles.scrollBody}>
+              <ProfileGameSkeleton reviews />
+            </View>
+          ),
+        },
+      ];
+    }
+    if (reviewError) {
+      return [
+        {
+          key: "reviews-error",
+          content: (
+            <View style={styles.scrollBody}>
+              <InlineState
+                text="评价加载失败"
+                actionLabel="重试"
+                onAction={() => void refetchReviews()}
+              />
+            </View>
+          ),
+        },
+      ];
+    }
+    const reviews = reviewItems ?? [];
+    if (reviews.length === 0) {
+      return [
+        {
           key: "reviews-empty",
           content: (
             <View style={styles.scrollBody}>
@@ -556,43 +645,19 @@ export default function ProfileScreen() {
               />
             </View>
           ),
-        });
-      } else {
-        profileListItems.push(
-          ...reviews.map((review, index) => ({
-            key: `review-${review.id}-${index}`,
-            content: <ReviewCard review={review} />,
-          })),
-        );
-      }
+        },
+      ];
     }
+    return reviews.map((review, index) => ({
+      key: `review-${review.id}-${index}`,
+      content: <ReviewCard review={review} />,
+    }));
+  }, [reviewLoading, reviewError, reviewItems, refetchReviews]);
 
-    return profileListItems;
-  }, [
-    insets.top,
-    profile,
-    coverImageSource,
-    isMine,
-    blacklistStatus,
-    openProfileRelation,
-    measureCover,
-    compactActive,
-    tabsInverseFade,
-    tab,
-    games,
-    activeGameId,
-    gameDetailLoading,
-    gameDetailError,
-    refetchGameDetail,
-    gameDetail,
-    reviewLoading,
-    reviewError,
-    reviewItems,
-    refetchReviews,
-    toggleVoice,
-    playingVoiceUrl,
-    openOrder,
-  ]);
+  const profileListItems = useMemo<ProfileListItem[]>(
+    () => [coverItem, tabsItem, ...(tab === "技能" ? skillItems : reviewListItems)],
+    [coverItem, tabsItem, skillItems, reviewListItems, tab],
+  );
 
   if (routeParams && (detailQuery.isLoading || (!focused && !detail))) {
     return (
@@ -646,26 +711,28 @@ export default function ProfileScreen() {
             {
               height: insets.top + NAV_BAR_CONTENT_HEIGHT + 48,
               overflow: "hidden",
-              opacity: headerFade,
             },
+            navbarBgFadeStyle,
           ]}
         >
-          <Image
-            source={coverImageSource}
-            contentFit="cover"
-            contentPosition="top"
-            style={StyleSheet.absoluteFill}
-          />
+          {navBgShown ? (
+            <Image
+              source={coverImageSource}
+              contentFit="cover"
+              contentPosition="top"
+              style={StyleSheet.absoluteFill}
+            />
+          ) : null}
           <LinearGradient
             pointerEvents="none"
             style={styles.navbarBgOverlay}
-            colors={["#3B79BA00", "#3B79BA", "#3B79BA"]}
+            colors={["#3B79BA00", "#3B79BA55", "#3B79BA55"]}
             locations={[0, 0.6, 1]}
           />
           <LinearGradient
             pointerEvents="none"
             style={styles.navbarBgOverlay}
-            colors={["rgba(0,0,0,0.2)", "rgba(0,0,0,0.8)"]}
+            colors={["rgba(0,0,0,0.07)", "rgba(0,0,0,0.27)"]}
           />
         </Animated.View>
         <View style={styles.navbarCompactRow}>
@@ -679,7 +746,7 @@ export default function ProfileScreen() {
           </Pressable>
           <Animated.View
             pointerEvents="none"
-            style={[styles.compactIdentity, { opacity: headerFade }]}
+            style={[styles.compactIdentity, compactIdentityFadeStyle]}
           >
             <Image
               source={
@@ -707,7 +774,7 @@ export default function ProfileScreen() {
         </View>
         <Animated.View
           pointerEvents={compactActive ? "box-none" : "none"}
-          style={[styles.tabsBar, { opacity: headerFade }]}
+          style={[styles.tabsBar, navTabsFadeStyle]}
         >
           <ProfileTabs tab={tab} onSelect={setTab} />
         </Animated.View>
@@ -728,7 +795,6 @@ export default function ProfileScreen() {
           paddingBottom: 88 + insets.bottom,
         }}
       />
-
       <View
         style={[
           styles.actionBar,
@@ -833,7 +899,8 @@ export default function ProfileScreen() {
             });
         }}
       />
-      {orderCard && gameDetail ? (
+      {/* gameDetailStale 时 gameDetail 可能切到新游戏而 orderCard 还是旧游戏的，关门防混合上下文下单 */}
+      {orderCard && gameDetail && !gameDetailStale ? (
         <CompanionOrderSheet
           card={orderCard}
           profile={profile}
@@ -847,7 +914,7 @@ export default function ProfileScreen() {
             gameLevelName: orderCard.levelName,
             buyerUserId: Number(user?.id) || 0,
           }}
-          token={useAuthStore.getState().accessToken}
+          token={accessToken}
           initialServiceName={reorderActive ? route.reorderService : undefined}
           initialQuantity={reorderActive ? Number(route.reorderQuantity) : undefined}
           onClose={() => {
@@ -870,7 +937,7 @@ export default function ProfileScreen() {
         <StarPaymentSheet
           order={paymentOrder}
           visible={paymentSheetVisible}
-          token={useAuthStore.getState().accessToken}
+          token={accessToken}
           onClose={() => {
             const orderId = paymentOrder.orderId;
             setPaymentSheetVisible(false);
@@ -914,7 +981,6 @@ export default function ProfileScreen() {
       />
     </View>
   );
-
 }
 
 // 头部标签栏独立组件：滚动阈值切换等无关重渲染时保持元素引用稳定
@@ -980,6 +1046,7 @@ const ProfileCover = memo(function ProfileCover({
         <Image
           source={coverImageSource}
           contentFit="cover"
+          contentPosition="top"
           style={StyleSheet.absoluteFill}
         />
       </View>
@@ -1190,7 +1257,10 @@ function ProfileIdentity({
   );
 }
 
-function GameSelector({
+const profileGameKey = (game: ProfileGame) => String(game.gameId);
+
+/** 技能 tab 的游戏行：横向虚拟化，游戏数量增长后只渲染窗口内的标签 */
+const GameSelector = memo(function GameSelector({
   games,
   selectedGameId,
   onSelect,
@@ -1199,35 +1269,60 @@ function GameSelector({
   selectedGameId: string;
   onSelect: (gameId: string) => void;
 }) {
+  const renderItem = useCallback(
+    ({ item }: { item: ProfileGame }) => (
+      <ProfileGameTag
+        gameId={String(item.gameId)}
+        gameName={item.gameName}
+        iconUrl={item.iconUrl ?? null}
+        active={String(item.gameId) === selectedGameId}
+        onSelect={onSelect}
+      />
+    ),
+    [onSelect, selectedGameId],
+  );
   return (
-    <ScrollView
+    <FlatList
       horizontal
+      data={games}
+      keyExtractor={profileGameKey}
+      renderItem={renderItem}
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.gameTags}
-    >
-      {games.map((game) => {
-        const active = String(game.gameId) === selectedGameId;
-        return (
-          <Pressable
-            key={game.gameId}
-            onPress={() => onSelect(String(game.gameId))}
-            style={[styles.gameTag, active && styles.gameTagActive]}
-          >
-            {game.iconUrl ? (
-              <CachedImage
-                source={{ uri: game.iconUrl }}
-                style={styles.gameTagIcon}
-              />
-            ) : null}
-            <Text style={[styles.gameText, active && styles.gameTextActive]}>
-              {game.gameName}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </ScrollView>
+      initialNumToRender={8}
+      maxToRenderPerBatch={8}
+      windowSize={5}
+    />
   );
-}
+});
+
+const ProfileGameTag = memo(function ProfileGameTag({
+  gameId,
+  gameName,
+  iconUrl,
+  active,
+  onSelect,
+}: {
+  gameId: string;
+  gameName: string;
+  iconUrl: string | null;
+  active: boolean;
+  onSelect: (gameId: string) => void;
+}) {
+  return (
+    <Pressable
+      onPress={() => onSelect(gameId)}
+      style={[styles.gameTag, active && styles.gameTagActive]}
+    >
+      {iconUrl ? (
+        <CachedImage source={{ uri: iconUrl }} style={styles.gameTagIcon} />
+      ) : null}
+      <Text style={[styles.gameText, active && styles.gameTextActive]}>
+        {gameName}
+      </Text>
+    </Pressable>
+  );
+});
 
 function SkillsSummary({
   detail,
@@ -1283,7 +1378,6 @@ function ImageGallery({ images }: { images: string[] }) {
         >
           <CachedImage
             source={{ uri: image }}
-            cachePolicy="disk"
             contentFit="cover"
             style={StyleSheet.absoluteFill}
           />
@@ -1301,10 +1395,12 @@ function ImageGallery({ images }: { images: string[] }) {
 const ServiceCard = memo(function ServiceCard({
   card,
   first,
+  orderDisabled,
   onOrder,
 }: {
   card: ProfileSkillCard;
   first: boolean;
+  orderDisabled: boolean;
   onOrder: (card: ProfileSkillCard) => void;
 }) {
   return (
@@ -1323,7 +1419,11 @@ const ServiceCard = memo(function ServiceCard({
           ) : null}
         </View>
       </View>
-      <Pressable style={styles.orderButton} onPress={() => onOrder(card)}>
+      <Pressable
+        style={styles.orderButton}
+        disabled={orderDisabled}
+        onPress={() => onOrder(card)}
+      >
         <Text style={styles.orderText}>下单</Text>
       </Pressable>
     </View>
@@ -1387,7 +1487,6 @@ const ReviewCard = memo(function ReviewCard({
               >
                 <CachedImage
                   source={{ uri: image }}
-                  cachePolicy="disk"
                   contentFit="cover"
                   style={StyleSheet.absoluteFill}
                 />
@@ -1633,8 +1732,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    // 与默认封面同高(375),让遮罩在顶部条上的渐变进度与默认头部完全一致
-    height: 375,
+    bottom: 0,
   },
   compactIdentity: {
     flex: 1,
@@ -1826,6 +1924,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     backgroundColor: "#fff",
   },
+  // 切游戏占位数据期间的技能区降透明度
+  bodyDimmed: {
+    opacity: 0.45,
+  },
   editProfileButton: {
     flex: 1,
     height: 42,
@@ -1887,7 +1989,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FE1F4C",
   },
   // paddingBottom 1：部分 Android 屏幕密度下 32dp 取整后最后 1px 物理行落在
-  // 横向 ScrollView 裁剪区外，选中态的圆角边框底部会被裁掉，留 1px 余量兼容
+  // 横向滚动裁剪区外，选中态的圆角边框底部会被裁掉，留 1px 余量兼容
   gameTags: { flexDirection: "row", gap: 10, marginTop: 12, paddingRight: 16, paddingBottom: 1 },
   gameTag: {
     height: 32,

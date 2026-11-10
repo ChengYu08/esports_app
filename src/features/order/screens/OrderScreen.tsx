@@ -18,7 +18,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { grabQuickMatchAndEnterAudition } from "@/features/match/grab-quick-match-flow";
 import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
 import { useHomeGames } from "@/features/home/hooks/use-home-data";
-import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
+import { ListFallbackState, LoadingState } from "@/shared/ui/AsyncStates";
+import { useIsOffline } from "@/shared/hooks/use-is-offline";
 import { PaginationFooter } from "@/shared/ui/PaginationFooter";
 import { buildAfterSalePayload } from "../after-sale-card";
 import { OrderAfterSaleSheet } from "../components/OrderAfterSaleSheet";
@@ -83,6 +84,7 @@ export default function OrderScreen() {
     return icons;
   }, [games.data]);
   const insets = useSafeAreaInsets();
+  const offline = useIsOffline();
   const { scope: requestedScope } = useLocalSearchParams<{ scope?: string }>();
   const isCompanion = useAuthStore((state) => state.isCompanion);
   const { openCustomerService } = useCustomerServiceEntry();
@@ -532,15 +534,21 @@ export default function OrderScreen() {
     if (orders.isLoading) {
       return <LoadingState />;
     }
-    if (orders.isError) {
-      return <ErrorState onRetry={() => void refetchOrders()} />;
-    }
+    // 失败/无网络态用组件默认文案，仅空态用业务文案，避免误导
+    const kind =
+      orders.isError || (offline && orders.data === undefined)
+        ? offline
+          ? "offline"
+          : "loadFailed"
+        : "empty";
     return (
-      <View style={styles.empty}>
-        <EmptyState message={emptyMessage} />
-      </View>
+      <ListFallbackState
+        kind={kind}
+        message={kind === "empty" ? emptyMessage : undefined}
+        onRetry={() => void refetchOrders()}
+      />
     );
-  }, [orders.isLoading, orders.isError, refetchOrders, emptyMessage]);
+  }, [orders.isLoading, orders.isError, orders.data, offline, refetchOrders, emptyMessage]);
 
   return (
     <View style={styles.screen}>
@@ -573,6 +581,8 @@ export default function OrderScreen() {
               loading={orders.isFetchingNextPage}
               hasMore={orders.hasNextPage}
               pageCount={orders.data?.pages.length}
+              failed={orders.isFetchNextPageError}
+              onRetry={orders.fetchNextPage}
             />
           ) : null
         }
@@ -788,10 +798,4 @@ const styles = StyleSheet.create({
   stickyHeader: { backgroundColor: "#FFFFFF" },
   content: { flexGrow: 1, paddingTop: 8 },
   separator: { height: 8 },
-  empty: {
-    flex: 1,
-    minHeight: 320,
-    alignItems: "center",
-    justifyContent: "center",
-  },
 });

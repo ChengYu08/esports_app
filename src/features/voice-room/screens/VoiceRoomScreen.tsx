@@ -7,7 +7,7 @@ import {
 } from "@/features/match/api/match.types";
 import { useQuickMatchEndSignals } from "@/features/match/quick-match-end-signals";
 import { ClubQuickMatchSheet } from "@/features/match/components/ClubQuickMatchSheet";
-import { clientAuthApi } from "@/features/auth/client-auth.api";
+import { useUserProfileStore } from "@/features/auth/user-profile-store";
 import { messageStore } from "@/features/message/message-store";
 import { useAuthStore } from "@esports/auth";
 import {
@@ -55,7 +55,10 @@ import {
   shouldSkipMemberChangeNotice,
   type MemberChangeAction,
 } from "../member-change-notice";
-import { inviteMember, normalizeMembers } from "../member-normalize";
+import {
+  applyChatRoomMemberActions,
+  normalizeMembers,
+} from "../member-normalize";
 import { useCustomerServiceCall } from "../use-customer-service-call";
 import { useSelectCompanionGrabCount } from "../use-select-companion-grab-count";
 import { useVoiceRoomMessages } from "../use-voice-room-messages";
@@ -368,7 +371,7 @@ export default function VoiceRoomScreen() {
     setMicState,
     setRtcReadyRoomId,
     speakingUserIds,
-    hydrateMemberProfile,
+    hydrateMemberProfiles,
     roomRef,
   } = useVoiceRoomRtc({
     roomId,
@@ -406,7 +409,7 @@ export default function VoiceRoomScreen() {
     currentUser,
     roomRef,
     kickedRef,
-    hydrateMemberProfile,
+    hydrateMemberProfiles,
     setMembers,
   });
 
@@ -824,7 +827,7 @@ export default function VoiceRoomScreen() {
                     {
                       id: "activity-match-tip",
                       kind: "notice" as const,
-                      text: "点击下方「选择陪玩」按钮查看抢单大神，勾选大神下单",
+                      text: "点击下方「匹配中」按钮查看抢单大神，勾选大神下单",
                       sentAt: Date.now(),
                     },
                   ].slice(-80),
@@ -878,7 +881,7 @@ export default function VoiceRoomScreen() {
       actions.forEach((action) => {
         const userId = action.userId == null ? "" : String(action.userId);
         if (action.actionType === 1) {
-          hydrateMemberProfile(userId, accessToken || "");
+          hydrateMemberProfiles([userId], accessToken || "");
           // 呼叫接待期间成员加入 → 反查是否为接单接待
           if (serviceCalling) void refreshServiceUserId(userId);
         }
@@ -925,51 +928,37 @@ export default function VoiceRoomScreen() {
       if (tips.length > 0) {
         setMessages((items) => [...items, ...tips].slice(-80));
       }
-      for (const tip of placeholderTips) {
-        if (!accessToken) continue;
-        void clientAuthApi
-          .getUserProfile(accessToken, tip.userId)
-          .then((profile) => {
-            if (!profile.nickname) return;
-            setMessages((items) =>
-              items.map((item) =>
-                item.id === tip.messageId
-                  ? { ...item, nickname: profile.nickname }
-                  : item,
-              ),
+      if (placeholderTips.length > 0 && accessToken) {
+        // 占位昵称统一走全局资料缓存批量补全，避免逐条 N+1 直查
+        const userIds = Array.from(new Set(placeholderTips.map((tip) => tip.userId)));
+        void useUserProfileStore
+          .getState()
+          .hydrateProfiles(userIds, accessToken)
+          .then((profiles) => {
+            if (profiles.length === 0) return;
+            const nicknameById = new Map(
+              profiles
+                .filter((profile) => profile.nickname)
+                .map((profile) => [profile.id, profile.nickname]),
             );
-          })
-          .catch(() => undefined);
+            if (nicknameById.size === 0) return;
+            setMessages((items) =>
+              items.map((item) => {
+                const tip = placeholderTips.find((entry) => entry.messageId === item.id);
+                if (!tip) return item;
+                const nickname = nicknameById.get(tip.userId);
+                return nickname ? { ...item, nickname } : item;
+              }),
+            );
+          });
       }
 
       setMembers((items) =>
-        actions.reduce<VoiceRoomMember[]>((next, action) => {
-          const userId = action.userId == null ? "" : String(action.userId);
-          if (!userId || userId === "invite" || userId === currentUser?.id)
-            return next;
-          if (action.actionType === 2)
-            return next.filter((member) => member.userId !== userId);
-          if (
-            action.actionType === 1 &&
-            !next.some((member) => member.userId === userId)
-          ) {
-            return [
-              ...next.filter((member) => member.userId !== "invite"),
-              {
-                userId,
-                nickname: `用户${userId}`,
-                role:
-                  String(room?.creatorUserId ?? "") === userId
-                    ? ("owner" as const)
-                    : String(room?.serviceUserId ?? "") === userId
-                      ? ("service" as const)
-                      : ("guest" as const),
-              },
-              inviteMember,
-            ].slice(0, 8);
-          }
-          return next;
-        }, items),
+        applyChatRoomMemberActions(items, actions, {
+          selfId: currentUser?.id,
+          creatorUserId: room?.creatorUserId,
+          serviceUserId: room?.serviceUserId,
+        }),
       );
     });
     return () => {
@@ -980,7 +969,7 @@ export default function VoiceRoomScreen() {
     accessToken,
     chatroomId,
     currentUser,
-    hydrateMemberProfile,
+    hydrateMemberProfiles,
     invitedRoomVersion,
     refreshServiceUserId,
     room?.creatorUserId,
@@ -1379,7 +1368,7 @@ export default function VoiceRoomScreen() {
         /** 活动需求进行中：MemberSheet「主页」入口替换为提示文案，下单统一走「选择陪玩」选人页 */
         orderEntryBlockedText={
           activityRequest
-            ? "活动需求进行中，请点击「选择陪玩」按钮选人下单"
+            ? "活动需求进行中，请点击「匹配中」按钮选人下单"
             : undefined
         }
         onClose={() => setMemberSheetVisible(false)}

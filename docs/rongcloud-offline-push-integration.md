@@ -14,7 +14,7 @@
 |---|---|
 | RN 引擎创建传 `pushOptions` | ✅ 已配置 |
 | Android 厂商 Push 插件依赖 | ✅ 已注入（`plugins/withRongCloudPush.js`） |
-| Android `RongPushPlugin.init()` | ✅ 已注入（`plugins/withRongCloudAndroidInit.js`） |
+| Android `RongPushPlugin.init()` | ✅ 已注入（`plugins/withRongCloudAndroidInit.js`），**隐私政策同意后才初始化** |
 | iOS `setDeviceToken` 调用 | ✅ 已在原生层调用（`plugins/withRongCloudIosPush.js`） |
 | iOS `aps-environment` entitlement | ✅ 已注入（development / production 自动切换） |
 | `POST_NOTIFICATIONS` 权限（Android 13+） | ✅ 已声明 + JS 层运行时请求 |
@@ -197,17 +197,24 @@ MEIZU_APPKEY=xxxxxxxx
 
 #### 步骤 5：`MainApplication.kt` 初始化 RongPushPlugin
 
-在 `plugins/withRongCloudPush.js` 中新建一个 `withMainApplication` 修改，在 `loadReactNative(this)` **之前**插入：
+隐私合规要求：第三方 SDK 不得在用户同意隐私政策前初始化。`plugins/withRongCloudAndroidInit.js` 在 `loadReactNative(this)` **之前**只注册初始化动作，同意后才真正 init（`RongPushHook` / `PrivacyConsentState` 位于 `modules/expo-app-toolkit`）：
 
 ```kotlin
-import cn.rongcloud.push.RongPushPlugin
+import io.rong.push.RongPushPlugin
+import expo.modules.app.toolkit.PrivacyConsentState
+import expo.modules.app.toolkit.RongPushHook
 
 override fun onCreate() {
     super.onCreate()
-    RongPushPlugin.init(this)  // ← 必须早于 IM SDK init（即 JS 层 create() 调用）
+    RongPushHook.initializer = { RongPushPlugin.init(this) }
+    if (PrivacyConsentState.isAccepted(this)) {
+        RongPushHook.tryInit()
+    }
     // ...原有代码
 }
 ```
+
+首次安装时由 JS 在弹窗「同意」后调用 `ExpoAppToolkit.markPrivacyConsentAccepted()` 触发初始化（须早于 IM SDK `create()`，此时尚未登录，满足时序）；已同意过的用户冷启动时由 `onCreate` 直接初始化。
 
 #### 步骤 6：`AndroidManifest.xml` 加权限
 

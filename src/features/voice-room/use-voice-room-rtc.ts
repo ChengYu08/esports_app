@@ -1,6 +1,6 @@
-import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
+import { useUserProfileStore, type CachedUserProfile } from "@/features/auth/user-profile-store";
 import { showToast } from "@/shared/ui/app-toast";
 
 import { promptSelfRealNameIfNeeded } from "./ensure-real-name-before-enter";
@@ -10,13 +10,19 @@ import {
   resolveMemberChangeNickname,
   shouldSkipMemberChangeNotice,
 } from "./member-change-notice";
-import { inviteMember, normalizeMembers } from "./member-normalize";
+import {
+  applyChatRoomMemberActions,
+  inviteMember,
+  normalizeMembers,
+  reconcileMembers,
+} from "./member-normalize";
 import type { ActiveVoiceRoom } from "./voice-room-session";
 import { useVoiceRoomSessionStore } from "./voice-room-session";
 import {
   getVoiceChatHistory,
   joinVoiceChatRoom,
   leaveVoiceChatRoom,
+  subscribeVoiceChatMembers,
 } from "./voice-room-rongcloud";
 import {
   clearVoiceRtcCallbacks,
@@ -32,8 +38,21 @@ import type {
   VoiceRoomMessage,
 } from "./voice-room.types";
 
-export interface UseVoiceRoomRtcOptions {
-  roomId: string | undefined;
+const mergeMemberProfiles = (items: VoiceRoomMember[], profiles: CachedUserProfile[]) => {
+  if (profiles.length === 0) return items;
+  const byId = new Map(profiles.map((profile) => [profile.id, profile]));
+  return items.map((member) => {
+    const profile = byId.get(member.userId);
+    if (!profile) return member;
+    return {
+      ...member,
+      nickname: profile.nickname || member.nickname,
+      avatar: profile.headImage || member.avatar,
+    };
+  });
+};
+
+export interface UseVoiceRoomRtcOptions {  roomId: string | undefined;
   accessToken: string | null;
   currentUser: { id: string; nickname?: string; headImage?: string } | null;
   room: VoiceRoomDetail | null;
@@ -85,39 +104,30 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
   const [error, setError] = useState<string | null>(() =>
     !roomId ? "语聊房不存在" : !accessToken ? "请先登录后进入语聊房" : null,
   );
-  const profileRequests = useRef(new Set<string>());
   const roomRef = useRef(room);
   useEffect(() => {
     roomRef.current = room;
   }, [room]);
 
-  const hydrateMemberProfile = useCallback(
-    (userId: string, token: string) => {
-      if (
-        !userId ||
-        !token ||
-        userId === currentUser?.id ||
-        profileRequests.current.has(userId)
-      )
-        return;
-      profileRequests.current.add(userId);
-      void clientAuthApi
-        .getUserProfile(token, userId)
-        .then((profile) => {
-          setMembers((items) =>
-            items.map((member) =>
-              member.userId === userId
-                ? {
-                    ...member,
-                    nickname: profile.nickname || member.nickname,
-                    avatar: profile.headImage || member.avatar,
-                  }
-                : member,
-            ),
-          );
-        })
-        .catch(() => undefined)
-        .finally(() => profileRequests.current.delete(userId));
+  const hydrateMemberProfiles = useCallback(
+    (userIds: string[], token: string) => {
+      if (!token) return;
+      const ids = userIds.filter((id) => id && id !== currentUser?.id);
+      if (ids.length === 0) return;
+      // 已缓存条目立即合并（消首帧占位闪烁），缺失部分走批量接口后合并
+      const { cached, missing } = useUserProfileStore.getState().splitByCache(ids);
+      if (cached.length > 0) {
+        setMembers((items) => mergeMemberProfiles(items, cached));
+      }
+      if (missing.length === 0) return;
+      void useUserProfileStore
+        .getState()
+        .hydrateProfiles(missing, token)
+        .then((fetched) => {
+          if (fetched.length > 0) {
+            setMembers((items) => mergeMemberProfiles(items, fetched));
+          }
+        });
     },
     [currentUser?.id, setMembers],
   );
@@ -145,11 +155,68 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
           ...items.filter((member) => member.userId !== "invite"),
           newMember,
           inviteMember,
-        ].slice(0, 8);
+        ];
       });
-      hydrateMemberProfile(userId, accessToken || "");
+      hydrateMemberProfiles([userId], accessToken || "");
     },
-    [accessToken, currentUser?.id, hydrateMemberProfile, setMembers],
+    [accessToken, currentUser?.id, hydrateMemberProfiles, setMembers],
+  );
+
+  // 对齐 PC（onImRoomReady → getChatRoomInfo 全量快照）：进房 detail 不含成员，
+  // join 期间加入/离开的成员既不在名单里也收不到事件（聊天室事件不存离线）。
+  // RC join 确认后拉取专用成员快照端点校准，并记录请求窗口内到达的成员事件、
+  // 合并后重放，防止权威覆盖把窗口内的变更脉冲冲掉。
+  const reconcileMembersAfterJoin = useCallback(
+    (rongChatroomId: string) => {
+      if (!roomId || !accessToken || kickedRef.current) return;
+      const roomVersion = roomRef.current?.roomVersion;
+      if (roomVersion == null) return;
+      const snapshotActions: { userId?: string; actionType?: number }[] = [];
+      const stopCapture = subscribeVoiceChatMembers((targetId, actions) => {
+        if (targetId === rongChatroomId) snapshotActions.push(...actions);
+      });
+      void (async () => {
+        try {
+          const snapshot = await voiceRoomApi.getRoomMembers(roomId, roomVersion, accessToken);
+          if (kickedRef.current) return;
+          // 请求期间房间已重建：名单归属新实例，不能用新实例成员覆盖当前聊天室视图
+          if (String(roomRef.current?.roomVersion ?? "") !== String(roomVersion)) {
+            return;
+          }
+          const room = roomRef.current;
+          const selfId = currentUser?.id ? String(currentUser.id) : "";
+          setMembers((items) =>
+            applyChatRoomMemberActions(
+              reconcileMembers(
+                items,
+                {
+                  roomVersion: snapshot.roomVersion,
+                  creatorUserId: room?.creatorUserId,
+                  serviceUserId: room?.serviceUserId,
+                  members: snapshot.members,
+                },
+                currentUser ?? undefined,
+              ),
+              snapshotActions,
+              {
+                selfId,
+                creatorUserId: room?.creatorUserId,
+                serviceUserId: room?.serviceUserId,
+              },
+            ),
+          );
+          const memberIds = snapshot.members
+            .map((member) => (member.userId == null ? "" : String(member.userId)))
+            .filter((userId) => userId && userId !== selfId);
+          hydrateMemberProfiles(memberIds, accessToken);
+        } catch (cause) {
+          console.warn("[voice-room] post-join member reconcile failed", cause);
+        } finally {
+          stopCapture();
+        }
+      })();
+    },
+    [accessToken, currentUser, hydrateMemberProfiles, kickedRef, roomId, setMembers],
   );
 
   useEffect(() => () => clearVoiceRtcCallbacks(), []);
@@ -252,11 +319,13 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
           currentUser || undefined,
         );
         setMembers(preparedMembers);
-        preparedMembers.forEach((member) =>
-          hydrateMemberProfile(member.userId, accessToken),
+        hydrateMemberProfiles(
+          preparedMembers.map((member) => member.userId),
+          accessToken,
         );
         await joinVoiceChatRoom(accessToken, prepared.rongChatroomId);
         if (!isCurrentJoin()) { await cleanupCancelledJoin(); return; }
+        void reconcileMembersAfterJoin(prepared.rongChatroomId);
         if (currentUser?.id) {
           const selfId = String(currentUser.id);
           const noticeKey = memberChangeNoticeKey(
@@ -442,9 +511,10 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
     accessToken,
     currentUser,
     ensureRtcMember,
-    hydrateMemberProfile,
+    hydrateMemberProfiles,
     invitedRoomVersion,
     kickedRef,
+    reconcileMembersAfterJoin,
     roomId,
     setMembers,
     setMessages,
@@ -463,7 +533,7 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
     setMicState,
     setRtcReadyRoomId,
     speakingUserIds,
-    hydrateMemberProfile,
+    hydrateMemberProfiles,
     roomRef,
   };
 }

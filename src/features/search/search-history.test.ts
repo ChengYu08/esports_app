@@ -63,16 +63,28 @@ describe("search history", () => {
     expect(getSearchHistoryEntry(user.nickname, [user, other], String(other.userId)).avatarUrl).toBe(other.headImage);
   });
 
-  it("keeps clubs and companions with the same ID or keyword in their own categories", () => {
+  it("keeps clubs and companions with the same ID in their own categories", () => {
     const clubEntry: SearchHistoryEntry = { keyword: "同名", entityId: "123", category: "club", avatarUrl: club.coverUrl };
     const userEntry: SearchHistoryEntry = { keyword: "同名", entityId: "123", category: "user", avatarUrl: user.headImage };
     const history = addSearchHistoryEntry([clubEntry], userEntry);
     expect(parseSearchHistory(JSON.stringify(history))).toEqual([userEntry, clubEntry]);
     const revisited = addSearchHistoryEntry(history, clubEntry);
     expect(revisited).toEqual([clubEntry, userEntry]);
+  });
 
-    const keywords = addSearchHistoryEntry([{ keyword: "成都", category: "club" }], { keyword: "成都", category: "user" });
-    expect(keywords).toHaveLength(2);
+  it("records a broad keyword once across categories", () => {
+    const first = addSearchHistoryEntry([], { keyword: "1", category: "club" });
+    const second = addSearchHistoryEntry(first, { keyword: "1", category: "user" });
+    expect(second).toEqual([{ keyword: "1", category: "user" }]);
+
+    const stored = JSON.stringify([
+      { keyword: "1", category: "user" },
+      { keyword: "1", category: "club" },
+    ]);
+    expect(parseSearchHistory(stored)).toEqual([{ keyword: "1", category: "user" }]);
+    expect(mergeLegacySearchHistory(JSON.stringify(["1"]), JSON.stringify(["1"]))).toEqual([
+      { keyword: "1", category: "club" },
+    ]);
   });
 
   it("migrates both legacy lists with category information even when a list is full", () => {

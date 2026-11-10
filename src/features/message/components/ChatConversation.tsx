@@ -4,6 +4,7 @@ import {
   ChevronRight16Regular,
   HeadphonesRegular,
 } from "@fluentui/react-native-icons";
+import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -29,6 +30,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EmojiKeyboard, type EmojiType } from "rn-emoji-keyboard";
+import { colors } from "@/shared/theme/tokens";
 
 import type { AfterSaleCardPayload } from "@/features/order/after-sale-card";
 import { afterSaleCardRows } from "@/features/order/after-sale-card";
@@ -60,6 +62,11 @@ import {
 
 // 聊天单次发送图片数量上限（相册多选防刷屏）
 const CHAT_IMAGE_MAX = 10;
+// 长按文案消息弹出的操作菜单：尺寸、与气泡的间距、指向气泡的箭头宽度（三角形高取一半）
+const COPY_MENU_WIDTH = 108;
+const COPY_MENU_HEIGHT = 44;
+const COPY_MENU_GAP = 8;
+const COPY_MENU_ARROW = 12;
 /** 输入框行高与最大行数：默认 44（单行 22 + 上下内边距 11），超过 4 行内部滚动 */
 const COMPOSER_LINE_HEIGHT = 22;
 const COMPOSER_MAX_CONTENT_HEIGHT = COMPOSER_LINE_HEIGHT * 4;
@@ -157,6 +164,7 @@ export function ChatConversation({
   const insets = useSafeAreaInsets();
   const accessToken = useAuthStore((state) => state.accessToken);
   const userId = useAuthStore((state) => state.user?.id);
+  const myClubId = useAuthStore((state) => state.user?.clubInfo?.id);
   const myAvatarUrl = useAuthStore((state) => state.user?.headImage);
   const myNickname = useAuthStore((state) => state.user?.nickname);
   const [afterSaleSending, setAfterSaleSending] = useState(false);
@@ -416,6 +424,21 @@ export function ChatConversation({
     isSheet,
     navigateWithSheetDismiss,
   ]);
+  // 右侧自己头像：进入自己的主页，参数与「我的」页 openHomepage 一致
+  const openMyProfile = useCallback(() => {
+    if (!userId) {
+      return;
+    }
+    navigateWithSheetDismiss(() => {
+      router.push({
+        pathname: "/profile" as const,
+        params: {
+          ...(myClubId ? { clubId: String(myClubId) } : {}),
+          userId: String(userId),
+        },
+      });
+    });
+  }, [myClubId, navigateWithSheetDismiss, userId]);
   const renderChatRow = useCallback(
     ({ item }: { item: ChatListRow }) =>
       item.kind === "time" ? (
@@ -437,6 +460,7 @@ export function ChatConversation({
           }}
           onRetry={handleRetryMessage}
           onOpenProfile={canViewProfile ? openProfile : undefined}
+          onOpenMyProfile={openMyProfile}
           onOpenOrder={isOrderAssistant ? openOrderDetail : undefined}
           onPreviewImage={openImagePreview}
         />
@@ -451,6 +475,7 @@ export function ChatConversation({
       myNickname,
       navigateWithSheetDismiss,
       openImagePreview,
+      openMyProfile,
       openOrderDetail,
       openProfile,
       title,
@@ -677,6 +702,9 @@ export function ChatConversation({
         }
         renderItem={renderChatRow}
         showsVerticalScrollIndicator={false}
+        // 键盘弹起时若保持默认 never，列表会在捕获阶段吞掉触摸（只用来收键盘），
+        // 气泡的长按/点击都收不到；handled 让子级处理后不再收键盘
+        keyboardShouldPersistTaps="handled"
         // 聊天行大多带图，收窄挂载窗口可减少同时挂载、同时解码的图片数量
         initialNumToRender={8}
         maxToRenderPerBatch={6}
@@ -1206,6 +1234,7 @@ const ChatBubble = memo(function ChatBubble({
   onEnterRoomInvite,
   onRetry,
   onOpenProfile,
+  onOpenMyProfile,
   onOpenOrder,
   onPreviewImage,
 }: {
@@ -1217,10 +1246,46 @@ const ChatBubble = memo(function ChatBubble({
   onEnterRoomInvite: (roomId: string, roomVersion: string) => void;
   onRetry: (clientId: string) => void;
   onOpenProfile?: () => void;
+  onOpenMyProfile?: () => void;
   onOpenOrder?: (orderId: string) => void;
   onPreviewImage: (message: ManagedMessage) => void;
 }) {
   const { width: windowWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const bubbleRef = useRef<View | null>(null);
+  // 长按文案消息后菜单锚定的气泡位置（窗口坐标），菜单要挂在气泡正上方
+  const [copyMenuAnchor, setCopyMenuAnchor] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const copyableText = item.kind === "text" ? item.text : "";
+  const copyMessageText = useCallback(() => {
+    setCopyMenuAnchor(null);
+    Clipboard.setStringAsync(copyableText).then(
+      () => showToast("已复制"),
+      () => showToast("复制失败，请重试"),
+    );
+  }, [copyableText]);
+  const openCopyMenu = useCallback(() => {
+    const measure = () => {
+      bubbleRef.current?.measureInWindow((x, y, width, height) => {
+        setCopyMenuAnchor({ x, y, width, height });
+      });
+    };
+    if (!Keyboard.isVisible()) {
+      measure();
+      return;
+    }
+    // 菜单 Modal 的 Dialog 会抢走输入框焦点让键盘自动收起，窗口高度恢复后旧坐标失效，
+    // 菜单会飘到错误位置；先主动收键盘，等布局恢复再按气泡新位置挂菜单
+    const subscription = Keyboard.addListener("keyboardDidHide", () => {
+      subscription.remove();
+      requestAnimationFrame(measure);
+    });
+    Keyboard.dismiss();
+  }, []);
   const knownRatio = item.kind === "image" ? item.imageAspectRatio : undefined;
   const [loadedRatio, setLoadedRatio] = useState<number | null>(null);
   // 消息自带宽高比优先用于首帧，避免先按 1:1 排版、解码后再回弹（每张图多一次布局和一次解码）
@@ -1239,6 +1304,47 @@ const ChatBubble = memo(function ChatBubble({
   const bubbleImageUri = item.kind === "image"
     ? (isGifMessage ? item.imageUrl : (isThumbnailSharpEnough ? item.thumbnailUri! : item.imageUrl))
     : "";
+  // 大图/GIF 下载解码完成前显示同尺寸灰底转圈占位，避免空白直接跳变成图；
+  // 图片地址变化时在渲染期重置加载态（React 官方推荐写法，避免 effect 内 setState）
+  const [imageLoading, setImageLoading] = useState(true);
+  const [loadedUri, setLoadedUri] = useState(bubbleImageUri);
+  if (loadedUri !== bubbleImageUri) {
+    setLoadedUri(bubbleImageUri);
+    setImageLoading(true);
+  }
+
+  // 菜单挂在气泡正上方并留出箭头和间距，水平居中对齐气泡；顶部放不下就翻到气泡下方
+  const copyMenuLeft = copyMenuAnchor
+    ? Math.min(
+        Math.max(
+          copyMenuAnchor.x + copyMenuAnchor.width / 2 - COPY_MENU_WIDTH / 2,
+          12,
+        ),
+        windowWidth - COPY_MENU_WIDTH - 12,
+      )
+    : 0;
+  const copyMenuAbove = copyMenuAnchor
+    ? copyMenuAnchor.y - COPY_MENU_HEIGHT - COPY_MENU_ARROW / 2 - COPY_MENU_GAP
+      >= insets.top + 8
+    : true;
+  const copyMenuTop = copyMenuAnchor
+    ? copyMenuAbove
+      ? copyMenuAnchor.y - COPY_MENU_HEIGHT - COPY_MENU_ARROW / 2 - COPY_MENU_GAP
+      : copyMenuAnchor.y + copyMenuAnchor.height + COPY_MENU_ARROW / 2 + COPY_MENU_GAP
+    : 0;
+  // 箭头对准气泡中心，同时夹在菜单圆角内侧，避免压到边角
+  const copyMenuArrowLeft = copyMenuAnchor
+    ? Math.min(
+        Math.max(
+          copyMenuAnchor.x + copyMenuAnchor.width / 2 - copyMenuLeft - COPY_MENU_ARROW / 2,
+          14,
+        ),
+        COPY_MENU_WIDTH - COPY_MENU_ARROW - 14,
+      )
+    : 0;
+  const copyMenuArrowTop = copyMenuAbove
+    ? copyMenuTop + COPY_MENU_HEIGHT
+    : copyMenuTop - COPY_MENU_ARROW / 2;
 
   return (
     <View
@@ -1266,6 +1372,7 @@ const ChatBubble = memo(function ChatBubble({
         </Pressable>
       )}
       <View
+        ref={bubbleRef}
         style={[
           styles.bubble,
           item.isMine ? styles.mineBubble : styles.theirBubble,
@@ -1291,6 +1398,7 @@ const ChatBubble = memo(function ChatBubble({
                 styles.messageImage,
                 { width: imageWidth, height: imageHeight },
               ]}
+              transition={120}
               onLoad={({ source }) => {
                 if (source.width <= 0 || source.height <= 0) {
                   return;
@@ -1302,7 +1410,13 @@ const ChatBubble = memo(function ChatBubble({
                 }
                 setLoadedRatio(next);
               }}
+              onLoadEnd={() => setImageLoading(false)}
             />
+            {imageLoading ? (
+              <View pointerEvents="none" style={[styles.imageLoadingPlaceholder, { width: imageWidth, height: imageHeight }]}>
+                <ActivityIndicator size="small" color={colors.textMuted} />
+              </View>
+            ) : null}
           </Pressable>
         ) : item.kind === "roomInvite" ? (
           <Pressable
@@ -1365,15 +1479,32 @@ const ChatBubble = memo(function ChatBubble({
         ) : item.kind === "markdown" ? (
           <MarkdownMessage content={item.text} />
         ) : (
-          <Text style={styles.bubbleText}>{item.text}</Text>
+          // 文案消息长按弹操作菜单（复制）；热区铺满整个气泡（用负外边距抵消内边距），
+          // 短按不响应，避免误触挡住列表滚动
+          <Pressable
+            accessibilityHint="长按弹出消息菜单"
+            delayLongPress={350}
+            onLongPress={openCopyMenu}
+            style={styles.bubbleTextPressable}
+          >
+            <Text style={styles.bubbleText}>{item.text}</Text>
+          </Pressable>
         )}
       </View>
       {item.isMine && (
-        <CachedImage
-          contentFit="cover"
-          source={myAvatar}
-          style={styles.messageAvatar}
-        />
+        <Pressable
+          accessibilityLabel="查看我的主页"
+          accessibilityRole="button"
+          disabled={!onOpenMyProfile}
+          hitSlop={6}
+          onPress={onOpenMyProfile}
+        >
+          <CachedImage
+            contentFit="cover"
+            source={myAvatar}
+            style={styles.messageAvatar}
+          />
+        </Pressable>
       )}
       {item.status === "failed" ? (
         <Pressable
@@ -1382,6 +1513,49 @@ const ChatBubble = memo(function ChatBubble({
         >
           <Text style={styles.retryLabel}>重试</Text>
         </Pressable>
+      ) : null}
+      {copyMenuAnchor ? (
+        <Modal
+          animationType="fade"
+          transparent
+          visible
+          onRequestClose={() => setCopyMenuAnchor(null)}
+        >
+          <View style={styles.copyMenuLayer}>
+            <Pressable
+              accessibilityLabel="关闭消息菜单"
+              onPress={() => setCopyMenuAnchor(null)}
+              style={StyleSheet.absoluteFill}
+            />
+            <View
+              style={[
+                styles.copyMenu,
+                {
+                  left: copyMenuLeft,
+                  top: copyMenuTop,
+                  width: COPY_MENU_WIDTH,
+                  height: COPY_MENU_HEIGHT,
+                },
+              ]}
+            >
+              <Pressable
+                accessibilityLabel="复制消息内容"
+                accessibilityRole="button"
+                onPress={copyMessageText}
+                style={styles.copyMenuItem}
+              >
+                <Text style={styles.copyMenuText}>复制</Text>
+              </Pressable>
+            </View>
+            <View
+              style={[
+                styles.copyMenuArrow,
+                copyMenuAbove ? styles.copyMenuArrowDown : styles.copyMenuArrowUp,
+                { left: copyMenuLeft + copyMenuArrowLeft, top: copyMenuArrowTop },
+              ]}
+            />
+          </View>
+        </Modal>
       ) : null}
     </View>
   );
@@ -1513,11 +1687,60 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
   },
+  // 负外边距抵消气泡内边距、再用同值内边距补回，文案位置不变但热区覆盖整个气泡
+  bubbleTextPressable: {
+    marginHorizontal: -12,
+    marginVertical: -8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  copyMenuLayer: { flex: 1 },
+  // 浅色气泡菜单：白色浮层 + 大圆角 + 柔和投影，避免深色菜单压在聊天背景上过重
+  copyMenu: {
+    position: "absolute",
+    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+    overflow: "hidden",
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.16,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 14,
+  },
+  copyMenuItem: { flex: 1, alignItems: "center", justifyContent: "center" },
+  copyMenuText: { color: "#1A1A1A", fontSize: 15, lineHeight: 20 },
+  // 指向被选中气泡的三角箭头，与菜单同色
+  copyMenuArrow: {
+    position: "absolute",
+    width: 0,
+    height: 0,
+    borderLeftWidth: COPY_MENU_ARROW / 2,
+    borderRightWidth: COPY_MENU_ARROW / 2,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+  },
+  // 菜单在气泡上方时箭头朝下，在下方时箭头朝上
+  copyMenuArrowDown: {
+    borderTopWidth: COPY_MENU_ARROW / 2,
+    borderTopColor: "#FFFFFF",
+  },
+  copyMenuArrowUp: {
+    borderBottomWidth: COPY_MENU_ARROW / 2,
+    borderBottomColor: "#FFFFFF",
+  },
   imageBubble: {
     padding: 0,
     overflow: "hidden",
     backgroundColor: "transparent",
     borderWidth: 0,
+  },
+  imageLoadingPlaceholder: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.skeleton,
   },
   roomInviteBubble: {
     maxWidth: "84%",

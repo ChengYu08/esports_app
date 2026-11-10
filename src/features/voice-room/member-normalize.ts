@@ -41,7 +41,7 @@ export function normalizeMembers(
             : member.role;
       return { ...member, userId, role };
     });
-  // 房主固定排在第一个麦位，其余成员按加入顺序排列
+  // 房主固定排在第一个麦位，其余成员按加入顺序排列；邀请位固定最后一位
   const isSelfOwner = Boolean(creatorUserId) && creatorUserId === currentUserId;
   const owner = people.filter((member) => member.role === "owner");
   const others = people.filter((member) => member.role !== "owner");
@@ -50,7 +50,44 @@ export function normalizeMembers(
     ...(isSelfOwner ? self : self.filter((member) => member.role !== "owner")),
     ...others,
   ];
-  return [...normalizedMembers.slice(0, 7), inviteMember];
+  return [...normalizedMembers, inviteMember];
+}
+
+/**
+ * 按融云聊天室成员事件增量维护成员列表（actionType 1=加入 2=离开）。
+ * 屏内实时监听与 join 后快照对账共用同一套语义，重放事件须幂等。
+ */
+export function applyChatRoomMemberActions(
+  items: VoiceRoomMember[],
+  actions: { userId?: string; actionType?: number }[],
+  context: { selfId?: string; creatorUserId?: string | number; serviceUserId?: string | number },
+): VoiceRoomMember[] {
+  return actions.reduce<VoiceRoomMember[]>((next, action) => {
+    const userId = action.userId == null ? "" : String(action.userId);
+    if (!userId || userId === "invite" || userId === context.selfId) return next;
+    if (action.actionType === 2)
+      return next.filter((member) => member.userId !== userId);
+    if (
+      action.actionType === 1 &&
+      !next.some((member) => member.userId === userId)
+    ) {
+      return [
+        ...next.filter((member) => member.userId !== "invite"),
+        {
+          userId,
+          nickname: `用户${userId}`,
+          role:
+            String(context.creatorUserId ?? "") === userId
+              ? ("owner" as const)
+              : String(context.serviceUserId ?? "") === userId
+                ? ("service" as const)
+                : ("guest" as const),
+        },
+        inviteMember,
+      ];
+    }
+    return next;
+  }, items);
 }
 
 /**
@@ -70,8 +107,16 @@ export function reconcileMembers(
     if (!local) {
       return member;
     }
+    // members 端点已瘦身（只剩 userId/role，昵称由资料缓存补全），
+    // 快照条目的昵称是「用户{userId}」占位时视为缺失，保留本地已补全的资料
+    const snapshotNickname =
+      member.nickname && member.nickname !== `用户${member.userId}`
+        ? member.nickname
+        : undefined;
     return {
       ...member,
+      ...(snapshotNickname ? { nickname: snapshotNickname } : local.nickname ? { nickname: local.nickname } : {}),
+      ...(member.avatar ? {} : local.avatar ? { avatar: local.avatar } : {}),
       ...(local.micOpen != null ? { micOpen: local.micOpen } : {}),
       ...(local.speaking != null ? { speaking: local.speaking } : {}),
     };

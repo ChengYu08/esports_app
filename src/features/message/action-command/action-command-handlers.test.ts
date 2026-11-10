@@ -45,6 +45,7 @@ vi.mock("@/core/logging/logger", () => ({
 }));
 
 const {
+  handleActivityRoomNotice,
   handleOrderNotifyPopup,
   handleQuickMatchExpired,
   handleQuickMatchNotice,
@@ -54,6 +55,7 @@ const { refreshDispatchForRemoteChange } = await import("@/features/order/order-
 const { logger } = await import("@/core/logging/logger");
 const { router } = await import("expo-router");
 const { acceptOrder } = await import("@/features/order/order.api");
+const Toast = (await import("react-native-root-toast")).default;
 
 const NOW = new Date("2026-10-20T12:00:00").getTime();
 const PLATFORM = "50000000";
@@ -92,16 +94,17 @@ describe("handleQuickMatchNotice", () => {
     const items = useActionNoticeStore.getState().items;
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({
-      id: "qm:QM1",
+      id: "qm:QM1:1",
       text: "「老板A」发布了王者荣耀需求",
       expireAt: new Date("2026-10-20T12:30:00").getTime(),
       maxDurationMs: 15_000,
     });
   });
 
-  it("同 requestNo 二次不弹", () => {
+  it("同 requestNo+同轮次二次不弹", () => {
     const cmd = command("QUICK_MATCH_NOTICE", {
       requestNo: "QM1",
+      notifyRound: 1,
       expireTime: "2026-10-20 12:30:00",
     });
     handleQuickMatchNotice(cmd, NOW);
@@ -146,15 +149,52 @@ describe("handleQuickMatchNotice", () => {
     expect(useActionNoticeStore.getState().items).toHaveLength(0);
   });
 
-  it("释放去重键后同 requestNo 可再次弹", () => {
+  it("关掉后同轮次仍不弹（会话内永久 seen）", () => {
     const cmd = command("QUICK_MATCH_NOTICE", {
       requestNo: "QM1",
+      notifyRound: 1,
       expireTime: "2026-10-20 12:30:00",
     });
     handleQuickMatchNotice(cmd, NOW);
-    actionNotice.dismiss("qm:QM1");
+    actionNotice.dismiss("qm:QM1:1");
+    expect(useActionNoticeStore.getState().items).toHaveLength(0);
+    handleQuickMatchNotice(cmd, NOW);
+    expect(useActionNoticeStore.getState().items).toHaveLength(0);
+  });
+
+  it("同 requestNo 不同 notifyRound 可再弹并叠条", () => {
+    handleQuickMatchNotice(
+      command("QUICK_MATCH_NOTICE", {
+        requestNo: "QM1",
+        notifyRound: 1,
+        expireTime: "2026-10-20 12:30:00",
+      }),
+      NOW,
+    );
+    handleQuickMatchNotice(
+      command("QUICK_MATCH_NOTICE", {
+        requestNo: "QM1",
+        notifyRound: 2,
+        expireTime: "2026-10-20 12:30:00",
+      }),
+      NOW,
+    );
+    const ids = useActionNoticeStore.getState().items.map((entry) => entry.id);
+    expect(ids).toEqual(["qm:QM1:1", "qm:QM1:2"]);
+  });
+
+  it("resetActionCommandDedupKeys 后同轮次可再弹（模拟切账号）", () => {
+    const cmd = command("QUICK_MATCH_NOTICE", {
+      requestNo: "QM1",
+      notifyRound: 1,
+      expireTime: "2026-10-20 12:30:00",
+    });
+    handleQuickMatchNotice(cmd, NOW);
+    actionNotice.dismiss("qm:QM1:1");
+    resetActionCommandDedupKeys();
     handleQuickMatchNotice(cmd, NOW);
     expect(useActionNoticeStore.getState().items).toHaveLength(1);
+    expect(useActionNoticeStore.getState().items[0]?.id).toBe("qm:QM1:1");
   });
 
   it("合法抢单消息刷新派单中心", () => {
@@ -301,7 +341,7 @@ describe("handleQuickMatchNotice", () => {
     const items = useActionNoticeStore.getState().items;
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({
-      id: "qm:QM1",
+      id: "qm:QM1:1",
       text: "秒杀匹配中：「老板A」发布了王者荣耀需求",
     });
   });
@@ -337,7 +377,7 @@ describe("handleQuickMatchNotice", () => {
       }),
       NOW,
     );
-    const onAction = getActionNoticeHandlers("qm:QM1")?.onAction;
+    const onAction = getActionNoticeHandlers("qm:QM1:1")?.onAction;
     expect(onAction).toBeDefined();
     await onAction?.();
     expect(grabQuickMatchAndEnterAudition).toHaveBeenCalledWith("QM1");
@@ -500,5 +540,114 @@ describe("handleQuickMatchExpired", () => {
     expect(notifyEnded).not.toHaveBeenCalled();
     expect(dismissQuickMatchBar).not.toHaveBeenCalled();
     expect(refreshDispatchForRemoteChange).not.toHaveBeenCalled();
+  });
+});
+
+describe("handleActivityRoomNotice", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("带 roomId 的活动发布成功 Toast", () => {
+    handleActivityRoomNotice(
+      command("ACTIVITY_ROOM_NOTICE", {
+        commandName: "ACTIVITY_ROOM_NOTICE",
+        requestNo: "QM2119632871408664578",
+        content: "恭喜参与秒杀活动，请尽快在语聊房中选定陪玩并支付，锁定秒杀名额",
+        roomId: 30100020,
+        roomVersion: 25,
+      }),
+      NOW,
+    );
+    expect(Toast.show).toHaveBeenCalledWith(
+      "恭喜参与秒杀活动，请尽快在语聊房中选定陪玩并支付，锁定秒杀名额",
+      expect.objectContaining({ duration: 10000 }),
+    );
+  });
+
+  it("不带 roomId 的扩大匹配范围 Toast", () => {
+    handleActivityRoomNotice(
+      command("ACTIVITY_ROOM_NOTICE", {
+        commandName: "ACTIVITY_ROOM_NOTICE",
+        requestNo: "QM2119632871408664578",
+        content: "已为您扩大匹配范围",
+      }),
+      NOW,
+    );
+    expect(Toast.show).toHaveBeenCalledWith(
+      "已为您扩大匹配范围",
+      expect.objectContaining({ duration: 10000 }),
+    );
+  });
+
+  it("非平台 sender 忽略", () => {
+    handleActivityRoomNotice(
+      command(
+        "ACTIVITY_ROOM_NOTICE",
+        { content: "已为您扩大匹配范围" },
+        "60000000",
+      ),
+      NOW,
+    );
+    expect(Toast.show).not.toHaveBeenCalled();
+  });
+
+  it("空 content 忽略", () => {
+    handleActivityRoomNotice(
+      command("ACTIVITY_ROOM_NOTICE", { content: "   " }),
+      NOW,
+    );
+    expect(Toast.show).not.toHaveBeenCalled();
+  });
+
+  it("其它命令名忽略", () => {
+    handleActivityRoomNotice(
+      command("ORDER_NOTIFY", { content: "已为您扩大匹配范围" }),
+      NOW,
+    );
+    expect(Toast.show).not.toHaveBeenCalled();
+  });
+
+  it("sentTime 距今超过 15 分钟的离线重放通知不 Toast", () => {
+    handleActivityRoomNotice(
+      command(
+        "ACTIVITY_ROOM_NOTICE",
+        { content: "已为您扩大匹配范围" },
+        PLATFORM,
+        NOW - 901_000,
+      ),
+      NOW,
+    );
+    expect(Toast.show).not.toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalledWith(
+      "activity_room_notice.stale_dropped",
+      expect.objectContaining({ skewMs: 901_000 }),
+    );
+  });
+
+  it("sentTime 距今恰满 15 分钟仍在阈值内，正常 Toast", () => {
+    handleActivityRoomNotice(
+      command(
+        "ACTIVITY_ROOM_NOTICE",
+        { content: "已为您扩大匹配范围" },
+        PLATFORM,
+        NOW - 900_000,
+      ),
+      NOW,
+    );
+    expect(Toast.show).toHaveBeenCalledTimes(1);
+  });
+
+  it("sentTime 缺失不拦截", () => {
+    handleActivityRoomNotice(
+      command(
+        "ACTIVITY_ROOM_NOTICE",
+        { content: "已为您扩大匹配范围" },
+        PLATFORM,
+        undefined,
+      ),
+      NOW,
+    );
+    expect(Toast.show).toHaveBeenCalledTimes(1);
   });
 });
