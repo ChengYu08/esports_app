@@ -302,7 +302,7 @@ export default function VoiceRoomScreen() {
   const [distanceEnabled, setDistanceEnabled] = useState(false);
   /**
    * 两套独立校验态（null=校验中不展示）：
-   * - audition：老板需试音自发
+   * - audition：用户需试音自发
    * - quickMatchCreated：客服代发 QUICK_MATCH_CREATED
    */
   const [matchActiveForAudition, setMatchActiveForAudition] = useState<

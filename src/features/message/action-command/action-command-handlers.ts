@@ -6,10 +6,10 @@ import { router } from "expo-router";
 import { grabQuickMatchAndEnterAudition } from "@/features/match/grab-quick-match-flow";
 import type { RongCommand } from "@/features/message/rongcloud-command";
 import {
-  parseOrderNotifyPopup,
-  parseQuickMatchExpired,
-  parseQuickMatchNotice,
-  PLATFORM_NOTICE_USER_ID,
+    parseOrderNotifyPopup,
+    parseQuickMatchExpired,
+    parseQuickMatchNotice,
+    PLATFORM_NOTICE_USER_ID,
 } from "@/features/message/rongcloud-commands";
 import { refreshDispatchForRemoteChange } from "@/features/order/order-query";
 import { acceptOrder } from "@/features/order/order.api";
@@ -43,7 +43,7 @@ export type QuickMatchEndActions = {
 
 /**
  * QUICK_MATCH_EXPIRED / QUICK_MATCH_CANCELLED：写终止信号（消费方按自身 requestNo 自门控）
- * 并撤掉对应的抢单通知条。发送方为平台通知、收件人为老板，但按 requestNo 分发即可。
+ * 并撤掉对应的抢单通知条。发送方为平台通知、收件人为用户，但按 requestNo 分发即可。
  */
 export function handleQuickMatchExpired(
   command: RongCommand,
@@ -70,7 +70,7 @@ function buildQuickMatchMessage(payload: {
   buyerNickname: string;
   gameName: string;
 }) {
-  const buyer = payload.buyerNickname || "老板";
+  const buyer = payload.buyerNickname || "用户";
   const game = payload.gameName.trim();
   if (!game) return `「${buyer}」发布了快速匹配需求`;
   return `「${buyer}」发布了${game}需求`;
@@ -89,7 +89,7 @@ function buildActivityQuickMatchMessage(payload: {
 }
 
 function buildOrderPayMessage(buyerNickname: string) {
-  return `「${buyerNickname || "老板"}」已支付订单，请尽快接单`;
+  return `「${buyerNickname || "用户"}」已支付订单，请尽快接单`;
 }
 
 export function handleQuickMatchNotice(command: RongCommand, now = Date.now()) {
@@ -107,8 +107,7 @@ export function handleQuickMatchNotice(command: RongCommand, now = Date.now()) {
   const expired =
     Number.isFinite(payload.expireAtMs) && payload.expireAtMs - now <= 0;
   const stale =
-    command.sentTime != null &&
-    now - command.sentTime > COMMAND_STALE_MAX_MS;
+    command.sentTime != null && now - command.sentTime > COMMAND_STALE_MAX_MS;
   logger.info("QUICK_MATCH_NOTICE", {
     requestNo: payload.requestNo,
     expired,
@@ -163,7 +162,10 @@ export function handleQuickMatchNotice(command: RongCommand, now = Date.now()) {
  * 仅展示后端下发的 content 文案；不进房、不消费 roomId/roomVersion。
  * 无业务过期字段，按 sentTime 门控离线重放（对齐 ORDER_NOTIFY）。
  */
-export function handleActivityRoomNotice(command: RongCommand, now = Date.now()) {
+export function handleActivityRoomNotice(
+  command: RongCommand,
+  now = Date.now(),
+) {
   if (command.name !== ACTIVITY_ROOM_NOTICE) return;
   if (command.senderId !== PLATFORM_NOTICE_USER_ID) return;
 
@@ -171,8 +173,7 @@ export function handleActivityRoomNotice(command: RongCommand, now = Date.now())
   if (!content) return;
 
   const stale =
-    command.sentTime != null &&
-    now - command.sentTime > COMMAND_STALE_MAX_MS;
+    command.sentTime != null && now - command.sentTime > COMMAND_STALE_MAX_MS;
   if (stale) {
     logger.warn("activity_room_notice.stale_dropped", {
       sentTime: formatServerDateTime(command.sentTime ?? now),
@@ -193,8 +194,7 @@ export function handleOrderNotifyPopup(command: RongCommand, now = Date.now()) {
 
   // 催单无业务过期字段，按 sentTime 门控离线重放（长时间未登录后重连会整批重放旧消息）
   const stale =
-    command.sentTime != null &&
-    now - command.sentTime > COMMAND_STALE_MAX_MS;
+    command.sentTime != null && now - command.sentTime > COMMAND_STALE_MAX_MS;
   if (stale) {
     logger.warn("order_notify.stale_dropped", {
       orderNo: payload.orderNo,

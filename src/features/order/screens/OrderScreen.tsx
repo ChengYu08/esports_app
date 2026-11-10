@@ -719,7 +719,7 @@ export default function OrderScreen() {
           visible={completePromptVisible}
           order={completeTarget}
           buyerName={
-            scope === "place" ? currentUser?.nickname || "老板" : undefined
+            scope === "place" ? currentUser?.nickname || "用户" : undefined
           }
           buyerAvatar={
             scope === "place"

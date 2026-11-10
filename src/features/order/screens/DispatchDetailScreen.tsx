@@ -156,7 +156,7 @@ export function DispatchDetailScreen({ requestNo }: { requestNo: string }) {
             />
             <View style={styles.userCopy}>
               <Text style={styles.userName}>
-                {request.buyerNickname || "老板"}
+                {request.buyerNickname || "用户"}
               </Text>
               <Text style={styles.userSub}>
                 {request.publishType === "RECEPTION" ? "客服派单" : "用户派单"}
@@ -267,7 +267,7 @@ export function DispatchDetailScreen({ requestNo }: { requestNo: string }) {
             </LinearGradient>
           ) : (
             <Text style={styles.actionDisabledText}>
-              {hasGrabbed ? "已抢单，等待老板选择" : statusLabel}
+              {hasGrabbed ? "已抢单，等待用户选择" : statusLabel}
             </Text>
           )}
         </Pressable>
@@ -283,7 +283,7 @@ function getStatusLabel(
 ) {
   // 落选（FAILED）只会与 ORDERED 共存，必须先于 ORDERED 判断，否则落选者永远看到"派单成功"
   if (grabStatus === "FAILED") return "抢单失败";
-  if (status === "CANCELLED") return "老板已取消";
+  if (status === "CANCELLED") return "用户已取消";
   if (status === "EXPIRED") return "派单已过期";
   if (status === "ORDERED") return "派单成功";
   if (grabStatus === "SUCCESS") return "抢单成功";
@@ -295,15 +295,15 @@ function getStateDescription(
   grabStatus?: GrabStatus,
   hasGrabbed = false,
 ) {
-  if (status === "CANCELLED") return "老板已取消本次需求";
+  if (status === "CANCELLED") return "用户已取消本次需求";
   if (status === "EXPIRED") return "本次派单已超过有效时间";
   if (status === "ORDERED")
     return grabStatus === "FAILED"
-      ? "老板已选择其他大神下单"
-      : "老板已完成下单";
+      ? "用户已选择其他大神下单"
+      : "用户已完成下单";
   if (grabStatus === "SUCCESS") return "抢单成功，等待订单开始";
-  if (grabStatus === "FAILED") return "老板已选择其他大神下单";
-  return hasGrabbed ? "已提交抢单，等待老板选择大神" : "该需求当前尚未被抢单";
+  if (grabStatus === "FAILED") return "用户已选择其他大神下单";
+  return hasGrabbed ? "已提交抢单，等待用户选择大神" : "该需求当前尚未被抢单";
 }
 
 function InfoRow({

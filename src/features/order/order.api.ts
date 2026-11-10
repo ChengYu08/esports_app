@@ -242,7 +242,7 @@ export function mapOrder(
     reviewExists,
     sellerName:
       scope === "accept"
-        ? (stringValue(item, "buyerNickname") ?? "老板")
+        ? (stringValue(item, "buyerNickname") ?? "用户")
         : (stringValue(
             item,
             "sellerName",

@@ -2,25 +2,34 @@
  * 快速匹配抢单流程（对齐 PC useQuickMatchRoomFlow.grabAndEnterAuditionRoom）：
  * 预取详情 → 有试音房则抢单前确认切房 → grab → 无试音只 Toast；有试音再切房进入
  */
+import { showToast } from "@/shared/ui/app-toast";
 import { useAuthStore } from "@esports/auth";
 import { router, type Href } from "expo-router";
-import { showToast } from "@/shared/ui/app-toast";
 
 import { fetchActiveQuickMatch } from "@/features/match/api/match.api";
 import {
-  type DispatchRequest,
-  fetchDispatchDetail,
-  grabDispatchRequest,
+    fetchDispatchDetail,
+    grabDispatchRequest,
+    type DispatchRequest,
 } from "@/features/order/dispatch.api";
-import { refreshDispatchAfterGrabAttempt, refreshDispatchDetail } from "@/features/order/order-query";
-import { useAppConfirm } from "@/shared/ui/app-confirm";
-import { actionNotice } from "@/shared/ui/action-notice/action-notice-store";
-import { ensureRealNameBeforeVoiceRoomEnter, promptSelfRealNameIfNeeded } from "@/features/voice-room/ensure-real-name-before-enter";
+import {
+    refreshDispatchAfterGrabAttempt,
+    refreshDispatchDetail,
+} from "@/features/order/order-query";
+import {
+    ensureRealNameBeforeVoiceRoomEnter,
+    promptSelfRealNameIfNeeded,
+} from "@/features/voice-room/ensure-real-name-before-enter";
 import { exitVoiceRoom } from "@/features/voice-room/exit-voice-room";
 import { navigateToVoiceRoom } from "@/features/voice-room/navigate-voice-room";
-import { resolveVoiceRoomId, voiceRoomApi } from "@/features/voice-room/voice-room.api";
-import type { VoiceRoomDetail } from "@/features/voice-room/voice-room.types";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
+import {
+    resolveVoiceRoomId,
+    voiceRoomApi,
+} from "@/features/voice-room/voice-room.api";
+import type { VoiceRoomDetail } from "@/features/voice-room/voice-room.types";
+import { actionNotice } from "@/shared/ui/action-notice/action-notice-store";
+import { useAppConfirm } from "@/shared/ui/app-confirm";
 
 export type QuickMatchGrabFlowResult =
   | { status: "entered" }
@@ -32,9 +41,16 @@ export type QuickMatchGrabFlowResult =
 const pendingRequestNos = new Set<string>();
 
 export function hasAuditionRoom(
-  request: Pick<DispatchRequest, "needVoice" | "roomId" | "roomVersion"> | null | undefined,
+  request:
+    | Pick<DispatchRequest, "needVoice" | "roomId" | "roomVersion">
+    | null
+    | undefined,
 ): boolean {
-  return !!request?.needVoice && request.roomId != null && request.roomVersion != null;
+  return (
+    !!request?.needVoice &&
+    request.roomId != null &&
+    request.roomVersion != null
+  );
 }
 
 function errorMessage(error: unknown, fallback: string) {
@@ -42,15 +58,25 @@ function errorMessage(error: unknown, fallback: string) {
 }
 
 function isSameRoom(
-  left: { id?: string | number; roomId?: string; roomVersion?: string | number } | null | undefined,
+  left:
+    | { id?: string | number; roomId?: string; roomVersion?: string | number }
+    | null
+    | undefined,
   right: { id: string; roomVersion: string | number } | null | undefined,
 ) {
   if (!left || !right) return false;
-  const leftId = resolveVoiceRoomId(left) || String(left.id ?? left.roomId ?? "");
-  return leftId === right.id && String(left.roomVersion ?? "") === String(right.roomVersion);
+  const leftId =
+    resolveVoiceRoomId(left) || String(left.id ?? left.roomId ?? "");
+  return (
+    leftId === right.id &&
+    String(left.roomVersion ?? "") === String(right.roomVersion)
+  );
 }
 
-async function grabWithRecovery(requestNo: string, token: string): Promise<DispatchRequest> {
+async function grabWithRecovery(
+  requestNo: string,
+  token: string,
+): Promise<DispatchRequest> {
   try {
     return await grabDispatchRequest(requestNo, token);
   } catch (error) {
@@ -70,8 +96,8 @@ function confirmRoomSwitch(current: VoiceRoomDetail): Promise<boolean> {
   const roomName = current.roomName || "当前房间";
   const roleText = isOwner ? "你是该房间的房主。" : "";
   const consequence = isOwner
-    ? "解散当前房间，房内其他用户也会被移出，然后进入老板的试音房。"
-    : "退出当前房间并进入老板的试音房。";
+    ? "解散当前房间，房内其他用户也会被移出，然后进入用户的试音房。"
+    : "退出当前房间并进入用户的试音房。";
 
   return useAppConfirm.getState().confirm({
     title: "切换语聊房并抢单",
@@ -98,8 +124,9 @@ async function canSwitchFromCurrentRoom(
     if (!activeRequest || activeRequest.status !== "MATCHING") return true;
     const currentId = resolveVoiceRoomId(current) || String(current.id ?? "");
     if (
-      String(activeRequest.roomId || "") !== currentId
-      || String(activeRequest.roomVersion || "") !== String(current.roomVersion ?? "")
+      String(activeRequest.roomId || "") !== currentId ||
+      String(activeRequest.roomVersion || "") !==
+        String(current.roomVersion ?? "")
     ) {
       return true;
     }
@@ -111,7 +138,7 @@ async function canSwitchFromCurrentRoom(
 }
 
 /**
- * 解析需求当前可进入的试音房；允许同一老板房间重开后的新版本（对齐 PC resolveAuditionRoom）
+ * 解析需求当前可进入的试音房；允许同一用户房间重开后的新版本（对齐 PC resolveAuditionRoom）
  */
 async function resolveAuditionRoom(
   reference: Pick<DispatchRequest, "roomId" | "roomVersion" | "buyerUserId">,
@@ -125,8 +152,8 @@ async function resolveAuditionRoom(
   if (!target || target.roomStatus !== 1) throw new Error("试音房已关闭");
   if (String(target.roomVersion) !== String(reference.roomVersion)) {
     const belongsToBuyer =
-      reference.buyerUserId != null
-      && String(target.creatorUserId) === String(reference.buyerUserId);
+      reference.buyerUserId != null &&
+      String(target.creatorUserId) === String(reference.buyerUserId);
     if (!allowReopened || !belongsToBuyer) {
       throw new Error("试音房已重新开启，请刷新后重试");
     }
@@ -143,9 +170,10 @@ async function leaveExpectedRoom(
   if (isSameRoom(latestCurrent, target)) return;
   if (!latestCurrent) return;
   if (
-    !expectedCurrent
-    || !isSameRoom(latestCurrent, {
-      id: resolveVoiceRoomId(expectedCurrent) || String(expectedCurrent.id ?? ""),
+    !expectedCurrent ||
+    !isSameRoom(latestCurrent, {
+      id:
+        resolveVoiceRoomId(expectedCurrent) || String(expectedCurrent.id ?? ""),
       roomVersion: expectedCurrent.roomVersion,
     })
   ) {
@@ -162,7 +190,8 @@ async function leaveExpectedRoom(
       roomId: latestId,
       roomVersion: latestCurrent.roomVersion ?? sessionRoom?.roomVersion ?? "1",
       creatorUserId: latestCurrent.creatorUserId ?? sessionRoom?.creatorUserId,
-      rongChatroomId: latestCurrent.rongChatroomId ?? sessionRoom?.rongChatroomId,
+      rongChatroomId:
+        latestCurrent.rongChatroomId ?? sessionRoom?.rongChatroomId,
     },
     userId,
     token,
@@ -252,12 +281,19 @@ export async function grabQuickMatchAndEnterAudition(
     }
 
     showToast("抢单成功，正在进入试音房…");
-    const room = await switchToAuditionRoom(detail, confirmedCurrent, accessToken);
+    const room = await switchToAuditionRoom(
+      detail,
+      confirmedCurrent,
+      accessToken,
+    );
     const roomParams = room.roomVersion
       ? { id: room.id, v: room.roomVersion }
       : { id: room.id };
     if (options.replaceRoom) {
-      router.replace({ pathname: "/voice-room/[id]", params: roomParams } satisfies Href);
+      router.replace({
+        pathname: "/voice-room/[id]",
+        params: roomParams,
+      } satisfies Href);
     } else {
       navigateToVoiceRoom(roomParams);
     }
@@ -266,9 +302,7 @@ export async function grabQuickMatchAndEnterAudition(
     const message = errorMessage(error, "抢单失败，请稍后重试");
     if (await promptSelfRealNameIfNeeded(message)) {
       if (!grabbed) settleGrab(requestNo);
-      return grabbed
-        ? { status: "grabbed" }
-        : { status: "failed", message };
+      return grabbed ? { status: "grabbed" } : { status: "failed", message };
     }
     if (grabbed) {
       showToast(

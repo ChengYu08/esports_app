@@ -119,7 +119,7 @@ function mapDispatchRequest(
             : request.publishType === "RECEPTION"
               ? "客服派单"
               : "用户派单",
-    sellerName: request.buyerNickname || "老板",
+    sellerName: request.buyerNickname || "用户",
     sellerAvatar: request.buyerHeadImage
       ? { uri: request.buyerHeadImage }
       : require("../../../assets/svgs/order-seller-avatar.svg"),

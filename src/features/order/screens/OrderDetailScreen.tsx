@@ -330,7 +330,7 @@ export function OrderDetailScreen({
         visible={actions.completePromptVisible}
         order={order}
         buyerName={
-          scope === "place" ? currentUser?.nickname || "老板" : undefined
+          scope === "place" ? currentUser?.nickname || "用户" : undefined
         }
         buyerAvatar={
           scope === "place"

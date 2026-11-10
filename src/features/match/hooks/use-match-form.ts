@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@esports/auth";
+import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
@@ -20,7 +20,10 @@ import type {
   MatchVoiceOption,
 } from "@/features/match/api/match.types";
 
-export const MATCH_GENDER_OPTIONS: { value: MatchGenderRequirement; label: string }[] = [
+export const MATCH_GENDER_OPTIONS: {
+  value: MatchGenderRequirement;
+  label: string;
+}[] = [
   { value: 0, label: "不限" },
   { value: 1, label: "男" },
   { value: 2, label: "女" },
@@ -32,8 +35,8 @@ export const MATCH_COMPANION_PREFERENCE_OPTIONS: {
   value: MatchCompanionPreference;
   label: string;
 }[] = [
-  { value: 1, label: "单陪" },
-  { value: 2, label: "双陪" },
+  { value: 1, label: "单大神" },
+  { value: 2, label: "双大神" },
 ];
 
 /** 备注字数上限，对齐 PC ClubQuickMatchModal */
@@ -121,7 +124,8 @@ export function useMatchForm(options: UseMatchFormOptions = {}) {
 
   const clubsQuery = useQuery({
     queryKey: ["quick-match", "clubs", token, gameId],
-    queryFn: ({ signal }) => fetchQuickMatchClubs(gameId as string, token as string, signal),
+    queryFn: ({ signal }) =>
+      fetchQuickMatchClubs(gameId as string, token as string, signal),
     enabled: enabled && !clubLockedMode && Boolean(token && gameId),
   });
 
@@ -134,13 +138,15 @@ export function useMatchForm(options: UseMatchFormOptions = {}) {
 
   const levelsQuery = useQuery({
     queryKey: ["quick-match", "levels", token, modeId],
-    queryFn: ({ signal }) => fetchClubGameLevels(modeId as string, token as string, signal),
+    queryFn: ({ signal }) =>
+      fetchClubGameLevels(modeId as string, token as string, signal),
     enabled: enabled && Boolean(token && modeId),
   });
 
   const servicesQuery = useQuery({
     queryKey: ["quick-match", "services", token, levelId],
-    queryFn: ({ signal }) => fetchClubGameServices(levelId as string, token as string, signal),
+    queryFn: ({ signal }) =>
+      fetchClubGameServices(levelId as string, token as string, signal),
     enabled: enabled && Boolean(token && levelId),
   });
 
@@ -219,17 +225,20 @@ export function useMatchForm(options: UseMatchFormOptions = {}) {
     }
   }, [companionPreference, serviceId, services, servicesQuery.isFetching]);
 
-  const selectGame = useCallback((nextGameId: string) => {
-    setGameId(nextGameId);
-    if (!clubLockedMode) {
-      setSelectedClub(null);
-    }
-    setModeId(null);
-    setLevelId(null);
-    setServiceId(null);
-    setGender(0);
-    setCompanionPreference(1);
-  }, [clubLockedMode]);
+  const selectGame = useCallback(
+    (nextGameId: string) => {
+      setGameId(nextGameId);
+      if (!clubLockedMode) {
+        setSelectedClub(null);
+      }
+      setModeId(null);
+      setLevelId(null);
+      setServiceId(null);
+      setGender(0);
+      setCompanionPreference(1);
+    },
+    [clubLockedMode],
+  );
 
   const selectClub = useCallback((nextClub: MatchClub) => {
     setSelectedClub(nextClub);

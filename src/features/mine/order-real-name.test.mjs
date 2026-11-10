@@ -27,7 +27,7 @@ test("does not treat prefixed real-name messages as self verification", () => {
     requiresSelfRealNameVerification("订单创建失败，大神未进行实名认证"),
     false,
   );
-  assert.equal(requiresSelfRealNameVerification("老板未进行实名认证"), false);
+  assert.equal(requiresSelfRealNameVerification("用户未进行实名认证"), false);
 });
 
 test("dismisses the order sheet before opening account settings for real-name verification", () => {

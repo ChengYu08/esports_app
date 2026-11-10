@@ -11,22 +11,25 @@ export class ApiError extends Error {
     public readonly code?: string,
   ) {
     super(message);
-    this.name = 'ApiError';
+    this.name = "ApiError";
   }
 }
 
-type AuthExpiredHandler = (error: ApiError, requestToken: string) => void | Promise<void>;
+type AuthExpiredHandler = (
+  error: ApiError,
+  requestToken: string,
+) => void | Promise<void>;
 
 let authExpiredHandler: AuthExpiredHandler | null = null;
 
 const AUTH_EXPIRED_CODES = new Set([
-  '401',
-  'UNAUTHORIZED',
-  'NOT_LOGIN',
-  'NOT_LOGGED_IN',
+  "401",
+  "UNAUTHORIZED",
+  "NOT_LOGIN",
+  "NOT_LOGGED_IN",
 ]);
 
-const AUTH_EXPIRY_IGNORED_PATHS = ['/client/v1/user/logout'];
+const AUTH_EXPIRY_IGNORED_PATHS = ["/client/v1/user/logout"];
 
 export function setAuthExpiredHandler(handler: AuthExpiredHandler | null) {
   authExpiredHandler = handler;
@@ -36,7 +39,9 @@ export function setAuthExpiredHandler(handler: AuthExpiredHandler | null) {
 }
 
 function isAuthExpiredResponse(status: number, code?: string): boolean {
-  return status === 401 || AUTH_EXPIRED_CODES.has(String(code ?? '').toUpperCase());
+  return (
+    status === 401 || AUTH_EXPIRED_CODES.has(String(code ?? "").toUpperCase())
+  );
 }
 
 // ─── 全局「未进行实名认证」拦截 ────────────────────────────────────────
@@ -46,20 +51,24 @@ type RealNameRequiredHandler = () => void | Promise<void>;
 let realNameRequiredHandler: RealNameRequiredHandler | null = null;
 let lastRealNameTriggeredAt = 0;
 
-/** 未实名完整文案（后端 BussinessException 的 info 文本，精确匹配；避免误命中「老板未进行实名认证」等） */
-const REAL_NAME_REQUIRED_MESSAGE = '未进行实名认证';
+/** 未实名完整文案（后端 BussinessException 的 info 文本，精确匹配；避免误命中「用户未进行实名认证」等） */
+const REAL_NAME_REQUIRED_MESSAGE = "未进行实名认证";
 /** 连续多个接口同时未实名失败时的引导冷却，避免重复压入实名页 */
 const REAL_NAME_TRIGGER_COOLDOWN_MS = 3000;
 
-export function setRealNameRequiredHandler(handler: RealNameRequiredHandler | null) {
+export function setRealNameRequiredHandler(
+  handler: RealNameRequiredHandler | null,
+) {
   realNameRequiredHandler = handler;
   return () => {
     if (realNameRequiredHandler === handler) realNameRequiredHandler = null;
   };
 }
 
-async function triggerRealNameRequiredIfNeed(payload: ResponseErrorPayload): Promise<void> {
-  if (!payload || payload.code === 'SUCCESS') return;
+async function triggerRealNameRequiredIfNeed(
+  payload: ResponseErrorPayload,
+): Promise<void> {
+  if (!payload || payload.code === "SUCCESS") return;
   const info = payload.info ?? payload.message;
   if (info !== REAL_NAME_REQUIRED_MESSAGE) return;
   const now = Date.now();
@@ -68,28 +77,32 @@ async function triggerRealNameRequiredIfNeed(payload: ResponseErrorPayload): Pro
   try {
     await realNameRequiredHandler?.();
   } catch {
-    logger.warn('api.real_name_handler_error', {});
+    logger.warn("api.real_name_handler_error", {});
   }
 }
 
-type ResponseErrorPayload = { info?: string; message?: string; code?: string } | null;
+type ResponseErrorPayload = {
+  info?: string;
+  message?: string;
+  code?: string;
+} | null;
 
 const MAX_RESPONSE_LOG_LENGTH = 2000;
 
 function serializeResponseData(data: unknown): string {
   try {
-    const text = JSON.stringify(data) ?? 'null';
+    const text = JSON.stringify(data) ?? "null";
     if (text.length <= MAX_RESPONSE_LOG_LENGTH) {
       return text;
     }
     return `${text.slice(0, MAX_RESPONSE_LOG_LENGTH)}...[truncated ${text.length}]`;
   } catch {
-    return '[unserializable]';
+    return "[unserializable]";
   }
 }
 
 function readErrorPayload(payload: unknown): ResponseErrorPayload {
-  if (!payload || typeof payload !== 'object') return null;
+  if (!payload || typeof payload !== "object") return null;
   return payload as ResponseErrorPayload;
 }
 
@@ -108,13 +121,16 @@ async function processResponse<T>(
   );
 
   if (isAuthExpiredResponse(status, errorPayload?.code)) {
-    const shouldHandleAuthExpiry = Boolean(token)
-      && !AUTH_EXPIRY_IGNORED_PATHS.some((ignoredPath) => path.includes(ignoredPath));
+    const shouldHandleAuthExpiry =
+      Boolean(token) &&
+      !AUTH_EXPIRY_IGNORED_PATHS.some((ignoredPath) =>
+        path.includes(ignoredPath),
+      );
     if (shouldHandleAuthExpiry) {
       try {
         await authExpiredHandler?.(requestError, token!);
       } catch {
-        logger.warn('api.auth_expiry_handler_error', { path });
+        logger.warn("api.auth_expiry_handler_error", { path });
       }
     }
     throw requestError;
@@ -129,7 +145,7 @@ async function processResponse<T>(
   return payload as T;
 }
 
-export type RequestOptions = Omit<RequestInit, 'body'> & {
+export type RequestOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
   timeoutMs?: number;
   /** C 端业务 token，后端约定请求头名称为 `token`。 */
@@ -138,14 +154,17 @@ export type RequestOptions = Omit<RequestInit, 'body'> & {
   suppressRealNameRedirect?: boolean;
 };
 
-export async function apiClient<T>(path: string, options: RequestOptions = {}): Promise<T> {
+export async function apiClient<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<T> {
   const { token, timeoutMs, body, method, suppressRealNameRedirect } = options;
   const startedAt = Date.now();
 
   try {
     const response = await apiAxios.request<T>({
       url: path,
-      method: (method as Method | undefined) ?? 'GET',
+      method: (method as Method | undefined) ?? "GET",
       data: body === undefined ? undefined : JSON.stringify(body),
       headers: {
         ...(token ? { token } : {}),
@@ -154,19 +173,44 @@ export async function apiClient<T>(path: string, options: RequestOptions = {}): 
       timeout: timeoutMs,
       signal: options.signal ?? undefined,
     });
-    logger.debug('api.request', { path, status: response.status, durationMs: Date.now() - startedAt, response: serializeResponseData(response.data) });
-    return await processResponse<T>(path, response.status, response.data, token, suppressRealNameRedirect);
+    logger.debug("api.request", {
+      path,
+      status: response.status,
+      durationMs: Date.now() - startedAt,
+      response: serializeResponseData(response.data),
+    });
+    return await processResponse<T>(
+      path,
+      response.status,
+      response.data,
+      token,
+      suppressRealNameRedirect,
+    );
   } catch (error) {
     // React Query 取消请求时原样抛出，不当作网络失败。
     if (isCancel(error)) throw error;
     if (error instanceof ApiError) throw error;
 
     if (isAxiosError(error) && error.response) {
-      logger.debug('api.request', { path, status: error.response.status, durationMs: Date.now() - startedAt, response: serializeResponseData(error.response.data) });
-      return await processResponse<T>(path, error.response.status, error.response.data, token, suppressRealNameRedirect);
+      logger.debug("api.request", {
+        path,
+        status: error.response.status,
+        durationMs: Date.now() - startedAt,
+        response: serializeResponseData(error.response.data),
+      });
+      return await processResponse<T>(
+        path,
+        error.response.status,
+        error.response.data,
+        token,
+        suppressRealNameRedirect,
+      );
     }
 
-    logger.warn('api.network_error', { path, durationMs: Date.now() - startedAt });
-    throw new ApiError('网络连接失败，请检查网络后重试', 0);
+    logger.warn("api.network_error", {
+      path,
+      durationMs: Date.now() - startedAt,
+    });
+    throw new ApiError("网络连接失败，请检查网络后重试", 0);
   }
 }

@@ -38,7 +38,8 @@ vi.mock("./voice-room.api", () => ({
   },
   voiceRoomApi: {
     getJoinedRoom: vi.fn(async () =>
-      mocks.exitCount > 0 ? mocks.joinedRoomAfterExit : mocks.joinedRoom),
+      mocks.exitCount > 0 ? mocks.joinedRoomAfterExit : mocks.joinedRoom,
+    ),
     claimClubService: vi.fn(async () => mocks.claimedRoom),
   },
 }));
@@ -53,9 +54,8 @@ vi.mock("./voice-room-session", () => ({
   useVoiceRoomSessionStore: { getState: () => ({ activeRoom: null }) },
 }));
 
-const { claimAndEnterCustomerServiceRoom } = await import(
-  "./use-customer-service-room-flow"
-);
+const { claimAndEnterCustomerServiceRoom } =
+  await import("./use-customer-service-room-flow");
 const { router } = await import("expo-router");
 const { voiceRoomApi } = await import("./voice-room.api");
 const { exitVoiceRoom } = await import("./exit-voice-room");
@@ -132,7 +132,9 @@ describe("claimAndEnterCustomerServiceRoom room-switch confirm", () => {
     expect(options.cancelText).toBe("暂不处理");
     expect(options.confirmText).toBe("继续接单");
     expect(options.message).toContain("当前房间");
-    expect(options.message).toContain("退出当前房间并进入老板的语聊房，其他成员不受影响。");
+    expect(options.message).toContain(
+      "退出当前房间并进入用户的语聊房，其他成员不受影响。",
+    );
 
     useAppConfirm.getState().settle(false);
     await expect(flow).resolves.toEqual({ status: "cancelled" });
@@ -204,7 +206,9 @@ describe("claimAndEnterCustomerServiceRoom room-switch confirm", () => {
   it("skips the dialog when already inside the target room", async () => {
     mocks.joinedRoom = { id: "room-target", roomVersion: "2" };
 
-    await expect(claimAndEnterCustomerServiceRoom(invite)).resolves.toEqual({ status: "entered" });
+    await expect(claimAndEnterCustomerServiceRoom(invite)).resolves.toEqual({
+      status: "entered",
+    });
 
     expect(useAppConfirm.getState().options).toBeNull();
     expect(voiceRoomApi.claimClubService).toHaveBeenCalledTimes(1);
@@ -213,7 +217,9 @@ describe("claimAndEnterCustomerServiceRoom room-switch confirm", () => {
   it("skips the dialog when not in any room", async () => {
     mocks.joinedRoom = null;
 
-    await expect(claimAndEnterCustomerServiceRoom(invite)).resolves.toEqual({ status: "entered" });
+    await expect(claimAndEnterCustomerServiceRoom(invite)).resolves.toEqual({
+      status: "entered",
+    });
 
     expect(useAppConfirm.getState().options).toBeNull();
     expect(voiceRoomApi.claimClubService).toHaveBeenCalledTimes(1);

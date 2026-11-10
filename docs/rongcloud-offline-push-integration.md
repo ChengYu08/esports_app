@@ -10,16 +10,16 @@
 
 离线推送**客户端已就绪**。App 当前仅有前台应用内横幅提醒（`src/features/message/notification-hub.ts`），无系统级推送通道。
 
-| 检查项 | 结果 |
-|---|---|
-| RN 引擎创建传 `pushOptions` | ✅ 已配置 |
-| Android 厂商 Push 插件依赖 | ✅ 已注入（`plugins/withRongCloudPush.js`） |
-| Android `RongPushPlugin.init()` | ✅ 已注入（`plugins/withRongCloudAndroidInit.js`），**隐私政策同意后才初始化** |
-| iOS `setDeviceToken` 调用 | ✅ 已在原生层调用（`plugins/withRongCloudIosPush.js`） |
-| iOS `aps-environment` entitlement | ✅ 已注入（development / production 自动切换） |
-| `POST_NOTIFICATIONS` 权限（Android 13+） | ✅ 已声明 + JS 层运行时请求 |
-| iOS `UIBackgroundModes` 含 `remote-notification` | ✅ 已添加 |
-| 融云控制台推送通道配置 | ❌ 待管理员配置 |
+| 检查项                                           | 结果                                                                           |
+| ------------------------------------------------ | ------------------------------------------------------------------------------ |
+| RN 引擎创建传 `pushOptions`                      | ✅ 已配置                                                                      |
+| Android 厂商 Push 插件依赖                       | ✅ 已注入（`plugins/withRongCloudPush.js`）                                    |
+| Android `RongPushPlugin.init()`                  | ✅ 已注入（`plugins/withRongCloudAndroidInit.js`），**隐私政策同意后才初始化** |
+| iOS `setDeviceToken` 调用                        | ✅ 已在原生层调用（`plugins/withRongCloudIosPush.js`）                         |
+| iOS `aps-environment` entitlement                | ✅ 已注入（development / production 自动切换）                                 |
+| `POST_NOTIFICATIONS` 权限（Android 13+）         | ✅ 已声明 + JS 层运行时请求                                                    |
+| iOS `UIBackgroundModes` 含 `remote-notification` | ✅ 已添加                                                                      |
+| 融云控制台推送通道配置                           | ❌ 待管理员配置                                                                |
 
 ---
 
@@ -48,10 +48,10 @@
 
 #### 小米推送
 
-| 配置位置 | 字段 | 获取途径 |
-|---|---|---|
+| 配置位置     | 字段                     | 获取途径                                        |
+| ------------ | ------------------------ | ----------------------------------------------- |
 | 小米开放平台 | AppID、AppKey、AppSecret | https://dev.mi.com/console/appservice/push.html |
-| 融云控制台 | AppSecret | 填小米 AppSecret |
+| 融云控制台   | AppSecret                | 填小米 AppSecret                                |
 
 - **推送通道类型**：建议选**私信消息**（聊天消息不受数量限制），需在小米运营平台申请私信 channelId 和模板 ID
 - **模板建议**：单聊用 `M12378`（标题 `新消息：{$keywords1$}`），群聊用 `M10306`
@@ -59,10 +59,10 @@
 
 #### 华为推送
 
-| 配置位置 | 字段 | 获取途径 |
-|---|---|---|
+| 配置位置           | 字段                     | 获取途径                                                             |
+| ------------------ | ------------------------ | -------------------------------------------------------------------- |
 | AppGallery Connect | Client ID、Client Secret | https://developer.huawei.com/consumer/cn/service/josp/agc/index.html |
-| 融云控制台 | Client ID、Client Secret | 同上 |
+| 融云控制台         | Client ID、Client Secret | 同上                                                                 |
 
 - 需先在 AGC 下载 `agconnect-services.json`，放入 `android/app/` 目录（客户端集成用）
 - 可选配置消息自分类标识（如 `IM`），提升推送优先级
@@ -70,29 +70,29 @@
 
 #### OPPO 推送
 
-| 配置位置 | 字段 | 获取途径 |
-|---|---|---|
+| 配置位置          | 字段                            | 获取途径                                     |
+| ----------------- | ------------------------------- | -------------------------------------------- |
 | OPPO 推送运营平台 | AppKey、AppSecret、MasterSecret | https://push.oppo.com/conf/app-configuration |
-| 融云控制台 | AppKey、MasterSecret | 同上 |
+| 融云控制台        | AppKey、MasterSecret            | 同上                                         |
 
 - **推送通道类型**：公信通道单日限量（注册用户数×2），IM 类应用建议申请**私信通道**并在融云控制台填 channelId
 - 需要 OPPO 企业开发者账号
 
 #### vivo 推送
 
-| 配置位置 | 字段 | 获取途径 |
-|---|---|---|
+| 配置位置      | 字段                     | 获取途径                  |
+| ------------- | ------------------------ | ------------------------- |
 | vivo 推送平台 | AppID、AppKey、AppSecret | https://vpush.vivo.com.cn |
-| 融云控制台 | AppID、AppKey、AppSecret | 同上 |
+| 融云控制台    | AppID、AppKey、AppSecret | 同上                      |
 
 - 可选配置推送模式（正式/测试）、推送通道类型与 Category
 
 #### 荣耀推送
 
-| 配置位置 | 字段 | 获取途径 |
-|---|---|---|
+| 配置位置           | 字段                     | 获取途径                      |
+| ------------------ | ------------------------ | ----------------------------- |
 | 荣耀开发者服务平台 | Client ID、Client Secret | https://developer.hihonor.com |
-| 融云控制台 | Client ID、Client Secret | 同上 |
+| 融云控制台         | Client ID、Client Secret | 同上                          |
 
 - 需先在荣耀平台下载 `mcs-services.json`，放入 `android/app/` 目录（客户端集成用）
 - ⚠️ IMLib SDK 从 5.6.7 开始支持荣耀推送；荣耀 Magic OS 8.0+ 设备必须集成荣耀推送才能收到通知
@@ -111,7 +111,12 @@
 新建 `plugins/withRongCloudPush.js`，内容要点：
 
 ```js
-const { withAppBuildGradle, withProjectBuildGradle, withGradleProperties, withAndroidManifest } = require('expo/config-plugins');
+const {
+  withAppBuildGradle,
+  withProjectBuildGradle,
+  withGradleProperties,
+  withAndroidManifest,
+} = require("expo/config-plugins");
 
 // 各厂商 manifestPlaceholders + push 依赖 + 厂商 Maven 仓库
 ```
@@ -217,10 +222,10 @@ override fun onCreate() {
 
 将以下文件放入 `android/app/`（通过 plugin 的 `withDangerousMod` 拷贝，或直接放入 `modules/` 目录引用）：
 
-| 文件 | 来源 |
-|---|---|
+| 文件                      | 来源                         |
+| ------------------------- | ---------------------------- |
 | `agconnect-services.json` | 华为 AppGallery Connect 下载 |
-| `mcs-services.json` | 荣耀开发者服务平台下载 |
+| `mcs-services.json`       | 荣耀开发者服务平台下载       |
 
 > ⚠️ `agconnect-services.json` 和 `mcs-services.json` 包含应用签名信息，**不要提交到 git**。
 
@@ -282,6 +287,7 @@ final class RongCloudPushHandler {
 #### 步骤 3：`aps-environment` entitlement
 
 由 `withRongCloudIosPush.js` 自动注入：
+
 - `development`（本地 debug / EAS development 构建）
 - `production`（`EAS_BUILD_PROFILE=production` 时）
 
@@ -326,10 +332,10 @@ engine = sdk.RCIMIWEngine.create(env.rongCloudAppKey, {
 ```ts
 export const env = {
   // ...原有字段
-  miPushAppId: process.env.EXPO_PUBLIC_MI_PUSH_APP_ID ?? '',
-  miPushAppKey: process.env.EXPO_PUBLIC_MI_PUSH_APP_KEY ?? '',
-  oppoPushAppKey: process.env.EXPO_PUBLIC_OPPO_PUSH_APP_KEY ?? '',
-  oppoPushAppSecret: process.env.EXPO_PUBLIC_OPPO_PUSH_APP_SECRET ?? '',
+  miPushAppId: process.env.EXPO_PUBLIC_MI_PUSH_APP_ID ?? "",
+  miPushAppKey: process.env.EXPO_PUBLIC_MI_PUSH_APP_KEY ?? "",
+  oppoPushAppKey: process.env.EXPO_PUBLIC_OPPO_PUSH_APP_KEY ?? "",
+  oppoPushAppSecret: process.env.EXPO_PUBLIC_OPPO_PUSH_APP_SECRET ?? "",
 };
 ```
 
@@ -342,12 +348,12 @@ export const env = {
 Android 13+ 需在 JS 层请求通知权限。用 `expo-notifications` 或原生模块：
 
 ```ts
-import * as Notifications from 'expo-notifications';
+import * as Notifications from "expo-notifications";
 
 async function requestNotificationPermission() {
-  if (Platform.OS === 'android' && Platform.Version >= 33) {
+  if (Platform.OS === "android" && Platform.Version >= 33) {
     const { status } = await Notifications.getPermissionsAsync();
-    if (status !== 'granted') {
+    if (status !== "granted") {
       await Notifications.requestPermissionsAsync();
     }
   }
@@ -362,14 +368,14 @@ async function requestNotificationPermission() {
 
 融云 SDK 根据设备 ROM 智能选择推送通道：
 
-| 通道 | 启用条件 | 优先级 |
-|---|---|---|
-| 华为 | 华为 ROM + 已配置 | 高 |
-| 荣耀 | 荣耀 ROM + 已配置 | 高 |
-| OPPO | ColorOS/realme/OnePlus ROM + 已配置 | 高 |
-| vivo | vivo ROM + 已配置 | 高 |
-| 小米 | 小米 ROM + 已配置 | 高 |
-| RongPush | 默认通道，不满足以上条件时兜底 | 低（国内大部分机型无法存活） |
+| 通道     | 启用条件                            | 优先级                       |
+| -------- | ----------------------------------- | ---------------------------- |
+| 华为     | 华为 ROM + 已配置                   | 高                           |
+| 荣耀     | 荣耀 ROM + 已配置                   | 高                           |
+| OPPO     | ColorOS/realme/OnePlus ROM + 已配置 | 高                           |
+| vivo     | vivo ROM + 已配置                   | 高                           |
+| 小米     | 小米 ROM + 已配置                   | 高                           |
+| RongPush | 默认通道，不满足以上条件时兜底      | 低（国内大部分机型无法存活） |
 
 > 魅族（Flyme）已移除厂商 AAR（其 Manifest 是 `READ_PHONE_STATE` 的唯一来源，且凭证长期为空），魅族设备回落 RongPush 兜底通道。
 
@@ -456,6 +462,7 @@ PC 端无系统推送，使用**应用内全局通知弹窗**，点击后跳转�
 ```
 
 关键文件：
+
 - `stores/chat.ts` — `notifyOrderStatus()` / `acceptOrderFromNotify()` / `notifyCustomerServiceInvite()`
 - `stores/ui.ts` — `openChat()` 打开全局聊天弹窗
 - `composables/useNotifyGuard.ts` — 通知上限守卫 + 降级通知中心
@@ -466,16 +473,16 @@ PC 端无系统推送，使用**应用内全局通知弹窗**，点击后跳转�
 
 根据 `chat-message.ts` 和 `rongcloud-commands.ts`，移动端涉及的消息类型：
 
-| 消息类型 | RC 消息标识 | 触发推送 | 说明 |
-|---|---|---|---|
-| 文本消息 | `RC:TxtMsg` | ✅ | 普通私聊文本，必然触发 |
-| 图片消息 | `RC:ImgMsg` | ✅ | 普通私聊图片，必然触发 |
-| 售后卡片 | `PZAfterSaleApply`（自定义） | ⚠️ 视配置 | 持久化消息，是否触发取决于融云控制台"自定义消息推送"开关 |
-| 订单通知卡片 | `ORDER_NOTIFY`（自定义） | ⚠️ 视配置 | 同上映响，需确认控制台配置 |
-| 接待邀请卡片 | `dispatchInvite`（自定义） | ⚠️ 视配置 | 同上映响，需确认控制台配置 |
-| 语聊房邀请 | 文本消息（含链接） | ✅ | 本质是文本消息，走 `RC:TxtMsg` 推送 |
-| 平台通知 | `TEXT_NOTIFY_MSG`（自定义） | ⚠️ 视配置 | 持久化消息，是否触发取决于控制台配置 |
-| 命令消息 | `RC:CmdMsg` | ❌ | 不持久化、不计未读，融云默认不推送 |
+| 消息类型     | RC 消息标识                  | 触发推送  | 说明                                                     |
+| ------------ | ---------------------------- | --------- | -------------------------------------------------------- |
+| 文本消息     | `RC:TxtMsg`                  | ✅        | 普通私聊文本，必然触发                                   |
+| 图片消息     | `RC:ImgMsg`                  | ✅        | 普通私聊图片，必然触发                                   |
+| 售后卡片     | `PZAfterSaleApply`（自定义） | ⚠️ 视配置 | 持久化消息，是否触发取决于融云控制台"自定义消息推送"开关 |
+| 订单通知卡片 | `ORDER_NOTIFY`（自定义）     | ⚠️ 视配置 | 同上映响，需确认控制台配置                               |
+| 接待邀请卡片 | `dispatchInvite`（自定义）   | ⚠️ 视配置 | 同上映响，需确认控制台配置                               |
+| 语聊房邀请   | 文本消息（含链接）           | ✅        | 本质是文本消息，走 `RC:TxtMsg` 推送                      |
+| 平台通知     | `TEXT_NOTIFY_MSG`（自定义）  | ⚠️ 视配置 | 持久化消息，是否触发取决于控制台配置                     |
+| 命令消息     | `RC:CmdMsg`                  | ❌        | 不持久化、不计未读，融云默认不推送                       |
 
 #### 关键结论
 
@@ -517,8 +524,8 @@ PrivateMessage message = new PrivateMessage()
 
 ```json
 {
-  "name": "ORDER_NOTIFY",        // RongMsgCommandEnum.code，客户端用此字段区分业务类型
-  "data": "{...}"                 // BaseMsgCommand 子类序列化 JSON 字符串
+  "name": "ORDER_NOTIFY", // RongMsgCommandEnum.code，客户端用此字段区分业务类型
+  "data": "{...}" // BaseMsgCommand 子类序列化 JSON 字符串
 }
 ```
 
@@ -528,7 +535,7 @@ PrivateMessage message = new PrivateMessage()
 {
   "commandName": "ORDER_NOTIFY",
   "expireTime": "2026-10-31T12:00:00",
-  "title": "老板已支付，请尽快接单~",
+  "title": "用户已支付，请尽快接单~",
   "orderId": 12345,
   "orderNo": "DJ20261031xxxx",
   "buyerNickname": "张三",
@@ -543,32 +550,32 @@ PrivateMessage message = new PrivateMessage()
 
 **各业务类型的 `name` 与 `data` 字段**：
 
-| `name`（RongMsgCommandEnum） | 发送者（SystemUserEnum） | `data` 类型 | 说明 |
-|---|---|---|---|
-| `ORDER_NOTIFY` | `ORDER_ASSISTANT`（50000002） | `OrderNotifyCommand` | 订单状态变更通知，持久化到聊天栏 |
-| `dispatchInvite` | `DISPATCH_ASSISTANT`（50000001） | `CustomerServiceInviteCommand` | 接待邀请卡片，持久化到聊天栏 |
-| `TEXT_NOTIFY_MSG` | `PLATFORM_NOTICE`（50000000） | `TextNotifyMsgCommand` | 平台文本通知，支持 markdown |
-| `QUICK_MATCH_NOTICE` | 按业务定 | `QuickMatchNoticeCommand` | 快速匹配抢单通知（命令消息，不推送） |
-| `QUICK_MATCH_EXPIRED` | 按业务定 | `QuickMatchExpiredCommand` | 快速匹配超时（命令消息，不推送） |
-| `CUSTOMER_SERVICE_INVITE` | 按业务定 | `CustomerServiceInviteCommand` | 拉客服实时信令（命令消息，不推送） |
-| `ROOM_KICKED` | 按业务定 | `RoomKickedCommand` | 语音房踢人通知（命令消息，不推送） |
+| `name`（RongMsgCommandEnum） | 发送者（SystemUserEnum）         | `data` 类型                    | 说明                                 |
+| ---------------------------- | -------------------------------- | ------------------------------ | ------------------------------------ |
+| `ORDER_NOTIFY`               | `ORDER_ASSISTANT`（50000002）    | `OrderNotifyCommand`           | 订单状态变更通知，持久化到聊天栏     |
+| `dispatchInvite`             | `DISPATCH_ASSISTANT`（50000001） | `CustomerServiceInviteCommand` | 接待邀请卡片，持久化到聊天栏         |
+| `TEXT_NOTIFY_MSG`            | `PLATFORM_NOTICE`（50000000）    | `TextNotifyMsgCommand`         | 平台文本通知，支持 markdown          |
+| `QUICK_MATCH_NOTICE`         | 按业务定                         | `QuickMatchNoticeCommand`      | 快速匹配抢单通知（命令消息，不推送） |
+| `QUICK_MATCH_EXPIRED`        | 按业务定                         | `QuickMatchExpiredCommand`     | 快速匹配超时（命令消息，不推送）     |
+| `CUSTOMER_SERVICE_INVITE`    | 按业务定                         | `CustomerServiceInviteCommand` | 拉客服实时信令（命令消息，不推送）   |
+| `ROOM_KICKED`                | 按业务定                         | `RoomKickedCommand`            | 语音房踢人通知（命令消息，不推送）   |
 
 **`BaseMsgCommand` 公共字段**（所有命令 DTO 的父类）：
 
-| 字段 | 类型 | 说明 |
-|---|---|---|
+| 字段          | 类型                 | 说明                            |
+| ------------- | -------------------- | ------------------------------- |
 | `commandName` | `RongMsgCommandEnum` | 融云命令名称，序列化时输出 code |
-| `expireTime` | `LocalDateTime` | 命令过期时间 |
+| `expireTime`  | `LocalDateTime`      | 命令过期时间                    |
 
 #### 各消息类型点击后目标页面
 
-| 消息来源 | targetId | 点击跳转目标 |
-|---|---|---|
-| 普通用户私聊 | 对方 userId | `/chat/{userId}` |
-| 订单助手（系统） | `50000002` | `/chat/50000002` |
-| 派单助手（系统） | `50000001` | `/chat/50000001` |
-| 平台通知（系统） | `50000000` | `/chat/50000000` |
-| 语聊房邀请 | 发送者 userId | `/chat/{userId}`（打开会话看邀请卡片） |
+| 消息来源         | targetId      | 点击跳转目标                           |
+| ---------------- | ------------- | -------------------------------------- |
+| 普通用户私聊     | 对方 userId   | `/chat/{userId}`                       |
+| 订单助手（系统） | `50000002`    | `/chat/50000002`                       |
+| 派单助手（系统） | `50000001`    | `/chat/50000001`                       |
+| 平台通知（系统） | `50000000`    | `/chat/50000000`                       |
+| 语聊房邀请       | 发送者 userId | `/chat/{userId}`（打开会话看邀请卡片） |
 
 ### 9.3 移动端推送点击流程
 
@@ -670,11 +677,16 @@ function navigateToPushTarget(targetId: string, conversationType: string) {
 
 export async function handlePendingPushClick() {
   try {
-    const pending = await NativeModules.RongCloudPushModule?.getPendingPushClick?.();
+    const pending =
+      await NativeModules.RongCloudPushModule?.getPendingPushClick?.();
     if (!pending?.targetId) return;
-    await NativeModules.RongCloudPushModule?.clearPendingPushClick?.().catch(() => undefined);
+    await NativeModules.RongCloudPushModule?.clearPendingPushClick?.().catch(
+      () => undefined,
+    );
     navigateToPushTarget(pending.targetId, pending.conversationType ?? "");
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 ```
 
@@ -752,35 +764,39 @@ private fun handlePushClickIntent(intent: android.content.Intent?) {
 async function handlePendingPushClickAndroid() {
   const raw = await NativeModules.RongCloudPushModule?.getPendingPushClick?.();
   if (!raw) return;
-  await NativeModules.RongCloudPushModule?.clearPendingPushClick?.().catch(() => undefined);
+  await NativeModules.RongCloudPushModule?.clearPendingPushClick?.().catch(
+    () => undefined,
+  );
   try {
     const data = JSON.parse(raw) as Partial<PendingPushClick>;
     navigateToPushTarget(data.targetId ?? "", data.conversationType ?? "");
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 ```
 
 ### 9.6 移动端与 PC 端差异对比
 
-| 维度 | PC 端 | 移动端 |
-|---|---|---|
-| 通知形式 | 应用内 TDesign NotifyPlugin 弹窗 | 系统通知栏推送 |
-| 点击事件 | `onClick` 回调（JS 直接处理） | 原生层回调 → UserDefaults/SharedPreferences → JS 启动时读取 |
-| 跳转方式 | `useUiStore().openChat()` 打开全局弹窗 | `router.push()` 导航到路由 |
-| 业务类型分发 | 订单通知/派单邀请/普通消息 | 按 targetId 分发（系统会话 vs 普通用户） |
-| 冷启动处理 | 不涉及（PC 常驻） | iOS：launchOptions 捕获 → UserDefaults；Android：onCreate Intent → SharedPreferences |
-| 温启动处理 | 不涉及 | iOS：didReceiveNotificationResponse；Android：onNewIntent |
-| 通知中心 | 有（降级被挤掉的通知） | 无（系统通知中心自然管理） |
+| 维度         | PC 端                                  | 移动端                                                                               |
+| ------------ | -------------------------------------- | ------------------------------------------------------------------------------------ |
+| 通知形式     | 应用内 TDesign NotifyPlugin 弹窗       | 系统通知栏推送                                                                       |
+| 点击事件     | `onClick` 回调（JS 直接处理）          | 原生层回调 → UserDefaults/SharedPreferences → JS 启动时读取                          |
+| 跳转方式     | `useUiStore().openChat()` 打开全局弹窗 | `router.push()` 导航到路由                                                           |
+| 业务类型分发 | 订单通知/派单邀请/普通消息             | 按 targetId 分发（系统会话 vs 普通用户）                                             |
+| 冷启动处理   | 不涉及（PC 常驻）                      | iOS：launchOptions 捕获 → UserDefaults；Android：onCreate Intent → SharedPreferences |
+| 温启动处理   | 不涉及                                 | iOS：didReceiveNotificationResponse；Android：onNewIntent                            |
+| 通知中心     | 有（降级被挤掉的通知）                 | 无（系统通知中心自然管理）                                                           |
 
 ### 9.7 关键文件改动清单
 
-| 文件 | 改动 | 平台 |
-|---|---|---|
-| `plugins/withRongCloudIosPush.js` | 追加注入 `didReceiveNotificationResponse` + 冷启动捕获（`super.application()` 之后） | iOS |
-| `plugins/withRongCloudAndroidInit.js` | 追加注入 `storePushClickData()` 到 MainApplication | Android |
-| `plugins/withRongCloudAndroidPushClick.js` | **新增**：注入 `handlePushClickIntent` 调用到 MainActivity.onCreate + `onNewIntent` 方法 | Android |
-| `src/features/message/push-click-handler.ts` | 新增：读取 PendingPushClick + 路由跳转 + `normalizeSystemConversationId` | JS |
-| `src/app/_layout.tsx` | 调用 `handlePendingPushClick()` | JS |
+| 文件                                         | 改动                                                                                     | 平台    |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------- | ------- |
+| `plugins/withRongCloudIosPush.js`            | 追加注入 `didReceiveNotificationResponse` + 冷启动捕获（`super.application()` 之后）     | iOS     |
+| `plugins/withRongCloudAndroidInit.js`        | 追加注入 `storePushClickData()` 到 MainApplication                                       | Android |
+| `plugins/withRongCloudAndroidPushClick.js`   | **新增**：注入 `handlePushClickIntent` 调用到 MainActivity.onCreate + `onNewIntent` 方法 | Android |
+| `src/features/message/push-click-handler.ts` | 新增：读取 PendingPushClick + 路由跳转 + `normalizeSystemConversationId`                 | JS      |
+| `src/app/_layout.tsx`                        | 调用 `handlePendingPushClick()`                                                          | JS      |
 
 ### 9.8 注意事项
 
@@ -798,17 +814,17 @@ async function handlePendingPushClickAndroid() {
 
 ## 10. 实施状态
 
-| 步骤 | 状态 | 说明 |
-|---|---|---|
-| iOS AppDelegate 推送权限 + deviceToken | ✅ 完成 | `plugins/withRongCloudIosPush.js` |
-| iOS `aps-environment` entitlement | ✅ 完成 | 自动注入 development/production |
-| iOS `UIBackgroundModes` | ✅ 完成 | `app.json` 已更新 |
-| Android 厂商 Push 插件 + 初始化 | ✅ 完成 | `plugins/withRongCloudPush.js` + `withRongCloudAndroidInit.js` |
-| Android `POST_NOTIFICATIONS` 权限 | ✅ 完成 | manifest + JS 层运行时请求 |
-| JS 层 `pushOptions` 传递 | ✅ 完成 | `rongcloud-im.ts` + `env.ts` |
-| **iOS APNs 证书配置** | ⏳ 待管理员 | Apple 开发者账户 → P8/P12 → 融云控制台 |
-| **Android 厂商凭证配置** | ⏳ 待管理员 | 各厂商后台 → 融云控制台 |
-| **融云控制台开启自定义消息推送** | ⏳ 待管理员 | 影响 ORDER_NOTIFY / dispatchInvite / TEXT_NOTIFY_MSG 是否触发推送 |
-| **推送点击跳转（iOS）** | ✅ 完成 | `plugins/withRongCloudIosPush.js` 追加回调 + `push-click-handler.ts` |
-| **推送点击跳转（Android）** | ✅ 完成 | `plugins/withRongCloudAndroidInit.js` 追加 Intent 处理 + `push-click-handler.ts` |
-| 真机联调 | ⏳ 待凭证配置完成 | 需 release 包验证 |
+| 步骤                                   | 状态              | 说明                                                                             |
+| -------------------------------------- | ----------------- | -------------------------------------------------------------------------------- |
+| iOS AppDelegate 推送权限 + deviceToken | ✅ 完成           | `plugins/withRongCloudIosPush.js`                                                |
+| iOS `aps-environment` entitlement      | ✅ 完成           | 自动注入 development/production                                                  |
+| iOS `UIBackgroundModes`                | ✅ 完成           | `app.json` 已更新                                                                |
+| Android 厂商 Push 插件 + 初始化        | ✅ 完成           | `plugins/withRongCloudPush.js` + `withRongCloudAndroidInit.js`                   |
+| Android `POST_NOTIFICATIONS` 权限      | ✅ 完成           | manifest + JS 层运行时请求                                                       |
+| JS 层 `pushOptions` 传递               | ✅ 完成           | `rongcloud-im.ts` + `env.ts`                                                     |
+| **iOS APNs 证书配置**                  | ⏳ 待管理员       | Apple 开发者账户 → P8/P12 → 融云控制台                                           |
+| **Android 厂商凭证配置**               | ⏳ 待管理员       | 各厂商后台 → 融云控制台                                                          |
+| **融云控制台开启自定义消息推送**       | ⏳ 待管理员       | 影响 ORDER_NOTIFY / dispatchInvite / TEXT_NOTIFY_MSG 是否触发推送                |
+| **推送点击跳转（iOS）**                | ✅ 完成           | `plugins/withRongCloudIosPush.js` 追加回调 + `push-click-handler.ts`             |
+| **推送点击跳转（Android）**            | ✅ 完成           | `plugins/withRongCloudAndroidInit.js` 追加 Intent 处理 + `push-click-handler.ts` |
+| 真机联调                               | ⏳ 待凭证配置完成 | 需 release 包验证                                                                |

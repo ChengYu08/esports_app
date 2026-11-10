@@ -83,7 +83,7 @@ describe("handleQuickMatchNotice", () => {
     handleQuickMatchNotice(
       command("QUICK_MATCH_NOTICE", {
         requestNo: "QM1",
-        buyerNickname: "老板A",
+        buyerNickname: "用户A",
         gameName: "王者荣耀",
         modeName: "上分",
         levelName: "钻石",
@@ -96,7 +96,7 @@ describe("handleQuickMatchNotice", () => {
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({
       id: "qm:QM1:1",
-      text: "「老板A」发布了王者荣耀需求",
+      text: "「用户A」发布了王者荣耀需求",
       expireAt: new Date("2026-10-20T12:30:00").getTime(),
       maxDurationMs: 15_000,
     });
@@ -143,7 +143,7 @@ describe("handleQuickMatchNotice", () => {
       NOW,
     );
     expect(useActionNoticeStore.getState().items[0]?.text).toBe(
-      "「老板」发布了快速匹配需求",
+      "「用户」发布了快速匹配需求",
     );
   });
 
@@ -344,7 +344,7 @@ describe("handleQuickMatchNotice", () => {
     handleQuickMatchNotice(
       command("QUICK_MATCH_NOTICE", {
         requestNo: "QM1",
-        buyerNickname: "老板A",
+        buyerNickname: "用户A",
         gameName: "王者荣耀",
         activityCode: "SECKILL001",
         activityType: "ACTIVITY_BASED_DISPATCHING",
@@ -356,7 +356,7 @@ describe("handleQuickMatchNotice", () => {
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({
       id: "qm:QM1:1",
-      text: "秒杀匹配中：「老板A」发布了王者荣耀需求",
+      text: "秒杀匹配中：「用户A」发布了王者荣耀需求",
     });
   });
 
@@ -364,7 +364,7 @@ describe("handleQuickMatchNotice", () => {
     handleQuickMatchNotice(
       command("QUICK_MATCH_NOTICE", {
         requestNo: "QM1",
-        buyerNickname: "老板A",
+        buyerNickname: "用户A",
         gameName: "王者荣耀",
         activityCode: "   ",
         expireTime: "2026-10-20 12:30:00",
@@ -372,7 +372,7 @@ describe("handleQuickMatchNotice", () => {
       NOW,
     );
     expect(useActionNoticeStore.getState().items[0]?.text).toBe(
-      "「老板A」发布了王者荣耀需求",
+      "「用户A」发布了王者荣耀需求",
     );
   });
 
@@ -408,7 +408,7 @@ describe("handleOrderNotifyPopup", () => {
     title: "订单支付通知",
     orderId: 123,
     orderNo: "PZ1",
-    buyerNickname: "老板B",
+    buyerNickname: "用户B",
     buyerHeadImage: "https://example.com/a.png",
   };
 
@@ -428,7 +428,7 @@ describe("handleOrderNotifyPopup", () => {
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({
       id: "pay:PZ1",
-      text: "「老板B」已支付订单，请尽快接单",
+      text: "「用户B」已支付订单，请尽快接单",
       actionText: "接单",
       expireAt: NOW + 15_000,
       maxDurationMs: 15_000,
@@ -468,7 +468,7 @@ describe("handleOrderNotifyPopup", () => {
       NOW,
     );
     expect(useActionNoticeStore.getState().items[0]?.text).toBe(
-      "「老板」已支付订单，请尽快接单",
+      "「用户」已支付订单，请尽快接单",
     );
   });
 

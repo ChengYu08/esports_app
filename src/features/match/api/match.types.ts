@@ -35,7 +35,7 @@ export type MatchService = {
 /** 0不限 / 1男 / 2女 */
 export type MatchGenderRequirement = 0 | 1 | 2;
 
-/** 1单陪 / 2双陪 */
+/** 1单大神 / 2双大神 */
 export type MatchCompanionPreference = 1 | 2;
 
 export type MatchVoiceOption = "不试音" | "需试音";
@@ -43,7 +43,7 @@ export type MatchVoiceOption = "不试音" | "需试音";
 export type PublishQuickMatchPayload = {
   clubId: number;
   publishType: "BUYER" | "RECEPTION";
-  /** 接待代发时必填：老板（语聊房房主）用户 ID */
+  /** 接待代发时必填：用户（语聊房房主）用户 ID */
   buyerUserId?: number;
   gameId: number;
   gameModeId: number;
@@ -174,7 +174,7 @@ export type QuickMatchAuditionRoom = {
   creatorUserId?: string | number;
 };
 
-/** 一陪多单：发布多陪服务时不带单/双陪偏好，详情中该字段为空即视为一陪多单 */
+/** 一陪多单：发布多陪服务时不带单/双大神偏好，详情中该字段为空即视为一陪多单 */
 export function isMultiCompanionRequest(
   detail: QuickMatchRequestDetail | null | undefined,
 ): boolean {
@@ -188,7 +188,9 @@ export const QUICK_MATCH_MAX_SELECT = 3;
 export function isActivityQuickMatch(
   detail: QuickMatchRequestDetail | null | undefined,
 ): boolean {
-  return Boolean(detail && detail.activityCode && detail.activityCode.trim() !== "");
+  return Boolean(
+    detail && detail.activityCode && detail.activityCode.trim() !== "",
+  );
 }
 
 /** 选人上限：活动模式用 maxSelectableCount（缺省兜底单选 1），普通模式维持 3 人多选 */
@@ -233,7 +235,9 @@ export function pruneSelectedIds(
   return selected.filter((id) => candidates.some((item) => item.id === id));
 }
 
-export function isQuickMatchActive(request: QuickMatchRequestDetail | null): boolean {
+export function isQuickMatchActive(
+  request: QuickMatchRequestDetail | null,
+): boolean {
   if (!request || request.status !== "MATCHING") return false;
   if (!request.expireTime) return true;
   return parseServerDateTime(request.expireTime) > Date.now();
@@ -251,7 +255,8 @@ export function isOwnActiveActivityRequest(
   if (userId == null || String(userId) === "") return false;
   if (!active || !isQuickMatchActive(active)) return false;
   // 活动判定与详情页 isActivityQuickMatch 同源：publishSource 为 ACTIVITY，或 activityCode 非空（旧数据可能缺省 publishSource）
-  if (active.publishSource !== "ACTIVITY" && !isActivityQuickMatch(active)) return false;
+  if (active.publishSource !== "ACTIVITY" && !isActivityQuickMatch(active))
+    return false;
   const buyerUserId = active.buyerUserId;
   if (buyerUserId == null || buyerUserId === "") return true;
   return buyerUserId === String(userId);

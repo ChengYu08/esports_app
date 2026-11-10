@@ -4,33 +4,33 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
-    useWindowDimensions,
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  useWindowDimensions,
 } from "react-native";
 import Animated, {
-    Easing,
-    useAnimatedStyle,
-    useSharedValue,
-    withDelay,
-    withRepeat,
-    withSequence,
-    withTiming,
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
+  withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
-    fetchActiveQuickMatch,
-    publishQuickMatch,
+  fetchActiveQuickMatch,
+  publishQuickMatch,
 } from "@/features/match/api/match.api";
 import {
-    isQuickMatchActive,
-    type MatchGame,
+  isQuickMatchActive,
+  type MatchGame,
 } from "@/features/match/api/match.types";
 import { LightGameOptionChip } from "@/features/match/components/LightGameOptionChip";
 import { LightOptionChip } from "@/features/match/components/LightOptionChip";
@@ -38,20 +38,20 @@ import { MatchLinearGradient } from "@/features/match/components/MatchLinearGrad
 import { openAuditionRoom } from "@/features/match/enter-audition-room";
 import { isExistingDispatchConflictMessage } from "@/features/match/existing-dispatch-hint";
 import {
-    MATCH_COMPANION_PREFERENCE_OPTIONS,
-    MATCH_GENDER_OPTIONS,
-    MATCH_REMARK_MAX,
-    MATCH_VOICE_OPTIONS,
-    useMatchForm,
+  MATCH_COMPANION_PREFERENCE_OPTIONS,
+  MATCH_GENDER_OPTIONS,
+  MATCH_REMARK_MAX,
+  MATCH_VOICE_OPTIONS,
+  useMatchForm,
 } from "@/features/match/hooks/use-match-form";
 import {
-    ensureRealNameBeforeVoiceRoomEnter,
-    promptSelfRealNameIfNeeded,
+  ensureRealNameBeforeVoiceRoomEnter,
+  promptSelfRealNameIfNeeded,
 } from "@/features/voice-room/ensure-real-name-before-enter";
 import { exitVoiceRoom } from "@/features/voice-room/exit-voice-room";
 import {
-    resolveVoiceRoomId,
-    voiceRoomApi,
+  resolveVoiceRoomId,
+  voiceRoomApi,
 } from "@/features/voice-room/voice-room.api";
 import type { VoiceRoomDetail } from "@/features/voice-room/voice-room.types";
 import { getDDinProStyle } from "@/shared/theme/typography";
@@ -106,13 +106,13 @@ type ClubQuickMatchSheetProps = {
   games: MatchGame[];
   initialGameId?: string;
   /**
-   * club：俱乐部页老板自发；
-   * reception：语聊房接待代发（买家为房主，固定需试音，发布后由老板端接管）
+   * club：俱乐部页用户自发；
+   * reception：语聊房接待代发（买家为房主，固定需试音，发布后由用户端接管）
    */
   mode?: "club" | "reception";
-  /** 接待代发时的老板用户 ID（mode=reception 必传） */
+  /** 接待代发时的用户用户 ID（mode=reception 必传） */
   buyerUserId?: string | number;
-  /** 接待代发时展示的老板昵称 */
+  /** 接待代发时展示的用户昵称 */
   buyerNickname?: string;
 };
 
@@ -305,7 +305,7 @@ export function ClubQuickMatchSheet({
       return;
     }
     if (form.showCompanionPreference && !form.companionPreference) {
-      showToast("请选择单陪或双陪");
+      showToast("请选择单大神或双大神");
       return;
     }
     if (form.remarkOverLimit) {
@@ -313,14 +313,14 @@ export function ClubQuickMatchSheet({
       return;
     }
     if (isReception && !buyerUserId) {
-      showToast("未识别到下单老板，请重试");
+      showToast("未识别到下单用户，请重试");
       return;
     }
     if (submitting) return;
 
-    // 接待代发固定需试音，由老板端接管进房；老板自发仍按表单选择
+    // 接待代发固定需试音，由用户端接管进房；用户自发仍按表单选择
     const needVoice = isReception ? true : form.voice === "需试音";
-    // 仅「会进试音房」的老板自发路径拦实名；接待纯代发不进房
+    // 仅「会进试音房」的用户自发路径拦实名；接待纯代发不进房
     if (
       !isReception &&
       needVoice &&
@@ -330,7 +330,7 @@ export function ClubQuickMatchSheet({
     }
     setSubmitting(true);
     try {
-      // 仅老板自发试音需退出当前房；接待代发在老板房间发起，不能退散老板房间
+      // 仅用户自发试音需退出当前房；接待代发在用户房间发起，不能退散用户房间
       const joinedRoom = joinedRoomRef.current;
       joinedRoomRef.current = null;
       const joinedRoomId = joinedRoom ? resolveVoiceRoomId(joinedRoom) : null;
@@ -368,7 +368,7 @@ export function ClubQuickMatchSheet({
       );
 
       if (isReception) {
-        showToast("已为老板发起派单");
+        showToast("已为用户发起派单");
         onClose();
         return;
       }
@@ -388,7 +388,7 @@ export function ClubQuickMatchSheet({
       if (await promptSelfRealNameIfNeeded(message)) {
         return;
       }
-      // 接待代发撞老板已有派单：保持 Toast，不替老板恢复进房
+      // 接待代发撞用户已有派单：保持 Toast，不替用户恢复进房
       if (!isReception && isExistingDispatchConflictMessage(message)) {
         try {
           const active = await fetchActiveQuickMatch(form.token);
@@ -444,7 +444,7 @@ export function ClubQuickMatchSheet({
       return;
     }
     if (form.showCompanionPreference && !form.companionPreference) {
-      showToast("请选择单陪或双陪");
+      showToast("请选择单大神或双大神");
       return;
     }
     if (form.remarkOverLimit) {
@@ -452,7 +452,7 @@ export function ClubQuickMatchSheet({
       return;
     }
     if (isReception && !buyerUserId) {
-      showToast("未识别到下单老板，请重试");
+      showToast("未识别到下单用户，请重试");
       return;
     }
 
@@ -504,7 +504,7 @@ export function ClubQuickMatchSheet({
             </Text>
             {isReception ? (
               <Text style={styles.subtitle} numberOfLines={1}>
-                帮「{buyerNickname || "老板"}」派单
+                帮「{buyerNickname || "用户"}」派单
               </Text>
             ) : null}
           </View>
@@ -737,7 +737,7 @@ export function ClubQuickMatchSheet({
                 </View>
               ) : (
                 <Text style={styles.publishText}>
-                  {isReception ? "为老板发起派单" : "立即发布，匹配大神"}
+                  {isReception ? "为用户发起派单" : "立即发布，匹配大神"}
                 </Text>
               )}
             </MatchLinearGradient>

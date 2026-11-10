@@ -33,12 +33,12 @@ it.each([
   expect(mapOrder(fields, 0, "accept").serviceName).toBe(expected);
 });
 
-it("下单侧展示大神和俱乐部，接单侧展示老板，并保留完整订单字段", () => {
+it("下单侧展示大神和俱乐部，接单侧展示用户，并保留完整订单字段", () => {
   const fields = {
     id: 42,
     orderNo: "ORDER-42",
     orderStatus: "ACCEPTED",
-    buyerNickname: "老板昵称",
+    buyerNickname: "用户昵称",
     buyerHeadImage: "https://example.com/buyer.png",
     receiverNickname: "大神昵称",
     receiverHeadImage: "https://example.com/companion.png",
@@ -63,7 +63,7 @@ it("下单侧展示大神和俱乐部，接单侧展示老板，并保留完整�
     clubName: "大神俱乐部",
   });
   expect(accept).toMatchObject({
-    sellerName: "老板昵称",
+    sellerName: "用户昵称",
     sellerAvatar: fields.buyerHeadImage,
     // 接单侧同样展示大神所属俱乐部
     clubName: "大神俱乐部",

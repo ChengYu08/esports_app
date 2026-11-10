@@ -6,22 +6,22 @@ import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Keyboard,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
-    fetchActiveQuickMatch,
-    publishQuickMatch,
+  fetchActiveQuickMatch,
+  publishQuickMatch,
 } from "@/features/match/api/match.api";
 import { isQuickMatchActive } from "@/features/match/api/match.types";
 import { ClubSelectSheet } from "@/features/match/components/ClubSelectSheet";
@@ -34,21 +34,21 @@ import { MatchStepper } from "@/features/match/components/MatchStepper";
 import { openAuditionRoom } from "@/features/match/enter-audition-room";
 import { isExistingDispatchConflictMessage } from "@/features/match/existing-dispatch-hint";
 import {
-    MATCH_COMPANION_PREFERENCE_OPTIONS,
-    MATCH_GENDER_OPTIONS,
-    MATCH_REMARK_MAX,
-    MATCH_VOICE_OPTIONS,
-    useMatchForm,
+  MATCH_COMPANION_PREFERENCE_OPTIONS,
+  MATCH_GENDER_OPTIONS,
+  MATCH_REMARK_MAX,
+  MATCH_VOICE_OPTIONS,
+  useMatchForm,
 } from "@/features/match/hooks/use-match-form";
 import { useRestoreActiveMatch } from "@/features/match/hooks/use-quick-match-session";
 import {
-    ensureRealNameBeforeVoiceRoomEnter,
-    promptSelfRealNameIfNeeded,
+  ensureRealNameBeforeVoiceRoomEnter,
+  promptSelfRealNameIfNeeded,
 } from "@/features/voice-room/ensure-real-name-before-enter";
 import { exitVoiceRoom } from "@/features/voice-room/exit-voice-room";
 import {
-    resolveVoiceRoomId,
-    voiceRoomApi,
+  resolveVoiceRoomId,
+  voiceRoomApi,
 } from "@/features/voice-room/voice-room.api";
 import type { VoiceRoomDetail } from "@/features/voice-room/voice-room.types";
 import { getDDinProStyle } from "@/shared/theme/typography";
@@ -174,7 +174,7 @@ export default function MatchPublishScreen() {
       return;
     }
     if (form.showCompanionPreference && !form.companionPreference) {
-      showToast("请选择单陪或双陪");
+      showToast("请选择单大神或双大神");
       return;
     }
     if (form.remarkOverLimit) {
@@ -293,7 +293,7 @@ export default function MatchPublishScreen() {
       return;
     }
     if (form.showCompanionPreference && !form.companionPreference) {
-      showToast("请选择单陪或双陪");
+      showToast("请选择单大神或双大神");
       return;
     }
     if (form.remarkOverLimit) {

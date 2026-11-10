@@ -1,17 +1,20 @@
 /**
  * 客服接单后的安全切房协调流程（对齐 PC useCustomerServiceRoomFlow）
  */
-import { useAuthStore } from "@esports/auth";
 import { showToast } from "@/shared/ui/app-toast";
+import { useAuthStore } from "@esports/auth";
 
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 
-import { ensureRealNameBeforeVoiceRoomEnter, promptSelfRealNameIfNeeded } from "./ensure-real-name-before-enter";
+import {
+    ensureRealNameBeforeVoiceRoomEnter,
+    promptSelfRealNameIfNeeded,
+} from "./ensure-real-name-before-enter";
 import { exitVoiceRoom } from "./exit-voice-room";
 import { navigateToVoiceRoom } from "./navigate-voice-room";
+import { useVoiceRoomSessionStore } from "./voice-room-session";
 import { resolveVoiceRoomId, voiceRoomApi } from "./voice-room.api";
 import type { VoiceRoomDetail } from "./voice-room.types";
-import { useVoiceRoomSessionStore } from "./voice-room-session";
 
 export type CustomerServiceInviteParams = {
   roomId: string;
@@ -27,21 +30,31 @@ export type CustomerServiceRoomFlowResult =
 const pendingClaimKeys = new Set<string>();
 
 function isSameRoom(
-  left: { id?: string | number; roomId?: string; roomVersion?: string | number } | null | undefined,
+  left:
+    | { id?: string | number; roomId?: string; roomVersion?: string | number }
+    | null
+    | undefined,
   right: { id: string; roomVersion: string | number } | null | undefined,
 ) {
   if (!left || !right) return false;
-  const leftId = resolveVoiceRoomId(left) || String(left.id ?? left.roomId ?? "");
-  return leftId === right.id && String(left.roomVersion ?? "") === String(right.roomVersion);
+  const leftId =
+    resolveVoiceRoomId(left) || String(left.id ?? left.roomId ?? "");
+  return (
+    leftId === right.id &&
+    String(left.roomVersion ?? "") === String(right.roomVersion)
+  );
 }
 
-function confirmRoomSwitch(current: VoiceRoomDetail, resumed: boolean): Promise<boolean> {
+function confirmRoomSwitch(
+  current: VoiceRoomDetail,
+  resumed: boolean,
+): Promise<boolean> {
   const selfId = String(useAuthStore.getState().user?.id || "");
   const isOwner = String(current.creatorUserId ?? "") === selfId;
   const prefix = resumed ? "你已接单。继续后将" : "只有接单成功后才会";
   const consequence = isOwner
-    ? "解散当前房间，房内所有成员都会被移出，然后进入老板的语聊房。"
-    : "退出当前房间并进入老板的语聊房，其他成员不受影响。";
+    ? "解散当前房间，房内所有成员都会被移出，然后进入用户的语聊房。"
+    : "退出当前房间并进入用户的语聊房，其他成员不受影响。";
   const roomName = current.roomName || "当前房间";
 
   return useAppConfirm.getState().confirm({
@@ -52,7 +65,9 @@ function confirmRoomSwitch(current: VoiceRoomDetail, resumed: boolean): Promise<
   });
 }
 
-async function canSwitchFromCurrentRoom(current: VoiceRoomDetail): Promise<boolean> {
+async function canSwitchFromCurrentRoom(
+  current: VoiceRoomDetail,
+): Promise<boolean> {
   const selfId = String(useAuthStore.getState().user?.id || "");
   if (String(current.serviceUserId ?? "") === selfId) {
     showToast("你正在当前房间接待，请先结束当前接待后再抢单");
@@ -70,9 +85,10 @@ async function leaveExpectedRoom(
   if (isSameRoom(latestCurrent, target)) return;
   if (!latestCurrent) return;
   if (
-    !expectedCurrent
-    || !isSameRoom(latestCurrent, {
-      id: resolveVoiceRoomId(expectedCurrent) || String(expectedCurrent.id ?? ""),
+    !expectedCurrent ||
+    !isSameRoom(latestCurrent, {
+      id:
+        resolveVoiceRoomId(expectedCurrent) || String(expectedCurrent.id ?? ""),
       roomVersion: expectedCurrent.roomVersion,
     })
   ) {
@@ -89,7 +105,8 @@ async function leaveExpectedRoom(
       roomId: latestId,
       roomVersion: latestCurrent.roomVersion ?? sessionRoom?.roomVersion ?? "1",
       creatorUserId: latestCurrent.creatorUserId ?? sessionRoom?.creatorUserId,
-      rongChatroomId: latestCurrent.rongChatroomId ?? sessionRoom?.rongChatroomId,
+      rongChatroomId:
+        latestCurrent.rongChatroomId ?? sessionRoom?.rongChatroomId,
     },
     userId,
     token,
@@ -150,7 +167,11 @@ export async function claimAndEnterCustomerServiceRoom(
     const targetVersion = String(target.roomVersion ?? params.roomVersion);
 
     try {
-      await leaveExpectedRoom(expectedCurrent, { id: targetId, roomVersion: targetVersion }, accessToken);
+      await leaveExpectedRoom(
+        expectedCurrent,
+        { id: targetId, roomVersion: targetVersion },
+        accessToken,
+      );
       navigateToVoiceRoom({ id: targetId, v: targetVersion });
       return { status: "entered" };
     } catch (error) {
@@ -159,7 +180,7 @@ export async function claimAndEnterCustomerServiceRoom(
         message:
           error instanceof Error
             ? error.message
-            : "暂时无法进入老板的语聊房，请稍后重试",
+            : "暂时无法进入用户的语聊房，请稍后重试",
       };
     }
   } catch (error) {

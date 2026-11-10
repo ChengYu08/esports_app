@@ -2,8 +2,8 @@ import { create } from "zustand";
 
 /**
  * 语聊房匹配选人场景（互斥，勿混用）：
- * - audition：老板一键匹配「需试音」自发进房
- * - quickMatchCreated：收到 QUICK_MATCH_CREATED（客服代发）后标记，供老板房内「选择大神」
+ * - audition：用户一键匹配「需试音」自发进房
+ * - quickMatchCreated：收到 QUICK_MATCH_CREATED（客服代发）后标记，供用户房内「选择大神」
  */
 export type VoiceRoomScene = "audition" | "quickMatchCreated";
 

@@ -143,7 +143,7 @@ export function OrderCompleteConfirmSheet({
           <View style={styles.participants}>
             <Participant
               label="点单玩家"
-              name={buyerName || order.sellerName || "老板"}
+              name={buyerName || order.sellerName || "用户"}
               avatar={buyerAvatar ?? order.sellerAvatar}
             />
             <Participant

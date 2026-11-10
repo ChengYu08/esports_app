@@ -431,7 +431,7 @@ export async function fetchActiveQuickMatch(
   return mapRequestDetail(response.data ?? null);
 }
 
-/** 查询当前客服代发的进行中需求（不含本人作为老板发布的需求） */
+/** 查询当前客服代发的进行中需求（不含本人作为用户发布的需求） */
 export async function fetchDispatchActiveQuickMatch(
   token: string,
   signal?: AbortSignal,

@@ -12,7 +12,7 @@ describe("parseQuickMatchNotice", () => {
     const payload = parseQuickMatchNotice({
       commandName: "QUICK_MATCH_NOTICE",
       requestNo: "QM20261020001",
-      buyerNickname: "老板A",
+      buyerNickname: "用户A",
       gameName: "王者荣耀",
       modeName: "上分",
       levelName: "钻石",
@@ -22,7 +22,7 @@ describe("parseQuickMatchNotice", () => {
     expect(payload).toEqual({
       requestNo: "QM20261020001",
       notifyRound: 1,
-      buyerNickname: "老板A",
+      buyerNickname: "用户A",
       gameName: "王者荣耀",
       modeName: "上分",
       levelName: "钻石",
@@ -113,14 +113,14 @@ describe("parseOrderNotifyPopup", () => {
       title: "订单支付通知",
       orderId: 12345,
       orderNo: "PZ20261020001",
-      buyerNickname: "老板B",
+      buyerNickname: "用户B",
       buyerHeadImage: "https://example.com/a.png",
     });
     expect(payload).toEqual({
       title: "订单支付通知",
       orderId: "12345",
       orderNo: "PZ20261020001",
-      buyerNickname: "老板B",
+      buyerNickname: "用户B",
       buyerHeadImage: "https://example.com/a.png",
     });
   });
