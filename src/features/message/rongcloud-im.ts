@@ -96,6 +96,70 @@ function getSdkEnums() {
   } : null;
 }
 
+type ProfileSnapshot = {
+  title: string;
+  avatar?: string;
+  isCustomerService?: boolean;
+};
+
+// 用户资料内存缓存：会话快照同步与每条收到的消息都要补拉昵称/头像，
+// 缓存 + 在途去重避免同一用户被反复请求（离线补偿一批同 peer 消息只发一次请求）；
+// TTL 兜底昵称/头像变更的展示时效，登出断开时整体清空
+const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
+const profileCache = new Map<string, { profile: ProfileSnapshot; expiresAt: number }>();
+const profileInFlight = new Map<string, Promise<ProfileSnapshot | null>>();
+
+function peekProfileSnapshot(userId: string): ProfileSnapshot | null {
+  const cached = profileCache.get(userId);
+  if (!cached || cached.expiresAt <= Date.now()) return null;
+  return cached.profile;
+}
+
+async function fetchProfileSnapshot(userId: string): Promise<ProfileSnapshot | null> {
+  const cached = peekProfileSnapshot(userId);
+  if (cached) return cached;
+  let pending = profileInFlight.get(userId);
+  if (!pending) {
+    pending = getClientAuthApi()
+      .getUserProfile(businessToken, userId)
+      .then((profile) => {
+        const snapshot: ProfileSnapshot = {
+          title: profile.nickname || '',
+          avatar: profile.headImage || undefined,
+          // 后端不下发该字段时保持 undefined（mergeConversations 保留本地标记）；
+          // 下发 "0" 时显式置 false，让客服身份始终以服务端为准（客服被移除后标签能退掉）
+          isCustomerService:
+            profile.customerService === undefined
+              ? undefined
+              : profile.customerService === '1',
+        };
+        // 昵称为空时只回退不落缓存：该用户资料可能未完善，落缓存会把
+        // 原始 ID 当标题钉住 5 分钟，完善后再收到消息也拿不到真名
+        if (profile.nickname) {
+          profileCache.set(userId, { profile: snapshot, expiresAt: Date.now() + PROFILE_CACHE_TTL_MS });
+        }
+        return snapshot;
+      })
+      .catch(() => null)
+      .finally(() => {
+        profileInFlight.delete(userId);
+      });
+    profileInFlight.set(userId, pending);
+  }
+  return pending;
+}
+
+function applyProfileSnapshot(conversation: RongConversation, profile: ProfileSnapshot): RongConversation {
+  return {
+    ...conversation,
+    title: profile.title || conversation.title,
+    avatar: profile.avatar || undefined,
+    ...(profile.isCustomerService === undefined
+      ? {}
+      : { isCustomerService: profile.isCustomerService }),
+  };
+}
+
 function mapPreview(message?: RCIMIWMessage) {
   const enums = getSdkEnums();
   const time = message?.sentTime ? new Date(message.sentTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '';
@@ -129,21 +193,9 @@ async function hydrateConversation(conversation: RongConversation) {
   if (isSystemConversationId(conversation.id)) {
     return { ...conversation, title: getSystemConversationTitle(conversation.id), avatar: undefined };
   }
-  try {
-    const profile = await getClientAuthApi().getUserProfile(businessToken, conversation.id);
-    return {
-      ...conversation,
-      title: profile.nickname || conversation.title,
-      avatar: profile.headImage || undefined,
-      // 后端不下发该字段时保持 undefined（mergeConversations 保留本地标记）；
-      // 下发 "0" 时显式置 false，让客服身份始终以服务端为准（客服被移除后标签能退掉）
-      ...(profile.customerService === undefined
-        ? {}
-        : { isCustomerService: profile.customerService === "1" }),
-    };
-  } catch {
-    return conversation;
-  }
+  const profile = await fetchProfileSnapshot(conversation.id);
+  if (!profile) return conversation;
+  return applyProfileSnapshot(conversation, profile);
 }
 
 export function isRongCloudAvailable() {
@@ -396,12 +448,18 @@ async function emitReceived(message: RCIMIWMessage, offline: boolean) {
   if (offline) {
     mapped.receivedOffline = true;
   }
-  const conversation = await hydrateConversation(mapConversation({
+  const base = mapConversation({
     targetId: getRongConversationTargetId(peerId),
     conversationType: message.conversationType,
     lastMessage: message,
     unreadCount: 1,
-  } as RCIMIWConversation));
+  } as RCIMIWConversation);
+  // 资料已缓存时同步 emit，消息落地/横幅不被资料请求的网络往返拖住；
+  // 未命中（本会话首次收到该用户消息）才等待补拉，行为与旧链路一致
+  const cachedProfile = peekProfileSnapshot(peerId);
+  const conversation = cachedProfile
+    ? applyProfileSnapshot(base, cachedProfile)
+    : await hydrateConversation(base);
   emitConversation(conversation);
   messageListeners.forEach((listener) => listener(peerId, mapped, conversation));
 }
@@ -916,6 +974,8 @@ export async function disconnectRongCloud() {
   if (engine) await engine.disconnect(false);
   connected = false;
   businessToken = '';
+  profileCache.clear();
+  profileInFlight.clear();
   conversationListeners.clear();
   conversationSyncListeners.clear();
   conversationReadSyncListeners.clear();
