@@ -161,13 +161,25 @@ export function handleQuickMatchNotice(command: RongCommand, now = Date.now()) {
 /**
  * ACTIVITY_ROOM_NOTICE：活动发布成功 / 扩大匹配范围等 Toast。
  * 仅展示后端下发的 content 文案；不进房、不消费 roomId/roomVersion。
+ * 无业务过期字段，按 sentTime 门控离线重放（对齐 ORDER_NOTIFY）。
  */
-export function handleActivityRoomNotice(command: RongCommand) {
+export function handleActivityRoomNotice(command: RongCommand, now = Date.now()) {
   if (command.name !== ACTIVITY_ROOM_NOTICE) return;
   if (command.senderId !== PLATFORM_NOTICE_USER_ID) return;
 
   const content = String(command.data.content ?? "").trim();
   if (!content) return;
+
+  const stale =
+    command.sentTime != null &&
+    now - command.sentTime > COMMAND_STALE_MAX_MS;
+  if (stale) {
+    logger.warn("activity_room_notice.stale_dropped", {
+      sentTime: formatServerDateTime(command.sentTime ?? now),
+      skewMs: now - (command.sentTime ?? now),
+    });
+    return;
+  }
 
   showToast(content, { duration: ACTIVITY_ROOM_NOTICE_TOAST_MS });
 }

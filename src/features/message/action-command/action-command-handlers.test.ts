@@ -557,10 +557,11 @@ describe("handleActivityRoomNotice", () => {
         roomId: 30100020,
         roomVersion: 25,
       }),
+      NOW,
     );
     expect(Toast.show).toHaveBeenCalledWith(
       "恭喜参与秒杀活动，请尽快在语聊房中选定陪玩并支付，锁定秒杀名额",
-      expect.objectContaining({ duration: 5000 }),
+      expect.objectContaining({ duration: 10000 }),
     );
   });
 
@@ -571,10 +572,11 @@ describe("handleActivityRoomNotice", () => {
         requestNo: "QM2119632871408664578",
         content: "已为您扩大匹配范围",
       }),
+      NOW,
     );
     expect(Toast.show).toHaveBeenCalledWith(
       "已为您扩大匹配范围",
-      expect.objectContaining({ duration: 5000 }),
+      expect.objectContaining({ duration: 10000 }),
     );
   });
 
@@ -585,6 +587,7 @@ describe("handleActivityRoomNotice", () => {
         { content: "已为您扩大匹配范围" },
         "60000000",
       ),
+      NOW,
     );
     expect(Toast.show).not.toHaveBeenCalled();
   });
@@ -592,6 +595,7 @@ describe("handleActivityRoomNotice", () => {
   it("空 content 忽略", () => {
     handleActivityRoomNotice(
       command("ACTIVITY_ROOM_NOTICE", { content: "   " }),
+      NOW,
     );
     expect(Toast.show).not.toHaveBeenCalled();
   });
@@ -599,7 +603,51 @@ describe("handleActivityRoomNotice", () => {
   it("其它命令名忽略", () => {
     handleActivityRoomNotice(
       command("ORDER_NOTIFY", { content: "已为您扩大匹配范围" }),
+      NOW,
     );
     expect(Toast.show).not.toHaveBeenCalled();
+  });
+
+  it("sentTime 距今超过 15 分钟的离线重放通知不 Toast", () => {
+    handleActivityRoomNotice(
+      command(
+        "ACTIVITY_ROOM_NOTICE",
+        { content: "已为您扩大匹配范围" },
+        PLATFORM,
+        NOW - 901_000,
+      ),
+      NOW,
+    );
+    expect(Toast.show).not.toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalledWith(
+      "activity_room_notice.stale_dropped",
+      expect.objectContaining({ skewMs: 901_000 }),
+    );
+  });
+
+  it("sentTime 距今恰满 15 分钟仍在阈值内，正常 Toast", () => {
+    handleActivityRoomNotice(
+      command(
+        "ACTIVITY_ROOM_NOTICE",
+        { content: "已为您扩大匹配范围" },
+        PLATFORM,
+        NOW - 900_000,
+      ),
+      NOW,
+    );
+    expect(Toast.show).toHaveBeenCalledTimes(1);
+  });
+
+  it("sentTime 缺失不拦截", () => {
+    handleActivityRoomNotice(
+      command(
+        "ACTIVITY_ROOM_NOTICE",
+        { content: "已为您扩大匹配范围" },
+        PLATFORM,
+        undefined,
+      ),
+      NOW,
+    );
+    expect(Toast.show).toHaveBeenCalledTimes(1);
   });
 });
