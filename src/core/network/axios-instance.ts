@@ -11,5 +11,7 @@ export const apiAxios = axiosCreate({
     "Content-Type": "application/json",
     // 必须带 Referer，否则会命中 WAF 被拦截（按平台取协议域名）
     Referer: env.referer,
+    // 后端按此头区分登录平台：dianjing-ios / dianjing-android
+    PZPlatform: env.ssoClientAppId,
   },
 });

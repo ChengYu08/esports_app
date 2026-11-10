@@ -1,19 +1,12 @@
 import { Search24Regular } from "@fluentui/react-native-icons";
 import type { ReactNode } from "react";
-import { Image } from "expo-image";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-
-const icons = {
-  clear: require("../../../../assets/svgs/message-clear.svg"),
-};
-
 type MessageHeaderProps = {
-  onClear: () => void;
   onSearch: () => void;
 };
 
-export function MessageHeader({ onClear, onSearch }: MessageHeaderProps) {
+export function MessageHeader({ onSearch }: MessageHeaderProps) {
   return (
     <View style={styles.header}>
       <View pointerEvents="none" style={styles.titleWrap}>
@@ -21,11 +14,6 @@ export function MessageHeader({ onClear, onSearch }: MessageHeaderProps) {
           消息
         </Text>
       </View>
-      <IconButton
-        accessibilityLabel="清除所有未读消息"
-        icon={<Image source={icons.clear} style={styles.icon} />}
-        onPress={onClear}
-      />
       <IconButton
         accessibilityLabel="搜索消息中的用户"
         icon={<Search24Regular color="#1A1A1A" width={24} height={24} />}
@@ -92,5 +80,4 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   buttonPressed: { opacity: 0.6 },
-  icon: { width: 24, height: 24 },
 });

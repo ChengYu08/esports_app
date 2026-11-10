@@ -96,25 +96,54 @@ function formatMessageTimeSeparator(timestamp: number) {
   return `${month}-${day} ${hours}:${minutes}`;
 }
 
-function buildChatListRows(messages: ManagedMessage[]): ChatListRow[] {
-  return messages.flatMap((message, index) => {
-    const previousMessage = messages[index - 1];
-    const showTime =
-      !previousMessage ||
-      message.sentAt - previousMessage.sentAt > 5 * 60 * 1000;
-    return [
-      ...(showTime
-        ? [
-            {
-              key: `time-${message.id}`,
-              kind: "time" as const,
-              label: formatMessageTimeSeparator(message.sentAt),
-            },
-          ]
-        : []),
-      { key: message.id, kind: "message" as const, message },
-    ];
-  });
+type ChatRowCacheEntry = {
+  previous: ManagedMessage | null;
+  rows: ChatListRow[];
+};
+
+// 行对象按消息引用缓存：store 里未变化的消息保持同一引用，对应行对象直接复用，
+// 新消息到达时已挂载气泡的 props 不变，PureComponent 列表项才能跳过重渲染；
+// 消息对象不可变，WeakMap 挂在消息上随 GC 回收，多实例共享也只做确定性复用
+const chatRowCache = new WeakMap<ManagedMessage, ChatRowCacheEntry>();
+function buildChatListRows(
+  messages: ManagedMessage[],
+  cache: WeakMap<ManagedMessage, ChatRowCacheEntry>,
+): ChatListRow[] {
+  // 倒序列表直接按新→旧构建，省掉正向拼接再整体翻转的两次数组拷贝
+  const rows: ChatListRow[] = [];
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    const previousMessage = index > 0 ? messages[index - 1] : null;
+    let entry = cache.get(message);
+    if (!entry || entry.previous !== previousMessage) {
+      const messageRow: ChatListRow = {
+        key: message.id,
+        kind: "message",
+        message,
+      };
+      const showTime =
+        !previousMessage ||
+        message.sentAt - previousMessage.sentAt > 5 * 60 * 1000;
+      entry = {
+        previous: previousMessage,
+        rows: showTime
+          ? [
+              {
+                key: `time-${message.id}`,
+                kind: "time",
+                label: formatMessageTimeSeparator(message.sentAt),
+              },
+              messageRow,
+            ]
+          : [messageRow],
+      };
+      cache.set(message, entry);
+    }
+    for (let row = entry.rows.length - 1; row >= 0; row -= 1) {
+      rows.push(entry.rows[row]);
+    }
+  }
+  return rows;
 }
 
 type ChatConversationProps = {
@@ -162,6 +191,9 @@ export function ChatConversation({
 }: ChatConversationProps) {
   const isSheet = presentation === "sheet";
   const insets = useSafeAreaInsets();
+  // 窗口宽度在顶层取一次下传给气泡：避免每个气泡各自订阅尺寸/安全区，
+  // 尺寸变化或转屏时 N 个订阅同时触发全量重渲染
+  const { width: windowWidth } = useWindowDimensions();
   const accessToken = useAuthStore((state) => state.accessToken);
   const userId = useAuthStore((state) => state.user?.id);
   const myClubId = useAuthStore((state) => state.user?.clubInfo?.id);
@@ -194,12 +226,15 @@ export function ChatConversation({
     [isPeerBlacklisted, messages],
   );
   const chatRows = useMemo(
-    () => buildChatListRows(visibleMessages).slice().reverse(),
+    () => buildChatListRows(visibleMessages, chatRowCache),
     [visibleMessages],
   );
   const connectionState = useMessageStore((state) => state.connectionState);
   const lastError = useMessageStore((state) => state.lastError);
   const openConversation = useMessageStore((state) => state.openConversation);
+  const ensureConversationHistory = useMessageStore(
+    (state) => state.ensureConversationHistory,
+  );
   const closeConversation = useMessageStore((state) => state.closeConversation);
   const sendText = useMessageStore((state) => state.sendText);
   const sendImage = useMessageStore((state) => state.sendImage);
@@ -352,6 +387,15 @@ export function ChatConversation({
       router.push({ pathname: "/order/[id]", params: { id: orderId } });
     });
   }, [navigateWithSheetDismiss]);
+  // 切房后原会话不再恢复弹窗；提成 useCallback 保持引用稳定，避免击穿气泡 memo
+  const handleEnterRoomInvite = useCallback(
+    (roomId: string, roomVersion: string) => {
+      navigateWithSheetDismiss(() => {
+        void enterRoomFromInvite(roomId, roomVersion);
+      }, false);
+    },
+    [navigateWithSheetDismiss],
+  );
   const openImagePreview = useCallback(
     async (message: ManagedMessage) => {
       try {
@@ -452,12 +496,9 @@ export function ChatConversation({
           myAvatar={myAvatar}
           peerName={conversation?.title || title || "用户"}
           myName={myNickname || "我"}
-          onEnterRoomInvite={(roomId, roomVersion) => {
-            // 切房后原会话不再恢复弹窗
-            navigateWithSheetDismiss(() => {
-              void enterRoomFromInvite(roomId, roomVersion);
-            }, false);
-          }}
+          windowWidth={windowWidth}
+          insetsTop={insets.top}
+          onEnterRoomInvite={handleEnterRoomInvite}
           onRetry={handleRetryMessage}
           onOpenProfile={canViewProfile ? openProfile : undefined}
           onOpenMyProfile={openMyProfile}
@@ -469,16 +510,18 @@ export function ChatConversation({
       canViewProfile,
       conversation?.title,
       conversationAvatar,
+      handleEnterRoomInvite,
       handleRetryMessage,
+      insets.top,
       isOrderAssistant,
       myAvatar,
       myNickname,
-      navigateWithSheetDismiss,
       openImagePreview,
       openMyProfile,
       openOrderDetail,
       openProfile,
       title,
+      windowWidth,
     ],
   );
 
@@ -498,6 +541,27 @@ export function ChatConversation({
     onBackRef.current = onBack;
   }, [onBack]);
 
+  // openConversation 载荷里的标题/头像/备注等随 store 与 props 漂移，经 ref 读取最新值，
+  // 避免进入下方 effect 的 deps——否则会话快照/资料一到就 close+open，消息记录被清空重拉
+  const openPayloadRef = useRef({
+    title: conversationBaseTitle,
+    avatar:
+      typeof conversationAvatar === "string" ? conversationAvatar : undefined,
+    clubId: clubId || conversation?.clubId,
+    isCustomerService,
+  });
+  useEffect(() => {
+    openPayloadRef.current = {
+      title: conversationBaseTitle,
+      avatar:
+        typeof conversationAvatar === "string" ? conversationAvatar : undefined,
+      clubId: clubId || conversation?.clubId,
+      isCustomerService,
+    };
+  });
+
+  // 会话的生命周期只跟路由参数绑定：id/登录态变化才 open/close，
+  // 连接状态与资料字段的变化由下方 effect 单独兜底，不再整段重跑
   useEffect(() => {
     if (isSelfConversation) {
       if (isSheet) {
@@ -507,31 +571,39 @@ export function ChatConversation({
       }
       return () => closeConversation(conversationId);
     }
-    if (accessToken && conversationId)
+    if (accessToken && conversationId) {
+      const payload = openPayloadRef.current;
       void openConversation({
         id: conversationId,
-        title: conversationBaseTitle,
-        avatar:
-          typeof conversationAvatar === "string"
-            ? conversationAvatar
-            : undefined,
-        clubId: clubId || conversation?.clubId,
-        ...(isCustomerService ? { isCustomerService: true } : {}),
+        title: payload.title,
+        avatar: payload.avatar,
+        clubId: payload.clubId,
+        ...(payload.isCustomerService ? { isCustomerService: true } : {}),
       });
+    }
     return () => closeConversation(conversationId);
   }, [
     accessToken,
     closeConversation,
-    clubId,
-    connectionState,
-    conversation?.clubId,
-    conversationAvatar,
-    conversationBaseTitle,
     conversationId,
-    isCustomerService,
     isSelfConversation,
     isSheet,
     openConversation,
+  ]);
+
+  // 进入聊天页时 IM 尚未 ready：openConversation 只记账不拉历史，
+  // 连接就绪后在这里补开一次；ensureConversationHistory 内部按历史记录存在性判重，
+  // 嵌套打开同一会话的各层共用一次拉取，不重复请求。
+  useEffect(() => {
+    if (connectionState !== "ready" || isSelfConversation) return;
+    if (!accessToken || !conversationId) return;
+    void ensureConversationHistory(conversationId);
+  }, [
+    accessToken,
+    connectionState,
+    conversationId,
+    ensureConversationHistory,
+    isSelfConversation,
   ]);
 
   const handleScroll = useCallback(
@@ -1149,6 +1221,19 @@ const ChatComposer = memo(function ChatComposer({
           >
             <Image source={chatEmoji} style={styles.toolIcon} />
           </Pressable>
+          {/* 弹窗模式展开表情面板时键盘已收起，此时没有任何发送入口；
+              草稿非空时补一个发送按钮，空态保持设计稿的单行输入条布局 */}
+          {draft.trim() ? (
+            <Pressable
+              accessibilityLabel="发送消息"
+              accessibilityRole="button"
+              onPress={() => void sendMessage()}
+              style={[styles.sendButton, styles.sendButtonSheet]}
+            >
+              <Text style={styles.sendText}>发送</Text>
+              <Image source={chatSend} style={styles.sendIcon} />
+            </Pressable>
+          ) : null}
         </View>
         {emojiPanel}
       </View>
@@ -1231,6 +1316,8 @@ const ChatBubble = memo(function ChatBubble({
   myAvatar,
   peerName,
   myName,
+  windowWidth,
+  insetsTop,
   onEnterRoomInvite,
   onRetry,
   onOpenProfile,
@@ -1243,6 +1330,10 @@ const ChatBubble = memo(function ChatBubble({
   myAvatar: { uri: string } | number;
   peerName: string;
   myName: string;
+  /** 窗口宽度：气泡/图片尺寸与复制菜单定位用，由父层订阅下传 */
+  windowWidth: number;
+  /** 顶部安全区：复制菜单翻转到气泡下方时判断是否越界 */
+  insetsTop: number;
   onEnterRoomInvite: (roomId: string, roomVersion: string) => void;
   onRetry: (clientId: string) => void;
   onOpenProfile?: () => void;
@@ -1250,8 +1341,6 @@ const ChatBubble = memo(function ChatBubble({
   onOpenOrder?: (orderId: string) => void;
   onPreviewImage: (message: ManagedMessage) => void;
 }) {
-  const { width: windowWidth } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
   const bubbleRef = useRef<View | null>(null);
   // 长按文案消息后菜单锚定的气泡位置（窗口坐标），菜单要挂在气泡正上方
   const [copyMenuAnchor, setCopyMenuAnchor] = useState<{
@@ -1325,7 +1414,7 @@ const ChatBubble = memo(function ChatBubble({
     : 0;
   const copyMenuAbove = copyMenuAnchor
     ? copyMenuAnchor.y - COPY_MENU_HEIGHT - COPY_MENU_ARROW / 2 - COPY_MENU_GAP
-      >= insets.top + 8
+      >= insetsTop + 8
     : true;
   const copyMenuTop = copyMenuAnchor
     ? copyMenuAbove
@@ -1843,6 +1932,8 @@ const styles = StyleSheet.create({
   },
   // 图标与单行文本垂直居中：底部留 10（44 条内 (44-24)/2）
   toolButtonSheet: { marginBottom: 10 },
+  // 弹窗模式发送按钮与图标行底部对齐
+  sendButtonSheet: { marginBottom: 10 },
   emojiPanel: { backgroundColor: "#FFFFFF" },
   // 表情/相册/发送按钮行左右留白 12
   composerActions: {

@@ -16,6 +16,8 @@ const VENDOR_REPOS = [
   "        maven { url 'https://developer.huawei.com/repo/' }",
   "        maven { url 'https://developer.hihonor.com/repo' }",
 ].join('\n');
+// 已移除 meizu:5.34.2：其 AAR manifest 是 READ_PHONE_STATE 的唯一来源，
+// 且魅族凭证长期为空、厂商通道实际未生效；Flyme 设备回落 RongPush 兜底通道。
 const VENDOR_PROPS = [
   ['MI_PUSH_APPID', process.env.MI_PUSH_APPID ?? ''],
   ['MI_PUSH_APPKEY', process.env.MI_PUSH_APPKEY ?? ''],
@@ -24,8 +26,6 @@ const VENDOR_PROPS = [
   ['VIVO_APPID', process.env.VIVO_APPID ?? ''],
   ['VIVO_APPKEY', process.env.VIVO_APPKEY ?? ''],
   ['HONOR_APPID', process.env.HONOR_APPID ?? ''],
-  ['MEIZU_APPID', process.env.MEIZU_APPID ?? ''],
-  ['MEIZU_APPKEY', process.env.MEIZU_APPKEY ?? ''],
 ];
 
 const APP_GRADLE_SNIPPET = `
@@ -42,8 +42,6 @@ android {
             VIVO_APP_ID      : "\${VIVO_APPID}",
             VIVO_APP_KEY     : "\${VIVO_APPKEY}",
             HONOR_APP_ID     : "\${HONOR_APPID}",
-            MEIZU_APP_ID     : "\${MEIZU_APPID}",
-            MEIZU_APP_KEY    : "\${MEIZU_APPKEY}",
         ]
     }
 }
@@ -55,7 +53,6 @@ dependencies {
     implementation "cn.rongcloud.sdk.push:oppo:${RONG_PUSH_VERSION}"
     implementation "cn.rongcloud.sdk.push:vivo:${RONG_PUSH_VERSION}"
     implementation "cn.rongcloud.sdk.push:honor:${RONG_PUSH_VERSION}"
-    implementation "cn.rongcloud.sdk.push:meizu:${RONG_PUSH_VERSION}"
 }
 // @generated end ${TAG}
 `;
@@ -138,4 +135,4 @@ function withRongCloudPush(config) {
   return config;
 }
 
-module.exports = createRunOncePlugin(withRongCloudPush, TAG, '1.0.0');
+module.exports = createRunOncePlugin(withRongCloudPush, TAG, '1.0.1');

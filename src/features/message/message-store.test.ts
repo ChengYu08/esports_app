@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import { clientAuthApi } from "@/features/auth/client-auth.api";
 import type {
-    ManagedMessage,
-    MessageConversation,
-    MessageHistoryPage,
+  ManagedMessage,
+  MessageConversation,
+  MessageHistoryPage,
 } from "./message-state";
 import { createMessageStore, type MessageAdapter } from "./message-store";
 import { useInAppNotification } from "./notification-hub";
@@ -112,6 +112,38 @@ describe("message store", () => {
     });
     await store.getState().reset();
     expect(store.getState().conversations).toEqual([]);
+  });
+
+  it("preserves messages and history while the same conversation is nested-opened twice", async () => {
+    let receiveMessage:
+      | Parameters<MessageAdapter["subscribeMessages"]>[0]
+      | undefined;
+    const adapter = makeAdapter({
+      subscribeMessages: (listener) => {
+        receiveMessage = listener;
+        return () => undefined;
+      },
+    });
+    const store = createMessageStore(adapter);
+    await store.getState().initialize("token");
+    // 嵌套打开同一会话（主页→聊天→主页→聊天），每层各持一项引用计数
+    await store.getState().openConversation({ id: "42", title: "Peer" });
+    await store.getState().openConversation({ id: "42", title: "Peer" });
+    receiveMessage?.("42", { ...sentMessage, isMine: false }, conversation);
+    expect(store.getState().messagesByPeerId["42"]).toHaveLength(1);
+    // 历史只拉一次，第二次 open 不重复请求
+    expect(adapter.getMessages).toHaveBeenCalledTimes(1);
+
+    // 关掉一层（外层页面），消息与历史都还在
+    store.getState().closeConversation("42");
+    expect(store.getState().messagesByPeerId["42"]).toHaveLength(1);
+    expect(store.getState().historyByPeerId["42"]).toBeDefined();
+
+    // 关掉最后一层才清空
+    store.getState().closeConversation("42");
+    expect(store.getState().messagesByPeerId["42"]).toBeUndefined();
+    expect(store.getState().historyByPeerId["42"]).toBeUndefined();
+    await store.getState().reset();
   });
 
   it("keeps IM ready and receives live messages when history synchronization fails", async () => {

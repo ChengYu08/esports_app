@@ -1,7 +1,7 @@
 # 融云离线推送集成方案
 
 > 状态：iOS ✅ 已完成客户端集成（待配置 APNs 证书）/ Android 代码就绪（待配置厂商凭证）
-> 范围：Android（小米/华为/OPPO/vivo/荣耀/魅族）+ iOS（APNs）
+> 范围：Android（小米/华为/OPPO/vivo/荣耀）+ iOS（APNs）
 > SDK 基线：`@rongcloud/react-native-im-wrapper@5.34.0`（Android IMLib 5.34.2 / iOS IMLib 5.34.0）
 
 ---
@@ -97,13 +97,6 @@
 - 需先在荣耀平台下载 `mcs-services.json`，放入 `android/app/` 目录（客户端集成用）
 - ⚠️ IMLib SDK 从 5.6.7 开始支持荣耀推送；荣耀 Magic OS 8.0+ 设备必须集成荣耀推送才能收到通知
 
-#### 魅族推送
-
-| 配置位置 | 字段 | 获取途径 |
-|---|---|---|
-| 魅族推送平台 | AppID、AppKey、AppSecret | https://push.meizu.com |
-| 融云控制台 | AppID、AppSecret | 同上 |
-
 ---
 
 ## 4. 客户端集成
@@ -155,9 +148,6 @@ android {
       VIVO_APP_KEY          : "${VIVO_APPKEY}",
       // 荣耀
       HONOR_APP_ID          : "${HONOR_APPID}",
-      // 魅族
-      MEIZU_APP_ID          : "${MEIZU_APPID}",
-      MEIZU_APP_KEY         : "${MEIZU_APPKEY}",
     ]
   }
 }
@@ -170,7 +160,6 @@ dependencies {
   implementation "cn.rongcloud.sdk.push:oppo:$rongPushVersion"
   implementation "cn.rongcloud.sdk.push:vivo:$rongPushVersion"
   implementation "cn.rongcloud.sdk.push:honor:$rongPushVersion"
-  implementation "cn.rongcloud.sdk.push:meizu:$rongPushVersion"
 }
 
 // 华为 AGC 插件（需加在文件底部）
@@ -189,11 +178,11 @@ OPPO_APPSECRET=xxxxxxxx
 VIVO_APPID=xxxxxxxx
 VIVO_APPKEY=xxxxxxxx
 HONOR_APPID=xxxxxxxx
-MEIZU_APPID=xxxxxxxx
-MEIZU_APPKEY=xxxxxxxx
 ```
 
 > ⚠️ 这些密钥会打包进 APK，属于客户端标识，非服务端密钥。不要提交真实密钥到公共仓库。
+
+> ⚠️ 厂商集合变更（新增或移除某个厂商 AAR）后必须执行 `npx expo prebuild --platform android --clean` 重建原生工程；非 clean 的 prebuild 会保留旧依赖，导致已删除的厂商通道仍被打包。
 
 #### 步骤 5：`MainApplication.kt` 初始化 RongPushPlugin
 
@@ -320,8 +309,6 @@ engine = sdk.RCIMIWEngine.create(env.rongCloudAppKey, {
   pushOptions: {
     idMI: Env.miPushAppId,
     appKeyMI: Env.miPushAppKey,
-    appIdMeizu: Env.meizuPushAppId,
-    appKeyMeizu: Env.meizuPushAppKey,
     appKeyOPPO: Env.oppoPushAppKey,
     appSecretOPPO: Env.oppoPushAppSecret,
     enableHWPush: true,
@@ -341,8 +328,6 @@ export const env = {
   // ...原有字段
   miPushAppId: process.env.EXPO_PUBLIC_MI_PUSH_APP_ID ?? '',
   miPushAppKey: process.env.EXPO_PUBLIC_MI_PUSH_APP_KEY ?? '',
-  meizuPushAppId: process.env.EXPO_PUBLIC_MEIZU_PUSH_APP_ID ?? '',
-  meizuPushAppKey: process.env.EXPO_PUBLIC_MEIZU_PUSH_APP_KEY ?? '',
   oppoPushAppKey: process.env.EXPO_PUBLIC_OPPO_PUSH_APP_KEY ?? '',
   oppoPushAppSecret: process.env.EXPO_PUBLIC_OPPO_PUSH_APP_SECRET ?? '',
 };
@@ -384,8 +369,9 @@ async function requestNotificationPermission() {
 | OPPO | ColorOS/realme/OnePlus ROM + 已配置 | 高 |
 | vivo | vivo ROM + 已配置 | 高 |
 | 小米 | 小米 ROM + 已配置 | 高 |
-| 魅族 | Flyme ROM + 已配置 | 高 |
 | RongPush | 默认通道，不满足以上条件时兜底 | 低（国内大部分机型无法存活） |
+
+> 魅族（Flyme）已移除厂商 AAR（其 Manifest 是 `READ_PHONE_STATE` 的唯一来源，且凭证长期为空），魅族设备回落 RongPush 兜底通道。
 
 ---
 
