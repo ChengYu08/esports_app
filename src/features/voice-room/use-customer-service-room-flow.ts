@@ -53,12 +53,12 @@ function confirmRoomSwitch(
   const isOwner = String(current.creatorUserId ?? "") === selfId;
   const prefix = resumed ? "你已接单。继续后将" : "只有接单成功后才会";
   const consequence = isOwner
-    ? "解散当前房间，房内所有成员都会被移出，然后进入用户的语聊房。"
-    : "退出当前房间并进入用户的语聊房，其他成员不受影响。";
+    ? "解散当前房间，房内所有成员都会被移出，然后进入用户的开黑房。"
+    : "退出当前房间并进入用户的开黑房，其他成员不受影响。";
   const roomName = current.roomName || "当前房间";
 
   return useAppConfirm.getState().confirm({
-    title: resumed ? "进入接待房间" : "切换语聊房并接单",
+    title: resumed ? "进入接待房间" : "切换开黑房并接单",
     message: `你当前正在「${roomName}」中。${isOwner ? "你是该房间的房主。" : ""}${prefix}${consequence}`,
     cancelText: "暂不处理",
     confirmText: resumed ? "继续进入" : "继续接单",
@@ -92,11 +92,11 @@ async function leaveExpectedRoom(
       roomVersion: expectedCurrent.roomVersion,
     })
   ) {
-    throw new Error("当前语聊房已发生变化，请确认后重试");
+    throw new Error("当前开黑房已发生变化，请确认后重试");
   }
 
   const latestId = resolveVoiceRoomId(latestCurrent);
-  if (!latestId) throw new Error("当前语聊房信息不完整");
+  if (!latestId) throw new Error("当前开黑房信息不完整");
 
   const sessionRoom = useVoiceRoomSessionStore.getState().activeRoom;
   const userId = String(useAuthStore.getState().user?.id || "");
@@ -114,7 +114,7 @@ async function leaveExpectedRoom(
 
   const remained = await voiceRoomApi.getJoinedRoom(token);
   if (remained && !isSameRoom(remained, target)) {
-    throw new Error("暂时无法退出当前语聊房，请稍后重试");
+    throw new Error("暂时无法退出当前开黑房，请稍后重试");
   }
 }
 
@@ -180,7 +180,7 @@ export async function claimAndEnterCustomerServiceRoom(
         message:
           error instanceof Error
             ? error.message
-            : "暂时无法进入用户的语聊房，请稍后重试",
+            : "暂时无法进入用户的开黑房，请稍后重试",
       };
     }
   } catch (error) {
@@ -189,7 +189,7 @@ export async function claimAndEnterCustomerServiceRoom(
       message:
         error instanceof Error
           ? error.message
-          : "暂时无法确认当前语聊房状态，请稍后重试",
+          : "暂时无法确认当前开黑房状态，请稍后重试",
     };
   } finally {
     pendingClaimKeys.delete(key);

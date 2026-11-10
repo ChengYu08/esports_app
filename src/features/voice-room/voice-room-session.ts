@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 /**
- * 语聊房匹配选人场景（互斥，勿混用）：
+ * 开黑房匹配选人场景（互斥，勿混用）：
  * - audition：用户一键匹配「需试音」自发进房
  * - quickMatchCreated：收到 QUICK_MATCH_CREATED（客服代发）后标记，供用户房内「选择大神」
  */
@@ -29,10 +29,10 @@ type VoiceRoomSessionState = {
   joiningRoom: ActiveVoiceRoom | null;
   lastKickedRoom: ActiveVoiceRoom | null;
   microphoneMuted: boolean;
-  /** 语聊房屏当前是否处于聚焦（栈顶可见）状态（单实例导航判断用，见 navigate-voice-room.ts） */
+  /** 开黑房屏当前是否处于聚焦（栈顶可见）状态（单实例导航判断用，见 navigate-voice-room.ts） */
   screenFocused: boolean;
   /**
-   * 当前持有聚焦权的语聊房屏实例 id（React useId，每次 mount 唯一）。
+   * 当前持有聚焦权的开黑房屏实例 id（React useId，每次 mount 唯一）。
    * 非聚焦页进房（如聊天页点邀请卡）会叠出同房第二个屏实例，此时旧实例仍在栈里；
    * 旧实例重新聚焦时若聚焦权不在自己手上，由焦点守卫自动弹出（见 VoiceRoomScreen）。
    */
@@ -48,7 +48,7 @@ type VoiceRoomSessionState = {
 };
 
 // 房主主动解散的实例标记：destroy 请求触发的融云销毁事件可能先于 HTTP 响应到达，
-// 命中标记的销毁事件是本人操作的结果，不弹「语聊房已关闭」（对齐 PC intentionalRoomExitInstances）
+// 命中标记的销毁事件是本人操作的结果，不弹「开黑房已关闭」（对齐 PC intentionalRoomExitInstances）
 const intentionalExitInstanceKeys = new Set<string>();
 
 export function markVoiceRoomIntentionalExit(room: {

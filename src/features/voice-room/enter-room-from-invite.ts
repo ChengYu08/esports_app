@@ -1,12 +1,15 @@
 /**
- * 私信语聊房邀请卡进房：始终查 joined/current；同 roomId 直进；其他房确认后 exit 再进。
+ * 私信开黑房邀请卡进房：始终查 joined/current；同 roomId 直进；其他房确认后 exit 再进。
  */
 import { useAuthStore } from "@esports/auth";
 
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { showToast } from "@/shared/ui/app-toast";
 
-import { ensureRealNameBeforeVoiceRoomEnter, promptSelfRealNameIfNeeded } from "./ensure-real-name-before-enter";
+import {
+    ensureRealNameBeforeVoiceRoomEnter,
+    promptSelfRealNameIfNeeded,
+} from "./ensure-real-name-before-enter";
 import { exitVoiceRoom } from "./exit-voice-room";
 import { navigateToVoiceRoom } from "./navigate-voice-room";
 import { useVoiceRoomSessionStore } from "./voice-room-session";
@@ -36,8 +39,8 @@ function confirmRoomSwitch(current: VoiceRoomDetail): Promise<boolean> {
   const leaveAction = isOwner ? "解散" : "退出";
 
   return useAppConfirm.getState().confirm({
-    title: "切换语聊房",
-    message: `切换将${leaveAction}「${roomName}」并进入目标语聊房，是否继续？`,
+    title: "切换开黑房",
+    message: `切换将${leaveAction}「${roomName}」并进入目标开黑房，是否继续？`,
     cancelText: "取消",
     confirmText: "进入",
   });
@@ -64,7 +67,7 @@ async function leaveCurrentForInvite(
   const expectedId = resolveVoiceRoomId(current);
   const latestId = resolveVoiceRoomId(latestCurrent);
   if (!expectedId || !latestId || latestId !== expectedId) {
-    throw new Error("当前语聊房已发生变化，请确认后重试");
+    throw new Error("当前开黑房已发生变化，请确认后重试");
   }
 
   const sessionRoom = useVoiceRoomSessionStore.getState().activeRoom;
@@ -83,7 +86,7 @@ async function leaveCurrentForInvite(
 
   const remained = await voiceRoomApi.getJoinedRoom(token);
   if (remained && !isSameRoomId(remained, targetRoomId)) {
-    throw new Error("暂时无法退出当前语聊房，请稍后重试");
+    throw new Error("暂时无法退出当前开黑房，请稍后重试");
   }
 }
 
@@ -117,12 +120,11 @@ export async function enterRoomFromInvite(
       const detail = await voiceRoomApi.getDetail(roomId, accessToken);
       // roomStatus：1 开启，0 关闭（对齐 PC）
       if (!detail || !resolveVoiceRoomId(detail) || detail.roomStatus !== 1) {
-        showToast("语聊房已关闭");
-        return { status: "failed", message: "语聊房已关闭" };
+        showToast("开黑房已关闭");
+        return { status: "failed", message: "开黑房已关闭" };
       }
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "语聊房已关闭";
+      const message = error instanceof Error ? error.message : "开黑房已关闭";
       if (await promptSelfRealNameIfNeeded(message)) {
         return { status: "failed", message };
       }
@@ -135,9 +137,7 @@ export async function enterRoomFromInvite(
       joined = await voiceRoomApi.getJoinedRoom(accessToken);
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : "查询语聊房状态失败，请重试";
+        error instanceof Error ? error.message : "查询开黑房状态失败，请重试";
       showToast(message);
       return { status: "failed", message };
     }
@@ -162,7 +162,7 @@ export async function enterRoomFromInvite(
       const message =
         error instanceof Error
           ? error.message
-          : "暂时无法进入语聊房，请稍后重试";
+          : "暂时无法进入开黑房，请稍后重试";
       showToast(message);
       return { status: "failed", message };
     }

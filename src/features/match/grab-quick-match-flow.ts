@@ -100,8 +100,8 @@ function confirmRoomSwitch(current: VoiceRoomDetail): Promise<boolean> {
     : "退出当前房间并进入用户的试音房。";
 
   return useAppConfirm.getState().confirm({
-    title: "切换语聊房并抢单",
-    message: `你当前正在「${roomName}」语聊房中。${roleText}继续抢单后，只有抢单成功才会${consequence}`,
+    title: "切换开黑房并抢单",
+    message: `你当前正在「${roomName}」开黑房中。${roleText}继续抢单后，只有抢单成功才会${consequence}`,
     cancelText: "暂不抢单",
     confirmText: "继续抢单",
   });
@@ -130,7 +130,7 @@ async function canSwitchFromCurrentRoom(
     ) {
       return true;
     }
-    showToast("当前语聊房关联了你正在进行的派单，请先取消该派单后再抢单");
+    showToast("当前开黑房关联了你正在进行的派单，请先取消该派单后再抢单");
     return false;
   } catch {
     return true;
@@ -177,11 +177,11 @@ async function leaveExpectedRoom(
       roomVersion: expectedCurrent.roomVersion,
     })
   ) {
-    throw new Error("当前语聊房已发生变化，请确认后重试");
+    throw new Error("当前开黑房已发生变化，请确认后重试");
   }
 
   const latestId = resolveVoiceRoomId(latestCurrent);
-  if (!latestId) throw new Error("当前语聊房信息不完整");
+  if (!latestId) throw new Error("当前开黑房信息不完整");
 
   const sessionRoom = useVoiceRoomSessionStore.getState().activeRoom;
   const userId = String(useAuthStore.getState().user?.id || "");
@@ -199,7 +199,7 @@ async function leaveExpectedRoom(
 
   const remained = await voiceRoomApi.getJoinedRoom(token);
   if (remained && !isSameRoom(remained, target)) {
-    throw new Error("暂时无法退出当前语聊房，请稍后重试");
+    throw new Error("暂时无法退出当前开黑房，请稍后重试");
   }
 }
 

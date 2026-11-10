@@ -128,12 +128,12 @@ describe("claimAndEnterCustomerServiceRoom room-switch confirm", () => {
     const flow = claimAndEnterCustomerServiceRoom(invite);
 
     const options = await waitForConfirmDialog();
-    expect(options.title).toBe("切换语聊房并接单");
+    expect(options.title).toBe("切换开黑房并接单");
     expect(options.cancelText).toBe("暂不处理");
     expect(options.confirmText).toBe("继续接单");
     expect(options.message).toContain("当前房间");
     expect(options.message).toContain(
-      "退出当前房间并进入用户的语聊房，其他成员不受影响。",
+      "退出当前房间并进入用户的开黑房，其他成员不受影响。",
     );
 
     useAppConfirm.getState().settle(false);

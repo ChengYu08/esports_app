@@ -59,7 +59,8 @@ vi.mock("@/features/voice-room/voice-room.api", () => ({
   voiceRoomApi: {
     getDetail: vi.fn(async () => mocks.roomDetail),
     getJoinedRoom: vi.fn(async () =>
-      mocks.exitCount > 0 ? mocks.joinedRoomAfterExit : mocks.joinedRoom),
+      mocks.exitCount > 0 ? mocks.joinedRoomAfterExit : mocks.joinedRoom,
+    ),
   },
 }));
 
@@ -91,8 +92,10 @@ const { router } = await import("expo-router");
 const Toast = (await import("react-native-root-toast")).default;
 const { voiceRoomApi } = await import("@/features/voice-room/voice-room.api");
 const { exitVoiceRoom } = await import("@/features/voice-room/exit-voice-room");
-const { refreshDispatchAfterGrabAttempt, refreshDispatchDetail } = await import("@/features/order/order-query");
-const { actionNotice } = await import("@/shared/ui/action-notice/action-notice-store");
+const { refreshDispatchAfterGrabAttempt, refreshDispatchDetail } =
+  await import("@/features/order/order-query");
+const { actionNotice } =
+  await import("@/shared/ui/action-notice/action-notice-store");
 
 function auditionDetail(overrides: Record<string, unknown> = {}) {
   return {
@@ -192,7 +195,7 @@ describe("grabQuickMatchAndEnterAudition", () => {
     expect(router.push).not.toHaveBeenCalled();
   });
 
-  it("有试音且不在其他房：抢单后进语聊房", async () => {
+  it("有试音且不在其他房：抢单后进开黑房", async () => {
     mocks.detail = auditionDetail();
     mocks.grabResult = auditionDetail();
 
@@ -237,7 +240,7 @@ describe("grabQuickMatchAndEnterAudition", () => {
 
     const flow = grabQuickMatchAndEnterAudition("QM1");
     const options = await waitForConfirmDialog();
-    expect(options.title).toBe("切换语聊房并抢单");
+    expect(options.title).toBe("切换开黑房并抢单");
     useAppConfirm.getState().settle(true);
 
     await expect(flow).resolves.toEqual({ status: "entered" });
@@ -246,7 +249,8 @@ describe("grabQuickMatchAndEnterAudition", () => {
   });
 
   it("有试音且用户取消切房：不抢单、不进房", async () => {
-    const { grabDispatchRequest } = await import("@/features/order/dispatch.api");
+    const { grabDispatchRequest } =
+      await import("@/features/order/dispatch.api");
     mocks.detail = auditionDetail();
     mocks.joinedRoom = {
       id: "old-room",

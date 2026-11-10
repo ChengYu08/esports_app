@@ -1,44 +1,57 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import {
+    useCallback,
+    useEffect,
+    useRef,
+    useState,
+    type Dispatch,
+    type SetStateAction,
+} from "react";
 
-import { useUserProfileStore, type CachedUserProfile } from "@/features/auth/user-profile-store";
+import {
+    useUserProfileStore,
+    type CachedUserProfile,
+} from "@/features/auth/user-profile-store";
 import { showToast } from "@/shared/ui/app-toast";
 
 import { promptSelfRealNameIfNeeded } from "./ensure-real-name-before-enter";
 import {
-  buildMemberChangeMessage,
-  memberChangeNoticeKey,
-  resolveMemberChangeNickname,
-  shouldSkipMemberChangeNotice,
+    buildMemberChangeMessage,
+    memberChangeNoticeKey,
+    resolveMemberChangeNickname,
+    shouldSkipMemberChangeNotice,
 } from "./member-change-notice";
 import {
-  applyChatRoomMemberActions,
-  inviteMember,
-  normalizeMembers,
-  reconcileMembers,
+    applyChatRoomMemberActions,
+    inviteMember,
+    normalizeMembers,
+    reconcileMembers,
 } from "./member-normalize";
-import type { ActiveVoiceRoom } from "./voice-room-session";
-import { useVoiceRoomSessionStore } from "./voice-room-session";
 import {
-  getVoiceChatHistory,
-  joinVoiceChatRoom,
-  leaveVoiceChatRoom,
-  subscribeVoiceChatMembers,
+    getVoiceChatHistory,
+    joinVoiceChatRoom,
+    leaveVoiceChatRoom,
+    subscribeVoiceChatMembers,
 } from "./voice-room-rongcloud";
 import {
-  clearVoiceRtcCallbacks,
-  getVoiceRtcMuted,
-  getVoiceRtcRemoteUserIds,
-  joinVoiceRtc,
-  leaveVoiceRtc,
+    clearVoiceRtcCallbacks,
+    getVoiceRtcMuted,
+    getVoiceRtcRemoteUserIds,
+    joinVoiceRtc,
+    leaveVoiceRtc,
 } from "./voice-room-rtc";
+import type { ActiveVoiceRoom } from "./voice-room-session";
+import { useVoiceRoomSessionStore } from "./voice-room-session";
 import { voiceRoomApi } from "./voice-room.api";
 import type {
-  VoiceRoomDetail,
-  VoiceRoomMember,
-  VoiceRoomMessage,
+    VoiceRoomDetail,
+    VoiceRoomMember,
+    VoiceRoomMessage,
 } from "./voice-room.types";
 
-const mergeMemberProfiles = (items: VoiceRoomMember[], profiles: CachedUserProfile[]) => {
+const mergeMemberProfiles = (
+  items: VoiceRoomMember[],
+  profiles: CachedUserProfile[],
+) => {
   if (profiles.length === 0) return items;
   const byId = new Map(profiles.map((profile) => [profile.id, profile]));
   return items.map((member) => {
@@ -52,7 +65,8 @@ const mergeMemberProfiles = (items: VoiceRoomMember[], profiles: CachedUserProfi
   });
 };
 
-export interface UseVoiceRoomRtcOptions {  roomId: string | undefined;
+export interface UseVoiceRoomRtcOptions {
+  roomId: string | undefined;
   accessToken: string | null;
   currentUser: { id: string; nickname?: string; headImage?: string } | null;
   room: VoiceRoomDetail | null;
@@ -95,14 +109,16 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
   // 每个说话人最后一次检测到说话的时间戳，用于迟滞判断
   const speakingLastAtRef = useRef<Record<string, number>>({});
   // 迟滞定时器，说话停止后延迟移除
-  const speakingTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const speakingTimersRef = useRef<
+    Record<string, ReturnType<typeof setTimeout>>
+  >({});
   const [micState, setMicState] = useState<{
     roomId: string;
     muted: boolean;
   } | null>(null);
   const [loading, setLoading] = useState(() => Boolean(roomId && accessToken));
   const [error, setError] = useState<string | null>(() =>
-    !roomId ? "语聊房不存在" : !accessToken ? "请先登录后进入语聊房" : null,
+    !roomId ? "开黑房不存在" : !accessToken ? "请先登录后进入开黑房" : null,
   );
   const roomRef = useRef(room);
   useEffect(() => {
@@ -115,7 +131,9 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
       const ids = userIds.filter((id) => id && id !== currentUser?.id);
       if (ids.length === 0) return;
       // 已缓存条目立即合并（消首帧占位闪烁），缺失部分走批量接口后合并
-      const { cached, missing } = useUserProfileStore.getState().splitByCache(ids);
+      const { cached, missing } = useUserProfileStore
+        .getState()
+        .splitByCache(ids);
       if (cached.length > 0) {
         setMembers((items) => mergeMemberProfiles(items, cached));
       }
@@ -177,10 +195,16 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
       });
       void (async () => {
         try {
-          const snapshot = await voiceRoomApi.getRoomMembers(roomId, roomVersion, accessToken);
+          const snapshot = await voiceRoomApi.getRoomMembers(
+            roomId,
+            roomVersion,
+            accessToken,
+          );
           if (kickedRef.current) return;
           // 请求期间房间已重建：名单归属新实例，不能用新实例成员覆盖当前聊天室视图
-          if (String(roomRef.current?.roomVersion ?? "") !== String(roomVersion)) {
+          if (
+            String(roomRef.current?.roomVersion ?? "") !== String(roomVersion)
+          ) {
             return;
           }
           const room = roomRef.current;
@@ -206,7 +230,9 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
             ),
           );
           const memberIds = snapshot.members
-            .map((member) => (member.userId == null ? "" : String(member.userId)))
+            .map((member) =>
+              member.userId == null ? "" : String(member.userId),
+            )
             .filter((userId) => userId && userId !== selfId);
           hydrateMemberProfiles(memberIds, accessToken);
         } catch (cause) {
@@ -216,7 +242,14 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
         }
       })();
     },
-    [accessToken, currentUser, hydrateMemberProfiles, kickedRef, roomId, setMembers],
+    [
+      accessToken,
+      currentUser,
+      hydrateMemberProfiles,
+      kickedRef,
+      roomId,
+      setMembers,
+    ],
   );
 
   useEffect(() => () => clearVoiceRtcCallbacks(), []);
@@ -228,14 +261,18 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
     if (kickedRef.current) return;
     let active = true;
     let joining: ActiveVoiceRoom | null = null;
-    const isCurrentJoin = () => active && !kickedRef.current
-      && (!joining || useVoiceRoomSessionStore.getState().joiningRoom === joining);
+    const isCurrentJoin = () =>
+      active &&
+      !kickedRef.current &&
+      (!joining || useVoiceRoomSessionStore.getState().joiningRoom === joining);
     const cleanupCancelledJoin = async () => {
       if (!joining) return;
       const state = useVoiceRoomSessionStore.getState();
       // Never tear down a newer room that took over while an old request waited.
-      const currentRoom = state.joiningRoom && state.joiningRoom !== joining
-        ? state.joiningRoom : state.activeRoom;
+      const currentRoom =
+        state.joiningRoom && state.joiningRoom !== joining
+          ? state.joiningRoom
+          : state.activeRoom;
       if (currentRoom?.rongChatroomId === joining.rongChatroomId) return;
       await Promise.allSettled([
         ...(currentRoom ? [] : [leaveVoiceRtc()]),
@@ -248,7 +285,7 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
         if (!isCurrentJoin()) return;
         const staleInvite = Boolean(
           invitedRoomVersion &&
-            String(detail.roomVersion ?? "1") !== invitedRoomVersion,
+          String(detail.roomVersion ?? "1") !== invitedRoomVersion,
         );
         // 邀请卡片携带的是旧实例版本：房间已重建，按当前版本进入最新实例
         const prepared = await voiceRoomApi.prepareJoin(
@@ -275,11 +312,14 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
                   routeRequestNo || prevAudition?.matchRequestNo || undefined,
                 matchExpireTime:
                   routeExpireTime || prevAudition?.matchExpireTime || undefined,
-                matchGameId: routeGameId || prevAudition?.matchGameId || undefined,
+                matchGameId:
+                  routeGameId || prevAudition?.matchGameId || undefined,
                 matchGameName:
                   routeGameName || prevAudition?.matchGameName || undefined,
                 matchGameIconUrl:
-                  routeGameIconUrl || prevAudition?.matchGameIconUrl || undefined,
+                  routeGameIconUrl ||
+                  prevAudition?.matchGameIconUrl ||
+                  undefined,
               }
             : prevQuickMatchCreated?.matchRequestNo
               ? {
@@ -293,14 +333,20 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
               : null;
         joining = {
           roomId,
-          roomVersion: String(prepared.roomVersion ?? detail.roomVersion ?? "1"),
+          roomVersion: String(
+            prepared.roomVersion ?? detail.roomVersion ?? "1",
+          ),
           rongChatroomId: prepared.rongChatroomId,
-          roomName: prepared.roomName || detail.roomName || "语聊房",
+          roomName: prepared.roomName || detail.roomName || "开黑房",
           creatorUserId: String(detail.creatorUserId ?? ""),
-          ownerName: String(detail.creatorUserId ?? "") === String(currentUser?.id ?? "")
-            ? currentUser?.nickname || "我" : "房间成员",
-          ownerAvatar: String(detail.creatorUserId ?? "") === String(currentUser?.id ?? "")
-            ? currentUser?.headImage : undefined,
+          ownerName:
+            String(detail.creatorUserId ?? "") === String(currentUser?.id ?? "")
+              ? currentUser?.nickname || "我"
+              : "房间成员",
+          ownerAvatar:
+            String(detail.creatorUserId ?? "") === String(currentUser?.id ?? "")
+              ? currentUser?.headImage
+              : undefined,
           ...(preservedMatch?.matchRequestNo
             ? {
                 scene: preservedMatch.scene,
@@ -324,7 +370,10 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
           accessToken,
         );
         await joinVoiceChatRoom(accessToken, prepared.rongChatroomId);
-        if (!isCurrentJoin()) { await cleanupCancelledJoin(); return; }
+        if (!isCurrentJoin()) {
+          await cleanupCancelledJoin();
+          return;
+        }
         void reconcileMembersAfterJoin(prepared.rongChatroomId);
         if (currentUser?.id) {
           const selfId = String(currentUser.id);
@@ -378,9 +427,12 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
           prepared.roomVersion,
           accessToken,
         );
-        if (!isCurrentJoin()) { await cleanupCancelledJoin(); return; }
+        if (!isCurrentJoin()) {
+          await cleanupCancelledJoin();
+          return;
+        }
         if (rtc.accessStatus && rtc.accessStatus !== "READY")
-          throw new Error("语聊房当前不可加入");
+          throw new Error("开黑房当前不可加入");
         const token = rtc.token || rtc.rtcToken;
         const channelName =
           rtc.channelName || rtc.rtcChannelName || prepared.rtcChannelName;
@@ -475,26 +527,31 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
             },
           },
         });
-        if (!isCurrentJoin()) { await cleanupCancelledJoin(); return; }
+        if (!isCurrentJoin()) {
+          await cleanupCancelledJoin();
+          return;
+        }
         if (!rtcJoined) throw new Error("当前设备的语音服务不可用");
-        if (!useVoiceRoomSessionStore.getState().completeRoomJoin(joining)) return;
+        if (!useVoiceRoomSessionStore.getState().completeRoomJoin(joining))
+          return;
         getVoiceRtcRemoteUserIds().forEach(ensureRtcMember);
         setRtcReadyRoomId(roomId);
         setMicState({ roomId, muted: getVoiceRtcMuted() });
         setError(null);
         if (staleInvite) {
-          showToast("语聊房已重新开启，已为你进入最新房间");
+          showToast("开黑房已重新开启，已为你进入最新房间");
         }
       } catch (cause) {
         await cleanupCancelledJoin();
         if (active && !kickedRef.current) {
           const message =
-            cause instanceof Error ? cause.message : "进入语聊房失败";
+            cause instanceof Error ? cause.message : "进入开黑房失败";
           await promptSelfRealNameIfNeeded(message);
           setError(message);
         }
       } finally {
-        if (joining) useVoiceRoomSessionStore.getState().cancelRoomJoin(joining);
+        if (joining)
+          useVoiceRoomSessionStore.getState().cancelRoomJoin(joining);
         if (active) setLoading(false);
       }
     })();

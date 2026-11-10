@@ -34,7 +34,7 @@ public class VoiceRoomBackgroundModule: Module {
       var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
       let baseTitle = (info[MPMediaItemPropertyTitle] as? String)?
         .replacingOccurrences(of: "（说话中）", with: "")
-        .replacingOccurrences(of: "（听筒中）", with: "") ?? "语聊房进行中"
+        .replacingOccurrences(of: "（听筒中）", with: "") ?? "开黑房进行中"
       info[MPMediaItemPropertyTitle] = enabled ? "\(baseTitle)（说话中）" : "\(baseTitle)（听筒中）"
       MPNowPlayingInfoCenter.default().nowPlayingInfo = info
       promise.resolve(nil)
@@ -106,7 +106,7 @@ public class VoiceRoomBackgroundModule: Module {
   private func updateNowPlaying(title: String, isPlaying: Bool, micEnabled: Bool) {
     var info: [String: Any] = [
       MPMediaItemPropertyTitle: micEnabled ? "\(title)（说话中）" : title,
-      MPMediaItemPropertyArtist: "盼之电竞 · 语聊房",
+      MPMediaItemPropertyArtist: "盼之电竞 · 开黑房",
       MPMediaItemPropertyAlbumTitle: "实时语音通话",
       MPNowPlayingInfoPropertyIsLiveStream: true,
       MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,

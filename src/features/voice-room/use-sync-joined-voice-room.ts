@@ -2,12 +2,12 @@ import { useAuthStore } from "@esports/auth";
 import { useEffect, useState } from "react";
 import { AppState, type AppStateStatus } from "react-native";
 
+import {
+    useVoiceRoomSessionStore,
+    type ActiveVoiceRoom,
+} from "./voice-room-session";
 import { resolveVoiceRoomId, voiceRoomApi } from "./voice-room.api";
 import type { VoiceRoomDetail } from "./voice-room.types";
-import {
-  useVoiceRoomSessionStore,
-  type ActiveVoiceRoom,
-} from "./voice-room-session";
 
 /** 前台 / 轮询 / 登录共用的最小请求间隔 */
 export const JOINED_SYNC_MIN_INTERVAL_MS = 10_000;
@@ -37,13 +37,12 @@ function mapJoinedToActiveRoom(
   const creatorUserId = String(
     detail.creatorUserId ?? current?.creatorUserId ?? "",
   );
-  const isOwner =
-    Boolean(user?.id) && creatorUserId === String(user?.id ?? "");
+  const isOwner = Boolean(user?.id) && creatorUserId === String(user?.id ?? "");
   const base: ActiveVoiceRoom = {
     roomId,
     roomVersion: String(detail.roomVersion ?? current?.roomVersion ?? "1"),
     rongChatroomId: detail.rongChatroomId ?? current?.rongChatroomId ?? "",
-    roomName: detail.roomName || current?.roomName || "语聊房",
+    roomName: detail.roomName || current?.roomName || "开黑房",
     creatorUserId,
     ownerName: isOwner
       ? user?.nickname || current?.ownerName || "我"
@@ -74,7 +73,8 @@ function applyJoinedRoom(detail: VoiceRoomDetail) {
   const roomId = resolveVoiceRoomId(detail);
   if (!roomId) {
     const active = useVoiceRoomSessionStore.getState().activeRoom;
-    if (active) useVoiceRoomSessionStore.getState().clearActiveRoom(active.roomId);
+    if (active)
+      useVoiceRoomSessionStore.getState().clearActiveRoom(active.roomId);
     return;
   }
 

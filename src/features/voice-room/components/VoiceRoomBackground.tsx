@@ -7,7 +7,7 @@ const bgPublishDark = require("../../../../assets/images/bg_publish_dark.webp");
 export const VOICE_ROOM_BG_BASE = "#0B0D17";
 
 /**
- * 语聊房背景：复用发单页 dark webp 铺满屏幕
+ * 开黑房背景：复用发单页 dark webp 铺满屏幕
  */
 export function VoiceRoomBackground() {
   return (

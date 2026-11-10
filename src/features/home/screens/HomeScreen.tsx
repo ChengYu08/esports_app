@@ -36,6 +36,7 @@ import { router, useFocusEffect, useIsFocused, useLocalSearchParams } from "expo
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
+  Platform,
   RefreshControl,
   StyleSheet,
   View,
@@ -94,7 +95,10 @@ export default function HomeScreen() {
       ? game
       : "";
   const banners = useHomeBanners(topTab, focused);
-  const homePopupQuery = useHomePopup(topTab === "home" && focused);
+  // iOS 暂不上首页弹窗，Android 保持原有逻辑
+  const homePopupQuery = useHomePopup(
+    Platform.OS !== "ios" && topTab === "home" && focused,
+  );
   const [homePopupVisible, setHomePopupVisible] = useState(false);
   const clubs = useHomeClubs(
     topTab,

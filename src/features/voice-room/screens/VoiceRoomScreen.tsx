@@ -231,7 +231,7 @@ export default function VoiceRoomScreen() {
     useState<ChatSheetConversation | null>(null);
   // 跳原生页面前收起聊天弹窗，返回后凭它重新拉起
   const activeChatConversationRef = useRef<ChatSheetConversation | null>(null);
-  // 跳原生路由（主页/订单/图片预览/选图）时置 true，重新聚焦语聊房后恢复弹窗；切房为 false
+  // 跳原生路由（主页/订单/图片预览/选图）时置 true，重新聚焦开黑房后恢复弹窗；切房为 false
   const pendingChatRestoreRef = useRef(false);
   // 消息列表里点开会话：登记 ref + 拉起聊天弹窗
   const openChatConversation = useCallback((item: MessageListItemModel) => {
@@ -249,7 +249,7 @@ export default function VoiceRoomScreen() {
     activeChatConversationRef.current = null;
     setActiveChatConversation(null);
   }, []);
-  // 头部 ×：两层弹窗整体关闭回语聊房
+  // 头部 ×：两层弹窗整体关闭回开黑房
   const closeAllChatLayers = useCallback(() => {
     activeChatConversationRef.current = null;
     setActiveChatConversation(null);
@@ -273,7 +273,7 @@ export default function VoiceRoomScreen() {
   const restoreChatAfterPick = useCallback(() => {
     restoreChatLayers();
   }, [restoreChatLayers]);
-  // 从主页/订单/图片预览返回语聊房时恢复被收起的聊天弹窗
+  // 从主页/订单/图片预览返回开黑房时恢复被收起的聊天弹窗
   useFocusEffect(
     useCallback(() => {
       if (!pendingChatRestoreRef.current) return;
@@ -317,7 +317,7 @@ export default function VoiceRoomScreen() {
   const activityTipShownRef = useRef(false);
 
   const chatroomId = room?.rongChatroomId;
-  const roomTitle = room?.roomName || "语聊房";
+  const roomTitle = room?.roomName || "开黑房";
   const memberColumns = members.length <= 2 ? 2 : members.length === 3 ? 3 : 4;
   const seatRowCount = Math.ceil(members.length / memberColumns) || 1;
   const seatNeedsScroll = seatRowCount > SEAT_MAX_ROWS;
@@ -604,7 +604,7 @@ export default function VoiceRoomScreen() {
     const gameIconUrl = useQuickMatchCreated
       ? matchMeta?.matchGameIconUrl
       : routeGameIconUrl || matchMeta?.matchGameIconUrl || undefined;
-    // push 压在语聊房之上；勿用 navigate/singular，否则会重排栈并可能清掉首页
+    // push 压在开黑房之上；勿用 navigate/singular，否则会重排栈并可能清掉首页
     router.push({
       pathname: "/match/matching/[requestNo]",
       params: {
@@ -1222,7 +1222,7 @@ export default function VoiceRoomScreen() {
         <View style={styles.header}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="收起语聊房"
+            accessibilityLabel="收起开黑房"
             onPress={minimize}
             disabled={leaving}
             hitSlop={12}
@@ -1239,7 +1239,7 @@ export default function VoiceRoomScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={
-              room ? (isOwner ? "解散语聊房" : "退出语聊房") : "退出语聊房"
+              room ? (isOwner ? "解散开黑房" : "退出开黑房") : "退出开黑房"
             }
             disabled={leaving}
             onPress={() => {

@@ -1,18 +1,18 @@
-import { Dismiss16Regular } from "@fluentui/react-native-icons";
 import { useAuthStore } from "@esports/auth";
+import { Dismiss16Regular } from "@fluentui/react-native-icons";
 import { useMutation, useQueries } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
+    ActivityIndicator,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+    useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -22,15 +22,15 @@ import { CompanionOrderSheet } from "@/features/mine/components/CompanionOrderSh
 import { StarPaymentSheet } from "@/features/mine/components/StarPaymentSheet";
 import { useProfileDetail } from "@/features/mine/hooks/use-profile-data";
 import {
-  useToggleUserFollow,
-  useUserFollowState,
+    useToggleUserFollow,
+    useUserFollowState,
 } from "@/features/mine/hooks/use-user-follow";
 import { afterOrderPaidOpenChat } from "@/features/order/notify-order-paid";
 import { invalidateOrderQueries } from "@/features/order/order-query";
 import { requireLogin } from "@/shared/navigation/require-login";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
-import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { showToast } from "@/shared/ui/app-toast";
+import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { canKickVoiceRoomMember, getMemberAge } from "../member-profile";
 import { voiceRoomApi } from "../voice-room.api";
@@ -103,10 +103,7 @@ export function VoiceRoomMemberSheet({
           signal,
         ),
       enabled:
-        visible &&
-        Boolean(clubId) &&
-        Boolean(memberUserId) &&
-        games.length > 0,
+        visible && Boolean(clubId) && Boolean(memberUserId) && games.length > 0,
     })),
   });
 
@@ -188,7 +185,7 @@ export function VoiceRoomMemberSheet({
     void (async () => {
       const confirmed = await useAppConfirm.getState().confirm({
         title: "踢出用户",
-        message: `确定将“${nickname}”踢出语聊房？`,
+        message: `确定将“${nickname}”踢出开黑房？`,
         cancelText: "取消",
         confirmText: "踢出",
       });
@@ -235,10 +232,7 @@ export function VoiceRoomMemberSheet({
   const actionsBlockHeight = actionsTopGap + 44 + insets.bottom + 16;
   const scrollMaxHeight = Math.max(
     80,
-    sheetMaxHeight -
-      profileBlockHeight -
-      serviceListGap -
-      actionsBlockHeight,
+    sheetMaxHeight - profileBlockHeight - serviceListGap - actionsBlockHeight,
   );
 
   return (
@@ -457,7 +451,9 @@ export function VoiceRoomMemberSheet({
           }}
           token={token}
           onClose={() => setOrderTarget(null)}
-          onRealNameVerificationRequired={() => router.push("/account-settings")}
+          onRealNameVerificationRequired={() =>
+            router.push("/account-settings")
+          }
           onOrderCreated={(order) => {
             setOrderTarget(null);
             setPaymentError(null);
@@ -479,7 +475,7 @@ export function VoiceRoomMemberSheet({
           }}
           onPaid={() => {
             const paidOrderId = paymentOrder.orderId;
-            // 语聊房场景优先用成员 id，避免 profile 查询态抖动导致跳过发消息
+            // 开黑房场景优先用成员 id，避免 profile 查询态抖动导致跳过发消息
             const companionUserId = String(profile?.userId || member.userId);
             const chatTitle =
               profile?.nickname || nickname || member.nickname || "用户聊天";

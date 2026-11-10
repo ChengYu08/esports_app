@@ -16,7 +16,7 @@ type ChatSheetProps = {
   conversation: ChatSheetConversation | null;
   /** 头部返回 / 安卓返回键：回到消息列表弹窗（表情面板打开时只收面板） */
   onBack: () => void;
-  /** 头部 ×：弹窗整体关闭回语聊房 */
+  /** 头部 ×：弹窗整体关闭回开黑房 */
   onClose: () => void;
   /** 跳转原生路由前收起弹窗（选图/主页/订单/图片预览），restorable=返回后可恢复 */
   onBeforeNavigate: (restorable: boolean) => void;
@@ -24,7 +24,7 @@ type ChatSheetProps = {
   onAfterPickImages: () => void;
 };
 
-/** 语聊房内从底部拉起的私聊弹窗，复用 message 领域的 ChatConversation。 */
+/** 开黑房内从底部拉起的私聊弹窗，复用 message 领域的 ChatConversation。 */
 export function ChatSheet({
   conversation,
   onBack,
@@ -56,10 +56,7 @@ export function ChatSheet({
         if (backInterceptorRef.current?.()) return;
         onBack();
       }}
-      contentStyle={[
-        styles.sheet,
-        { height: Math.round(windowHeight * 0.85) },
-      ]}
+      contentStyle={[styles.sheet, { height: Math.round(windowHeight * 0.85) }]}
     >
       <ChatConversation
         key={current.id}

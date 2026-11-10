@@ -75,7 +75,7 @@ export type AfterOrderPaidOpenChatOptions = {
   };
   /** 默认 push；匹配页用 replace */
   navigate?: "push" | "replace";
-  /** 导航前钩子（如语聊房 onClose） */
+  /** 导航前钩子（如开黑房 onClose） */
   beforeNavigate?: () => void;
 };
 

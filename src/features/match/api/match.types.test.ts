@@ -111,7 +111,7 @@ describe("isMultiCompanionRequest（普通模式既有判定回归）", () => {
   });
 });
 
-describe("isOwnActiveActivityRequest（语聊房「派单匹配中」判定）", () => {
+describe("isOwnActiveActivityRequest（开黑房「派单匹配中」判定）", () => {
   const activityUser = "1001";
 
   function activeActivity(

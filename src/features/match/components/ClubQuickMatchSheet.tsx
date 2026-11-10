@@ -107,7 +107,7 @@ type ClubQuickMatchSheetProps = {
   initialGameId?: string;
   /**
    * club：俱乐部页用户自发；
-   * reception：语聊房接待代发（买家为房主，固定需试音，发布后由用户端接管）
+   * reception：开黑房接待代发（买家为房主，固定需试音，发布后由用户端接管）
    */
   mode?: "club" | "reception";
   /** 接待代发时的用户用户 ID（mode=reception 必传） */
@@ -430,7 +430,7 @@ export function ClubQuickMatchSheet({
   ]);
 
   const handlePublish = useCallback(async () => {
-    // 先完成表单必填校验，再查语聊房，避免未选配置就弹退房提示
+    // 先完成表单必填校验，再查开黑房，避免未选配置就弹退房提示
     if (!form.token) {
       showToast("请先登录");
       return;
@@ -476,7 +476,7 @@ export function ClubQuickMatchSheet({
       void runPublish();
     } catch (error) {
       showToast(
-        error instanceof Error ? error.message : "查询语聊房状态失败，请重试",
+        error instanceof Error ? error.message : "查询开黑房状态失败，请重试",
       );
     } finally {
       checkingJoinedRoomRef.current = false;

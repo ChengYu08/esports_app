@@ -1,64 +1,68 @@
+import { colors } from "@/shared/theme/tokens";
 import { useAuthStore } from "@esports/auth";
 import {
-  ChevronLeft24Regular,
-  ChevronRight16Regular,
-  HeadphonesRegular,
+    ChevronLeft24Regular,
+    ChevronRight16Regular,
+    HeadphonesRegular,
 } from "@fluentui/react-native-icons";
 import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  AppState,
-  BackHandler,
-  FlatList,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  PixelRatio,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  type TextInputContentSizeChangeEventData,
-  View,
-  useWindowDimensions,
+    ActivityIndicator,
+    AppState,
+    BackHandler,
+    FlatList,
+    Keyboard,
+    KeyboardAvoidingView,
+    Modal,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
+    PixelRatio,
+    Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    type TextInputContentSizeChangeEventData,
+    View,
+    useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EmojiKeyboard, type EmojiType } from "rn-emoji-keyboard";
-import { colors } from "@/shared/theme/tokens";
 
 import type { AfterSaleCardPayload } from "@/features/order/after-sale-card";
 import { afterSaleCardRows } from "@/features/order/after-sale-card";
+import { enterRoomFromInvite } from "@/features/voice-room/enter-room-from-invite";
+import {
+    convertToJpeg,
+    isGifImage,
+    isGifMessageImage,
+} from "@/shared/media-picker/image-compat";
 import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
-import { convertToJpeg, isGifImage, isGifMessageImage } from "@/shared/media-picker/image-compat";
-import { showToast } from "@/shared/ui/app-toast";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
+import { showToast } from "@/shared/ui/app-toast";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { CachedImage } from "@/shared/ui/CachedImage";
-import { enterRoomFromInvite } from "@/features/voice-room/enter-room-from-invite";
-import { CsInviteCard } from "./CsInviteCard";
-import { MarkdownMessage } from "./MarkdownMessage";
-import { OrderNotifyCard } from "./OrderNotifyCard";
 import { openChatImagePreviewSession } from "../chat-image-preview-session";
 import { touchCustomerServiceSession } from "../customer-service.api";
+import { useOnlineStatusPolling } from "../hooks/use-online-status-polling";
 import { resolveConversationAvatar } from "../message-avatar";
 import type { ManagedMessage } from "../message-state";
 import { messageStore, useMessageStore } from "../message-store";
-import { useOnlineStatusPolling } from "../hooks/use-online-status-polling";
 import { getConversationDisplayTitle } from "../message-title";
 import {
-  getSystemConversationTitle,
-  isOrderAssistantConversationId,
-  isSelfConversationId,
-  isSystemConversationId,
-  normalizeSystemConversationId,
+    getSystemConversationTitle,
+    isOrderAssistantConversationId,
+    isSelfConversationId,
+    isSystemConversationId,
+    normalizeSystemConversationId,
 } from "../system-conversations";
+import { CsInviteCard } from "./CsInviteCard";
+import { MarkdownMessage } from "./MarkdownMessage";
+import { OrderNotifyCard } from "./OrderNotifyCard";
 
 // 聊天单次发送图片数量上限（相册多选防刷屏）
 const CHAT_IMAGE_MAX = 10;
@@ -157,7 +161,7 @@ type ChatConversationProps = {
   customerService?: string;
   /** 仅聊天页使用：是否从个人主页进入（影响查看主页的返回行为） */
   fromProfile?: string;
-  /** page=聊天页全屏；sheet=底部弹窗（语聊房内拉起） */
+  /** page=聊天页全屏；sheet=底部弹窗（开黑房内拉起） */
   presentation?: "page" | "sheet";
   /** 页面聚焦 / 弹窗可见时为 true，驱动已读前台状态与在线状态刷新 */
   active?: boolean;
@@ -206,7 +210,9 @@ export function ChatConversation({
   const listRef = useRef<FlatList<ChatListRow>>(null);
   const isNearBottom = useRef(true);
   const scrollFrame = useRef<number | null>(null);
-  const conversationId = normalizeSystemConversationId(String(rawConversationId || ""));
+  const conversationId = normalizeSystemConversationId(
+    String(rawConversationId || ""),
+  );
   const isSelfConversation = isSelfConversationId(conversationId, userId);
   const canViewProfile = !isSystemConversationId(conversationId);
   const conversation = useMessageStore((state) =>
@@ -326,9 +332,7 @@ export function ChatConversation({
   // 系统会话没有输入框，加大列表底部留白，避免最后一条消息贴屏幕底不利查看
   const isSystemConversation = isSystemConversationId(conversationId);
   // 弹窗内 safe-area inset 在 Android Modal 下可能取不到，兜底保证输入条不贴屏幕底
-  const bottomInset = isSheet
-    ? Math.max(insets.bottom, 28)
-    : insets.bottom;
+  const bottomInset = isSheet ? Math.max(insets.bottom, 28) : insets.bottom;
   const scrollToLatest = useCallback(() => {
     isNearBottom.current = true;
     if (scrollFrame.current !== null) cancelAnimationFrame(scrollFrame.current);
@@ -374,7 +378,7 @@ export function ChatConversation({
     [conversationId, retryMessage, scrollToLatest],
   );
   // 弹窗模式下 Modal 会盖住 push 出来的原生路由页，跳转前必须先收起弹窗；
-  // restorable 标记返回语聊房后能否恢复弹窗（进入其它房间不恢复）
+  // restorable 标记返回开黑房后能否恢复弹窗（进入其它房间不恢复）
   const navigateWithSheetDismiss = useCallback(
     (navigate: () => void, restorable = true) => {
       if (isSheet) onBeforeNavigate?.(restorable);
@@ -382,11 +386,14 @@ export function ChatConversation({
     },
     [isSheet, onBeforeNavigate],
   );
-  const openOrderDetail = useCallback((orderId: string) => {
-    navigateWithSheetDismiss(() => {
-      router.push({ pathname: "/order/[id]", params: { id: orderId } });
-    });
-  }, [navigateWithSheetDismiss]);
+  const openOrderDetail = useCallback(
+    (orderId: string) => {
+      navigateWithSheetDismiss(() => {
+        router.push({ pathname: "/order/[id]", params: { id: orderId } });
+      });
+    },
+    [navigateWithSheetDismiss],
+  );
   // 切房后原会话不再恢复弹窗；提成 useCallback 保持引用稳定，避免击穿气泡 memo
   const handleEnterRoomInvite = useCallback(
     (roomId: string, roomVersion: string) => {
@@ -424,9 +431,9 @@ export function ChatConversation({
         });
       } catch (error) {
         void useAppConfirm.getState().confirm({
-        title: "图片预览失败",
-        message: error instanceof Error ? error.message : "融云图片下载失败",
-      });
+          title: "图片预览失败",
+          message: error instanceof Error ? error.message : "融云图片下载失败",
+        });
       }
     },
     [navigateWithSheetDismiss, resolveImagePreview, visibleMessages],
@@ -741,12 +748,7 @@ export function ChatConversation({
   );
 
   const body = (
-    <View
-      style={[
-        styles.screen,
-        isSheet ? styles.screenSheet : null,
-      ]}
-    >
+    <View style={[styles.screen, isSheet ? styles.screenSheet : null]}>
       {header}
       <FlatList
         key={conversationId}
@@ -1028,9 +1030,8 @@ const ChatComposer = memo(function ChatComposer({
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [imageSending, setImageSending] = useState(false);
   // 输入区内容高度（不含内边距）：单行 22，随输入行数增高，封顶 4 行后内部滚动
-  const [inputContentHeight, setInputContentHeight] = useState(
-    COMPOSER_LINE_HEIGHT,
-  );
+  const [inputContentHeight, setInputContentHeight] =
+    useState(COMPOSER_LINE_HEIGHT);
   const handleInputContentSizeChange = (
     event: NativeSyntheticEvent<TextInputContentSizeChangeEventData>,
   ) => {
@@ -1123,7 +1124,9 @@ const ChatComposer = memo(function ChatComposer({
       // 避免原图上传过大的文件）。GIF 重编码会丢动画，原样发送
       for (const uri of picked) {
         try {
-          const sendUri = isGifImage(uri) ? uri : await convertToJpeg(uri, 0.85, 1080);
+          const sendUri = isGifImage(uri)
+            ? uri
+            : await convertToJpeg(uri, 0.85, 1080);
           await onSendImage(sendUri);
         } catch {
           failed += 1;
@@ -1384,15 +1387,22 @@ const ChatBubble = memo(function ChatBubble({
   const imageHeight = imageWidth / imageRatio;
   // GIF 不走融云缩略图（静态 JPEG 会丢动画）：本地原文件按魔数识别，远端 URL 是
   // OSS 上的原图（发送时保留真实扩展名），直接用 imageUrl，图片库按气泡尺寸解码播放
-  const isGifMessage = item.kind === "image" && isGifMessageImage(item.imageUrl);
+  const isGifMessage =
+    item.kind === "image" && isGifMessageImage(item.imageUrl);
   // 缩略图宽度不足以铺满气泡的物理像素时会被放大发虚，这种消息继续用原图（解码尺寸由图片库按气泡缩小）
-  const isThumbnailSharpEnough = item.kind === "image"
-    && !isGifMessage
-    && !!item.thumbnailUri
-    && (item.thumbnailWidth ?? 0) >= imageWidth * PixelRatio.get();
-  const bubbleImageUri = item.kind === "image"
-    ? (isGifMessage ? item.imageUrl : (isThumbnailSharpEnough ? item.thumbnailUri! : item.imageUrl))
-    : "";
+  const isThumbnailSharpEnough =
+    item.kind === "image" &&
+    !isGifMessage &&
+    !!item.thumbnailUri &&
+    (item.thumbnailWidth ?? 0) >= imageWidth * PixelRatio.get();
+  const bubbleImageUri =
+    item.kind === "image"
+      ? isGifMessage
+        ? item.imageUrl
+        : isThumbnailSharpEnough
+          ? item.thumbnailUri!
+          : item.imageUrl
+      : "";
   // 大图/GIF 下载解码完成前显示同尺寸灰底转圈占位，避免空白直接跳变成图；
   // 图片地址变化时在渲染期重置加载态（React 官方推荐写法，避免 effect 内 setState）
   const [imageLoading, setImageLoading] = useState(true);
@@ -1413,19 +1423,31 @@ const ChatBubble = memo(function ChatBubble({
       )
     : 0;
   const copyMenuAbove = copyMenuAnchor
-    ? copyMenuAnchor.y - COPY_MENU_HEIGHT - COPY_MENU_ARROW / 2 - COPY_MENU_GAP
-      >= insetsTop + 8
+    ? copyMenuAnchor.y -
+        COPY_MENU_HEIGHT -
+        COPY_MENU_ARROW / 2 -
+        COPY_MENU_GAP >=
+      insetsTop + 8
     : true;
   const copyMenuTop = copyMenuAnchor
     ? copyMenuAbove
-      ? copyMenuAnchor.y - COPY_MENU_HEIGHT - COPY_MENU_ARROW / 2 - COPY_MENU_GAP
-      : copyMenuAnchor.y + copyMenuAnchor.height + COPY_MENU_ARROW / 2 + COPY_MENU_GAP
+      ? copyMenuAnchor.y -
+        COPY_MENU_HEIGHT -
+        COPY_MENU_ARROW / 2 -
+        COPY_MENU_GAP
+      : copyMenuAnchor.y +
+        copyMenuAnchor.height +
+        COPY_MENU_ARROW / 2 +
+        COPY_MENU_GAP
     : 0;
   // 箭头对准气泡中心，同时夹在菜单圆角内侧，避免压到边角
   const copyMenuArrowLeft = copyMenuAnchor
     ? Math.min(
         Math.max(
-          copyMenuAnchor.x + copyMenuAnchor.width / 2 - copyMenuLeft - COPY_MENU_ARROW / 2,
+          copyMenuAnchor.x +
+            copyMenuAnchor.width / 2 -
+            copyMenuLeft -
+            COPY_MENU_ARROW / 2,
           14,
         ),
         COPY_MENU_WIDTH - COPY_MENU_ARROW - 14,
@@ -1494,7 +1516,10 @@ const ChatBubble = memo(function ChatBubble({
                 }
                 const next = source.width / source.height;
                 // 与消息自带比例相差不到 1% 就沿用，避免为亚像素差异再触发一次布局
-                if (knownRatio && Math.abs(next - knownRatio) / knownRatio < 0.01) {
+                if (
+                  knownRatio &&
+                  Math.abs(next - knownRatio) / knownRatio < 0.01
+                ) {
                   return;
                 }
                 setLoadedRatio(next);
@@ -1502,14 +1527,20 @@ const ChatBubble = memo(function ChatBubble({
               onLoadEnd={() => setImageLoading(false)}
             />
             {imageLoading ? (
-              <View pointerEvents="none" style={[styles.imageLoadingPlaceholder, { width: imageWidth, height: imageHeight }]}>
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.imageLoadingPlaceholder,
+                  { width: imageWidth, height: imageHeight },
+                ]}
+              >
                 <ActivityIndicator size="small" color={colors.textMuted} />
               </View>
             ) : null}
           </Pressable>
         ) : item.kind === "roomInvite" ? (
           <Pressable
-            accessibilityLabel={`进入${item.isMine ? myName : peerName}分享的语聊房`}
+            accessibilityLabel={`进入${item.isMine ? myName : peerName}分享的开黑房`}
             accessibilityRole="button"
             onPress={() => onEnterRoomInvite(item.roomId, item.roomVersion)}
             style={styles.roomInviteCard}
@@ -1522,7 +1553,7 @@ const ChatBubble = memo(function ChatBubble({
             </View>
             <View style={styles.roomInviteBody}>
               <Text numberOfLines={1} style={styles.roomInviteTitle}>
-                语聊房邀请
+                开黑房邀请
               </Text>
               <View style={styles.roomInviteSender}>
                 <CachedImage
@@ -1639,8 +1670,13 @@ const ChatBubble = memo(function ChatBubble({
             <View
               style={[
                 styles.copyMenuArrow,
-                copyMenuAbove ? styles.copyMenuArrowDown : styles.copyMenuArrowUp,
-                { left: copyMenuLeft + copyMenuArrowLeft, top: copyMenuArrowTop },
+                copyMenuAbove
+                  ? styles.copyMenuArrowDown
+                  : styles.copyMenuArrowUp,
+                {
+                  left: copyMenuLeft + copyMenuArrowLeft,
+                  top: copyMenuArrowTop,
+                },
               ]}
             />
           </View>
@@ -1720,7 +1756,11 @@ const styles = StyleSheet.create({
   // 倒序列表中 paddingTop 落在屏幕底部（最新消息一侧）；系统会话无输入框，用大留白替代
   messageListSystem: { paddingTop: 48 },
   orderAssistantEmpty: { flex: 1 },
-  orderAssistantLoading: { flex: 1, alignItems: "center", justifyContent: "center" },
+  orderAssistantLoading: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   timeSeparator: {
     minHeight: 32,
     paddingVertical: 7,

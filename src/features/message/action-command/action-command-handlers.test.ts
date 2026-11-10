@@ -582,14 +582,14 @@ describe("handleActivityRoomNotice", () => {
         commandName: "ACTIVITY_ROOM_NOTICE",
         requestNo: "QM2119632871408664578",
         content:
-          "恭喜参与秒杀活动，请尽快在语聊房中选定大神并支付，锁定秒杀名额",
+          "恭喜参与秒杀活动，请尽快在开黑房中选定大神并支付，锁定秒杀名额",
         roomId: 30100020,
         roomVersion: 25,
       }),
       NOW,
     );
     expect(Toast.show).toHaveBeenCalledWith(
-      "恭喜参与秒杀活动，请尽快在语聊房中选定大神并支付，锁定秒杀名额",
+      "恭喜参与秒杀活动，请尽快在开黑房中选定大神并支付，锁定秒杀名额",
       expect.objectContaining({ duration: 10000 }),
     );
   });

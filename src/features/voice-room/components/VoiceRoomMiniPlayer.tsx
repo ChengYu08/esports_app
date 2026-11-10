@@ -1,18 +1,22 @@
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
-import { router, usePathname } from 'expo-router';
-import { useCallback, useMemo } from 'react';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { clamp, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
+import { router, usePathname } from "expo-router";
+import { useCallback, useMemo } from "react";
+import { StyleSheet, View, useWindowDimensions } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, {
+    clamp,
+    useAnimatedStyle,
+    useSharedValue,
+} from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { VoiceWaveform } from '@/shared/audio/VoiceWaveform';
-import { navigateToVoiceRoom } from '../navigate-voice-room';
-import { useVoiceRoomSessionStore } from '../voice-room-session';
+import { VoiceWaveform } from "@/shared/audio/VoiceWaveform";
+import { navigateToVoiceRoom } from "../navigate-voice-room";
+import { useVoiceRoomSessionStore } from "../voice-room-session";
 
-const fallbackAvatar = require('../../../../assets/images/avatar_default.webp');
-const recordingIcon = require('../../../../assets/svgs/floating-recording.svg');
+const fallbackAvatar = require("../../../../assets/images/avatar_default.webp");
+const recordingIcon = require("../../../../assets/svgs/floating-recording.svg");
 const PLAYER_WIDTH = 50;
 const PLAYER_HEIGHT = 48;
 const DRAG_THRESHOLD = 6;
@@ -24,7 +28,7 @@ const FIGMA_PLAYER_BOTTOM_FROM_SCREEN = 204;
 
 /** Figma 102.85° 底层蓝渐变 */
 const BLUE_GRADIENT = {
-  colors: ['#1F31FF', '#1FBCFF'] as const,
+  colors: ["#1F31FF", "#1FBCFF"] as const,
   locations: [0.091369, 0.93383] as const,
   start: { x: 0.013, y: 0.389 },
   end: { x: 0.987, y: 0.611 },
@@ -32,7 +36,7 @@ const BLUE_GRADIENT = {
 
 /** Figma 257.84° 上层深蓝紫渐变 */
 const NAVY_GRADIENT = {
-  colors: ['#0C0C2E', '#2F2759'] as const,
+  colors: ["#0C0C2E", "#2F2759"] as const,
   locations: [0.007869, 0.67447] as const,
   start: { x: 0.989, y: 0.396 },
   end: { x: 0.011, y: 0.604 },
@@ -43,7 +47,9 @@ export function VoiceRoomMiniPlayer() {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const room = useVoiceRoomSessionStore((state) => state.activeRoom);
-  const microphoneMuted = useVoiceRoomSessionStore((state) => state.microphoneMuted);
+  const microphoneMuted = useVoiceRoomSessionStore(
+    (state) => state.microphoneMuted,
+  );
   // Keep offsets mounted while the room screen is open so minimizing restores the position.
   const offsetY = useSharedValue(0);
   const dragStartY = useSharedValue(0);
@@ -56,8 +62,8 @@ export function VoiceRoomMiniPlayer() {
 
   const openRoom = useCallback(() => {
     if (!room) return;
-    // 选人页是房内临时页：直接 back 回到压在下面的语聊房实例，不叠层
-    if (pathname.startsWith('/match/matching') && router.canGoBack()) {
+    // 选人页是房内临时页：直接 back 回到压在下面的开黑房实例，不叠层
+    if (pathname.startsWith("/match/matching") && router.canGoBack()) {
       router.back();
       return;
     }
@@ -66,9 +72,9 @@ export function VoiceRoomMiniPlayer() {
       id: room.roomId,
       v: room.roomVersion,
       // 试音场景靠路由回填；quickMatchCreated 仅依赖 session，进房后由 VoiceRoomScreen 读 session
-      ...(room.scene === 'audition' && room.matchRequestNo
+      ...(room.scene === "audition" && room.matchRequestNo
         ? {
-            scene: 'audition',
+            scene: "audition",
             requestNo: room.matchRequestNo,
             ...(room.matchExpireTime
               ? { expireTime: room.matchExpireTime }
@@ -114,7 +120,7 @@ export function VoiceRoomMiniPlayer() {
     };
   });
 
-  if (!room || pathname.startsWith('/voice-room/')) return null;
+  if (!room || pathname.startsWith("/voice-room/")) return null;
 
   const avatar = room.ownerAvatar?.trim();
 
@@ -124,13 +130,15 @@ export function VoiceRoomMiniPlayer() {
         <Animated.View
           accessible
           accessibilityRole="button"
-          accessibilityLabel={`返回${room.roomName || '语聊房'}`}
+          accessibilityLabel={`返回${room.roomName || "开黑房"}`}
           accessibilityHint="语音连接保持中，点击展开房间，可沿右侧上下拖动"
-          accessibilityValue={{ text: microphoneMuted ? '麦克风已关闭' : '麦克风已开启' }}
-          accessibilityActions={[{ name: 'activate', label: '展开房间' }]}
+          accessibilityValue={{
+            text: microphoneMuted ? "麦克风已关闭" : "麦克风已开启",
+          }}
+          accessibilityActions={[{ name: "activate", label: "展开房间" }]}
           onAccessibilityTap={openRoom}
           onAccessibilityAction={(event) => {
-            if (event.nativeEvent.actionName === 'activate') openRoom();
+            if (event.nativeEvent.actionName === "activate") openRoom();
           }}
           style={[styles.position, positionStyle]}
         >
@@ -151,13 +159,25 @@ export function VoiceRoomMiniPlayer() {
             >
               <View style={styles.avatarWrap}>
                 <Image
-                  source={avatar ? { uri: avatar.startsWith('//') ? `https:${avatar}` : avatar } : fallbackAvatar}
+                  source={
+                    avatar
+                      ? {
+                          uri: avatar.startsWith("//")
+                            ? `https:${avatar}`
+                            : avatar,
+                        }
+                      : fallbackAvatar
+                  }
                   contentFit="cover"
                   style={styles.avatar}
                 />
                 <View style={styles.avatarOverlay} />
                 {microphoneMuted ? (
-                  <Image source={recordingIcon} contentFit="contain" style={styles.recordingIcon} />
+                  <Image
+                    source={recordingIcon}
+                    contentFit="contain"
+                    style={styles.recordingIcon}
+                  />
                 ) : (
                   <VoiceWaveform playing />
                 )}
@@ -173,11 +193,11 @@ export function VoiceRoomMiniPlayer() {
 const styles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFill, zIndex: 100 },
   position: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     width: PLAYER_WIDTH,
     height: PLAYER_HEIGHT,
-    shadowColor: '#0C0C2E',
+    shadowColor: "#0C0C2E",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
@@ -187,11 +207,11 @@ const styles = StyleSheet.create({
     flex: 1,
     borderTopLeftRadius: 100,
     borderBottomLeftRadius: 100,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   background: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingLeft: 6,
     paddingRight: 8,
     paddingVertical: 6,
@@ -200,17 +220,17 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
   },
   avatar: { ...StyleSheet.absoluteFill },
   avatarOverlay: {
     ...StyleSheet.absoluteFill,
     borderRadius: 18,
     borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.6)',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderColor: "rgba(255,255,255,0.6)",
+    backgroundColor: "rgba(0,0,0,0.4)",
   },
   recordingIcon: { width: 18, height: 18 },
 });

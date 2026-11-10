@@ -1,5 +1,5 @@
 /**
- * 语聊房「房外首次进房」实名门禁：本地 isRealName 先拦，接口未实名兜底弹窗复用。
+ * 开黑房「房外首次进房」实名门禁：本地 isRealName 先拦，接口未实名兜底弹窗复用。
  */
 import { useAuthStore } from "@esports/auth";
 import { router } from "expo-router";

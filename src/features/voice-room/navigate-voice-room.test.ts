@@ -27,7 +27,7 @@ describe("navigateToVoiceRoom", () => {
     expect(dismissTo).not.toHaveBeenCalled();
   });
 
-  it("正聚焦在语聊房屏（房内切房）时 dismissTo 原地换 params，不叠层", () => {
+  it("正聚焦在开黑房屏（房内切房）时 dismissTo 原地换 params，不叠层", () => {
     useVoiceRoomSessionStore.getState().setScreenFocused(true);
 
     navigateToVoiceRoom({ id: "room-2", v: "1" });

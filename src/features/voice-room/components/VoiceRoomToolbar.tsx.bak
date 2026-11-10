@@ -62,7 +62,7 @@ export function VoiceRoomToolbar({
     >
       <View style={[styles.composer, compact && styles.composerCompact]}>
         <TextInput
-          accessibilityLabel="语聊房消息"
+          accessibilityLabel="开黑房消息"
           value={input}
           onChangeText={onChangeText}
           onSubmitEditing={onSend}

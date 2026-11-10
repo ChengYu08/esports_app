@@ -172,13 +172,13 @@ export default function MineScreen() {
         .getJoinedRoom(accessToken)
         .catch(() => null);
       if (!resolveVoiceRoomId(room))
-        room = await voiceRoomApi.createRoom("我的语聊房", accessToken);
+        room = await voiceRoomApi.createRoom("我的开黑房", accessToken);
       const roomId = resolveVoiceRoomId(room);
       if (!roomId) throw new Error("房间信息不完整，请稍后重试");
       navigateToVoiceRoom({ id: roomId });
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "进入语聊房失败，请稍后重试";
+        error instanceof Error ? error.message : "进入开黑房失败，请稍后重试";
       if (await promptSelfRealNameIfNeeded(message)) {
         return;
       }

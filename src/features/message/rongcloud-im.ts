@@ -1,63 +1,93 @@
 import type {
-  RCIMIWChatRoomMemberBlockEvent,
-  RCIMIWConversation,
-  RCIMIWEngine,
-  RCIMIWMediaMessage,
-  RCIMIWMessage,
-} from '@rongcloud/react-native-im-wrapper';
+    RCIMIWChatRoomMemberBlockEvent,
+    RCIMIWConversation,
+    RCIMIWEngine,
+    RCIMIWMediaMessage,
+    RCIMIWMessage,
+} from "@rongcloud/react-native-im-wrapper";
 
-import { ApiError } from '@/core/network/api-client';
-import { logger } from '@/core/logging/logger';
-import { mapRongMessage, messagePreview, type RongSdkMessage } from './chat-message';
-import type { ManagedMessage, MessageConversation, MessageHistoryPage } from './message-state';
-import type { AfterSaleCardPayload } from '@/features/order/after-sale-card';
-import { getRongConversationTargetId, getSystemConversationTitle, isSystemConversationId, normalizeSystemConversationId } from './system-conversations';
-import { loadConversationSnapshot } from './conversation-loader';
-import { parseRongCommand, type RongCommand } from './rongcloud-command';
-import { KNOWN_RONG_COMMAND_NAMES } from './rongcloud-commands';
-import { fetchRongHistoryMessages } from './rong-history';
-import { isGifImage } from '@/shared/media-picker/image-compat';
+import { logger } from "@/core/logging/logger";
+import { ApiError } from "@/core/network/api-client";
+import type { AfterSaleCardPayload } from "@/features/order/after-sale-card";
+import { isGifImage } from "@/shared/media-picker/image-compat";
+import {
+    mapRongMessage,
+    messagePreview,
+    type RongSdkMessage,
+} from "./chat-message";
+import { loadConversationSnapshot } from "./conversation-loader";
+import type {
+    ManagedMessage,
+    MessageConversation,
+    MessageHistoryPage,
+} from "./message-state";
+import { fetchRongHistoryMessages } from "./rong-history";
+import { parseRongCommand, type RongCommand } from "./rongcloud-command";
+import { KNOWN_RONG_COMMAND_NAMES } from "./rongcloud-commands";
+import {
+    getRongConversationTargetId,
+    getSystemConversationTitle,
+    isSystemConversationId,
+    normalizeSystemConversationId,
+} from "./system-conversations";
 
 export type RongConversation = MessageConversation;
 export type RongTextMessage = ManagedMessage;
 
-type RongSdk = typeof import('@rongcloud/react-native-im-wrapper');
+type RongSdk = typeof import("@rongcloud/react-native-im-wrapper");
 type ConversationListener = (conversation: RongConversation) => void;
-type MessageListener = (peerId: string, message: ManagedMessage, conversation: RongConversation) => void;
+type MessageListener = (
+  peerId: string,
+  message: ManagedMessage,
+  conversation: RongConversation,
+) => void;
 type ChatRoomMessageListener = (roomId: string, message: RCIMIWMessage) => void;
-type ChatRoomMemberListener = (roomId: string, actions: { userId?: string; actionType?: number }[]) => void;
-export type RongCloudConnectionSignal = 'connected' | 'connecting' | 'timeout' | 'terminal';
+type ChatRoomMemberListener = (
+  roomId: string,
+  actions: { userId?: string; actionType?: number }[],
+) => void;
+export type RongCloudConnectionSignal =
+  | "connected"
+  | "connecting"
+  | "timeout"
+  | "terminal";
 
 let engine: RCIMIWEngine | null = null;
 let connected = false;
-let businessToken = '';
+let businessToken = "";
 let hasStartedConnection = false;
 let connectionAttempt: Promise<boolean> | null = null;
 let cancelConnectionAttempt: (() => void) | null = null;
 let connectionEpoch = 0;
 const conversationListeners = new Set<ConversationListener>();
 const conversationSyncListeners = new Set<() => void>();
-const conversationReadSyncListeners = new Set<(peerId: string, timestamp: number) => void>();
+const conversationReadSyncListeners = new Set<
+  (peerId: string, timestamp: number) => void
+>();
 const messageListeners = new Set<MessageListener>();
-const connectionStatusListeners = new Set<(signal: RongCloudConnectionSignal) => void>();
+const connectionStatusListeners = new Set<
+  (signal: RongCloudConnectionSignal) => void
+>();
 const chatRoomMessageListeners = new Set<ChatRoomMessageListener>();
 const chatRoomMemberListeners = new Set<ChatRoomMemberListener>();
 const commandListeners = new Set<(command: RongCommand) => void>();
-const chatRoomBlockedListeners = new Set<(event: RCIMIWChatRoomMemberBlockEvent) => void>();
+const chatRoomBlockedListeners = new Set<
+  (event: RCIMIWChatRoomMemberBlockEvent) => void
+>();
 const chatRoomDestroyedListeners = new Set<(chatroomId: string) => void>();
 
 function getRuntimeConfig() {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('../../core/config/env') as typeof import('../../core/config/env');
+    return require("../../core/config/env") as typeof import("../../core/config/env");
   } catch {
     return {
       env: {
-        rongCloudAppKey: '',
-        miPushAppId: '',
-        miPushAppKey: '',
-        oppoPushAppKey: '',
-        oppoPushAppSecret: '',
+        rongCloudAppKey: "",
+        miPushAppId: "",
+        miPushAppKey: "",
+        oppoPushAppKey: "",
+        oppoPushAppSecret: "",
       },
     };
   }
@@ -65,21 +95,23 @@ function getRuntimeConfig() {
 
 function getClientAuthApi() {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  return require('../auth/client-auth.api').clientAuthApi as typeof import('../auth/client-auth.api').clientAuthApi;
+  return require("../auth/client-auth.api")
+    .clientAuthApi as typeof import("../auth/client-auth.api").clientAuthApi;
 }
 
 // chat-image-upload 静态依赖 react-native（client-auth.api），这里保持 require
 // 惰性加载，避免污染本模块的纯 JS 测试导入链（与 getClientAuthApi 同一处理方式）
 function uploadChatImageForIm(token: string, uri: string): Promise<string> {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { uploadChatImage } = require('./chat-image-upload') as typeof import('./chat-image-upload');
+  const { uploadChatImage } =
+    require("./chat-image-upload") as typeof import("./chat-image-upload");
   return uploadChatImage(token, uri);
 }
 
 function loadSdk(): RongSdk | null {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('@rongcloud/react-native-im-wrapper') as RongSdk;
+    return require("@rongcloud/react-native-im-wrapper") as RongSdk;
   } catch {
     return null;
   }
@@ -87,13 +119,15 @@ function loadSdk(): RongSdk | null {
 
 function getSdkEnums() {
   const sdk = loadSdk();
-  return sdk ? {
-    conversationType: sdk.RCIMIWConversationType.PRIVATE,
-    imageType: sdk.RCIMIWMessageType.IMAGE,
-    directionSend: sdk.RCIMIWMessageDirection.SEND,
-    timeBefore: sdk.RCIMIWTimeOrder.BEFORE,
-    localRemote: sdk.RCIMIWMessageOperationPolicy.LOCAL_REMOTE,
-  } : null;
+  return sdk
+    ? {
+        conversationType: sdk.RCIMIWConversationType.PRIVATE,
+        imageType: sdk.RCIMIWMessageType.IMAGE,
+        directionSend: sdk.RCIMIWMessageDirection.SEND,
+        timeBefore: sdk.RCIMIWTimeOrder.BEFORE,
+        localRemote: sdk.RCIMIWMessageOperationPolicy.LOCAL_REMOTE,
+      }
+    : null;
 }
 
 type ProfileSnapshot = {
@@ -106,7 +140,10 @@ type ProfileSnapshot = {
 // 缓存 + 在途去重避免同一用户被反复请求（离线补偿一批同 peer 消息只发一次请求）；
 // TTL 兜底昵称/头像变更的展示时效，登出断开时整体清空
 const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
-const profileCache = new Map<string, { profile: ProfileSnapshot; expiresAt: number }>();
+const profileCache = new Map<
+  string,
+  { profile: ProfileSnapshot; expiresAt: number }
+>();
 const profileInFlight = new Map<string, Promise<ProfileSnapshot | null>>();
 
 function peekProfileSnapshot(userId: string): ProfileSnapshot | null {
@@ -115,7 +152,9 @@ function peekProfileSnapshot(userId: string): ProfileSnapshot | null {
   return cached.profile;
 }
 
-async function fetchProfileSnapshot(userId: string): Promise<ProfileSnapshot | null> {
+async function fetchProfileSnapshot(
+  userId: string,
+): Promise<ProfileSnapshot | null> {
   const cached = peekProfileSnapshot(userId);
   if (cached) return cached;
   let pending = profileInFlight.get(userId);
@@ -124,19 +163,22 @@ async function fetchProfileSnapshot(userId: string): Promise<ProfileSnapshot | n
       .getUserProfile(businessToken, userId)
       .then((profile) => {
         const snapshot: ProfileSnapshot = {
-          title: profile.nickname || '',
+          title: profile.nickname || "",
           avatar: profile.headImage || undefined,
           // 后端不下发该字段时保持 undefined（mergeConversations 保留本地标记）；
           // 下发 "0" 时显式置 false，让客服身份始终以服务端为准（客服被移除后标签能退掉）
           isCustomerService:
             profile.customerService === undefined
               ? undefined
-              : profile.customerService === '1',
+              : profile.customerService === "1",
         };
         // 昵称为空时只回退不落缓存：该用户资料可能未完善，落缓存会把
         // 原始 ID 当标题钉住 5 分钟，完善后再收到消息也拿不到真名
         if (profile.nickname) {
-          profileCache.set(userId, { profile: snapshot, expiresAt: Date.now() + PROFILE_CACHE_TTL_MS });
+          profileCache.set(userId, {
+            profile: snapshot,
+            expiresAt: Date.now() + PROFILE_CACHE_TTL_MS,
+          });
         }
         return snapshot;
       })
@@ -149,7 +191,10 @@ async function fetchProfileSnapshot(userId: string): Promise<ProfileSnapshot | n
   return pending;
 }
 
-function applyProfileSnapshot(conversation: RongConversation, profile: ProfileSnapshot): RongConversation {
+function applyProfileSnapshot(
+  conversation: RongConversation,
+  profile: ProfileSnapshot,
+): RongConversation {
   return {
     ...conversation,
     title: profile.title || conversation.title,
@@ -162,22 +207,36 @@ function applyProfileSnapshot(conversation: RongConversation, profile: ProfileSn
 
 function mapPreview(message?: RCIMIWMessage) {
   const enums = getSdkEnums();
-  const time = message?.sentTime ? new Date(message.sentTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '';
-  const mapped = message && enums
-    ? mapRongMessage(message as RongSdkMessage, { image: enums.imageType, send: enums.directionSend })
-    : null;
+  const time = message?.sentTime
+    ? new Date(message.sentTime).toLocaleTimeString("zh-CN", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
+  const mapped =
+    message && enums
+      ? mapRongMessage(message as RongSdkMessage, {
+          image: enums.imageType,
+          send: enums.directionSend,
+        })
+      : null;
   if (mapped) return { preview: messagePreview(mapped), time };
-  const content = message as (RCIMIWMessage & { text?: string; content?: string }) | undefined;
+  const content = message as
+    | (RCIMIWMessage & { text?: string; content?: string })
+    | undefined;
   const text = content?.text || content?.content;
-  return { preview: text || '新消息', time };
+  return { preview: text || "新消息", time };
 }
 
 function mapConversation(conversation: RCIMIWConversation): RongConversation {
-  const id = normalizeSystemConversationId(String(conversation.targetId || ''));
+  const id = normalizeSystemConversationId(String(conversation.targetId || ""));
   const last = mapPreview(conversation.lastMessage);
   return {
     id,
-    title: getSystemConversationTitle(id, String(conversation.targetId || '消息')),
+    title: getSystemConversationTitle(
+      id,
+      String(conversation.targetId || "消息"),
+    ),
     preview: last.preview,
     time: last.time,
     unreadCount: conversation.unreadCount || 0,
@@ -191,7 +250,11 @@ function mapConversation(conversation: RCIMIWConversation): RongConversation {
 async function hydrateConversation(conversation: RongConversation) {
   if (!businessToken || !conversation.id) return conversation;
   if (isSystemConversationId(conversation.id)) {
-    return { ...conversation, title: getSystemConversationTitle(conversation.id), avatar: undefined };
+    return {
+      ...conversation,
+      title: getSystemConversationTitle(conversation.id),
+      avatar: undefined,
+    };
   }
   const profile = await fetchProfileSnapshot(conversation.id);
   if (!profile) return conversation;
@@ -200,27 +263,34 @@ async function hydrateConversation(conversation: RongConversation) {
 
 export function isRongCloudAvailable() {
   let nativeModules: { RCReactNativeIM?: unknown } = {};
-  let platform = 'web';
+  let platform = "web";
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const reactNative = require('react-native') as { NativeModules?: typeof nativeModules; Platform?: { OS?: string } };
+    const reactNative = require("react-native") as {
+      NativeModules?: typeof nativeModules;
+      Platform?: { OS?: string };
+    };
     nativeModules = reactNative.NativeModules || {};
     platform = reactNative.Platform?.OS || platform;
   } catch (error) {
-    logger.warn('Could not inspect native module availability', {
-      stage: 'availability',
+    logger.warn("Could not inspect native module availability", {
+      stage: "availability",
       errorName: error instanceof Error ? error.name : typeof error,
     });
     return false;
   }
-  const turboModuleEnabled = Boolean((globalThis as typeof globalThis & { __turboModuleProxy?: unknown }).__turboModuleProxy);
+  const turboModuleEnabled = Boolean(
+    (globalThis as typeof globalThis & { __turboModuleProxy?: unknown })
+      .__turboModuleProxy,
+  );
   const { env } = getRuntimeConfig();
   const hasAppKey = Boolean(env.rongCloudAppKey);
   const hasNativeModule = Boolean(nativeModules.RCReactNativeIM);
-  const available = platform !== 'web' && hasAppKey && (hasNativeModule || turboModuleEnabled);
+  const available =
+    platform !== "web" && hasAppKey && (hasNativeModule || turboModuleEnabled);
   if (!available) {
-    logger.warn('RongCloud is unavailable in this runtime', {
-      stage: 'availability',
+    logger.warn("RongCloud is unavailable in this runtime", {
+      stage: "availability",
       platform,
       hasAppKey,
       hasNativeModule,
@@ -230,30 +300,40 @@ export function isRongCloudAvailable() {
   return available;
 }
 
-export function toManagedMessage(message: RongSdkMessage | RCIMIWMessage, messageEnums = getSdkEnums()): ManagedMessage | null {
+export function toManagedMessage(
+  message: RongSdkMessage | RCIMIWMessage,
+  messageEnums = getSdkEnums(),
+): ManagedMessage | null {
   if (!messageEnums) return null;
-  const mapped = mapRongMessage(message as RongSdkMessage, { image: messageEnums.imageType, send: messageEnums.directionSend });
+  const mapped = mapRongMessage(message as RongSdkMessage, {
+    image: messageEnums.imageType,
+    send: messageEnums.directionSend,
+  });
   if (!mapped) return null;
   return {
     ...mapped,
-    ...(mapped.kind === 'image' ? { mediaSource: message as RCIMIWMediaMessage } : {}),
-    status: 'sent',
+    ...(mapped.kind === "image"
+      ? { mediaSource: message as RCIMIWMediaMessage }
+      : {}),
+    status: "sent",
     sentAt: message.sentTime || Date.now(),
   };
 }
 
 function toLocalMediaUri(path: string) {
   if (/^(?:file|content):\/\//i.test(path)) return path;
-  return `file://${path.startsWith('/') ? '' : '/'}${path}`;
+  return `file://${path.startsWith("/") ? "" : "/"}${path}`;
 }
 
-export async function downloadRongImageMessage(message: ManagedMessage): Promise<string> {
-  if (message.kind !== 'image') throw new Error('消息不是图片');
+export async function downloadRongImageMessage(
+  message: ManagedMessage,
+): Promise<string> {
+  if (message.kind !== "image") throw new Error("消息不是图片");
   if (/^(?:file|content):\/\//i.test(message.imageUrl)) return message.imageUrl;
   const mediaMessage = message.mediaSource as RCIMIWMediaMessage | undefined;
   if (!mediaMessage) {
     if (/^https?:\/\/[^/]*ronghub\.com\//i.test(message.imageUrl)) {
-      throw new Error('缺少融云媒体消息数据，无法通过 SDK 下载图片');
+      throw new Error("缺少融云媒体消息数据，无法通过 SDK 下载图片");
     }
     return message.imageUrl;
   }
@@ -270,25 +350,30 @@ export async function downloadRongImageMessage(message: ManagedMessage): Promise
         return;
       }
       if (!localPath) {
-        reject(new Error('融云图片下载完成，但没有返回本地文件路径'));
+        reject(new Error("融云图片下载完成，但没有返回本地文件路径"));
         return;
       }
       resolve(toLocalMediaUri(localPath));
     };
 
-    void currentEngine.downloadMediaMessage(mediaMessage, {
-      onMediaMessageDownloaded: (code, downloadedMessage) => {
-        if (code !== 0) {
-          finish(new Error(`融云图片下载失败（${code}）`));
-          return;
-        }
-        finish(undefined, downloadedMessage.local);
-      },
-    }).then((code) => {
-      if (code !== 0) finish(new Error(`融云图片下载请求失败（${code}）`));
-    }).catch((error: unknown) => {
-      finish(error instanceof Error ? error : new Error('融云图片下载请求失败'));
-    });
+    void currentEngine
+      .downloadMediaMessage(mediaMessage, {
+        onMediaMessageDownloaded: (code, downloadedMessage) => {
+          if (code !== 0) {
+            finish(new Error(`融云图片下载失败（${code}）`));
+            return;
+          }
+          finish(undefined, downloadedMessage.local);
+        },
+      })
+      .then((code) => {
+        if (code !== 0) finish(new Error(`融云图片下载请求失败（${code}）`));
+      })
+      .catch((error: unknown) => {
+        finish(
+          error instanceof Error ? error : new Error("融云图片下载请求失败"),
+        );
+      });
   });
 }
 
@@ -299,23 +384,24 @@ function emitConversation(conversation: RongConversation) {
 function publishConnectionStatus(status: number): RongCloudConnectionSignal {
   const sdk = loadSdk();
   const statuses = sdk?.RCIMIWConnectionStatus;
-  const signal: RongCloudConnectionSignal = status === statuses?.CONNECTED
-    ? 'connected'
-    : status === statuses?.TIMEOUT
-      ? 'timeout'
-      : status === statuses?.TOKEN_INCORRECT
-        || status === statuses?.CONN_USER_BLOCKED
-        || status === statuses?.KICKED_OFFLINE_BY_OTHER_CLIENT
-        || status === statuses?.SIGN_OUT
-        ? 'terminal'
-        : 'connecting';
-  connected = signal === 'connected';
+  const signal: RongCloudConnectionSignal =
+    status === statuses?.CONNECTED
+      ? "connected"
+      : status === statuses?.TIMEOUT
+        ? "timeout"
+        : status === statuses?.TOKEN_INCORRECT ||
+            status === statuses?.CONN_USER_BLOCKED ||
+            status === statuses?.KICKED_OFFLINE_BY_OTHER_CLIENT ||
+            status === statuses?.SIGN_OUT
+          ? "terminal"
+          : "connecting";
+  connected = signal === "connected";
   connectionStatusListeners.forEach((listener) => listener(signal));
   return signal;
 }
 
 function publishConnectionSignal(signal: RongCloudConnectionSignal) {
-  connected = signal === 'connected';
+  connected = signal === "connected";
   connectionStatusListeners.forEach((listener) => listener(signal));
 }
 
@@ -345,21 +431,24 @@ function waitForRongCloudConnection(currentEngine: RCIMIWEngine) {
       resolve(value);
     };
     const onStatus = (signal: RongCloudConnectionSignal) => {
-      if (signal === 'connected') finish(true);
-      else if (signal === 'terminal' || signal === 'timeout') finish(false);
+      if (signal === "connected") finish(true);
+      else if (signal === "terminal" || signal === "timeout") finish(false);
     };
     const stopListening = subscribeRongConnectionStatus(onStatus);
     const cancel = () => finish(false);
     cancelConnectionAttempt = cancel;
     const inspect = () => {
-      void currentEngine.getConnectionStatus()
+      void currentEngine
+        .getConnectionStatus()
         .then((status) => publishConnectionStatus(status))
         .catch(() => undefined);
     };
     // 限时轮询（2s × 4 次）：SDK 发出状态信号则立即返回，否则 8s 后放弃交给上层落错误态
     pollTimer = setInterval(inspect, CONNECTION_WAIT_POLL_INTERVAL_MS);
     timeoutTimer = setTimeout(() => {
-      logger.warn('RongCloud reconnect wait timed out', { stage: 'reconnect-wait' });
+      logger.warn("RongCloud reconnect wait timed out", {
+        stage: "reconnect-wait",
+      });
       finish(false);
     }, CONNECTION_WAIT_TIMEOUT_MS);
     inspect();
@@ -384,10 +473,12 @@ function waitBeforeConnectionRetry(delayMs: number, attemptEpoch: number) {
 
 function isTransientImTokenError(error: unknown): error is ApiError {
   if (!(error instanceof ApiError)) return false;
-  return error.status === 0
-    || error.status === 408
-    || error.status === 429
-    || error.status >= 500;
+  return (
+    error.status === 0 ||
+    error.status === 408 ||
+    error.status === 429 ||
+    error.status >= 500
+  );
 }
 
 // 断网时 getImToken 会持续返回临时错误，无限重试会让 initialize 永不返回、页面一直停在「消息连接中」；
@@ -395,32 +486,43 @@ function isTransientImTokenError(error: unknown): error is ApiError {
 const IM_TOKEN_RETRY_BUDGET_MS = 8_000;
 const IM_TOKEN_MAX_RETRIES = 4;
 
-async function fetchImTokenWithRetry(accessToken: string, attemptEpoch: number) {
+async function fetchImTokenWithRetry(
+  accessToken: string,
+  attemptEpoch: number,
+) {
   const deadline = Date.now() + IM_TOKEN_RETRY_BUDGET_MS;
   let retryCount = 0;
   while (attemptEpoch === connectionEpoch) {
     try {
       return await getClientAuthApi().getImToken(accessToken);
     } catch (error) {
-      if (!isTransientImTokenError(error) || attemptEpoch !== connectionEpoch) throw error;
+      if (!isTransientImTokenError(error) || attemptEpoch !== connectionEpoch)
+        throw error;
       const remainingMs = deadline - Date.now();
       if (remainingMs <= 0 || retryCount >= IM_TOKEN_MAX_RETRIES) {
-        logger.warn('IM token retry budget exhausted', {
-          stage: 'im-token',
+        logger.warn("IM token retry budget exhausted", {
+          stage: "im-token",
           attempts: retryCount,
           status: error.status,
         });
         return null;
       }
-      const delayMs = Math.min(1_000 * 2 ** Math.min(retryCount, 5), 30_000, remainingMs);
+      const delayMs = Math.min(
+        1_000 * 2 ** Math.min(retryCount, 5),
+        30_000,
+        remainingMs,
+      );
       retryCount += 1;
-      logger.warn('IM token request failed temporarily; retrying', {
-        stage: 'im-token',
+      logger.warn("IM token request failed temporarily; retrying", {
+        stage: "im-token",
         attempt: retryCount,
         retryInMs: delayMs,
         status: error.status,
       });
-      const shouldRetry = await waitBeforeConnectionRetry(delayMs, attemptEpoch);
+      const shouldRetry = await waitBeforeConnectionRetry(
+        delayMs,
+        attemptEpoch,
+      );
       if (!shouldRetry) return null;
     }
   }
@@ -429,11 +531,17 @@ async function fetchImTokenWithRetry(accessToken: string, attemptEpoch: number) 
 
 async function emitReceived(message: RCIMIWMessage, offline: boolean) {
   const enums = getSdkEnums();
-  const peerId = normalizeSystemConversationId(message.senderUserId || message.targetId || '');
-  if (!enums || message.conversationType !== enums.conversationType || !peerId) {
+  const peerId = normalizeSystemConversationId(
+    message.senderUserId || message.targetId || "",
+  );
+  if (
+    !enums ||
+    message.conversationType !== enums.conversationType ||
+    !peerId
+  ) {
     // 重装回补场景下这里被丢弃的会话永远不会出现在列表里，必须留痕排查
-    logger.warn('RongCloud message dropped before reaching conversation list', {
-      stage: 'emit-received',
+    logger.warn("RongCloud message dropped before reaching conversation list", {
+      stage: "emit-received",
       conversationType: message.conversationType,
       expectedType: enums?.conversationType,
       peerId,
@@ -461,7 +569,9 @@ async function emitReceived(message: RCIMIWMessage, offline: boolean) {
     ? applyProfileSnapshot(base, cachedProfile)
     : await hydrateConversation(base);
   emitConversation(conversation);
-  messageListeners.forEach((listener) => listener(peerId, mapped, conversation));
+  messageListeners.forEach((listener) =>
+    listener(peerId, mapped, conversation),
+  );
 }
 
 function installListeners() {
@@ -472,7 +582,7 @@ function installListeners() {
   engine.setOnMessageReceivedListener((message, _left, offline) => {
     const sdk = loadSdk();
     if (sdk && message.messageType === sdk.RCIMIWMessageType.COMMAND) {
-      logger.info('rong_command.message_received', {
+      logger.info("rong_command.message_received", {
         name: (message as RongSdkMessage).name,
         senderId: message.senderUserId,
         conversationType: message.conversationType,
@@ -485,7 +595,7 @@ function installListeners() {
       });
       if (command) {
         if (!KNOWN_RONG_COMMAND_NAMES.has(command.name)) {
-          logger.warn('Unknown RongCloud command received', {
+          logger.warn("Unknown RongCloud command received", {
             name: command.name,
             senderId: command.senderId,
           });
@@ -494,8 +604,11 @@ function installListeners() {
       }
       return;
     }
-    if (sdk && message.conversationType === sdk.RCIMIWConversationType.CHATROOM) {
-      const roomId = String(message.targetId || '');
+    if (
+      sdk &&
+      message.conversationType === sdk.RCIMIWConversationType.CHATROOM
+    ) {
+      const roomId = String(message.targetId || "");
       chatRoomMessageListeners.forEach((listener) => listener(roomId, message));
       return;
     }
@@ -506,7 +619,10 @@ function installListeners() {
   });
   engine.setOnChatRoomNotifyBlockListener((event) => {
     const sdk = loadSdk();
-    if (sdk && event.operateType === sdk.RCIMIWChatRoomMemberOperateType.Blocked) {
+    if (
+      sdk &&
+      event.operateType === sdk.RCIMIWChatRoomMemberOperateType.Blocked
+    ) {
       chatRoomBlockedListeners.forEach((listener) => listener(event));
     }
   });
@@ -517,18 +633,30 @@ function installListeners() {
       chatRoomDestroyedListeners.forEach((listener) => listener(targetId));
     }
   });
-  engine.setOnConversationReadStatusSyncMessageReceivedListener((type, targetId, timestamp) => {
-    const sdk = loadSdk();
-    const currentEngine = engine;
-    if (!sdk || !targetId || type !== sdk.RCIMIWConversationType.PRIVATE || !currentEngine) return;
-    // SDK 不会自动清本机未读，这里同步清掉，避免下次从快照加载又冒出来
-    void currentEngine.clearUnreadCount(type, targetId, '', timestamp).catch(() => undefined);
-    const peerId = normalizeSystemConversationId(targetId);
-    conversationReadSyncListeners.forEach((listener) => listener(peerId, timestamp));
-  });
+  engine.setOnConversationReadStatusSyncMessageReceivedListener(
+    (type, targetId, timestamp) => {
+      const sdk = loadSdk();
+      const currentEngine = engine;
+      if (
+        !sdk ||
+        !targetId ||
+        type !== sdk.RCIMIWConversationType.PRIVATE ||
+        !currentEngine
+      )
+        return;
+      // SDK 不会自动清本机未读，这里同步清掉，避免下次从快照加载又冒出来
+      void currentEngine
+        .clearUnreadCount(type, targetId, "", timestamp)
+        .catch(() => undefined);
+      const peerId = normalizeSystemConversationId(targetId);
+      conversationReadSyncListeners.forEach((listener) =>
+        listener(peerId, timestamp),
+      );
+    },
+  );
   engine.setOnConnectionStatusChangedListener((status) => {
     const signal = publishConnectionStatus(status);
-    logger.info('rong_connection.status_changed', { status, signal });
+    logger.info("rong_connection.status_changed", { status, signal });
   });
 }
 
@@ -536,22 +664,36 @@ export function getRongCloudEngine() {
   return engine;
 }
 
-export function subscribeRongCommands(listener: (command: RongCommand) => void) {
+export function subscribeRongCommands(
+  listener: (command: RongCommand) => void,
+) {
   commandListeners.add(listener);
-  return () => { commandListeners.delete(listener); };
+  return () => {
+    commandListeners.delete(listener);
+  };
 }
 
-export function subscribeRongChatRoomBlocked(listener: (event: RCIMIWChatRoomMemberBlockEvent) => void) {
+export function subscribeRongChatRoomBlocked(
+  listener: (event: RCIMIWChatRoomMemberBlockEvent) => void,
+) {
   chatRoomBlockedListeners.add(listener);
-  return () => { chatRoomBlockedListeners.delete(listener); };
+  return () => {
+    chatRoomBlockedListeners.delete(listener);
+  };
 }
 
-export function subscribeRongChatRoomDestroyed(listener: (chatroomId: string) => void) {
+export function subscribeRongChatRoomDestroyed(
+  listener: (chatroomId: string) => void,
+) {
   chatRoomDestroyedListeners.add(listener);
-  return () => { chatRoomDestroyedListeners.delete(listener); };
+  return () => {
+    chatRoomDestroyedListeners.delete(listener);
+  };
 }
 
-export function subscribeRongChatRoomMessages(listener: ChatRoomMessageListener) {
+export function subscribeRongChatRoomMessages(
+  listener: ChatRoomMessageListener,
+) {
   chatRoomMessageListeners.add(listener);
   return () => chatRoomMessageListeners.delete(listener);
 }
@@ -568,36 +710,40 @@ export function isRongCloudConnected() {
 export function connectRongCloud(accessToken: string) {
   if (connectionAttempt) return connectionAttempt;
   const attemptEpoch = connectionEpoch;
-  logger.info('RongCloud connectRongCloud invoked', {
-    stage: 'connect-invoked',
+  logger.info("RongCloud connectRongCloud invoked", {
+    stage: "connect-invoked",
     hasEngine: Boolean(engine),
     hasStartedConnection,
   });
-  const attempt = connectRongCloudOnce(accessToken, attemptEpoch).finally(() => {
-    if (connectionAttempt === attempt) connectionAttempt = null;
-  });
+  const attempt = connectRongCloudOnce(accessToken, attemptEpoch).finally(
+    () => {
+      if (connectionAttempt === attempt) connectionAttempt = null;
+    },
+  );
   connectionAttempt = attempt;
   return attempt;
 }
 
 async function connectRongCloudOnce(accessToken: string, attemptEpoch: number) {
-  let stage = 'availability';
+  let stage = "availability";
   try {
     if (attemptEpoch !== connectionEpoch) return false;
     if (!isRongCloudAvailable()) return false;
     if (!accessToken) {
-      logger.warn('RongCloud connection skipped without an access token', { stage: 'access-token' });
+      logger.warn("RongCloud connection skipped without an access token", {
+        stage: "access-token",
+      });
       return false;
     }
     businessToken = accessToken;
     if (!engine) {
-      stage = 'sdk-load';
+      stage = "sdk-load";
       const sdk = loadSdk();
       if (!sdk) {
-        logger.warn('RongCloud SDK could not be loaded', { stage });
+        logger.warn("RongCloud SDK could not be loaded", { stage });
         return false;
       }
-      stage = 'engine-init';
+      stage = "engine-init";
       const { env } = getRuntimeConfig();
       engine = sdk.RCIMIWEngine.create(env.rongCloudAppKey, {
         enablePush: true,
@@ -618,15 +764,15 @@ async function connectRongCloudOnce(accessToken: string, attemptEpoch: number) {
       });
       // Server notifications use this envelope; ORDER_NOTIFY is its name field.
       await engine.registerNativeCustomMessage(
-        'RC:CustomMsg',
+        "RC:CustomMsg",
         sdk.RCIMIWNativeCustomMessagePersistentFlag.Counted,
       );
       await engine.registerNativeCustomMessage(
-        'ORDER_NOTIFY',
+        "ORDER_NOTIFY",
         sdk.RCIMIWNativeCustomMessagePersistentFlag.Counted,
       );
       await engine.registerNativeCustomMessage(
-        'PZAfterSaleApply',
+        "PZAfterSaleApply",
         sdk.RCIMIWNativeCustomMessagePersistentFlag.Counted,
       );
       installListeners();
@@ -636,38 +782,48 @@ async function connectRongCloudOnce(accessToken: string, attemptEpoch: number) {
     const sdk = loadSdk();
     if (!currentEngine || !sdk) return false;
 
-    const currentStatus = await currentEngine.getConnectionStatus().catch(() => undefined);
+    const currentStatus = await currentEngine
+      .getConnectionStatus()
+      .catch(() => undefined);
     if (attemptEpoch !== connectionEpoch) return false;
-    if (typeof currentStatus === 'number') {
+    if (typeof currentStatus === "number") {
       const signal = publishConnectionStatus(currentStatus);
       // 这条轮询路径绕过了 status_changed 监听器，必须留痕，否则连接状态广播无日志可查
-      logger.info('RongCloud connection status polled before connect', {
-        stage: 'connection-status-poll',
+      logger.info("RongCloud connection status polled before connect", {
+        stage: "connection-status-poll",
         status: currentStatus,
         signal,
       });
-      if (signal === 'connected') return true;
+      if (signal === "connected") return true;
       const statuses = sdk.RCIMIWConnectionStatus;
-      const sdkIsReconnecting = currentStatus === statuses.CONNECTING
-        || currentStatus === statuses.SUSPEND
-        || currentStatus === statuses.NETWORK_UNAVAILABLE;
+      const sdkIsReconnecting =
+        currentStatus === statuses.CONNECTING ||
+        currentStatus === statuses.SUSPEND ||
+        currentStatus === statuses.NETWORK_UNAVAILABLE;
       if (hasStartedConnection && sdkIsReconnecting) {
-        logger.info('RongCloud SDK is already reconnecting', { stage: 'connection-status' });
+        logger.info("RongCloud SDK is already reconnecting", {
+          stage: "connection-status",
+        });
         return waitForRongCloudConnection(currentEngine);
       }
     }
 
-    stage = 'im-token';
-    logger.info('RongCloud fetching IM token', { stage });
-    const tokenResponse = await fetchImTokenWithRetry(accessToken, attemptEpoch);
+    stage = "im-token";
+    logger.info("RongCloud fetching IM token", { stage });
+    const tokenResponse = await fetchImTokenWithRetry(
+      accessToken,
+      attemptEpoch,
+    );
     if (attemptEpoch !== connectionEpoch) return false;
     const token = tokenResponse?.token;
     if (!token) {
-      logger.warn('RongCloud IM token response did not contain a token', { stage });
+      logger.warn("RongCloud IM token response did not contain a token", {
+        stage,
+      });
       return false;
     }
-    stage = 'connect';
-    logger.info('RongCloud invoking engine.connect', {
+    stage = "connect";
+    logger.info("RongCloud invoking engine.connect", {
       stage,
       hasExistingConnection: hasStartedConnection,
     });
@@ -684,22 +840,26 @@ async function connectRongCloudOnce(accessToken: string, attemptEpoch: number) {
         resolve(value);
       };
       const onStatus = (signal: RongCloudConnectionSignal) => {
-        if (signal === 'connected') finish(true);
-        else if (signal === 'terminal' || signal === 'timeout') finish(false);
+        if (signal === "connected") finish(true);
+        else if (signal === "terminal" || signal === "timeout") finish(false);
       };
       const stopListening = subscribeRongConnectionStatus(onStatus);
       const cancel = () => finish(false);
       cancelConnectionAttempt = cancel;
       const inspectStatus = () => {
-        void currentEngine.getConnectionStatus()
+        void currentEngine
+          .getConnectionStatus()
           .then((status) => {
             const signal = publishConnectionStatus(status);
             // 34001 兜底路径的广播同样绕过 status_changed 监听器，需留痕
-            logger.info('RongCloud connection status inspected after existing-connection code', {
-              stage: 'connection-status-inspect',
-              status,
-              signal,
-            });
+            logger.info(
+              "RongCloud connection status inspected after existing-connection code",
+              {
+                stage: "connection-status-inspect",
+                status,
+                signal,
+              },
+            );
           })
           .catch(() => undefined);
       };
@@ -711,46 +871,58 @@ async function connectRongCloudOnce(accessToken: string, attemptEpoch: number) {
         }
         if (code === 34001) {
           if (!loggedExistingConnection) {
-            logger.info('RongCloud connection already exists or is reconnecting', {
-              stage: resultStage,
-              errorCode: code,
-            });
+            logger.info(
+              "RongCloud connection already exists or is reconnecting",
+              {
+                stage: resultStage,
+                errorCode: code,
+              },
+            );
             loggedExistingConnection = true;
           }
           inspectStatus();
           return;
         }
         if (code === 34006) {
-          logger.warn('RongCloud connection timed out; scheduling another attempt', {
-            stage: resultStage,
-            errorCode: code,
-          });
-          publishConnectionSignal('timeout');
+          logger.warn(
+            "RongCloud connection timed out; scheduling another attempt",
+            {
+              stage: resultStage,
+              errorCode: code,
+            },
+          );
+          publishConnectionSignal("timeout");
           finish(false);
           return;
         }
-        logger.warn('RongCloud connection failed', { stage: resultStage, errorCode: code });
+        logger.warn("RongCloud connection failed", {
+          stage: resultStage,
+          errorCode: code,
+        });
         finish(false);
       };
 
-      void currentEngine.connect(token, 0, {
-        onConnected: (code) => {
-          handleConnectResult(code, 'connect-callback');
-        },
-      }).then((code) => {
-        if (code !== 0) handleConnectResult(code, 'connect-result');
-      }).catch((error: unknown) => {
-        logger.warn('RongCloud connect call rejected', {
-          stage: 'connect-rejected',
-          errorName: error instanceof Error ? error.name : typeof error,
+      void currentEngine
+        .connect(token, 0, {
+          onConnected: (code) => {
+            handleConnectResult(code, "connect-callback");
+          },
+        })
+        .then((code) => {
+          if (code !== 0) handleConnectResult(code, "connect-result");
+        })
+        .catch((error: unknown) => {
+          logger.warn("RongCloud connect call rejected", {
+            stage: "connect-rejected",
+            errorName: error instanceof Error ? error.name : typeof error,
+          });
+          finish(false);
         });
-        finish(false);
-      });
     });
   } catch (error) {
     if (attemptEpoch !== connectionEpoch) return false;
     connected = false;
-    logger.warn('RongCloud initialization failed', {
+    logger.warn("RongCloud initialization failed", {
       stage,
       errorName: error instanceof Error ? error.name : typeof error,
     });
@@ -764,40 +936,58 @@ export async function initializeRongCloud(accessToken: string) {
 
 export async function getRongConversations(): Promise<RongConversation[]> {
   const sdk = loadSdk();
-  if (!engine || !connected || !sdk) throw new Error('即时消息尚未连接，请稍后重试');
+  if (!engine || !connected || !sdk)
+    throw new Error("即时消息尚未连接，请稍后重试");
   const epoch = connectionEpoch;
-  const conversations = await loadConversationSnapshot(engine, sdk.RCIMIWConversationType.PRIVATE);
+  const conversations = await loadConversationSnapshot(
+    engine,
+    sdk.RCIMIWConversationType.PRIVATE,
+  );
   if (epoch !== connectionEpoch) return [];
   const entries = conversations
     .map((raw) => {
       const item = mapConversation(raw);
       // 目录同步恢复的会话壳不带 lastMessage，预览是"新消息"兜底，需从云端补最后一条生成真实预览
-      const isShell = !raw.lastMessage || item.preview === '新消息';
+      const isShell = !raw.lastMessage || item.preview === "新消息";
       return { item, isShell };
     })
     .filter((entry) => entry.item.id);
-  logger.info('RongCloud conversations mapped', {
+  logger.info("RongCloud conversations mapped", {
     count: entries.length,
-    shells: entries.filter((entry) => entry.isShell).map((entry) => entry.item.id).join(','),
+    shells: entries
+      .filter((entry) => entry.isShell)
+      .map((entry) => entry.item.id)
+      .join(","),
   });
-  return Promise.all(entries.map(({ item, isShell }) =>
-    (isShell ? hydrateShellPreview(item) : Promise.resolve(item)).then(hydrateConversation),
-  ));
+  return Promise.all(
+    entries.map(({ item, isShell }) =>
+      (isShell ? hydrateShellPreview(item) : Promise.resolve(item)).then(
+        hydrateConversation,
+      ),
+    ),
+  );
 }
 
 // REMOTE 拉取不落本地库（探针实测），会话壳每次列表刷新都需补拉最新一条；失败则保持原预览不阻塞列表
-async function hydrateShellPreview(conversation: RongConversation): Promise<RongConversation> {
+async function hydrateShellPreview(
+  conversation: RongConversation,
+): Promise<RongConversation> {
   // 复用聊天页同一条拉取链路（远端优先 + count 20）：探针/聊天页均验证可用，
   // 单独按 count=1 请求在真机实测返回 0 条
   const page = await getRongMessages(conversation.id);
   const latest = page.messages[page.messages.length - 1];
-  logger.info('RongCloud shell conversation preview hydrate', {
+  logger.info("RongCloud shell conversation preview hydrate", {
     peerId: conversation.id,
     pulled: page.messages.length,
     preview: latest ? messagePreview(latest) : undefined,
   });
   if (!latest) return conversation;
-  return { ...conversation, preview: messagePreview(latest), time: latest.time, updatedAt: latest.sentAt };
+  return {
+    ...conversation,
+    preview: messagePreview(latest),
+    time: latest.time,
+    updatedAt: latest.sentAt,
+  };
 }
 
 export function subscribeRongConversationSync(listener: () => void) {
@@ -805,7 +995,9 @@ export function subscribeRongConversationSync(listener: () => void) {
   return () => conversationSyncListeners.delete(listener);
 }
 
-export function subscribeRongConversationReadSync(listener: (peerId: string, timestamp: number) => void) {
+export function subscribeRongConversationReadSync(
+  listener: (peerId: string, timestamp: number) => void,
+) {
   conversationReadSyncListeners.add(listener);
   return () => conversationReadSyncListeners.delete(listener);
 }
@@ -815,9 +1007,15 @@ export function subscribeRongMessages(onMessage: ConversationListener) {
   return () => conversationListeners.delete(onMessage);
 }
 
-export function subscribeRongConversationMessages(targetId: string, onMessage: (message: ManagedMessage) => void) {
+export function subscribeRongConversationMessages(
+  targetId: string,
+  onMessage: (message: ManagedMessage) => void,
+) {
   const normalizedTargetId = normalizeSystemConversationId(targetId);
-  const listener: MessageListener = (peerId, message) => { if (normalizeSystemConversationId(peerId) === normalizedTargetId) onMessage(message); };
+  const listener: MessageListener = (peerId, message) => {
+    if (normalizeSystemConversationId(peerId) === normalizedTargetId)
+      onMessage(message);
+  };
   messageListeners.add(listener);
   return () => messageListeners.delete(listener);
 }
@@ -827,9 +1025,13 @@ export function subscribeRongMessageEvents(onMessage: MessageListener) {
   return () => messageListeners.delete(onMessage);
 }
 
-export async function getRongMessages(targetId: string, beforeSentTime?: number): Promise<MessageHistoryPage> {
+export async function getRongMessages(
+  targetId: string,
+  beforeSentTime?: number,
+): Promise<MessageHistoryPage> {
   const sdk = loadSdk();
-  if (!engine || !connected || !sdk || !targetId) return { messages: [], nextCursor: null, hasMore: false };
+  if (!engine || !connected || !sdk || !targetId)
+    return { messages: [], nextCursor: null, hasMore: false };
   const count = 20;
   // 远端优先：换机/重装后本地库为空，LOCAL_REMOTE 实测不会去云端拉（返回 0 条），
   // 必须显式用 REMOTE 兜底，否则云端有消息但聊天页空白
@@ -845,43 +1047,80 @@ export async function getRongMessages(targetId: string, beforeSentTime?: number)
   const mapped = messages
     .map((message) => toManagedMessage(message))
     .filter((message): message is ManagedMessage => Boolean(message));
-  const chronological = mapped.sort((left, right) => left.sentAt - right.sentAt);
+  const chronological = mapped.sort(
+    (left, right) => left.sentAt - right.sentAt,
+  );
   const oldest = chronological[0]?.sentAt || null;
-  return { messages: chronological, nextCursor: chronological.length === count ? oldest : null, hasMore: chronological.length === count };
+  return {
+    messages: chronological,
+    nextCursor: chronological.length === count ? oldest : null,
+    hasMore: chronological.length === count,
+  };
 }
 
 function requireConnected() {
-  if (!engine || !connected) throw new Error('融云尚未连接');
+  if (!engine || !connected) throw new Error("融云尚未连接");
   return engine;
 }
 
-export async function sendRongText(targetId: string, text: string): Promise<ManagedMessage> {
+export async function sendRongText(
+  targetId: string,
+  text: string,
+): Promise<ManagedMessage> {
   const sdk = loadSdk();
-  if (!sdk) throw new Error('当前版本暂不支持即时消息');
+  if (!sdk) throw new Error("当前版本暂不支持即时消息");
   const currentEngine = requireConnected();
-  const message = await currentEngine.createTextMessage(sdk.RCIMIWConversationType.PRIVATE, getRongConversationTargetId(targetId), '', text);
+  const message = await currentEngine.createTextMessage(
+    sdk.RCIMIWConversationType.PRIVATE,
+    getRongConversationTargetId(targetId),
+    "",
+    text,
+  );
   return new Promise((resolve, reject) => {
     let settled = false;
     const finish = (error?: Error, sent?: RCIMIWMessage) => {
       if (settled) return;
       settled = true;
-      if (error) { reject(error); return; }
+      if (error) {
+        reject(error);
+        return;
+      }
       const managed = sent ? toManagedMessage(sent) : null;
       if (managed) resolve({ ...managed, isMine: true });
-      else reject(new Error('发送消息失败'));
+      else reject(new Error("发送消息失败"));
     };
-    void currentEngine.sendMessage(message, { onMessageSent: (code, sent) => code === 0 ? finish(undefined, sent) : finish(new Error(`发送消息失败（${code}）`)) }).then((code) => { if (code !== 0) finish(new Error(`发送消息失败（${code}）`)); }).catch((error) => finish(error instanceof Error ? error : new Error('发送消息失败')));
+    void currentEngine
+      .sendMessage(message, {
+        onMessageSent: (code, sent) =>
+          code === 0
+            ? finish(undefined, sent)
+            : finish(new Error(`发送消息失败（${code}）`)),
+      })
+      .then((code) => {
+        if (code !== 0) finish(new Error(`发送消息失败（${code}）`));
+      })
+      .catch((error) =>
+        finish(error instanceof Error ? error : new Error("发送消息失败")),
+      );
   });
 }
 
-export async function sendRongImage(targetId: string, path: string): Promise<ManagedMessage> {
+export async function sendRongImage(
+  targetId: string,
+  path: string,
+): Promise<ManagedMessage> {
   const sdk = loadSdk();
-  if (!sdk) throw new Error('当前版本暂不支持即时消息');
+  if (!sdk) throw new Error("当前版本暂不支持即时消息");
   const currentEngine = requireConnected();
   // 融云私有存储的媒体 URL 直接访问会 401：先上传自家 OSS，把公网地址预置到
-  // remote 后用 sendMessage 直发（与语聊房、PC 端 Web SDK 行为一致）
+  // remote 后用 sendMessage 直发（与开黑房、PC 端 Web SDK 行为一致）
   const imageUrl = await uploadChatImageForIm(businessToken, path);
-  const message = await currentEngine.createImageMessage(sdk.RCIMIWConversationType.PRIVATE, getRongConversationTargetId(targetId), '', path);
+  const message = await currentEngine.createImageMessage(
+    sdk.RCIMIWConversationType.PRIVATE,
+    getRongConversationTargetId(targetId),
+    "",
+    path,
+  );
   message.remote = imageUrl;
   // 安卓 SDK 对 ImageMessage 一律解码重编码成 JPEG，GIF 会变单帧；original=true 走
   // isFull 路径按原文件拷贝上传（缩略图仍由 SDK 生成），动图才能保留动画
@@ -893,72 +1132,123 @@ export async function sendRongImage(targetId: string, path: string): Promise<Man
     const finish = (error?: Error, sent?: RCIMIWMessage) => {
       if (settled) return;
       settled = true;
-      if (error) { reject(error); return; }
+      if (error) {
+        reject(error);
+        return;
+      }
       const managed = sent ? toManagedMessage(sent) : null;
       if (managed) resolve({ ...managed, isMine: true });
-      else reject(new Error('发送图片失败'));
+      else reject(new Error("发送图片失败"));
     };
-    void currentEngine.sendMessage(message, { onMessageSent: (code, sent) => code === 0 ? finish(undefined, sent) : finish(new Error(`发送图片失败（${code}）`)) }).then((code) => { if (code !== 0) finish(new Error(`发送图片失败（${code}）`)); }).catch((error) => finish(error instanceof Error ? error : new Error('发送图片失败')));
+    void currentEngine
+      .sendMessage(message, {
+        onMessageSent: (code, sent) =>
+          code === 0
+            ? finish(undefined, sent)
+            : finish(new Error(`发送图片失败（${code}）`)),
+      })
+      .then((code) => {
+        if (code !== 0) finish(new Error(`发送图片失败（${code}）`));
+      })
+      .catch((error) =>
+        finish(error instanceof Error ? error : new Error("发送图片失败")),
+      );
   });
 }
 
-export async function sendRongAfterSaleCard(targetId: string, payload: AfterSaleCardPayload): Promise<ManagedMessage> {
+export async function sendRongAfterSaleCard(
+  targetId: string,
+  payload: AfterSaleCardPayload,
+): Promise<ManagedMessage> {
   const sdk = loadSdk();
-  if (!sdk) throw new Error('当前版本暂不支持即时消息');
+  if (!sdk) throw new Error("当前版本暂不支持即时消息");
   const currentEngine = requireConnected();
-  const fields = new Map<string, string>([['data', JSON.stringify(payload)], ['content', '【售后申请】订单 ' + (payload.orderNo || '')]]);
+  const fields = new Map<string, string>([
+    ["data", JSON.stringify(payload)],
+    ["content", "【售后申请】订单 " + (payload.orderNo || "")],
+  ]);
   // 原生自定义消息：线上标识为 PZAfterSaleApply 本身，与 PC 端 registerMessageType 对齐；
   // createCustomMessage 会包装成 RC:CustomMsg，PC 端无法按卡片解析
-  const message = await currentEngine.createNativeCustomMessage(sdk.RCIMIWConversationType.PRIVATE, getRongConversationTargetId(targetId), '', 'PZAfterSaleApply', fields);
+  const message = await currentEngine.createNativeCustomMessage(
+    sdk.RCIMIWConversationType.PRIVATE,
+    getRongConversationTargetId(targetId),
+    "",
+    "PZAfterSaleApply",
+    fields,
+  );
   return new Promise((resolve, reject) => {
-    void currentEngine.sendMessage(message, { onMessageSent: (code, sent) => {
-      if (code !== 0) return reject(new Error(`售后卡片发送失败（${code}）`));
-      const managed = sent ? toManagedMessage(sent) : null;
-      if (managed) {
-        resolve({ ...managed, isMine: true });
-        return;
-      }
-      reject(new Error('发送消息失败'));
-    } });
+    void currentEngine.sendMessage(message, {
+      onMessageSent: (code, sent) => {
+        if (code !== 0) return reject(new Error(`售后卡片发送失败（${code}）`));
+        const managed = sent ? toManagedMessage(sent) : null;
+        if (managed) {
+          resolve({ ...managed, isMine: true });
+          return;
+        }
+        reject(new Error("发送消息失败"));
+      },
+    });
   });
 }
 
 export async function markRongConversationRead(targetId: string) {
   const sdk = loadSdk();
   if (!engine || !connected || !sdk || !targetId) {
-    logger.warn('RongCloud mark read skipped (engine not connected)', { targetId });
+    logger.warn("RongCloud mark read skipped (engine not connected)", {
+      targetId,
+    });
     return false;
   }
   const rongTargetId = getRongConversationTargetId(targetId);
-  const code = await engine.clearUnreadCount(sdk.RCIMIWConversationType.PRIVATE, rongTargetId, '', Date.now());
+  const code = await engine.clearUnreadCount(
+    sdk.RCIMIWConversationType.PRIVATE,
+    rongTargetId,
+    "",
+    Date.now(),
+  );
   if (code !== 0) {
-    logger.warn('RongCloud clear unread count failed', { code, targetId });
+    logger.warn("RongCloud clear unread count failed", { code, targetId });
     throw new Error(`清除未读失败（${code}）`);
   }
   // 上报服务端"已读至当前时间"，其他设备收到同步后清各自的未读数
-  const syncCode = await engine.syncConversationReadStatus(sdk.RCIMIWConversationType.PRIVATE, rongTargetId, '', Date.now(), {
-    onConversationReadStatusSynced: (result) => {
-      if (result !== 0) {
-        logger.warn('RongCloud conversation read status sync failed', { code: result, targetId });
-      }
+  const syncCode = await engine.syncConversationReadStatus(
+    sdk.RCIMIWConversationType.PRIVATE,
+    rongTargetId,
+    "",
+    Date.now(),
+    {
+      onConversationReadStatusSynced: (result) => {
+        if (result !== 0) {
+          logger.warn("RongCloud conversation read status sync failed", {
+            code: result,
+            targetId,
+          });
+        }
+      },
     },
-  });
+  );
   if (syncCode !== 0) {
-    logger.warn('RongCloud conversation read status sync failed', { code: syncCode, targetId });
+    logger.warn("RongCloud conversation read status sync failed", {
+      code: syncCode,
+      targetId,
+    });
     return false;
   }
-  logger.info('RongCloud mark read reported to server', { targetId });
+  logger.info("RongCloud mark read reported to server", { targetId });
   return true;
 }
 
 // 与 Web 端保持一致：置顶写入融云服务端，保证多端同步。
-export async function setRongConversationPinned(targetId: string, isPinned: boolean) {
+export async function setRongConversationPinned(
+  targetId: string,
+  isPinned: boolean,
+) {
   const sdk = loadSdk();
   if (!engine || !connected || !sdk || !targetId) return false;
   const code = await engine.changeConversationTopStatus(
     sdk.RCIMIWConversationType.PRIVATE,
     getRongConversationTargetId(targetId),
-    '',
+    "",
     isPinned,
   );
   if (code !== 0) throw new Error(`设置置顶失败（${code}）`);
@@ -970,10 +1260,10 @@ export async function disconnectRongCloud() {
   cancelConnectionAttempt?.();
   connectionAttempt = null;
   hasStartedConnection = false;
-  logger.info('rong_connection.disconnect_invoked');
+  logger.info("rong_connection.disconnect_invoked");
   if (engine) await engine.disconnect(false);
   connected = false;
-  businessToken = '';
+  businessToken = "";
   profileCache.clear();
   profileInFlight.clear();
   conversationListeners.clear();

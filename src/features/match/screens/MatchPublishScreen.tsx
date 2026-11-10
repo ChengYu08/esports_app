@@ -227,7 +227,7 @@ export default function MatchPublishScreen() {
       const selectedGame = form.games.find((item) => item.id === form.gameId);
       if (needVoice) {
         // 需试音：直接进试音房，不落匹配等待页；选人由房内「选择大神」再 push
-        // replace：替换发布页，避免语聊房返回又回到发布表单（与不试音 goMatching 一致）
+        // replace：替换发布页，避免开黑房返回又回到发布表单（与不试音 goMatching 一致）
         await openAuditionRoom(result.requestNo, form.token, {
           expireTime: result.expireTime,
           game: selectedGame ?? null,
@@ -279,7 +279,7 @@ export default function MatchPublishScreen() {
   }, [form, goMatching, submitting, user?.id]);
 
   const handlePublish = useCallback(async () => {
-    // 先完成表单必填校验，再查语聊房，避免未选俱乐部等就弹退房提示
+    // 先完成表单必填校验，再查开黑房，避免未选俱乐部等就弹退房提示
     if (!form.token) {
       showToast("请先登录");
       return;
@@ -321,7 +321,7 @@ export default function MatchPublishScreen() {
       void runPublish();
     } catch (error) {
       showToast(
-        error instanceof Error ? error.message : "查询语聊房状态失败，请重试",
+        error instanceof Error ? error.message : "查询开黑房状态失败，请重试",
       );
     } finally {
       checkingJoinedRoomRef.current = false;

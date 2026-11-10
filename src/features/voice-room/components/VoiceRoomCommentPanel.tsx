@@ -1,19 +1,19 @@
 import { Image } from "expo-image";
 import { router } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Animated,
-  BackHandler,
-  Easing,
-  Keyboard,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    Animated,
+    BackHandler,
+    Easing,
+    Keyboard,
+    Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { EmojiKeyboard, type EmojiType } from "rn-emoji-keyboard";
-import { useCallback, useEffect, useRef, useState } from "react";
 
 import { convertToJpeg } from "@/shared/media-picker/image-compat";
 import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
@@ -32,10 +32,7 @@ const IMAGE_MAX = 10;
  * 遮挡到屏幕底，占位槽要补回 bottomInset，否则键盘会盖住 actions 图标行；
  * iOS 键盘高度本身已含底部安全区，不需要补偿
  */
-const slotHeightForKeyboard = (
-  keyboardHeight: number,
-  bottomInset: number,
-) => {
+const slotHeightForKeyboard = (keyboardHeight: number, bottomInset: number) => {
   if (keyboardHeight <= 0) {
     return 0;
   }
@@ -158,7 +155,10 @@ export function VoiceRoomCommentPanel({
     }
     if (!keyboardVisibleRef.current && lastKeyboardHeightRef.current > 0) {
       Animated.timing(slotHeight, {
-        toValue: slotHeightForKeyboard(lastKeyboardHeightRef.current, bottomInset),
+        toValue: slotHeightForKeyboard(
+          lastKeyboardHeightRef.current,
+          bottomInset,
+        ),
         duration: 250,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: false,
@@ -205,7 +205,7 @@ export function VoiceRoomCommentPanel({
     return () => subscription.remove();
   }, [closeEmojiToKeyboard, emojiPickerOpen, keyboardVisible, onClose]);
 
-  // 草稿镜像 ref：语聊房整屏很重，草稿更新触发的重渲染可能滞后于下一次点击，
+  // 草稿镜像 ref：开黑房整屏很重，草稿更新触发的重渲染可能滞后于下一次点击，
   // 回调闭包里的 draft 会是过期值，快速连点 emoji 时会把上一次的选择覆盖掉。
   // 这里用 ref 同步读写最新草稿，点击追加不再依赖渲染快照
   const draftRef = useRef(draft);
@@ -270,13 +270,16 @@ export function VoiceRoomCommentPanel({
       style={[
         styles.container,
         // 槽（键盘/表情面板）已顶到屏幕底，容器不再额外垫安全区
-        { paddingBottom: emojiPickerOpen || keyboardHeight > 0 ? 0 : bottomInset },
+        {
+          paddingBottom:
+            emojiPickerOpen || keyboardHeight > 0 ? 0 : bottomInset,
+        },
       ]}
     >
       <View style={styles.content}>
         <View style={styles.textArea}>
           <TextInput
-            accessibilityLabel="语聊房消息输入"
+            accessibilityLabel="开黑房消息输入"
             autoFocus
             multiline
             ref={inputRef}
@@ -300,7 +303,11 @@ export function VoiceRoomCommentPanel({
               onPress={toggleEmojiPanel}
               style={styles.toolButton}
             >
-              <Image source={emojiIcon} style={styles.toolIcon} contentFit="contain" />
+              <Image
+                source={emojiIcon}
+                style={styles.toolIcon}
+                contentFit="contain"
+              />
             </Pressable>
             <Pressable
               accessibilityLabel="图片"
@@ -309,7 +316,11 @@ export function VoiceRoomCommentPanel({
               onPress={() => void pickImage()}
               style={styles.toolButton}
             >
-              <Image source={photoIcon} style={styles.toolIcon} contentFit="contain" />
+              <Image
+                source={photoIcon}
+                style={styles.toolIcon}
+                contentFit="contain"
+              />
             </Pressable>
           </View>
           <Pressable
@@ -317,10 +328,17 @@ export function VoiceRoomCommentPanel({
             accessibilityRole="button"
             disabled={!draft.trim()}
             onPress={() => void sendMessage()}
-            style={[styles.sendButton, !draft.trim() && styles.sendButtonDisabled]}
+            style={[
+              styles.sendButton,
+              !draft.trim() && styles.sendButtonDisabled,
+            ]}
           >
             <Text style={styles.sendText}>发送</Text>
-            <Image source={sendIcon} style={styles.sendIcon} contentFit="contain" />
+            <Image
+              source={sendIcon}
+              style={styles.sendIcon}
+              contentFit="contain"
+            />
           </Pressable>
         </View>
       </View>

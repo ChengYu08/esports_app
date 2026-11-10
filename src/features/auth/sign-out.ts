@@ -3,8 +3,8 @@ import { useAuthStore } from "@esports/auth";
 import { queryClient } from "@/core/query/query-client";
 import { clearActionCommandAccountState } from "@/features/message/action-command/action-command-handlers";
 import { messageStore } from "@/features/message/message-store";
-import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
 import { leaveVoiceChatRoom } from "@/features/voice-room/voice-room-rongcloud";
+import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
 
 import { clientAuthApi } from "./client-auth.api";
@@ -18,7 +18,7 @@ export function getLogoutConfirmMessage(
   const uid = userId == null ? "" : String(userId);
   const room = useVoiceRoomSessionStore.getState().activeRoom;
   if (room && uid && String(room.creatorUserId) === uid) {
-    return "你当前创建的语聊房仍在进行中。退出登录将解散该房间，房内成员会被移出，正在进行的接待或试音也会结束。是否继续退出？";
+    return "你当前创建的开黑房仍在进行中。退出登录将解散该房间，房内成员会被移出，正在进行的接待或试音也会结束。是否继续退出？";
   }
   return "确认要退出登录吗？";
 }

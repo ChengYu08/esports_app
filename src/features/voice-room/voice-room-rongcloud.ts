@@ -1,24 +1,34 @@
-import type { RCIMIWEngine, RCIMIWMessage, RCIMIWTextMessage } from '@rongcloud/react-native-im-wrapper';
-import { logger } from '@/core/logging/logger';
-import { pickRongImageUrl, type RongSdkMessage } from '@/features/message/chat-message';
+import { logger } from "@/core/logging/logger";
+import {
+    pickRongImageUrl,
+    type RongSdkMessage,
+} from "@/features/message/chat-message";
+import type {
+    RCIMIWEngine,
+    RCIMIWMessage,
+    RCIMIWTextMessage,
+} from "@rongcloud/react-native-im-wrapper";
 
 import {
-  initializeRongCloud,
-  isRongCloudConnected,
-  getRongCloudEngine,
-  subscribeRongChatRoomMessages,
-  subscribeRongChatRoomMembers,
-  subscribeRongConnectionStatus,
-} from '@/features/message/rongcloud-im';
+    getRongCloudEngine,
+    initializeRongCloud,
+    isRongCloudConnected,
+    subscribeRongChatRoomMembers,
+    subscribeRongChatRoomMessages,
+    subscribeRongConnectionStatus,
+} from "@/features/message/rongcloud-im";
 
-import { appendCachedVoiceChatMessage, clearVoiceChatMessageCache } from './voice-room-message-cache';
+import {
+    appendCachedVoiceChatMessage,
+    clearVoiceChatMessageCache,
+} from "./voice-room-message-cache";
 
 /** 进房不拉本地历史（对齐 PC count:-1）；历史统一走 getChatRoomMessages 云端接口 */
 const JOIN_CHATROOM_MESSAGE_COUNT = -1;
 /** 云端历史单页上限（融云约束 0 < count ≤ 50） */
 const CHATROOM_HISTORY_PAGE_SIZE = 50;
 
-type RongSdk = typeof import('@rongcloud/react-native-im-wrapper');
+type RongSdk = typeof import("@rongcloud/react-native-im-wrapper");
 type RoomMessage = {
   id: string;
   userId?: string;
@@ -35,19 +45,29 @@ type VoiceChatSender = {
   headImage?: string;
 };
 
-const roomMessageListeners = new Set<(chatroomId: string, message: RoomMessage) => void>();
-const roomMemberListeners = new Set<(targetId: string, actions: { userId?: string; actionType?: number }[]) => void>();
+const roomMessageListeners = new Set<
+  (chatroomId: string, message: RoomMessage) => void
+>();
+const roomMemberListeners = new Set<
+  (
+    targetId: string,
+    actions: { userId?: string; actionType?: number }[],
+  ) => void
+>();
 let listenersInstalled = false;
 const joinedChatroomIds = new Set<string>();
 // 融云聊天室成员事件不存离线：屏内无人订阅期间（最小化/首屏未挂载）先缓冲，
 // 首个订阅者挂载时冲刷，避免已加入/已离开的成员丢失
 const MAX_BUFFERED_MEMBER_ACTIONS = 100;
-const bufferedMemberActions = new Map<string, { userId?: string; actionType?: number }[]>();
+const bufferedMemberActions = new Map<
+  string,
+  { userId?: string; actionType?: number }[]
+>();
 
 function loadSdk(): RongSdk | null {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('@rongcloud/react-native-im-wrapper') as RongSdk;
+    return require("@rongcloud/react-native-im-wrapper") as RongSdk;
   } catch {
     return null;
   }
@@ -77,22 +97,24 @@ function installRoomListeners() {
     if (!normalized) return;
     // 屏幕最小化期间屏内订阅已断开，这里把消息累积到会话级缓存，重进时可恢复
     if (joinedChatroomIds.has(_targetId)) {
-      appendCachedVoiceChatMessage(_targetId, { ...normalized, kind: 'chat' });
+      appendCachedVoiceChatMessage(_targetId, { ...normalized, kind: "chat" });
     }
     roomMessageListeners.forEach((listener) => listener(_targetId, normalized));
   });
 }
 
-// PC 端语聊房会发 RC:ImgMsg（融云 ImageMessage，imageUri 在 remote 上），
+// PC 端开黑房会发 RC:ImgMsg（融云 ImageMessage，imageUri 在 remote 上），
 // 只认 text 会把图片消息整个丢弃，这里按 SDK 枚举识别图片类型
 function normalizeRoomMessage(message: RCIMIWMessage): RoomMessage | null {
   const sdk = loadSdk();
   const sdkMessage = message as RCIMIWTextMessage & RongSdkMessage;
-  const isImage = sdk != null && sdkMessage.messageType === sdk.RCIMIWMessageType.IMAGE;
+  const isImage =
+    sdk != null && sdkMessage.messageType === sdk.RCIMIWMessageType.IMAGE;
   const text = sdkMessage.text ?? "";
   // App 端发送的图片会把发送方的 localPath 带进消息体，接收方必须优先 remote；
   // 聊天室不会回显自己发的消息，这里再按 direction 兜底区分本地/远端优先级
-  const isMine = sdk != null && message.direction === sdk.RCIMIWMessageDirection.SEND;
+  const isMine =
+    sdk != null && message.direction === sdk.RCIMIWMessageDirection.SEND;
   const imageUrl = pickRongImageUrl(sdkMessage, isMine);
   if (!text && !(isImage && imageUrl)) return null;
   return {
@@ -106,22 +128,32 @@ function normalizeRoomMessage(message: RCIMIWMessage): RoomMessage | null {
   };
 }
 
-export async function joinVoiceChatRoom(accessToken: string, chatroomId: string) {
+export async function joinVoiceChatRoom(
+  accessToken: string,
+  chatroomId: string,
+) {
   if (joinedChatroomIds.has(chatroomId)) return loadSdk();
-  const connected = isRongCloudConnected() || await initializeRongCloud(accessToken);
-  if (!connected) throw new Error('融云连接不可用');
+  const connected =
+    isRongCloudConnected() || (await initializeRongCloud(accessToken));
+  if (!connected) throw new Error("融云连接不可用");
   const engine = getRongCloudEngine();
-  if (!engine) throw new Error('融云 SDK 不可用');
+  if (!engine) throw new Error("融云 SDK 不可用");
   installRoomListeners();
   const sdk = loadSdk();
   const code = await new Promise<number>((resolve, reject) => {
-    void engine.joinChatRoom(chatroomId, JOIN_CHATROOM_MESSAGE_COUNT, false, {
-      onChatRoomJoined: (result) => result === 0 ? resolve(result) : reject(new Error(`加入语聊房失败（${result}）`)),
-    }).then((result) => {
-      if (result !== 0) reject(new Error(`加入语聊房失败（${result}）`));
-    }).catch(reject);
+    void engine
+      .joinChatRoom(chatroomId, JOIN_CHATROOM_MESSAGE_COUNT, false, {
+        onChatRoomJoined: (result) =>
+          result === 0
+            ? resolve(result)
+            : reject(new Error(`加入开黑房失败（${result}）`)),
+      })
+      .then((result) => {
+        if (result !== 0) reject(new Error(`加入开黑房失败（${result}）`));
+      })
+      .catch(reject);
   });
-  if (code !== 0) throw new Error(`加入语聊房失败（${code}）`);
+  if (code !== 0) throw new Error(`加入开黑房失败（${code}）`);
   joinedChatroomIds.add(chatroomId);
   return sdk;
 }
@@ -141,7 +173,7 @@ export async function getVoiceChatHistory(chatroomId: string) {
   const engine = getRongCloudEngine();
   const sdk = loadSdk();
   if (!engine || !sdk || !isRongCloudConnected()) {
-    logger.warn('voice_room.history_skipped', {
+    logger.warn("voice_room.history_skipped", {
       chatroomId,
       hasEngine: Boolean(engine),
       hasSdk: Boolean(sdk),
@@ -149,7 +181,10 @@ export async function getVoiceChatHistory(chatroomId: string) {
     });
     return [];
   }
-  logger.info('voice_room.history_fetch_start', { chatroomId, count: CHATROOM_HISTORY_PAGE_SIZE });
+  logger.info("voice_room.history_fetch_start", {
+    chatroomId,
+    count: CHATROOM_HISTORY_PAGE_SIZE,
+  });
   return new Promise<RoomMessage[]>((resolve, reject) => {
     let settled = false;
     const finish = (messages: RoomMessage[] | Error) => {
@@ -158,42 +193,50 @@ export async function getVoiceChatHistory(chatroomId: string) {
       if (messages instanceof Error) reject(messages);
       else resolve(messages);
     };
-    void engine.getChatRoomMessages(
-      chatroomId,
-      0,
-      sdk.RCIMIWTimeOrder.BEFORE,
-      CHATROOM_HISTORY_PAGE_SIZE,
-      {
-        onSuccess: (messages) => {
-          const rawCount = messages?.length ?? 0;
-          const mapped = (messages || [])
-            .map(normalizeRoomMessage)
-            .filter((message): message is RoomMessage => Boolean(message))
-            .sort((left, right) => left.sentAt - right.sentAt);
-          logger.info('voice_room.history_fetch_success', {
-            chatroomId,
-            rawCount,
-            mappedCount: mapped.length,
-          });
-          finish(mapped);
-        },
-        onError: (code) => {
-          logger.warn('voice_room.history_fetch_error', { chatroomId, code });
-          finish(new Error(`聊天室历史消息拉取失败（${code}）`));
-        },
-      },
-    ).then((code) => {
-      if (code !== 0) {
-        logger.warn('voice_room.history_fetch_invoke_failed', { chatroomId, code });
-        finish(new Error(`聊天室历史消息拉取失败（${code}）`));
-      }
-    }).catch((error: unknown) => {
-      logger.warn('voice_room.history_fetch_exception', {
+    void engine
+      .getChatRoomMessages(
         chatroomId,
-        message: error instanceof Error ? error.message : String(error),
+        0,
+        sdk.RCIMIWTimeOrder.BEFORE,
+        CHATROOM_HISTORY_PAGE_SIZE,
+        {
+          onSuccess: (messages) => {
+            const rawCount = messages?.length ?? 0;
+            const mapped = (messages || [])
+              .map(normalizeRoomMessage)
+              .filter((message): message is RoomMessage => Boolean(message))
+              .sort((left, right) => left.sentAt - right.sentAt);
+            logger.info("voice_room.history_fetch_success", {
+              chatroomId,
+              rawCount,
+              mappedCount: mapped.length,
+            });
+            finish(mapped);
+          },
+          onError: (code) => {
+            logger.warn("voice_room.history_fetch_error", { chatroomId, code });
+            finish(new Error(`聊天室历史消息拉取失败（${code}）`));
+          },
+        },
+      )
+      .then((code) => {
+        if (code !== 0) {
+          logger.warn("voice_room.history_fetch_invoke_failed", {
+            chatroomId,
+            code,
+          });
+          finish(new Error(`聊天室历史消息拉取失败（${code}）`));
+        }
+      })
+      .catch((error: unknown) => {
+        logger.warn("voice_room.history_fetch_exception", {
+          chatroomId,
+          message: error instanceof Error ? error.message : String(error),
+        });
+        finish(
+          error instanceof Error ? error : new Error("聊天室历史消息拉取失败"),
+        );
       });
-      finish(error instanceof Error ? error : new Error('聊天室历史消息拉取失败'));
-    });
   });
 }
 
@@ -204,17 +247,26 @@ export async function sendVoiceChatMessage(
 ) {
   const engine = getRongCloudEngine();
   const sdk = loadSdk();
-  if (!engine || !sdk) throw new Error('融云 SDK 不可用');
-  const message = await engine.createTextMessage(sdk.RCIMIWConversationType.CHATROOM, chatroomId, '', text);
+  if (!engine || !sdk) throw new Error("融云 SDK 不可用");
+  const message = await engine.createTextMessage(
+    sdk.RCIMIWConversationType.CHATROOM,
+    chatroomId,
+    "",
+    text,
+  );
   if (sender) {
     message.userInfo = {
       userId: sender.userId,
       name: sender.nickname || `用户${sender.userId}`,
-      portrait: sender.headImage || '',
+      portrait: sender.headImage || "",
     };
   }
   let sent: RCIMIWMessage | undefined;
-  const code = await engine.sendMessage(message, { onMessageSent: (result: number, item?: RCIMIWMessage) => { if (result === 0) sent = item; } });
+  const code = await engine.sendMessage(message, {
+    onMessageSent: (result: number, item?: RCIMIWMessage) => {
+      if (result === 0) sent = item;
+    },
+  });
   if (code !== 0) throw new Error(`发送消息失败（${code}）`);
   return sent;
 }
@@ -226,19 +278,24 @@ export async function sendVoiceChatMessage(
  * 拿到的都是可直接显示的公网 URL。
  */
 export async function sendVoiceChatImageMessage(
-  engine: Pick<RCIMIWEngine, 'createImageMessage' | 'sendMessage'>,
+  engine: Pick<RCIMIWEngine, "createImageMessage" | "sendMessage">,
   conversationType: number,
   targetId: string,
   imagePath: string,
   imageUrl: string,
   sender?: VoiceChatSender,
 ) {
-  const message = await engine.createImageMessage(conversationType, targetId, '', imagePath);
+  const message = await engine.createImageMessage(
+    conversationType,
+    targetId,
+    "",
+    imagePath,
+  );
   if (sender) {
     message.userInfo = {
       userId: sender.userId,
       name: sender.nickname || `用户${sender.userId}`,
-      portrait: sender.headImage || '',
+      portrait: sender.headImage || "",
     };
   }
   message.remote = imageUrl;
@@ -254,25 +311,44 @@ export async function sendVoiceChatImage(
 ) {
   const engine = getRongCloudEngine();
   const sdk = loadSdk();
-  if (!engine || !sdk) throw new Error('融云 SDK 不可用');
-  return sendVoiceChatImageMessage(engine, sdk.RCIMIWConversationType.CHATROOM, chatroomId, imagePath, imageUrl, sender);
+  if (!engine || !sdk) throw new Error("融云 SDK 不可用");
+  return sendVoiceChatImageMessage(
+    engine,
+    sdk.RCIMIWConversationType.CHATROOM,
+    chatroomId,
+    imagePath,
+    imageUrl,
+    sender,
+  );
 }
 
-export function subscribeVoiceChatMessages(listener: (chatroomId: string, message: RoomMessage) => void) {
+export function subscribeVoiceChatMessages(
+  listener: (chatroomId: string, message: RoomMessage) => void,
+) {
   roomMessageListeners.add(listener);
   return () => roomMessageListeners.delete(listener);
 }
 
-export function subscribeVoiceChatMembers(listener: (targetId: string, actions: { userId?: string; actionType?: number }[]) => void) {
+export function subscribeVoiceChatMembers(
+  listener: (
+    targetId: string,
+    actions: { userId?: string; actionType?: number }[],
+  ) => void,
+) {
   if (roomMemberListeners.size === 0) {
-    bufferedMemberActions.forEach((actions, targetId) => listener(targetId, actions));
+    bufferedMemberActions.forEach((actions, targetId) =>
+      listener(targetId, actions),
+    );
     bufferedMemberActions.clear();
   }
   roomMemberListeners.add(listener);
   return () => roomMemberListeners.delete(listener);
 }
 
-export function subscribeVoiceChatConnection(listener: (connected: boolean) => void) {
-  return subscribeRongConnectionStatus((signal) => listener(signal === 'connected'));
+export function subscribeVoiceChatConnection(
+  listener: (connected: boolean) => void,
+) {
+  return subscribeRongConnectionStatus((signal) =>
+    listener(signal === "connected"),
+  );
 }
-

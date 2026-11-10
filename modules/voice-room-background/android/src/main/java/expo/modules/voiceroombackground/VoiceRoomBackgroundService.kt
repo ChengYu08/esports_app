@@ -25,7 +25,7 @@ class VoiceRoomBackgroundService : Service() {
       return START_NOT_STICKY
     }
 
-    val title = intent?.getStringExtra(EXTRA_TITLE) ?: "语聊房进行中"
+    val title = intent?.getStringExtra(EXTRA_TITLE) ?: "开黑房进行中"
     val microphoneEnabled = intent?.getBooleanExtra(EXTRA_MICROPHONE_ENABLED, false) ?: false
     val updateOnly = intent?.getBooleanExtra(EXTRA_UPDATE_ONLY, false) ?: false
 
@@ -52,8 +52,8 @@ class VoiceRoomBackgroundService : Service() {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
     val manager = getSystemService(NotificationManager::class.java)
     manager.createNotificationChannel(
-      NotificationChannel(CHANNEL_ID, "语聊房", NotificationManager.IMPORTANCE_LOW).apply {
-        description = "语聊房通话进行时显示"
+      NotificationChannel(CHANNEL_ID, "开黑房", NotificationManager.IMPORTANCE_LOW).apply {
+        description = "开黑房通话进行时显示"
       },
     )
   }

@@ -34,11 +34,11 @@ flowchart LR
 
 ### 2.1 三个系统的职责
 
-| 系统 | 负责内容 | 关键数据 |
-| --- | --- | --- |
+| 系统       | 负责内容                                                     | 关键数据                                                         |
+| ---------- | ------------------------------------------------------------ | ---------------------------------------------------------------- |
 | 业务服务端 | 创建/关闭房间、房间版本、成员候选索引、角色和权限、RTC Token | `roomId`、`roomVersion`、`roomStatus`、`clubId`、`serviceUserId` |
-| 融云 IM | 私聊、房间文字消息、聊天室成员事件、客服/踢人/匹配等命令 | `rongChatroomId`、消息 `messageUId`、命令 `name/data` |
-| 声网 RTC | 麦克风采集、远端音频播放、RTC 在线、开麦、说话指示 | `rtcChannelName`、Agora UID、RTC Token |
+| 融云 IM    | 私聊、房间文字消息、聊天室成员事件、客服/踢人/匹配等命令     | `rongChatroomId`、消息 `messageUId`、命令 `name/data`            |
+| 声网 RTC   | 麦克风采集、远端音频播放、RTC 在线、开麦、说话指示           | `rtcChannelName`、Agora UID、RTC Token                           |
 
 PC 端封装位置：
 
@@ -68,20 +68,20 @@ PC 端封装位置：
 
 `stores/chat.ts` 中的 `VoiceRoom` 是页面运行时模型，主要字段如下：
 
-| 字段 | 作用 |
-| --- | --- |
-| `id` | 业务房间主键，固定房间重新开启时可复用 |
-| `roomVersion` | 当前开启实例版本，每次重开递增；所有异步操作都要带上它 |
-| `rongChatroomId` | 当前融云聊天室 ID |
-| `rtcChannelName` | 当前声网频道名 |
-| `roomStatus` | `1` 表示开启，`0` 表示关闭 |
-| `creatorUserId` | 房主 ID |
-| `clubId` / `serviceUserId` | 接待俱乐部和当前接待客服 |
-| `members` | 由融云成员列表/服务端资料组成的页面成员列表 |
-| `rtcOnlineUserIds` | 声网频道内在线用户 |
-| `rtcMicOpenUserIds` | 已发布音频的用户 |
-| `rtcSpeakingUserIds` | 正在说话的用户 |
-| `rtcPresenceReady` | RTC 首次全量快照是否完成；未完成时不显示“断连” |
+| 字段                       | 作用                                                   |
+| -------------------------- | ------------------------------------------------------ |
+| `id`                       | 业务房间主键，固定房间重新开启时可复用                 |
+| `roomVersion`              | 当前开启实例版本，每次重开递增；所有异步操作都要带上它 |
+| `rongChatroomId`           | 当前融云聊天室 ID                                      |
+| `rtcChannelName`           | 当前声网频道名                                         |
+| `roomStatus`               | `1` 表示开启，`0` 表示关闭                             |
+| `creatorUserId`            | 房主 ID                                                |
+| `clubId` / `serviceUserId` | 接待俱乐部和当前接待客服                               |
+| `members`                  | 由融云成员列表/服务端资料组成的页面成员列表            |
+| `rtcOnlineUserIds`         | 声网频道内在线用户                                     |
+| `rtcMicOpenUserIds`        | 已发布音频的用户                                       |
+| `rtcSpeakingUserIds`       | 正在说话的用户                                         |
+| `rtcPresenceReady`         | RTC 首次全量快照是否完成；未完成时不显示“断连”         |
 
 `roomId + roomVersion + rongChatroomId + rtcChannelName + userId` 共同构成 RTC 会话实例栅栏。旧房间的异步回调不能写入新房间状态。
 
@@ -175,7 +175,7 @@ sequenceDiagram
 加入聊天室时透传：
 
 ```json
-{"roomId":"业务房间ID","roomVersion":"实例版本"}
+{ "roomId": "业务房间ID", "roomVersion": "实例版本" }
 ```
 
 服务端使用该信息维护 Redis 成员候选索引。Redis 只是反查候选，最终是否在房间以融云成员关系为准。
@@ -279,29 +279,29 @@ PC 端收到命令后只在房间 ID和版本都匹配时清理当前房间。�
 
 接口前缀为 `/client/v1`，均使用业务登录态。
 
-| 接口 | 用途 | 关键说明 |
-| --- | --- | --- |
-| `POST /voiceRoom/create` | 创建或开启房间 | `roomName`、可选 `clubId` |
-| `POST /voiceRoom/joined/current` | 查询当前实际加入的房间 | 无房返回 `null`；服务端会校验融云成员关系 |
-| `POST /voiceRoom/{roomId}/detail` | 查询房间详情 | 邀请链接进入、刷新接待绑定 |
-| `POST /voiceRoom/{roomId}/join/prepare?roomVersion=v` | 准备入房 | 写成员候选索引并返回最新外部实例 ID |
-| `POST /voiceRoom/{roomId}/rtc/token?roomVersion=v` | RTC 准入和 Token | 返回 `READY` 或终止状态 |
-| `POST /voiceRoom/{roomId}/leave?roomVersion=v` | 确认离开 | 清理当前用户成员索引 |
-| `POST /voiceRoom/{roomId}/destroy?roomVersion=v` | 房主解散 | 关闭房间并销毁外部资源 |
-| `POST /voiceRoom/{roomId}/kickOut` | 踢普通成员 | action：`userId`、`roomVersion` |
-| `POST /voiceRoom/inviteClubService` | 房主呼叫接待 | action：`roomId`、`clubId`、`roomVersion` |
-| `POST /voiceRoom/claimClubService` | 客服接单 | 返回房间信息和客服 RTC Token |
-| `POST /voiceRoom/{roomId}/join/kicked?roomVersion=v` | 查询封禁 | 只读检查，真正入房仍需走准入 |
+| 接口                                                  | 用途                   | 关键说明                                  |
+| ----------------------------------------------------- | ---------------------- | ----------------------------------------- |
+| `POST /voiceRoom/create`                              | 创建或开启房间         | `roomName`、可选 `clubId`                 |
+| `POST /voiceRoom/joined/current`                      | 查询当前实际加入的房间 | 无房返回 `null`；服务端会校验融云成员关系 |
+| `POST /voiceRoom/{roomId}/detail`                     | 查询房间详情           | 邀请链接进入、刷新接待绑定                |
+| `POST /voiceRoom/{roomId}/join/prepare?roomVersion=v` | 准备入房               | 写成员候选索引并返回最新外部实例 ID       |
+| `POST /voiceRoom/{roomId}/rtc/token?roomVersion=v`    | RTC 准入和 Token       | 返回 `READY` 或终止状态                   |
+| `POST /voiceRoom/{roomId}/leave?roomVersion=v`        | 确认离开               | 清理当前用户成员索引                      |
+| `POST /voiceRoom/{roomId}/destroy?roomVersion=v`      | 房主解散               | 关闭房间并销毁外部资源                    |
+| `POST /voiceRoom/{roomId}/kickOut`                    | 踢普通成员             | action：`userId`、`roomVersion`           |
+| `POST /voiceRoom/inviteClubService`                   | 房主呼叫接待           | action：`roomId`、`clubId`、`roomVersion` |
+| `POST /voiceRoom/claimClubService`                    | 客服接单               | 返回房间信息和客服 RTC Token              |
+| `POST /voiceRoom/{roomId}/join/kicked?roomVersion=v`  | 查询封禁               | 只读检查，真正入房仍需走准入              |
 
 `RtcTokenResult.accessStatus`：
 
-| 状态 | 含义 | PC 处理 |
-| --- | --- | --- |
-| `READY` | 可以加入声网 | join/forceRejoin |
-| `ROOM_CLOSED` | 房间已关闭或不存在 | 退出并提示房间已关闭 |
-| `ROOM_VERSION_CHANGED` | 房间已重开 | 清理旧实例，重新获取详情 |
-| `NOT_IN_CHATROOM` | 融云成员关系已失效 | 退出本地房间 |
-| `KICKED_BANNED` | 当前实例被踢且仍在封禁期 | 退出并禁止立即重入 |
+| 状态                   | 含义                     | PC 处理                  |
+| ---------------------- | ------------------------ | ------------------------ |
+| `READY`                | 可以加入声网             | join/forceRejoin         |
+| `ROOM_CLOSED`          | 房间已关闭或不存在       | 退出并提示房间已关闭     |
+| `ROOM_VERSION_CHANGED` | 房间已重开               | 清理旧实例，重新获取详情 |
+| `NOT_IN_CHATROOM`      | 融云成员关系已失效       | 退出本地房间             |
+| `KICKED_BANNED`        | 当前实例被踢且仍在封禁期 | 退出并禁止立即重入       |
 
 ## 10. 移动端复用建议
 
@@ -335,24 +335,23 @@ PC 端收到命令后只在房间 ID和版本都匹配时清理当前房间。�
 
 ## 12. 关键源码索引
 
-| 主题 | 文件 |
-| --- | --- |
-| 房间状态、创建/进入/退出、接待流程 | `pzdj-pc/stores/chat.ts` |
-| 全局聊天宿主和房间视图切换 | `pzdj-pc/components/chat/ChatFloatingHost.vue`、`ChatDialog.vue` |
-| 房间布局 | `pzdj-pc/components/chat/ChatRoom.vue` |
-| 房间头、邀请、接待按钮 | `pzdj-pc/components/chat/RoomHeader.vue`、`VoiceRoomBar.vue` |
-| 成员卡、在线/开麦/说话状态、踢人 | `pzdj-pc/components/chat/MemberGrid.vue`、`RoomMemberPopup.vue` |
-| 麦克风/扬声器控制 | `pzdj-pc/components/chat/VoiceDeviceBar.vue` |
-| 融云 IM 和邀请链接 | `pzdj-pc/composables/useRc.ts` |
-| 声网 RTC 原子操作 | `pzdj-pc/composables/useRtc.ts` |
-| RTC 续期和断线恢复 | `pzdj-pc/composables/useRtcRecovery.ts` |
-| 统一离开/解散入口 | `pzdj-pc/composables/useRoomLeave.ts` |
-| 业务接口 DTO 和请求 | `pzdj-pc/composables/useSso.ts` |
-| 服务端 C 端接口 | `pzdj-service/.../controller/client/chat/ClientVoiceRoomController.java` |
-| 服务端房间、准入和接待逻辑 | `pzdj-service/.../service/client/chat/impl/ChatRoomServiceImpl.java` |
-| 服务端成员候选索引设计 | `pzdj-service/.../service/client/chat/ChatRoomMembershipService.java` |
-| 移动端语聊房页面与固定邀请麦位 | `esports_app/src/features/voice-room/screens/VoiceRoomScreen.tsx` |
-| 移动端业务接口与房间 DTO | `esports_app/src/features/voice-room/voice-room.api.ts`、`voice-room.types.ts` |
-| 移动端融云聊天室适配 | `esports_app/src/features/voice-room/voice-room-rongcloud.ts`、`src/features/message/rongcloud-im.ts` |
-| 移动端 Agora RTC 适配 | `esports_app/src/features/voice-room/voice-room-rtc.ts` |
-
+| 主题                               | 文件                                                                                                  |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| 房间状态、创建/进入/退出、接待流程 | `pzdj-pc/stores/chat.ts`                                                                              |
+| 全局聊天宿主和房间视图切换         | `pzdj-pc/components/chat/ChatFloatingHost.vue`、`ChatDialog.vue`                                      |
+| 房间布局                           | `pzdj-pc/components/chat/ChatRoom.vue`                                                                |
+| 房间头、邀请、接待按钮             | `pzdj-pc/components/chat/RoomHeader.vue`、`VoiceRoomBar.vue`                                          |
+| 成员卡、在线/开麦/说话状态、踢人   | `pzdj-pc/components/chat/MemberGrid.vue`、`RoomMemberPopup.vue`                                       |
+| 麦克风/扬声器控制                  | `pzdj-pc/components/chat/VoiceDeviceBar.vue`                                                          |
+| 融云 IM 和邀请链接                 | `pzdj-pc/composables/useRc.ts`                                                                        |
+| 声网 RTC 原子操作                  | `pzdj-pc/composables/useRtc.ts`                                                                       |
+| RTC 续期和断线恢复                 | `pzdj-pc/composables/useRtcRecovery.ts`                                                               |
+| 统一离开/解散入口                  | `pzdj-pc/composables/useRoomLeave.ts`                                                                 |
+| 业务接口 DTO 和请求                | `pzdj-pc/composables/useSso.ts`                                                                       |
+| 服务端 C 端接口                    | `pzdj-service/.../controller/client/chat/ClientVoiceRoomController.java`                              |
+| 服务端房间、准入和接待逻辑         | `pzdj-service/.../service/client/chat/impl/ChatRoomServiceImpl.java`                                  |
+| 服务端成员候选索引设计             | `pzdj-service/.../service/client/chat/ChatRoomMembershipService.java`                                 |
+| 移动端开黑房页面与固定邀请麦位     | `esports_app/src/features/voice-room/screens/VoiceRoomScreen.tsx`                                     |
+| 移动端业务接口与房间 DTO           | `esports_app/src/features/voice-room/voice-room.api.ts`、`voice-room.types.ts`                        |
+| 移动端融云聊天室适配               | `esports_app/src/features/voice-room/voice-room-rongcloud.ts`、`src/features/message/rongcloud-im.ts` |
+| 移动端 Agora RTC 适配              | `esports_app/src/features/voice-room/voice-room-rtc.ts`                                               |

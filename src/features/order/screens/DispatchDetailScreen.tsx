@@ -94,7 +94,7 @@ export function DispatchDetailScreen({ requestNo }: { requestNo: string }) {
     if (!canGrab || !request.requestNo || !token || grabbing) return;
     setGrabbing(true);
     try {
-      // 与抢单条同一条流程；replace 进房后从语聊房返回直接回派单中心
+      // 与抢单条同一条流程；replace 进房后从开黑房返回直接回派单中心
       const result = await grabQuickMatchAndEnterAudition(request.requestNo, {
         replaceRoom: true,
       });

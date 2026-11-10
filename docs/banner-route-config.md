@@ -77,7 +77,7 @@ PC 端请用 `jumpType: "URL"` + https 外链，不走本文 App 路由表。
 | 俱乐部价目表 | `/club/price-list`            | `groupId`（必填语义）                   |
 | 订单详情     | `/order/[id]`                 | `id`；可选 `scope`=`place`/`accept`     |
 | 派单页       | `/order/dispatch/[requestNo]` | `requestNo`                             |
-| 语聊房       | `/voice-room/[id]`            | `id`；可选 `v`、`scene`、`requestNo` 等 |
+| 开黑房       | `/voice-room/[id]`            | `id`；可选 `v`、`scene`、`requestNo` 等 |
 | 匹配中       | `/match/matching/[requestNo]` | `requestNo`                             |
 | 匹配入口     | `/match`                      | —                                       |
 | 小法庭详情   | `/court/[id]`                 | `id`；可选 `mine`                       |

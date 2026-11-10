@@ -5,8 +5,8 @@ import { handleVoiceRoomKicked } from "./voice-room-kicked";
 
 function showKickedAlert() {
   void useAppConfirm.getState().confirm({
-    title: "已退出语聊房",
-    message: "你已被移出语聊房，暂时无法重新进入",
+    title: "已退出开黑房",
+    message: "你已被移出开黑房，暂时无法重新进入",
     confirmText: "我知道了",
   });
 }

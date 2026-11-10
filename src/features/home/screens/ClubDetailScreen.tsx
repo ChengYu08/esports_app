@@ -1,6 +1,6 @@
 import {
-  ClubDetailMemberSkeletonList,
-  ClubDetailSkeleton,
+    ClubDetailMemberSkeletonList,
+    ClubDetailSkeleton,
 } from "@/features/home/components/ClubDetailSkeleton";
 import { fetchClubGameLevels } from "@/features/match/api/match.api";
 import { ClubQuickMatchSheet } from "@/features/match/components/ClubQuickMatchSheet";
@@ -8,16 +8,16 @@ import { tryRestoreActiveMatch } from "@/features/match/hooks/use-quick-match-se
 import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
 import { useCustomerDispatch } from "@/features/voice-room/use-customer-dispatch";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
+import { requireLogin } from "@/shared/navigation/require-login";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
-import { showToast } from "@/shared/ui/app-toast";
 import { EmptyState, ErrorState } from "@/shared/ui/AsyncStates";
-import { PaginationFooter } from "@/shared/ui/PaginationFooter";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { CompanionCard } from "@/shared/ui/CompanionCard";
+import { PaginationFooter } from "@/shared/ui/PaginationFooter";
 import { useAuthStore } from "@esports/auth";
 import {
-  ChevronLeft24Regular,
-  Search24Regular,
+    ChevronLeft24Regular,
+    Search24Regular,
 } from "@fluentui/react-native-icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
@@ -26,28 +26,33 @@ import { router, useIsFocused, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Animated,
-  Easing,
-  FlatList,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-  type LayoutChangeEvent,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
+    Animated,
+    Easing,
+    FlatList,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    useWindowDimensions,
+    View,
+    type LayoutChangeEvent,
+    type NativeScrollEvent,
+    type NativeSyntheticEvent,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { fetchCompanionTags } from "../api/home.api";
-import type { ClubDetailGame, Companion, CompanionFilters, GameKey } from "../api/home.types";
+import type {
+    ClubDetailGame,
+    Companion,
+    CompanionFilters,
+    GameKey,
+} from "../api/home.types";
 import {
-  useClubCompanions,
-  useClubDetail,
-  useClubGameModes,
-  usePriceList,
+    useClubCompanions,
+    useClubDetail,
+    useClubGameModes,
+    usePriceList,
 } from "../hooks/use-home-data";
 
 // 切图资源（新设计稿：俱乐部主页 455-68151 / 490-84520 / 557-88105）
@@ -132,67 +137,72 @@ type ClubMemberRowProps = {
   onToggleVoice: (url: string) => void;
 };
 
-const ClubMemberRow = memo(function ClubMemberRow({
-  item,
-  clubId,
-  fromClubUserId,
-  fromSearchPage,
-  gameName,
-  gameIconUrl,
-  voicePlayingUrl,
-  onToggleVoice,
-}: ClubMemberRowProps) {
-  const onPress = useCallback(() => {
-    if (fromClubUserId && fromClubUserId === String(item.userId)) {
-      router.back();
-      return;
-    }
-    router.push({
-      pathname: "/profile",
-      params: {
-        clubId,
-        userId: String(item.userId),
-        fromClubId: clubId,
-        ...(fromSearchPage ? { fromSearch: "1" } : {}),
-      },
-    });
-  }, [clubId, fromClubUserId, fromSearchPage, item.userId]);
+const ClubMemberRow = memo(
+  function ClubMemberRow({
+    item,
+    clubId,
+    fromClubUserId,
+    fromSearchPage,
+    gameName,
+    gameIconUrl,
+    voicePlayingUrl,
+    onToggleVoice,
+  }: ClubMemberRowProps) {
+    const onPress = useCallback(() => {
+      if (fromClubUserId && fromClubUserId === String(item.userId)) {
+        router.back();
+        return;
+      }
+      router.push({
+        pathname: "/profile",
+        params: {
+          clubId,
+          userId: String(item.userId),
+          fromClubId: clubId,
+          ...(fromSearchPage ? { fromSearch: "1" } : {}),
+        },
+      });
+    }, [clubId, fromClubUserId, fromSearchPage, item.userId]);
 
-  return (
-    <CompanionCard
-      nickname={item.nickname}
-      avatar={item.headImage ?? ""}
-      sex={item.sex ?? 0}
-      age={item.age ?? null}
-      introTagText={item.tagName}
-      introTagColor={item.tagBackgroundColor || "#474748"}
-      gameName={item.gameName || gameName}
-      gameIconUrl={gameIconUrl}
-      modeName={item.modeName}
-      levelName={item.levelName}
-      serviceName={item.serviceName}
-      signature={item.signature}
-      onlineStatus={item.onlineStatus}
-      gameStatus={item.gameStatus}
-      price={item.price}
-      orderCount={item.orderCount}
-      voiceUrl={item.voiceUrl ?? null}
-      voiceDurationSeconds={item.voiceDurationSeconds ?? null}
-      voicePlayingUrl={voicePlayingUrl === item.voiceUrl ? voicePlayingUrl : null}
-      onToggleVoice={onToggleVoice}
-      onPress={onPress}
-    />
-  );
-}, (previous, next) =>
-  previous.item === next.item &&
-  previous.clubId === next.clubId &&
-  previous.fromClubUserId === next.fromClubUserId &&
-  previous.fromSearchPage === next.fromSearchPage &&
-  previous.gameName === next.gameName &&
-  previous.gameIconUrl === next.gameIconUrl &&
-  previous.onToggleVoice === next.onToggleVoice &&
-  (previous.voicePlayingUrl === previous.item.voiceUrl) ===
-    (next.voicePlayingUrl === next.item.voiceUrl));
+    return (
+      <CompanionCard
+        nickname={item.nickname}
+        avatar={item.headImage ?? ""}
+        sex={item.sex ?? 0}
+        age={item.age ?? null}
+        introTagText={item.tagName}
+        introTagColor={item.tagBackgroundColor || "#474748"}
+        gameName={item.gameName || gameName}
+        gameIconUrl={gameIconUrl}
+        modeName={item.modeName}
+        levelName={item.levelName}
+        serviceName={item.serviceName}
+        signature={item.signature}
+        onlineStatus={item.onlineStatus}
+        gameStatus={item.gameStatus}
+        price={item.price}
+        orderCount={item.orderCount}
+        voiceUrl={item.voiceUrl ?? null}
+        voiceDurationSeconds={item.voiceDurationSeconds ?? null}
+        voicePlayingUrl={
+          voicePlayingUrl === item.voiceUrl ? voicePlayingUrl : null
+        }
+        onToggleVoice={onToggleVoice}
+        onPress={onPress}
+      />
+    );
+  },
+  (previous, next) =>
+    previous.item === next.item &&
+    previous.clubId === next.clubId &&
+    previous.fromClubUserId === next.fromClubUserId &&
+    previous.fromSearchPage === next.fromSearchPage &&
+    previous.gameName === next.gameName &&
+    previous.gameIconUrl === next.gameIconUrl &&
+    previous.onToggleVoice === next.onToggleVoice &&
+    (previous.voicePlayingUrl === previous.item.voiceUrl) ===
+      (next.voicePlayingUrl === next.item.voiceUrl),
+);
 
 export default function ClubDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -234,13 +244,13 @@ export default function ClubDetailScreen() {
   const queryClient = useQueryClient();
   const checkingActiveRef = useRef(false);
   const { openCustomerService } = useCustomerServiceEntry();
-  // 俱乐部「接待派单」流程（创建/切换语聊房并自动呼叫接待）
+  // 俱乐部「接待派单」流程（创建/切换开黑房并自动呼叫接待）
   const { dispatch: dispatchReception } = useCustomerDispatch();
 
   /** 有进行中派单则恢复匹配中页；返回 true 表示已跳转 */
   const restoreActiveOrContinue = useCallback(async (): Promise<boolean> => {
     if (!accessToken) {
-      showToast("请先登录");
+      requireLogin();
       return true;
     }
     if (checkingActiveRef.current) return true;
@@ -612,11 +622,13 @@ export default function ClubDetailScreen() {
   const handleSectionsScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       // 滚动时同步左侧分类栏高亮：取最后一个起始位置越过当前视口顶部的分区
-      const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+      const { contentOffset, contentSize, layoutMeasurement } =
+        event.nativeEvent;
       // 滚到底部时强制高亮最后一个分区：短内容下最大偏移量够不到「标签」的 y，否则永远高亮不到
       const isAtBottom =
         contentSize.height - layoutMeasurement.height - contentOffset.y < 24;
-      let current: string = FILTER_RAIL_SECTIONS[FILTER_RAIL_SECTIONS.length - 1].key;
+      let current: string =
+        FILTER_RAIL_SECTIONS[FILTER_RAIL_SECTIONS.length - 1].key;
       if (!isAtBottom) {
         current = FILTER_RAIL_SECTIONS[0].key;
         for (const { key } of FILTER_RAIL_SECTIONS) {
@@ -646,7 +658,10 @@ export default function ClubDetailScreen() {
           cover 缩放由宽度主导时与整屏渲染显示同一顶部内容，contentPosition="top" 保证不裁到中段 */}
       <Image
         source={bgClubImage}
-        style={[styles.background, { height: bgHeight > 0 ? bgHeight : windowHeight }]}
+        style={[
+          styles.background,
+          { height: bgHeight > 0 ? bgHeight : windowHeight },
+        ]}
         contentFit="cover"
         contentPosition="top"
         pointerEvents="none"
@@ -728,7 +743,9 @@ export default function ClubDetailScreen() {
               </View>
               <View style={styles.clubMetaItem}>
                 <Text style={styles.clubMetaLabel}>俱乐部ID</Text>
-                <Text style={styles.clubMetaValue}>{club.clubCode ?? club.id}</Text>
+                <Text style={styles.clubMetaValue}>
+                  {club.clubCode ?? club.id}
+                </Text>
               </View>
             </View>
           </View>
@@ -775,7 +792,11 @@ export default function ClubDetailScreen() {
         </View>
       </View>
       {/* 游戏页签 */}
-      <ClubGameTabBar games={games} selectedGame={selectedGame} onSelect={selectGame} />
+      <ClubGameTabBar
+        games={games}
+        selectedGame={selectedGame}
+        onSelect={selectGame}
+      />
       {/* 成员列表面板（白色圆角容器：固定筛选栏 + 卡片列表，筛选栏不随列表滚动） */}
       <View style={styles.listWrap} onLayout={handleListWrapLayout}>
         <View style={styles.filterBar}>

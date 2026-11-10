@@ -457,7 +457,7 @@ PC 端无系统推送，使用**应用内全局通知弹窗**，点击后跳转�
     ↓ 用户点击按钮
 按消息类型分发：
   - 订单通知（order-notify）→ acceptOrderFromNotify() → 接单 → openChat({ type:'chat', id: buyerId })
-  - 派单邀请（cs-invite）   → 进入语聊房 → openChat({ type:'chat-room', id: roomId, v: roomVersion })
+  - 派单邀请（cs-invite）   → 进入开黑房 → openChat({ type:'chat-room', id: roomId, v: roomVersion })
   - 普通私聊消息            → openChat({ type:'chat', id: targetId })
 ```
 
@@ -480,7 +480,7 @@ PC 端无系统推送，使用**应用内全局通知弹窗**，点击后跳转�
 | 售后卡片     | `PZAfterSaleApply`（自定义） | ⚠️ 视配置 | 持久化消息，是否触发取决于融云控制台"自定义消息推送"开关 |
 | 订单通知卡片 | `ORDER_NOTIFY`（自定义）     | ⚠️ 视配置 | 同上映响，需确认控制台配置                               |
 | 接待邀请卡片 | `dispatchInvite`（自定义）   | ⚠️ 视配置 | 同上映响，需确认控制台配置                               |
-| 语聊房邀请   | 文本消息（含链接）           | ✅        | 本质是文本消息，走 `RC:TxtMsg` 推送                      |
+| 开黑房邀请   | 文本消息（含链接）           | ✅        | 本质是文本消息，走 `RC:TxtMsg` 推送                      |
 | 平台通知     | `TEXT_NOTIFY_MSG`（自定义）  | ⚠️ 视配置 | 持久化消息，是否触发取决于控制台配置                     |
 | 命令消息     | `RC:CmdMsg`                  | ❌        | 不持久化、不计未读，融云默认不推送                       |
 
@@ -575,7 +575,7 @@ PrivateMessage message = new PrivateMessage()
 | 订单助手（系统） | `50000002`    | `/chat/50000002`                       |
 | 派单助手（系统） | `50000001`    | `/chat/50000001`                       |
 | 平台通知（系统） | `50000000`    | `/chat/50000000`                       |
-| 语聊房邀请       | 发送者 userId | `/chat/{userId}`（打开会话看邀请卡片） |
+| 开黑房邀请       | 发送者 userId | `/chat/{userId}`（打开会话看邀请卡片） |
 
 ### 9.3 移动端推送点击流程
 

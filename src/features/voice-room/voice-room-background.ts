@@ -1,4 +1,4 @@
-import { PermissionsAndroid, Platform } from 'react-native';
+import { PermissionsAndroid, Platform } from "react-native";
 
 type VoiceRoomBackgroundModule = {
   start: (title: string, microphoneEnabled: boolean) => Promise<void>;
@@ -13,8 +13,11 @@ function getModule() {
   if (cachedModule !== undefined) return cachedModule;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { requireNativeModule } = require('expo-modules-core') as typeof import('expo-modules-core');
-    cachedModule = requireNativeModule<VoiceRoomBackgroundModule>('VoiceRoomBackground');
+    const { requireNativeModule } =
+      require("expo-modules-core") as typeof import("expo-modules-core");
+    cachedModule = requireNativeModule<VoiceRoomBackgroundModule>(
+      "VoiceRoomBackground",
+    );
   } catch {
     cachedModule = null;
   }
@@ -22,7 +25,7 @@ function getModule() {
 }
 
 async function ensureAndroidNotificationPermission() {
-  if (Platform.OS !== 'android') return;
+  if (Platform.OS !== "android") return;
   if (Platform.Version < 33) return;
   if (notificationPermissionRequested) return;
   notificationPermissionRequested = true;
@@ -30,14 +33,14 @@ async function ensureAndroidNotificationPermission() {
     await PermissionsAndroid.request(
       PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
       {
-        title: '通知权限',
-        message: '语聊房需要在通知栏显示通话状态',
-        buttonPositive: '允许',
-        buttonNegative: '拒绝',
+        title: "通知权限",
+        message: "开黑房需要在通知栏显示通话状态",
+        buttonPositive: "允许",
+        buttonNegative: "拒绝",
       },
     );
   } catch (error) {
-    console.warn('[voice-room] request notification permission failed', error);
+    console.warn("[voice-room] request notification permission failed", error);
   }
 }
 
@@ -46,10 +49,10 @@ export async function startVoiceRoomBackground(microphoneEnabled: boolean) {
   if (!module) return;
   try {
     await ensureAndroidNotificationPermission();
-    await module.start('语聊房进行中', microphoneEnabled);
+    await module.start("开黑房进行中", microphoneEnabled);
   } catch (error) {
     // iOS 音频会话激活失败会直接导致听不到远端声音，必须留日志便于排查
-    console.error('[voice-room] background service start failed', error);
+    console.error("[voice-room] background service start failed", error);
   }
 }
 
@@ -59,7 +62,7 @@ export async function stopVoiceRoomBackground() {
   try {
     await module.stop();
   } catch (error) {
-    console.warn('[voice-room] background service stop failed', error);
+    console.warn("[voice-room] background service stop failed", error);
   }
 }
 
@@ -69,6 +72,6 @@ export async function updateVoiceRoomMicrophone(enabled: boolean) {
   try {
     await module.updateMicrophone(enabled);
   } catch (error) {
-    console.warn('[voice-room] update microphone state failed', error);
+    console.warn("[voice-room] update microphone state failed", error);
   }
 }

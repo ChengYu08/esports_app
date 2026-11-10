@@ -143,7 +143,7 @@ export default function VoiceRoomScreen() {
     {
       id: "welcome",
       kind: "notice",
-      text: "欢迎来到语聊房，和大家一起开黑吧",
+      text: "欢迎来到开黑房，和大家一起开黑吧",
       sentAt: 1,
     },
     {
@@ -171,12 +171,12 @@ export default function VoiceRoomScreen() {
   const [serviceCalling, setServiceCalling] = useState(false);
   const [loading, setLoading] = useState(() => Boolean(roomId && accessToken));
   const [error, setError] = useState<string | null>(() =>
-    !roomId ? "语聊房不存在" : !accessToken ? "请先登录后进入语聊房" : null,
+    !roomId ? "开黑房不存在" : !accessToken ? "请先登录后进入开黑房" : null,
   );
 
   const roomVersion = room?.roomVersion ?? "1";
   const chatroomId = room?.rongChatroomId;
-  const roomTitle = room?.roomName || "语聊房";
+  const roomTitle = room?.roomName || "开黑房";
   const memberColumns = members.length <= 2 ? 2 : members.length === 3 ? 3 : 4;
   const isOwner =
     Boolean(currentUser?.id) &&
@@ -263,7 +263,7 @@ export default function VoiceRoomScreen() {
           invitedRoomVersion &&
           String(detail.roomVersion ?? "1") !== invitedRoomVersion
         ) {
-          throw new Error("语聊房已重新开启，请重新获取邀请链接");
+          throw new Error("开黑房已重新开启，请重新获取邀请链接");
         }
         const prepared = await voiceRoomApi.prepareJoin(
           roomId,
@@ -310,7 +310,7 @@ export default function VoiceRoomScreen() {
           accessToken,
         );
         if (rtc.accessStatus && rtc.accessStatus !== "READY")
-          throw new Error("语聊房当前不可加入");
+          throw new Error("开黑房当前不可加入");
         const token = rtc.token || rtc.rtcToken;
         const channelName =
           rtc.channelName || rtc.rtcChannelName || prepared.rtcChannelName;
@@ -360,7 +360,7 @@ export default function VoiceRoomScreen() {
             prepared.roomVersion ?? detail.roomVersion ?? "1",
           ),
           rongChatroomId: prepared.rongChatroomId,
-          roomName: prepared.roomName || detail.roomName || "语聊房",
+          roomName: prepared.roomName || detail.roomName || "开黑房",
           creatorUserId: String(detail.creatorUserId ?? ""),
           ownerName:
             String(detail.creatorUserId ?? "") === String(currentUser?.id ?? "")
@@ -374,7 +374,7 @@ export default function VoiceRoomScreen() {
         setError(null);
       } catch (cause) {
         if (active)
-          setError(cause instanceof Error ? cause.message : "进入语聊房失败");
+          setError(cause instanceof Error ? cause.message : "进入开黑房失败");
       } finally {
         if (active) setLoading(false);
       }
@@ -649,7 +649,7 @@ export default function VoiceRoomScreen() {
         <View style={styles.header}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="收起语聊房"
+            accessibilityLabel="收起开黑房"
             onPress={minimize}
             disabled={leaving}
             hitSlop={12}
@@ -660,7 +660,7 @@ export default function VoiceRoomScreen() {
           <Text style={styles.title}>{roomTitle}</Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={isOwner ? "解散语聊房" : "退出语聊房"}
+            accessibilityLabel={isOwner ? "解散开黑房" : "退出开黑房"}
             disabled={loading || !room || leaving}
             onPress={() => {
               Keyboard.dismiss();

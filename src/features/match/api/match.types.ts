@@ -43,7 +43,7 @@ export type MatchVoiceOption = "不试音" | "需试音";
 export type PublishQuickMatchPayload = {
   clubId: number;
   publishType: "BUYER" | "RECEPTION";
-  /** 接待代发时必填：用户（语聊房房主）用户 ID */
+  /** 接待代发时必填：用户（开黑房房主）用户 ID */
   buyerUserId?: number;
   gameId: number;
   gameModeId: number;
@@ -244,7 +244,7 @@ export function isQuickMatchActive(
 }
 
 /**
- * 语聊房「派单匹配中」判定（任务 4）：当前用户有进行中的活动需求。
+ * 开黑房「派单匹配中」判定（任务 4）：当前用户有进行中的活动需求。
  * 条件：需求进行中（MATCHING 且未过期）+ 活动派单（publishSource === "ACTIVITY" 或 activityCode 非空）+ 本人发起。
  * buyerUserId 有值时二次校验；缺省视为本人（/quickMatch/active/detail 仅返回调用者自己的需求）。
  */
