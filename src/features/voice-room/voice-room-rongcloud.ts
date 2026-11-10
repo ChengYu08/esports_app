@@ -1,4 +1,5 @@
 import type { RCIMIWEngine, RCIMIWMessage, RCIMIWTextMessage } from '@rongcloud/react-native-im-wrapper';
+import { logger } from '@/core/logging/logger';
 import { pickRongImageUrl, type RongSdkMessage } from '@/features/message/chat-message';
 
 import {
@@ -11,6 +12,11 @@ import {
 } from '@/features/message/rongcloud-im';
 
 import { appendCachedVoiceChatMessage, clearVoiceChatMessageCache } from './voice-room-message-cache';
+
+/** 进房不拉本地历史（对齐 PC count:-1）；历史统一走 getChatRoomMessages 云端接口 */
+const JOIN_CHATROOM_MESSAGE_COUNT = -1;
+/** 云端历史单页上限（融云约束 0 < count ≤ 50） */
+const CHATROOM_HISTORY_PAGE_SIZE = 50;
 
 type RongSdk = typeof import('@rongcloud/react-native-im-wrapper');
 type RoomMessage = {
@@ -109,7 +115,7 @@ export async function joinVoiceChatRoom(accessToken: string, chatroomId: string)
   installRoomListeners();
   const sdk = loadSdk();
   const code = await new Promise<number>((resolve, reject) => {
-    void engine.joinChatRoom(chatroomId, 50, false, {
+    void engine.joinChatRoom(chatroomId, JOIN_CHATROOM_MESSAGE_COUNT, false, {
       onChatRoomJoined: (result) => result === 0 ? resolve(result) : reject(new Error(`加入语聊房失败（${result}）`)),
     }).then((result) => {
       if (result !== 0) reject(new Error(`加入语聊房失败（${result}）`));
@@ -134,7 +140,16 @@ export async function leaveVoiceChatRoom(chatroomId: string) {
 export async function getVoiceChatHistory(chatroomId: string) {
   const engine = getRongCloudEngine();
   const sdk = loadSdk();
-  if (!engine || !sdk || !isRongCloudConnected()) return [];
+  if (!engine || !sdk || !isRongCloudConnected()) {
+    logger.warn('voice_room.history_skipped', {
+      chatroomId,
+      hasEngine: Boolean(engine),
+      hasSdk: Boolean(sdk),
+      connected: isRongCloudConnected(),
+    });
+    return [];
+  }
+  logger.info('voice_room.history_fetch_start', { chatroomId, count: CHATROOM_HISTORY_PAGE_SIZE });
   return new Promise<RoomMessage[]>((resolve, reject) => {
     let settled = false;
     const finish = (messages: RoomMessage[] | Error) => {
@@ -147,17 +162,38 @@ export async function getVoiceChatHistory(chatroomId: string) {
       chatroomId,
       0,
       sdk.RCIMIWTimeOrder.BEFORE,
-      50,
+      CHATROOM_HISTORY_PAGE_SIZE,
       {
-        onSuccess: (messages) => finish((messages || [])
-          .map(normalizeRoomMessage)
-          .filter((message): message is RoomMessage => Boolean(message))
-          .sort((left, right) => left.sentAt - right.sentAt)),
-        onError: (code) => finish(new Error(`聊天室历史消息拉取失败（${code}）`)),
+        onSuccess: (messages) => {
+          const rawCount = messages?.length ?? 0;
+          const mapped = (messages || [])
+            .map(normalizeRoomMessage)
+            .filter((message): message is RoomMessage => Boolean(message))
+            .sort((left, right) => left.sentAt - right.sentAt);
+          logger.info('voice_room.history_fetch_success', {
+            chatroomId,
+            rawCount,
+            mappedCount: mapped.length,
+          });
+          finish(mapped);
+        },
+        onError: (code) => {
+          logger.warn('voice_room.history_fetch_error', { chatroomId, code });
+          finish(new Error(`聊天室历史消息拉取失败（${code}）`));
+        },
       },
     ).then((code) => {
-      if (code !== 0) finish(new Error(`聊天室历史消息拉取失败（${code}）`));
-    }).catch((error: unknown) => finish(error instanceof Error ? error : new Error('聊天室历史消息拉取失败')));
+      if (code !== 0) {
+        logger.warn('voice_room.history_fetch_invoke_failed', { chatroomId, code });
+        finish(new Error(`聊天室历史消息拉取失败（${code}）`));
+      }
+    }).catch((error: unknown) => {
+      logger.warn('voice_room.history_fetch_exception', {
+        chatroomId,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      finish(error instanceof Error ? error : new Error('聊天室历史消息拉取失败'));
+    });
   });
 }
 
