@@ -38,7 +38,6 @@ export default function CircleUserVideosScreen() {
   const accessToken = useAuthStore((state) => state.accessToken);
   const isMine = Boolean(userId) && String(currentUserId ?? "") === userId;
   const [activeIndex, setActiveIndex] = useState(0);
-  const [hasSwiped, setHasSwiped] = useState(false);
   const [manualPlayback, setManualPlayback] = useState<{
     videoId: string;
     isPlaying: boolean;
@@ -140,10 +139,10 @@ export default function CircleUserVideosScreen() {
 
   const renderPost = useCallback(
     ({ item, index }: ListRenderItemInfo<CircleVideoPost>) => {
-      const autoPlay = hasSwiped || index > 0;
+      // 本页始终由用户在个人主页点选某条视频进入，进入即自动播放（含第一条）
       const isPlaying = manualPlayback?.videoId === item.id
         ? manualPlayback.isPlaying
-        : autoPlay;
+        : true;
       return (
         <CircleVideoCard
           feedId={feedId}
@@ -160,7 +159,7 @@ export default function CircleUserVideosScreen() {
         />
       );
     },
-    [activeIndex, feedId, feedHeight, hasSwiped, manualPlayback, feedActive],
+    [activeIndex, feedId, feedHeight, manualPlayback, feedActive],
   );
 
   const handleEndReached = useCallback(() => {
@@ -199,7 +198,6 @@ export default function CircleUserVideosScreen() {
             }
             const index = Math.round(event.nativeEvent.contentOffset.y / feedHeight);
             if (index !== activeIndex) {
-              setHasSwiped(true);
               setManualPlayback(null);
             }
             setActiveIndex(Math.max(0, Math.min(index, posts.length - 1)));
