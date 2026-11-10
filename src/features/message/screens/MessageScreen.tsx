@@ -7,7 +7,6 @@ import { useCallback, useEffect, useMemo } from "react";
 import { AppState, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { showToast } from "@/shared/ui/app-toast";
 import { layout } from "@/shared/theme/tokens";
 import { stripCustomerServiceTitlePrefix } from "../customer-service.api";
 import { MessageHeader } from "../components/MessageHeader";
@@ -58,7 +57,6 @@ export default function MessageScreen() {
   const refreshConversations = useMessageStore((state) => state.refreshConversations);
   const retryIfEmpty = useMessageStore((state) => state.retryIfEmpty);
   const refreshOnlineStatuses = useMessageStore((state) => state.refreshOnlineStatuses);
-  const clearAllUnread = useMessageStore((state) => state.clearAllUnread);
 
   const isFocused = useIsFocused();
   // 只有存在真实会话时才轮询；纯系统会话（通知/订单助手）没有在线状态
@@ -73,11 +71,6 @@ export default function MessageScreen() {
     undefined,
     ONLINE_STATUS_LIST_POLL_INTERVAL_MS,
   );
-
-  const handleClear = async () => {
-    await clearAllUnread();
-    showToast("清理完成");
-  };
 
   const handleRetry = async () => {
     if (!accessToken) return;
@@ -210,7 +203,6 @@ export default function MessageScreen() {
       <StatusBar style="dark" />
       <View style={[styles.navbar, { paddingTop: insets.top }]}>
         <MessageHeader
-          onClear={() => void handleClear()}
           onSearch={() =>
             router.push({ pathname: "/search", params: { type: "message" } })
           }
