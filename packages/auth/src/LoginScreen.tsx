@@ -32,7 +32,6 @@ import { PasswordVisibilityIcon } from "./PasswordVisibilityIcon";
 const topArt = require("../assets/top-login.jpg");
 const phoneIcon = require("../assets/phone.svg");
 const lockIcon = require("../assets/lock.svg");
-const wechatIcon = require("../assets/wechat.svg");
 
 export type LoginPayload = { phone: string; code: string };
 export type PasswordLoginPayload = { username: string; password: string };
@@ -327,7 +326,6 @@ export function LoginScreen({
                   setMode((current) => (current === "sms" ? "password" : "sms"))
                 }
               />
-              {/* <LoginMethod icon={wechatIcon} label="微信" /> */}
             </View>
             <Pressable
               accessibilityLabel="已阅读并同意用户协议和隐私政策"

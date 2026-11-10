@@ -1,12 +1,7 @@
-import { Platform } from "react-native";
+import StarRechargeEntry from "@/features/mine/screens/StarRechargeEntry";
 
-import StarRechargeAndroidScreen from "@/features/mine/screens/StarRechargeAndroidScreen";
-import StarRechargeScreen from "@/features/mine/screens/StarRechargeScreen";
-
-/** Android 走专用充值页；iOS 暂留旧页，由他人替换为 StarRechargeIosScreen。 */
+/** 平台拆分见 StarRechargeEntry.ios.tsx / StarRechargeEntry.android.tsx:
+ *  iOS 只打包苹果内购充值页,Android 支付页(支付宝/微信)不进 iOS bundle。 */
 export default function StarRechargeRoute() {
-  if (Platform.OS === "android") {
-    return <StarRechargeAndroidScreen />;
-  }
-  return <StarRechargeScreen />;
+  return <StarRechargeEntry />;
 }
