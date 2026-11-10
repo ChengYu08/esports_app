@@ -1,5 +1,6 @@
 import { SYSTEM_FONT } from "@/shared/theme/typography";
-import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
+import { ListFallbackState, LoadingState } from "@/shared/ui/AsyncStates";
+import { useIsOffline } from "@/shared/hooks/use-is-offline";
 import { Info16Regular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -48,6 +49,7 @@ export default function RankingScreen({
   initialFilters?: RankingFilters;
 }) {
   const insets = useSafeAreaInsets();
+  const offline = useIsOffline();
   const focused = useIsFocused();
   const [filters, setFilters] = useState(initialFilters);
   const [rulesVisible, setRulesVisible] = useState(false);
@@ -130,23 +132,25 @@ export default function RankingScreen({
 
   let emptyContent;
   if (top.data === undefined) {
-    if (top.isError) {
+    // 断网时 react-query 首次请求会停在 paused，视为无网络而非失败
+    if (top.isError || top.fetchStatus === "paused") {
       emptyContent = (
-        <ErrorState message={top.error.message} onRetry={retryTop} />
-      );
-    } else if (top.fetchStatus === "paused") {
-      emptyContent = (
-        <ErrorState message="网络未连接，请连接后重试" onRetry={retryTop} />
+        <ListFallbackState kind={offline ? "offline" : "loadFailed"} onRetry={retryTop} />
       );
     } else {
       emptyContent = <LoadingState message="榜单加载中…" />;
     }
   } else {
+    const hasGameFilter = board.hasGame && filters.gameId !== "0";
     emptyContent = (
       <View style={styles.empty}>
-        <EmptyState message="本期暂无上榜用户" />
+        <ListFallbackState
+          kind={hasGameFilter ? "filterEmpty" : "empty"}
+          message="本期暂无上榜用户"
+          style={styles.fallbackShrink}
+        />
         <Text style={styles.emptyHint}>试试其他游戏或切换榜单周期</Text>
-        {board.hasGame && filters.gameId !== "0" ? (
+        {hasGameFilter ? (
           <Pressable
             accessibilityRole="button"
             style={styles.reset}
@@ -443,12 +447,14 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   listContentWithMyRank: { paddingBottom: 92 },
-  empty: { alignItems: "center" },
+  empty: { flexGrow: 1, alignItems: "center", justifyContent: "center" },
+  // 兜底组件默认 flexGrow 撑满，这里收拢为内容高度，由外层 empty 统一居中
+  fallbackShrink: { flexGrow: 0 },
   emptyHint: {
     fontFamily: SYSTEM_FONT,
     fontSize: 11,
     color: "#979799",
-    marginTop: -12,
+    marginTop: 4,
   },
   reset: {
     minHeight: 44,
