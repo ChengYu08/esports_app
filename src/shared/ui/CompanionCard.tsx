@@ -192,9 +192,9 @@ export const CompanionCard = memo(function CompanionCard({
                 <Text style={styles.levelTagText}>{introTagText}</Text>
               </View>
             ) : null}
-            <Text numberOfLines={1} style={styles.introText}>
+            {/* <Text numberOfLines={1} style={styles.introText}>
               {introLine}
-            </Text>
+            </Text> */}
           </View>
         </View>
         <View style={styles.priceRow}>
