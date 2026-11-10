@@ -56,8 +56,6 @@ function getRuntimeConfig() {
         rongCloudAppKey: '',
         miPushAppId: '',
         miPushAppKey: '',
-        meizuPushAppId: '',
-        meizuPushAppKey: '',
         oppoPushAppKey: '',
         oppoPushAppSecret: '',
       },
@@ -554,8 +552,6 @@ async function connectRongCloudOnce(accessToken: string, attemptEpoch: number) {
         pushOptions: {
           idMI: env.miPushAppId || undefined,
           appKeyMI: env.miPushAppKey || undefined,
-          appIdMeizu: env.meizuPushAppId || undefined,
-          appKeyMeizu: env.meizuPushAppKey || undefined,
           appKeyOPPO: env.oppoPushAppKey || undefined,
           appSecretOPPO: env.oppoPushAppSecret || undefined,
           enableHWPush: true,

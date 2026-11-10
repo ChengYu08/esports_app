@@ -52,6 +52,8 @@
 -dontwarn com.huawei.libcore.io.ExternalStorageFileInputStream
 -dontwarn com.huawei.libcore.io.ExternalStorageFileOutputStream
 -dontwarn com.huawei.libcore.io.ExternalStorageRandomAccessFile
+# 已移除 meizu 厂商 AAR，但 im_libcore 仍保留
+# io.rong.push.platform.meizu.MeizuPush/MeiZuReceiver 引用这些类型，不能删除
 -dontwarn com.meizu.cloud.pushsdk.PushManager
 -dontwarn com.meizu.cloud.pushsdk.MzPushMessageReceiver
 -dontwarn com.meizu.cloud.pushsdk.handler.MzPushMessage
