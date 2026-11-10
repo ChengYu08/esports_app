@@ -123,3 +123,19 @@ PC 端请用 `jumpType: "URL"` + https 外链，不走本文 App 路由表。
 黑名单源文件：[`src/features/home/banner-route-deny.ts`](../src/features/home/banner-route-deny.ts)。
 
 外链请使用 `jumpType: "URL"` + `http(s)://...`，不要用 `/web-view`。
+
+---
+
+## 首页开屏弹窗（`APP_HOME_POPUP`）
+
+与楼层 Banner 共用素材字段与 `linkConfig` 跳转协议，独立资源位编码：`APP_HOME_POPUP`。
+
+| 项 | 约定 |
+|---|---|
+| 展示 | 弹层内轮播投放中的全部有效展示图（按 `sort`）；仅 1 张时不自动轮播 |
+| 间隔 | 接口 `intervalSec`，非法时默认 5s |
+| 频控 | 每次冷启动进首页有素材弹一次（进程内只弹一次） |
+| 点击 | 与 Banner 相同：`ROUTE` / `URL` / 内容图预览；**不自动关闭弹窗** |
+| UI | 图片按比例 contain 适配且不超出屏幕；底部关闭按钮 |
+
+App 请求示例：`{ "slotCodes": ["APP_HOME_POPUP"] }`（不与楼层 `APP_HOME_FLOOR*` 混渲染）。

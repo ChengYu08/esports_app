@@ -9,6 +9,9 @@ export const HOME_BANNER_SLOT_CODES: HomeBannerSlotCode[] = [
   "APP_HOME_FLOOR3",
 ];
 
+/** 首页开屏弹窗资源位（与楼层 Banner 分离请求，不混入楼层渲染）。 */
+export const APP_HOME_POPUP_SLOT_CODE = "APP_HOME_POPUP";
+
 /** 按端跳转协议动作：route 为 App 内路由，url 为外链，none 为未配置或配置非法。 */
 export type BannerJump =
   | { type: "route"; path: string; params: Record<string, string> }

@@ -17,12 +17,18 @@ import { HomeHighlights } from "@/features/home/components/HomeHighlights";
 import { useHomeHighlights } from "@/features/home/hooks/use-home-highlights";
 import { DEFAULT_RANKING_FILTERS } from "@/features/ranking/ranking.config";
 import type { RankingFilters } from "@/features/ranking/api/ranking.types";
+import { HomePopupModal } from "@/features/home/components/HomePopupModal";
 import {
   useHomeBanners,
   useHomeClubs,
   useHomeGameCategories,
   useHomeGames,
+  useHomePopup,
 } from "@/features/home/hooks/use-home-data";
+import {
+  hasHomePopupShownThisSession,
+  markHomePopupShownThisSession,
+} from "@/features/home/home-popup-session";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
 import { PaginationFooter } from "@/shared/ui/PaginationFooter";
 import { router, useFocusEffect, useIsFocused, useLocalSearchParams } from "expo-router";
@@ -86,6 +92,8 @@ export default function HomeScreen() {
       ? game
       : "";
   const banners = useHomeBanners(topTab, focused);
+  const homePopupQuery = useHomePopup(topTab === "home" && focused);
+  const [homePopupVisible, setHomePopupVisible] = useState(false);
   const clubs = useHomeClubs(
     topTab,
     {
@@ -95,6 +103,25 @@ export default function HomeScreen() {
     focused,
   );
   const bannerSlots = useMemo(() => banners.data ?? [], [banners.data]);
+  const homePopup = homePopupQuery.data ?? null;
+
+  useEffect(() => {
+    if (topTab !== "home" || !focused) {
+      return;
+    }
+    if (hasHomePopupShownThisSession()) {
+      return;
+    }
+    if (!homePopup || homePopup.items.length === 0) {
+      return;
+    }
+    setHomePopupVisible(true);
+  }, [focused, homePopup, topTab]);
+
+  const dismissHomePopup = useCallback(() => {
+    markHomePopupShownThisSession();
+    setHomePopupVisible(false);
+  }, []);
 
   // 用拖拽/惯性的起止事件跟踪列表滚动，不在逐帧 onScroll 里做 JS 状态更新。
   const scrollStateRef = useRef(initialClubListScrollState);
@@ -379,6 +406,14 @@ export default function HomeScreen() {
           />
         )}
       </View>
+      {homePopup ? (
+        <HomePopupModal
+          visible={homePopupVisible}
+          items={homePopup.items}
+          intervalMs={homePopup.intervalMs}
+          onDismiss={dismissHomePopup}
+        />
+      ) : null}
     </View>
   );
 }

@@ -99,9 +99,9 @@ describe("parseBannerJump 按端跳转协议", () => {
   });
 
   it.each([
-    ["/login"],
     ["/web-view"],
     ["/account-cancellation"],
+    ["/forgot-password"],
   ])("敏感路径 %s 命中黑名单返回 none", (jumpUrl) => {
     expect(parseBannerJump({ ANDROID: { jumpType: "ROUTE", jumpUrl, params: {} } })).toEqual({ type: "none" });
   });
