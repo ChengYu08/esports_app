@@ -2,14 +2,14 @@ import { Image } from "expo-image";
 import { useEffect } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, {
-  Easing,
-  FadeInDown,
-  interpolate,
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withSpring,
-  withTiming,
+    Easing,
+    FadeInDown,
+    interpolate,
+    useAnimatedStyle,
+    useReducedMotion,
+    useSharedValue,
+    withSpring,
+    withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -80,7 +80,7 @@ function formatConfirmLabel(
   return `选TA下单（${selectedCount}）`;
 }
 
-/** 单个候选人卡片：错峰入场 + 按压回弹 + 新陪玩一次性金色描边 */
+/** 单个候选人卡片：错峰入场 + 按压回弹 + 新大神一次性金色描边 */
 function AnimatedGrabCard({
   item,
   index,
@@ -94,7 +94,7 @@ function AnimatedGrabCard({
   selected: boolean;
   onSelect: (grabId: string) => void;
 }) {
-  // 抢单备注描述的是订单状态，签名和年龄应使用陪玩的公开个人资料。
+  // 抢单备注描述的是订单状态，签名和年龄应使用大神的公开个人资料。
   const { data: profile } = useProfileDetail(
     item.companionUserId
       ? { userId: item.companionUserId, clubId: item.clubId }
@@ -106,7 +106,7 @@ function AnimatedGrabCard({
   const pressScale = useSharedValue(1);
   const glow = useSharedValue(0);
 
-  // 新陪玩出现：金色描边亮一下停留 400ms 后淡出（一次性）
+  // 新大神出现：金色描边亮一下停留 400ms 后淡出（一次性）
   useEffect(() => {
     if (!isNew || reducedMotion) return;
     glow.set(
@@ -201,7 +201,7 @@ export function MatchingGrabListView({
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.textBlock}>
-          <Text style={styles.title}>选择你的陪玩大神</Text>
+          <Text style={styles.title}>选择你的大神大神</Text>
           <MatchingCountdownText
             countdownText={countdownText}
             seconds={countdownSec}

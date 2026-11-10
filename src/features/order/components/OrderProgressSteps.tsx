@@ -7,7 +7,7 @@ const orderStepCheck = require("../../../../assets/svgs/order-step-check.svg");
 const orderStepActive = require("../../../../assets/svgs/order-step-active.svg");
 const orderStepPending = require("../../../../assets/svgs/order-step-pending.svg");
 
-/** 订单进度步骤条：支付 → 陪玩确认/抢单 → 陪玩服务 → 服务完成 */
+/** 订单进度步骤条：支付 → 大神确认/抢单 → 大神服务 → 服务完成 */
 export function OrderProgressSteps({
   status,
   scope,
@@ -17,8 +17,8 @@ export function OrderProgressSteps({
 }) {
   const labels = [
     "支付订单",
-    scope === "accept" ? "陪玩抢单" : "陪玩确认",
-    "陪玩服务",
+    scope === "accept" ? "大神抢单" : "大神确认",
+    "大神服务",
     "服务完成",
   ];
   const activeStep =

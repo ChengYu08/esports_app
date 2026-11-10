@@ -32,7 +32,7 @@ type ApiGodRecord = {
   gameStatus?: number | null;
   gameId?: number;
   gameName?: string;
-  /** 卡内陪玩标签（明星/魔王pro 等），背景色由后台配置下发 */
+  /** 卡内大神标签（明星/魔王pro 等），背景色由后台配置下发 */
   tagId?: number;
   tagName?: string;
   tagIconUrl?: string;
@@ -45,7 +45,7 @@ type ApiGodRecord = {
   /** 游戏等级/段位，如 星耀 */
   levelName?: string;
   clubGameServiceId?: number;
-  /** 服务类型，如 陪玩 */
+  /** 服务类型，如 大神 */
   clubGameServiceName?: string;
   companionServiceId?: number;
   price?: number | string;
@@ -63,7 +63,7 @@ export type GodListItem = {
   age: number | null;
   signature: string;
   gameName: string;
-  /** 卡内陪玩标签名（明星/魔王pro 等），空表示不展示标签 */
+  /** 卡内大神标签名（明星/魔王pro 等），空表示不展示标签 */
   tagName: string;
   /** 标签背景色：优先移动端色值，后台未配置时由 UI 兜底 */
   tagColor: string;
@@ -112,11 +112,14 @@ export async function fetchGodPage(params: {
   if (priceSort) action.priceSort = priceSort;
   if (filters.level) action.levelName = filters.level;
 
-  const response = await apiClient<GodEnvelope>("/client/v1/companion/public/home/page", {
-    method: "POST",
-    body: { page, pageSize, action },
-    signal,
-  });
+  const response = await apiClient<GodEnvelope>(
+    "/client/v1/companion/public/home/page",
+    {
+      method: "POST",
+      body: { page, pageSize, action },
+      signal,
+    },
+  );
   const records = response.data?.records ?? [];
   const items = records.map((row) => ({
     userId: row.userId,
@@ -139,6 +142,8 @@ export async function fetchGodPage(params: {
     voiceUrl: row.voiceUrl ?? null,
     voiceDurationSeconds: row.voiceDurationSeconds ?? null,
   }));
-  const total = items.length ? response.data?.total ?? items.length : items.length;
+  const total = items.length
+    ? (response.data?.total ?? items.length)
+    : items.length;
   return { items, total };
 }

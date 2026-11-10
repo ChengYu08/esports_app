@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { SYSTEM_FONT } from "@/shared/theme/typography";
 
-/** 订单详情信息行：左侧标签、右侧值，支持复制按钮与陪玩端样式 */
+/** 订单详情信息行：左侧标签、右侧值，支持复制按钮与大神端样式 */
 export function OrderDetailInfoRow({
   label,
   value,

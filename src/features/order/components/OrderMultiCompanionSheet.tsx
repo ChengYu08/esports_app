@@ -1,18 +1,18 @@
 import {
-  Checkmark16Regular,
-  ErrorCircle16Regular,
-  Search24Regular,
+    Checkmark16Regular,
+    ErrorCircle16Regular,
+    Search24Regular,
 } from "@fluentui/react-native-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useMemo, useState } from "react";
 import {
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  useWindowDimensions,
+    FlatList,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+    useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -25,7 +25,7 @@ const CONFIRM_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
 
 type OrderMultiCompanionSheetProps = {
   visible: boolean;
-  /** 需选择的参与陪玩人数（配置总人数 - 1） */
+  /** 需选择的参与大神人数（配置总人数 - 1） */
   needSelect: number;
   candidates: MultiCompanionCandidate[];
   loading?: boolean;
@@ -36,7 +36,7 @@ type OrderMultiCompanionSheetProps = {
 
 const DEFAULT_AVATAR = { uri: "" };
 
-/** 一单多陪订单开始服务前的选人弹窗：勾选参与陪玩，选满才能确认开始服务 */
+/** 一单多陪订单开始服务前的选人弹窗：勾选参与大神，选满才能确认开始服务 */
 export function OrderMultiCompanionSheet({
   visible,
   needSelect,
@@ -98,7 +98,7 @@ export function OrderMultiCompanionSheet({
         style={[styles.body, { paddingBottom: Math.max(insets.bottom, 12) }]}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>选择共同服务陪玩</Text>
+          <Text style={styles.title}>选择共同服务大神</Text>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="关闭选人弹窗"
@@ -117,7 +117,7 @@ export function OrderMultiCompanionSheet({
             style={styles.tipIcon}
           />
           <Text style={styles.tipText}>
-            请提前确认一起服务的陪玩师时间，避免订单开始服务后无法履约。
+            请提前确认一起服务的大神时间，避免订单开始服务后无法履约。
           </Text>
         </View>
         <View style={styles.searchBox}>
@@ -145,7 +145,7 @@ export function OrderMultiCompanionSheet({
           ListEmptyComponent={
             <View style={styles.empty}>
               <Text style={styles.emptyText}>
-                {loading ? "加载中..." : "暂无符合条件的陪玩"}
+                {loading ? "加载中..." : "暂无符合条件的大神"}
               </Text>
             </View>
           }
@@ -181,7 +181,7 @@ export function OrderMultiCompanionSheet({
                   style={styles.avatar}
                 />
                 <Text numberOfLines={1} style={styles.name}>
-                  {item.nickname || `陪玩${item.userId}`}
+                  {item.nickname || `大神${item.userId}`}
                 </Text>
                 <Text style={styles.userId}>ID {item.userId}</Text>
               </Pressable>
@@ -190,7 +190,7 @@ export function OrderMultiCompanionSheet({
         />
         <View style={styles.footer}>
           <Text style={styles.footerTip}>
-            需选择 {needSelect} 名陪玩一同服务
+            需选择 {needSelect} 名大神一同服务
           </Text>
           <View style={styles.footerButtons}>
             <Pressable

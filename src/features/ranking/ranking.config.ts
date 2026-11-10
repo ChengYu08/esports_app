@@ -1,4 +1,9 @@
-import type { RankingBoard, RankingFilters, RankingItem, RankingPeriod } from "./api/ranking.types";
+import type {
+    RankingBoard,
+    RankingFilters,
+    RankingItem,
+    RankingPeriod,
+} from "./api/ranking.types";
 
 export const RANKING_BOARDS = [
   {
@@ -13,7 +18,7 @@ export const RANKING_BOARDS = [
     key: "ORDER_RECEIVE",
     label: "接单榜",
     title: "接单榜",
-    nameColumnLabel: "陪玩昵称",
+    nameColumnLabel: "大神昵称",
     metricLabel: "总订单",
     hasGame: true,
   },
@@ -21,7 +26,7 @@ export const RANKING_BOARDS = [
     key: "TURNOVER",
     label: "流水榜",
     title: "流水榜",
-    nameColumnLabel: "陪玩昵称",
+    nameColumnLabel: "大神昵称",
     metricLabel: "竹子收益",
     hasGame: true,
   },
@@ -42,13 +47,19 @@ export function getRankingBoard(board: RankingBoard) {
   return RANKING_BOARDS.find((item) => item.key === board)!;
 }
 
-export function getRankingRulesTitle(board: RankingBoard, period: RankingPeriod) {
+export function getRankingRulesTitle(
+  board: RankingBoard,
+  period: RankingPeriod,
+) {
   if (board === "GOD") return "榜单说明";
   return `${getRankingBoard(board).label}（${period === "DAILY" ? "日榜" : "周榜"}）规则`;
 }
 
 /** 接口已返回展示数值（不是分），这里只负责按移动端榜单样式缩写。 */
-export function formatRankingMetric(value: number, board: RankingBoard): string {
+export function formatRankingMetric(
+  value: number,
+  board: RankingBoard,
+): string {
   if (board === "ORDER_RECEIVE") {
     return `${Math.round(value)}单`;
   }

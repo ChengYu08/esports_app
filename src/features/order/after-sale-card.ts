@@ -1,4 +1,18 @@
-export type AfterSaleCardPayload = { orderId: number; orderNo?: string; companionUserId?: number; companionNickname?: string; gameName?: string; serviceDesc?: string; unitPrice?: number; quantity?: number; totalPrice?: number; createTime?: string; remark?: string; clubId?: number; csUserId: number };
+export type AfterSaleCardPayload = {
+  orderId: number;
+  orderNo?: string;
+  companionUserId?: number;
+  companionNickname?: string;
+  gameName?: string;
+  serviceDesc?: string;
+  unitPrice?: number;
+  quantity?: number;
+  totalPrice?: number;
+  createTime?: string;
+  remark?: string;
+  clubId?: number;
+  csUserId: number;
+};
 
 export type AfterSaleCardRow = { label: string; value: string };
 
@@ -12,7 +26,9 @@ function formatCardTime(value?: string) {
   return value ? String(value).replace("T", " ").slice(0, 19) : "";
 }
 
-export function afterSaleCardRows(payload: Partial<AfterSaleCardPayload>): AfterSaleCardRow[] {
+export function afterSaleCardRows(
+  payload: Partial<AfterSaleCardPayload>,
+): AfterSaleCardRow[] {
   const rows: AfterSaleCardRow[] = [];
   const push = (label: string, value: unknown) => {
     const formatted = text(value);
@@ -22,13 +38,22 @@ export function afterSaleCardRows(payload: Partial<AfterSaleCardPayload>): After
   const companionNickname = text(payload.companionNickname);
   const companionUserId = text(payload.companionUserId);
   if (companionNickname) {
-    push("陪玩师", companionUserId ? `${companionNickname}（ID：${companionUserId}）` : companionNickname);
+    push(
+      "大神",
+      companionUserId
+        ? `${companionNickname}（ID：${companionUserId}）`
+        : companionNickname,
+    );
   }
   push("订单号", payload.orderNo);
   push("游戏", payload.gameName);
   const serviceDesc = text(payload.serviceDesc);
   const unitPrice = text(payload.unitPrice);
-  if (serviceDesc) push("服务", unitPrice ? `${serviceDesc} ${unitPrice}钻石/小时` : serviceDesc);
+  if (serviceDesc)
+    push(
+      "服务",
+      unitPrice ? `${serviceDesc} ${unitPrice}钻石/小时` : serviceDesc,
+    );
   push("数量", payload.quantity ? `${payload.quantity}小时` : "");
   push("总价", payload.totalPrice ? `${payload.totalPrice}钻石` : "");
   push("时间", formatCardTime(payload.createTime));
@@ -36,14 +61,29 @@ export function afterSaleCardRows(payload: Partial<AfterSaleCardPayload>): After
   return rows;
 }
 
-export function buildAfterSalePayload(order: {
-  id: string; orderNo?: string; receiverUserId?: string; sellerName: string; gameName: string; serviceName: string;
-  unitPrice: string; quantity: number; totalPrice: string; createTime?: string; remark?: string; clubId?: number;
-}, csUserId: number): AfterSaleCardPayload {
+export function buildAfterSalePayload(
+  order: {
+    id: string;
+    orderNo?: string;
+    receiverUserId?: string;
+    sellerName: string;
+    gameName: string;
+    serviceName: string;
+    unitPrice: string;
+    quantity: number;
+    totalPrice: string;
+    createTime?: string;
+    remark?: string;
+    clubId?: number;
+  },
+  csUserId: number,
+): AfterSaleCardPayload {
   return {
     orderId: Number(order.id),
     orderNo: text(order.orderNo) || undefined,
-    companionUserId: order.receiverUserId ? Number(order.receiverUserId) || undefined : undefined,
+    companionUserId: order.receiverUserId
+      ? Number(order.receiverUserId) || undefined
+      : undefined,
     companionNickname: text(order.sellerName) || undefined,
     gameName: text(order.gameName) || undefined,
     serviceDesc: text(order.serviceName) || undefined,

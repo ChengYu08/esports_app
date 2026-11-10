@@ -1,34 +1,31 @@
+import { showToast } from "@/shared/ui/app-toast";
 import { useAuthStore } from "@esports/auth";
-import {
-  useQueryClient,
-  type QueryClient,
-} from "@tanstack/react-query";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { showToast } from "@/shared/ui/app-toast";
 
 import {
-  cancelQuickMatch,
-  ensureAuditionRoom,
-  fetchActiveQuickMatch,
-  fetchQuickMatchDetail,
-  fetchQuickMatchGames,
-  fetchQuickMatchGrabList,
+    cancelQuickMatch,
+    ensureAuditionRoom,
+    fetchActiveQuickMatch,
+    fetchQuickMatchDetail,
+    fetchQuickMatchGames,
+    fetchQuickMatchGrabList,
 } from "@/features/match/api/match.api";
 import {
-  applyGrabSelection,
-  isQuickMatchActive,
-  pruneSelectedIds,
-  resolveMaxSelectableCount,
-  type QuickMatchGrabItem,
-  type QuickMatchRequestDetail,
+    applyGrabSelection,
+    isQuickMatchActive,
+    pruneSelectedIds,
+    resolveMaxSelectableCount,
+    type QuickMatchGrabItem,
+    type QuickMatchRequestDetail,
 } from "@/features/match/api/match.types";
 import { quickMatchGamesQueryKey } from "@/features/match/hooks/use-match-form";
 import { useQuickMatchEndSignals } from "@/features/match/quick-match-end-signals";
-import { parseServerDateTime } from "@/shared/time/server-date";
 import { exitVoiceRoom } from "@/features/voice-room/exit-voice-room";
-import { resolveVoiceRoomId } from "@/features/voice-room/voice-room.api";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
+import { resolveVoiceRoomId } from "@/features/voice-room/voice-room.api";
+import { parseServerDateTime } from "@/shared/time/server-date";
 
 const POLL_INTERVAL_MS = 4000;
 const DEFAULT_COUNTDOWN_SEC = 30 * 60;
@@ -223,8 +220,10 @@ export function useQuickMatchSession(
   const detailRef = useRef<QuickMatchRequestDetail | null>(null);
   /** 上一次轮询的候选人 id，用于 diff 出新出现的 */
   const prevGrabIdsRef = useRef<Set<string>>(new Set());
-  /** 清「新陪玩」标记的延时器，切换 requestNo/支付时取消 */
-  const clearNewMarkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 清「新大神」标记的延时器，切换 requestNo/支付时取消 */
+  const clearNewMarkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   useEffect(() => {
     requestNoRef.current = requestNo;
@@ -246,19 +245,22 @@ export function useQuickMatchSession(
     selectedGrabIdsRef.current = selectedGrabIds;
   }, [selectedGrabIds]);
 
-  const finishEnded = useCallback((reason: MatchEndReason, message?: string) => {
-    if (orderPendingRef.current || endedRef.current) return;
-    endedRef.current = true;
-    generationRef.current += 1;
-    if (reason === "cancelled") {
-      showToast(message || "派单已取消");
-    } else if (reason === "expired") {
-      showToast(message || "派单已超时自动取消");
-    } else {
-      showToast(message || "该派单已结束");
-    }
-    onEndedRef.current?.(reason);
-  }, []);
+  const finishEnded = useCallback(
+    (reason: MatchEndReason, message?: string) => {
+      if (orderPendingRef.current || endedRef.current) return;
+      endedRef.current = true;
+      generationRef.current += 1;
+      if (reason === "cancelled") {
+        showToast(message || "派单已取消");
+      } else if (reason === "expired") {
+        showToast(message || "派单已超时自动取消");
+      } else {
+        showToast(message || "该派单已结束");
+      }
+      onEndedRef.current?.(reason);
+    },
+    [],
+  );
 
   const endMatching = useCallback(
     async (reason: MatchEndReason, message?: string) => {
@@ -290,7 +292,10 @@ export function useQuickMatchSession(
     endedRef.current = false;
     generationRef.current += 1;
     expireAtRef.current = resolveExpireAtMs(expireTime);
-    const sec = Math.max(0, Math.floor((expireAtRef.current - Date.now()) / 1000));
+    const sec = Math.max(
+      0,
+      Math.floor((expireAtRef.current - Date.now()) / 1000),
+    );
     setCountdownSec(sec);
     setCandidates([]);
     setSelectedGrabIds([]);
@@ -312,7 +317,13 @@ export function useQuickMatchSession(
   const pollGrabList = useCallback(async () => {
     const no = requestNoRef.current;
     const tokenValue = token;
-    if (!no || !tokenValue || pollBusyRef.current || orderPendingRef.current || endedRef.current) {
+    if (
+      !no ||
+      !tokenValue ||
+      pollBusyRef.current ||
+      orderPendingRef.current ||
+      endedRef.current
+    ) {
       return;
     }
     const generation = generationRef.current;
@@ -320,10 +331,10 @@ export function useQuickMatchSession(
     try {
       const nextDetail = await fetchQuickMatchDetail(no, tokenValue);
       if (
-        generation !== generationRef.current
-        || requestNoRef.current !== no
-        || orderPendingRef.current
-        || endedRef.current
+        generation !== generationRef.current ||
+        requestNoRef.current !== no ||
+        orderPendingRef.current ||
+        endedRef.current
       ) {
         return;
       }
@@ -333,7 +344,10 @@ export function useQuickMatchSession(
         if (Number.isFinite(nextExpire)) expireAtRef.current = nextExpire;
       }
       if (!isQuickMatchActive(nextDetail)) {
-        if (nextDetail.status === "EXPIRED" || nextDetail.status === "MATCHING") {
+        if (
+          nextDetail.status === "EXPIRED" ||
+          nextDetail.status === "MATCHING"
+        ) {
           void endMatching("expired");
         } else {
           finishEnded("ended");
@@ -342,10 +356,10 @@ export function useQuickMatchSession(
       }
       const list = await fetchQuickMatchGrabList(no, tokenValue);
       if (
-        generation !== generationRef.current
-        || requestNoRef.current !== no
-        || orderPendingRef.current
-        || endedRef.current
+        generation !== generationRef.current ||
+        requestNoRef.current !== no ||
+        orderPendingRef.current ||
+        endedRef.current
       ) {
         return;
       }
@@ -357,7 +371,9 @@ export function useQuickMatchSession(
 
       // diff 出本次新出现的候选人，触发一次性金色描边
       const prevIds = prevGrabIdsRef.current;
-      const arrivedIds = list.filter((item) => !prevIds.has(item.id)).map((item) => item.id);
+      const arrivedIds = list
+        .filter((item) => !prevIds.has(item.id))
+        .map((item) => item.id);
       prevGrabIdsRef.current = new Set(list.map((item) => item.id));
       if (clearNewMarkTimerRef.current) {
         clearTimeout(clearNewMarkTimerRef.current);
@@ -384,7 +400,10 @@ export function useQuickMatchSession(
     if (!requestNo || orderPending || endedRef.current) return;
     const timer = setInterval(() => {
       if (orderPendingRef.current || endedRef.current) return;
-      const sec = Math.max(0, Math.floor((expireAtRef.current - Date.now()) / 1000));
+      const sec = Math.max(
+        0,
+        Math.floor((expireAtRef.current - Date.now()) / 1000),
+      );
       setCountdownSec(sec);
       if (sec <= 0) void endMatching("expired");
     }, 1000);
@@ -425,7 +444,9 @@ export function useQuickMatchSession(
       await endMatching("cancelled", "已取消派单");
       return true;
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "取消派单失败，请稍后重试");
+      showToast(
+        error instanceof Error ? error.message : "取消派单失败，请稍后重试",
+      );
       void pollGrabList();
       return false;
     } finally {
@@ -451,11 +472,15 @@ export function useQuickMatchSession(
   const toggleGrab = useCallback((grabId: string) => {
     if (selectionLockedRef.current) return;
     const maxSelectable = resolveMaxSelectableCount(detailRef.current);
-    const result = applyGrabSelection(selectedGrabIdsRef.current, grabId, maxSelectable);
+    const result = applyGrabSelection(
+      selectedGrabIdsRef.current,
+      grabId,
+      maxSelectable,
+    );
     selectedGrabIdsRef.current = result.ids;
     setSelectedGrabIds(result.ids);
     if (result.overLimit) {
-      showToast(`最多选择${maxSelectable}名陪玩`);
+      showToast(`最多选择${maxSelectable}名大神`);
     }
   }, []);
 

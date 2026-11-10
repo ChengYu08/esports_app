@@ -5,7 +5,7 @@ type MultiCompanionFields = Pick<
   "multiCompanion" | "multiCompanionCount" | "companions"
 >;
 
-/** 一单多陪：开始服务前是否需要先选参与陪玩（对齐 Web 端判定口径） */
+/** 一单多陪：开始服务前是否需要先选参与大神（对齐 Web 端判定口径） */
 export function needsMultiCompanionSelect(
   order: MultiCompanionFields,
 ): boolean {
@@ -18,7 +18,7 @@ export function needsMultiCompanionSelect(
   );
 }
 
-/** 需选择的参与陪玩人数（配置总人数 - 1 主单） */
+/** 需选择的参与大神人数（配置总人数 - 1 主单） */
 export function multiCompanionNeedSelect(
   order: Pick<OrderItemModel, "multiCompanionCount">,
 ): number {

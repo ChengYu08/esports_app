@@ -6,10 +6,16 @@
 import { logger } from "@/core/logging/logger";
 import { showToast } from "@/shared/ui/app-toast";
 
-import { markCsInviteClaimed, markCsInviteUnclaimed } from "@/features/message/cs-invite-claim-state";
-import type { RongCommand } from "@/features/message/rongcloud-command";
+import {
+    markCsInviteClaimed,
+    markCsInviteUnclaimed,
+} from "@/features/message/cs-invite-claim-state";
 import { registerRongCommandHandler } from "@/features/message/rong-command-dispatch/rong-command-registry";
-import { formatServerDateTime, parseServerDateTime } from "@/shared/time/server-date";
+import type { RongCommand } from "@/features/message/rongcloud-command";
+import {
+    formatServerDateTime,
+    parseServerDateTime,
+} from "@/shared/time/server-date";
 import { actionNotice } from "@/shared/ui/action-notice/action-notice-store";
 import { TRADE_NOTICE_ICON } from "@/shared/ui/action-notice/trade-notice-icon";
 
@@ -78,8 +84,8 @@ export function handleCustomerServiceInvite(command: RongCommand) {
 
   const playerUserId = stringField(command.data, "playerUserId");
   const playerName =
-    stringField(command.data, "playerName")
-    || (playerUserId ? `玩家${playerUserId}` : "玩家");
+    stringField(command.data, "playerName") ||
+    (playerUserId ? `玩家${playerUserId}` : "玩家");
   const noticeId = `cs:${key}`;
 
   logger.info("cs_invite.received", {
@@ -120,7 +126,10 @@ export function handleCustomerServiceInvite(command: RongCommand) {
   );
 }
 
-export function handleQuickMatchCreated(command: RongCommand, now = Date.now()) {
+export function handleQuickMatchCreated(
+  command: RongCommand,
+  now = Date.now(),
+) {
   if (command.name !== QUICK_MATCH_CREATED) return;
   if (command.senderId !== PLATFORM_NOTICE_USER_ID) return;
 
@@ -154,7 +163,7 @@ export function handleQuickMatchCreated(command: RongCommand, now = Date.now()) 
   const activeRoom = useVoiceRoomSessionStore.getState().activeRoom;
   if (!activeRoom) return;
 
-  // 只写 quickMatchCreated 场景；是否显示「选择陪玩」由 VoiceRoomScreen 调 fetchActiveQuickMatch 决定
+  // 只写 quickMatchCreated 场景；是否显示「选择大神」由 VoiceRoomScreen 调 fetchActiveQuickMatch 决定
   useVoiceRoomSessionStore.getState().setActiveRoom({
     ...activeRoom,
     scene: "quickMatchCreated",

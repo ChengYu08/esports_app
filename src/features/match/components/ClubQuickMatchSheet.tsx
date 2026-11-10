@@ -4,33 +4,33 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  useWindowDimensions,
+    ActivityIndicator,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+    useWindowDimensions,
 } from "react-native";
 import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withRepeat,
-  withSequence,
-  withTiming,
+    Easing,
+    useAnimatedStyle,
+    useSharedValue,
+    withDelay,
+    withRepeat,
+    withSequence,
+    withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
-  fetchActiveQuickMatch,
-  publishQuickMatch,
+    fetchActiveQuickMatch,
+    publishQuickMatch,
 } from "@/features/match/api/match.api";
 import {
-  isQuickMatchActive,
-  type MatchGame,
+    isQuickMatchActive,
+    type MatchGame,
 } from "@/features/match/api/match.types";
 import { LightGameOptionChip } from "@/features/match/components/LightGameOptionChip";
 import { LightOptionChip } from "@/features/match/components/LightOptionChip";
@@ -38,20 +38,20 @@ import { MatchLinearGradient } from "@/features/match/components/MatchLinearGrad
 import { openAuditionRoom } from "@/features/match/enter-audition-room";
 import { isExistingDispatchConflictMessage } from "@/features/match/existing-dispatch-hint";
 import {
-  MATCH_COMPANION_PREFERENCE_OPTIONS,
-  MATCH_GENDER_OPTIONS,
-  MATCH_REMARK_MAX,
-  MATCH_VOICE_OPTIONS,
-  useMatchForm,
+    MATCH_COMPANION_PREFERENCE_OPTIONS,
+    MATCH_GENDER_OPTIONS,
+    MATCH_REMARK_MAX,
+    MATCH_VOICE_OPTIONS,
+    useMatchForm,
 } from "@/features/match/hooks/use-match-form";
 import {
-  ensureRealNameBeforeVoiceRoomEnter,
-  promptSelfRealNameIfNeeded,
+    ensureRealNameBeforeVoiceRoomEnter,
+    promptSelfRealNameIfNeeded,
 } from "@/features/voice-room/ensure-real-name-before-enter";
 import { exitVoiceRoom } from "@/features/voice-room/exit-voice-room";
 import {
-  resolveVoiceRoomId,
-  voiceRoomApi,
+    resolveVoiceRoomId,
+    voiceRoomApi,
 } from "@/features/voice-room/voice-room.api";
 import type { VoiceRoomDetail } from "@/features/voice-room/voice-room.types";
 import { getDDinProStyle } from "@/shared/theme/typography";
@@ -321,7 +321,11 @@ export function ClubQuickMatchSheet({
     // 接待代发固定需试音，由老板端接管进房；老板自发仍按表单选择
     const needVoice = isReception ? true : form.voice === "需试音";
     // 仅「会进试音房」的老板自发路径拦实名；接待纯代发不进房
-    if (!isReception && needVoice && !(await ensureRealNameBeforeVoiceRoomEnter())) {
+    if (
+      !isReception &&
+      needVoice &&
+      !(await ensureRealNameBeforeVoiceRoomEnter())
+    ) {
       return;
     }
     setSubmitting(true);
@@ -642,7 +646,7 @@ export function ClubQuickMatchSheet({
 
           {form.showCompanionPreference ? (
             <View style={styles.field}>
-              <LightFieldLabel label="陪玩人数" required />
+              <LightFieldLabel label="大神人数" required />
               <View style={styles.options}>
                 {MATCH_COMPANION_PREFERENCE_OPTIONS.map((option) => (
                   <LightOptionChip
@@ -707,7 +711,7 @@ export function ClubQuickMatchSheet({
         <View style={styles.footer}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="立即发布，匹配陪玩"
+            accessibilityLabel="立即发布，匹配大神"
             disabled={submitting || form.remarkOverLimit}
             onPress={handlePublish}
             style={({ pressed }) => [
@@ -733,7 +737,7 @@ export function ClubQuickMatchSheet({
                 </View>
               ) : (
                 <Text style={styles.publishText}>
-                  {isReception ? "为老板发起派单" : "立即发布，匹配陪玩"}
+                  {isReception ? "为老板发起派单" : "立即发布，匹配大神"}
                 </Text>
               )}
             </MatchLinearGradient>

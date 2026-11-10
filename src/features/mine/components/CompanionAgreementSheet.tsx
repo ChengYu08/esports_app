@@ -4,13 +4,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -24,7 +24,8 @@ export function CompanionAgreementSheet() {
   const token = useAuthStore((state) => state.accessToken);
   const userId = useAuthStore((state) => state.user?.id);
   const queryClient = useQueryClient();
-  const agreementCode = Platform.OS === "ios" ? "user_playmate_ios" : "user_playmate";
+  const agreementCode =
+    Platform.OS === "ios" ? "user_playmate_ios" : "user_playmate";
   const queryKey = ["companion-agreement-status", userId, agreementCode];
   const [visible, setVisible] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -82,7 +83,7 @@ export function CompanionAgreementSheet() {
       <View accessibilityViewIsModal style={styles.content}>
         <View style={styles.header}>
           <Text accessibilityRole="header" style={styles.title}>
-            陪玩师协议确认
+            大神协议确认
           </Text>
           <Pressable
             accessibilityRole="button"
@@ -147,7 +148,7 @@ export function CompanionAgreementSheet() {
             ]}
           >
             <Text style={styles.agreeText}>
-              {submitting ? "正在确认…" : "我已阅读并同意陪玩师协议"}
+              {submitting ? "正在确认…" : "我已阅读并同意大神协议"}
             </Text>
           </Pressable>
         </View>

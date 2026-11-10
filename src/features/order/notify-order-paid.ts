@@ -2,7 +2,7 @@ import { router } from "expo-router";
 
 import { messageStore } from "@/features/message/message-store";
 
-/** 支付成功后发给陪玩的固定文案（对齐 PC / 匹配页） */
+/** 支付成功后发给大神的固定文案（对齐 PC / 匹配页） */
 export const ORDER_PAID_NOTIFY_TEXT = "我已支付订单~";
 
 const READY_POLL_INTERVAL_MS = 100;
@@ -21,7 +21,10 @@ async function waitUntilMessageReady(
   }
 
   // 可能已有 initialize 在进行（initializeInProgress 时会直接 return），需轮询等到 ready
-  await messageStore.getState().initialize(accessToken).catch(() => {});
+  await messageStore
+    .getState()
+    .initialize(accessToken)
+    .catch(() => {});
 
   for (let attempt = 0; attempt < READY_POLL_MAX_ATTEMPTS; attempt += 1) {
     if (messageStore.getState().connectionState === "ready") {
@@ -29,7 +32,10 @@ async function waitUntilMessageReady(
     }
     // 卡在 idle/error 时周期性再触发；connecting 时 initialize 会早退，继续等
     if (attempt > 0 && attempt % REINIT_EVERY_ATTEMPTS === 0) {
-      await messageStore.getState().initialize(accessToken).catch(() => {});
+      await messageStore
+        .getState()
+        .initialize(accessToken)
+        .catch(() => {});
     }
     await new Promise((resolve) => setTimeout(resolve, READY_POLL_INTERVAL_MS));
   }
@@ -37,7 +43,7 @@ async function waitUntilMessageReady(
 }
 
 /**
- * 支付成功通知陪玩：确保 IM ready 后再 sendText；单条失败静默。
+ * 支付成功通知大神：确保 IM ready 后再 sendText；单条失败静默。
  */
 export async function notifyOrderPaidToCompanions(
   companionUserIds: string[],
@@ -74,7 +80,7 @@ export type AfterOrderPaidOpenChatOptions = {
 };
 
 /**
- * 支付成功统一编排：先通知陪玩「我已支付订单~」，再打开聊天页。
+ * 支付成功统一编排：先通知大神「我已支付订单~」，再打开聊天页。
  */
 export async function afterOrderPaidOpenChat(
   options: AfterOrderPaidOpenChatOptions,

@@ -10,21 +10,28 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { fetchProfileDetail } from "@/features/mine/api/profile.api";
+import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
 import { OrderAfterSaleSheet } from "@/features/order/components/OrderAfterSaleSheet";
 import { OrderCompleteConfirmSheet } from "@/features/order/components/OrderCompleteConfirmSheet";
-import { OrderMultiCompanionSheet } from "@/features/order/components/OrderMultiCompanionSheet";
 import { OrderDetailBottomBar } from "@/features/order/components/OrderDetailBottomBar";
 import { OrderDetailInfoBlocks } from "@/features/order/components/OrderDetailInfoBlocks";
 import { OrderDetailStatusBar } from "@/features/order/components/OrderDetailStatusBar";
 import { OrderFreeConfirmFlow } from "@/features/order/components/OrderFreeConfirmFlow";
+import { OrderMultiCompanionSheet } from "@/features/order/components/OrderMultiCompanionSheet";
 import { OrderReviewSheet } from "@/features/order/components/OrderReviewSheet";
 import { useOrderDetailActions } from "@/features/order/hooks/use-order-detail-actions";
 import { multiCompanionNeedSelect } from "@/features/order/multi-companion";
 import { getOrderDetailAction } from "@/features/order/order-detail-actions";
 import { formatOrderTime } from "@/features/order/order-detail-format";
-import { orderClubQueryKey, orderDetailQueryKey } from "@/features/order/order-query";
-import { fetchOrderClub, fetchOrderDetail, mapOrder } from "@/features/order/order.api";
-import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
+import {
+    orderClubQueryKey,
+    orderDetailQueryKey,
+} from "@/features/order/order-query";
+import {
+    fetchOrderClub,
+    fetchOrderDetail,
+    mapOrder,
+} from "@/features/order/order.api";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 
 /** 详情页只有接单方/下单方两种视角 */
@@ -47,7 +54,7 @@ export function OrderDetailScreen({
     queryFn: async ({ signal }) =>
       mapOrder(await fetchOrderDetail(id, token as string, signal), 0, scope),
     enabled: Boolean(id && token),
-    // 陪玩侧的接单/开始/完成随时推进订单；推送可能缺失（开始服务事件
+    // 大神侧的接单/开始/完成随时推进订单；推送可能缺失（开始服务事件
     // 不一定下发 ORDER_NOTIFY），停留期间对活跃订单轮询兜底。
     refetchOnMount: "always",
     refetchInterval: (query) => {
@@ -94,21 +101,40 @@ export function OrderDetailScreen({
   });
   const [paymentVisible, setPaymentVisible] = useState(false);
   const [paymentError, setPaymentError] = useState("");
-  const companionIds = scope === "place"
-    ? [...new Set((detail.data?.companions ?? []).map((companion) => companion.userId).filter((userId) => /^\d+$/.test(userId) && userId !== "0"))]
-    : [];
+  const companionIds =
+    scope === "place"
+      ? [
+          ...new Set(
+            (detail.data?.companions ?? [])
+              .map((companion) => companion.userId)
+              .filter((userId) => /^\d+$/.test(userId) && userId !== "0"),
+          ),
+        ]
+      : [];
   const companionProfiles = useQueries({
     queries: companionIds.map((userId) => ({
       queryKey: ["profile-detail", undefined, userId],
-      queryFn: ({ signal }: { signal: AbortSignal }) => fetchProfileDetail({ userId }, signal),
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchProfileDetail({ userId }, signal),
       staleTime: 10 * 60_000,
       retry: 1,
     })),
   });
-  const companionClubs = Object.fromEntries(companionIds.map((userId, index) => {
-    const profile = companionProfiles[index]?.data;
-    return [userId, profile?.clubId ? { clubId: profile.clubId, clubName: profile.clubName, logoUrl: profile.logoUrl } : undefined];
-  }));
+  const companionClubs = Object.fromEntries(
+    companionIds.map((userId, index) => {
+      const profile = companionProfiles[index]?.data;
+      return [
+        userId,
+        profile?.clubId
+          ? {
+              clubId: profile.clubId,
+              clubName: profile.clubName,
+              logoUrl: profile.logoUrl,
+            }
+          : undefined,
+      ];
+    }),
+  );
   const [clock, setClock] = useState(() => Date.now());
   const dispatchDeadline = detail.data?.dispatchDeadline;
   useEffect(() => {
@@ -154,13 +180,17 @@ export function OrderDetailScreen({
             ["afterSales", "review", "reorder"].includes(item.key),
           )
         : detailAction
-          ? order.actions.filter((item) => item.key === detailAction).map((item) => item.key === "pay" ? { ...item, label: "立即支付" } : item)
+          ? order.actions
+              .filter((item) => item.key === detailAction)
+              .map((item) =>
+                item.key === "pay" ? { ...item, label: "立即支付" } : item,
+              )
           : [];
   const isPending = order.status === "pendingPayment";
   const statusTitle =
     scope === "accept"
       ? order.status === "paid"
-        ? "待陪玩师抢单"
+        ? "待大神抢单"
         : order.status === "waitingService"
           ? "待服务"
           : order.status === "inService"
@@ -290,16 +320,35 @@ export function OrderDetailScreen({
         }}
         onPaymentFailed={setPaymentError}
       />
-      <AppPrompt visible={!!paymentError} title="支付失败" message={paymentError} onConfirm={() => setPaymentError("")} />
+      <AppPrompt
+        visible={!!paymentError}
+        title="支付失败"
+        message={paymentError}
+        onConfirm={() => setPaymentError("")}
+      />
       <OrderCompleteConfirmSheet
         visible={actions.completePromptVisible}
         order={order}
-        buyerName={scope === "place" ? currentUser?.nickname || "老板" : undefined}
-        buyerAvatar={scope === "place" ? (currentUser?.headImage ? { uri: currentUser.headImage } : require("../../../../assets/images/avatar_default.webp")) : undefined}
-        companionName={order.receiverName || (scope === "place" ? order.sellerName : currentUser?.nickname) || "陪玩师"}
+        buyerName={
+          scope === "place" ? currentUser?.nickname || "老板" : undefined
+        }
+        buyerAvatar={
+          scope === "place"
+            ? currentUser?.headImage
+              ? { uri: currentUser.headImage }
+              : require("../../../../assets/images/avatar_default.webp")
+            : undefined
+        }
+        companionName={
+          order.receiverName ||
+          (scope === "place" ? order.sellerName : currentUser?.nickname) ||
+          "大神"
+        }
         companionAvatar={
           order.receiverAvatar ??
-          (scope === "accept" && currentUser?.headImage ? { uri: currentUser.headImage } : undefined)
+          (scope === "accept" && currentUser?.headImage
+            ? { uri: currentUser.headImage }
+            : undefined)
         }
         serviceTime={formatOrderTime(
           order.serviceStartTime || order.serviceEndTime || order.createTime,
@@ -324,9 +373,7 @@ export function OrderDetailScreen({
       {actions.actionPrompt === "free" ? (
         <OrderFreeConfirmFlow
           order={order}
-          companionName={
-            order.receiverName || currentUser?.nickname || "陪玩师"
-          }
+          companionName={order.receiverName || currentUser?.nickname || "大神"}
           companionAvatar={
             order.receiverAvatar ??
             (scope === "accept" && currentUser?.headImage

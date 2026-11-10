@@ -6,7 +6,7 @@ https://www.figma.com/design/RiaC2pmggaf13Xisz9X0I2/%E7%A7%BB%E5%8A%A8%E7%AB%AF-
 
 bug：
 
-陪玩师
-陪玩师协议 ios端 加ios后缀
+大神
+大神协议 ios端 加ios后缀
 
-陪玩师和玩家切换 订单详情中的用户聊天 的人错误
+大神和玩家切换 订单详情中的用户聊天 的人错误

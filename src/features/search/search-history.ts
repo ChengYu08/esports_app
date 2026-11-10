@@ -13,7 +13,7 @@ const MAX_HISTORY = 10;
 
 /**
  * 关键词记录跨分类视为同一条（同一搜索词在两个 tab 下只留一条）；
- * 带实体 ID 的记录必须按分类区分，避免俱乐部与陪玩师的同 ID 记录被合并。
+ * 带实体 ID 的记录必须按分类区分，避免俱乐部与大神的同 ID 记录被合并。
  */
 function isSameHistoryEntry(
   item: SearchHistoryEntry,
@@ -23,7 +23,11 @@ function isSameHistoryEntry(
   if (!entry.entityId) {
     return !item.entityId && item.keyword === keyword;
   }
-  return item.category === entry.category && (item.entityId === entry.entityId || (!item.entityId && item.keyword === keyword));
+  return (
+    item.category === entry.category &&
+    (item.entityId === entry.entityId ||
+      (!item.entityId && item.keyword === keyword))
+  );
 }
 
 export function addSearchHistoryEntry(
@@ -34,16 +38,25 @@ export function addSearchHistoryEntry(
   if (!keyword) {
     return history;
   }
-  const isSameEntry = (item: SearchHistoryEntry) => isSameHistoryEntry(item, entry);
+  const isSameEntry = (item: SearchHistoryEntry) =>
+    isSameHistoryEntry(item, entry);
   const previous = history.find(isSameEntry);
   return [
-    { keyword, avatarUrl: entry.avatarUrl || previous?.avatarUrl, entityId: entry.entityId, category: entry.category },
+    {
+      keyword,
+      avatarUrl: entry.avatarUrl || previous?.avatarUrl,
+      entityId: entry.entityId,
+      category: entry.category,
+    },
     ...history.filter((item) => !isSameEntry(item)),
   ].slice(0, MAX_HISTORY);
 }
 
 /** Accept the previous string-only format without discarding existing history. */
-export function parseSearchHistory(value: string | null, fallbackCategory?: SearchCategory): SearchHistoryEntry[] {
+export function parseSearchHistory(
+  value: string | null,
+  fallbackCategory?: SearchCategory,
+): SearchHistoryEntry[] {
   try {
     const entries: unknown = JSON.parse(value ?? "[]");
     if (!Array.isArray(entries)) {
@@ -55,11 +68,16 @@ export function parseSearchHistory(value: string | null, fallbackCategory?: Sear
       if (typeof keyword !== "string" || !keyword.trim()) {
         continue;
       }
-      const entityId = typeof entry?.entityId === "string" ? entry.entityId : undefined;
-      const category = entry?.category === "club" || entry?.category === "user" ? entry.category : fallbackCategory;
+      const entityId =
+        typeof entry?.entityId === "string" ? entry.entityId : undefined;
+      const category =
+        entry?.category === "club" || entry?.category === "user"
+          ? entry.category
+          : fallbackCategory;
       const parsed: SearchHistoryEntry = {
         keyword: keyword.trim(),
-        avatarUrl: typeof entry?.avatarUrl === "string" ? entry.avatarUrl : undefined,
+        avatarUrl:
+          typeof entry?.avatarUrl === "string" ? entry.avatarUrl : undefined,
         entityId,
         category,
       };
@@ -78,7 +96,10 @@ export function parseSearchHistory(value: string | null, fallbackCategory?: Sear
 }
 
 /** Old per-category lists have no timestamps; interleave them to retain both. */
-export function mergeLegacySearchHistory(clubs: string | null, users: string | null) {
+export function mergeLegacySearchHistory(
+  clubs: string | null,
+  users: string | null,
+) {
   const clubHistory = parseSearchHistory(clubs, "club");
   const userHistory = parseSearchHistory(users, "user");
   const merged: SearchHistoryEntry[] = [];
@@ -87,7 +108,11 @@ export function mergeLegacySearchHistory(clubs: string | null, users: string | n
       merged.push(entry);
     }
   };
-  for (let index = 0; index < Math.max(clubHistory.length, userHistory.length); index += 1) {
+  for (
+    let index = 0;
+    index < Math.max(clubHistory.length, userHistory.length);
+    index += 1
+  ) {
     if (clubHistory[index]) {
       append(clubHistory[index]);
     }
@@ -110,14 +135,29 @@ export function getSearchHistoryEntry(
       return ("name" in item ? item.id : String(item.userId)) === entityId;
     }
     if ("name" in item) {
-      return item.name.toLocaleLowerCase() === normalized || item.id === normalized || item.clubCode === normalized;
+      return (
+        item.name.toLocaleLowerCase() === normalized ||
+        item.id === normalized ||
+        item.clubCode === normalized
+      );
     }
-    return item.nickname.toLocaleLowerCase() === normalized || String(item.userId) === normalized;
+    return (
+      item.nickname.toLocaleLowerCase() === normalized ||
+      String(item.userId) === normalized
+    );
   });
   const match = matches.length === 1 ? matches[0] : undefined;
   return {
     keyword: keyword.trim(),
-    avatarUrl: match ? ("name" in match ? match.coverUrl : match.headImage) : undefined,
-    entityId: match ? ("name" in match ? match.id : String(match.userId)) : undefined,
+    avatarUrl: match
+      ? "name" in match
+        ? match.coverUrl
+        : match.headImage
+      : undefined,
+    entityId: match
+      ? "name" in match
+        ? match.id
+        : String(match.userId)
+      : undefined,
   };
 }

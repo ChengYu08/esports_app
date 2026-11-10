@@ -6,7 +6,9 @@ import { apiClient } from "@/core/network/api-client";
 vi.mock("@/core/network/api-client", () => ({ apiClient: vi.fn() }));
 // 映射测试只需要图片资源句柄，无需加载原生图片。
 const require = createRequire(import.meta.url);
-require.extensions[".svg"] = (module) => { module.exports = 1; };
+require.extensions[".svg"] = (module) => {
+  module.exports = 1;
+};
 const {
   fetchDispatchPage,
   fetchDispatchDetail,
@@ -45,7 +47,12 @@ describe("派单中心列表：活动字段映射", () => {
 
     expect(apiClient).toHaveBeenCalledWith(
       "/client/v1/quickMatch/available/page",
-      { method: "POST", token: "token", body: { page: 1, pageSize: 10, action: {} }, signal: undefined },
+      {
+        method: "POST",
+        token: "token",
+        body: { page: 1, pageSize: 10, action: {} },
+        signal: undefined,
+      },
     );
     expect(result.items).toHaveLength(1);
     expect(result.items[0]).toMatchObject({
@@ -81,7 +88,9 @@ describe("派单中心列表：活动字段映射", () => {
               requestNo: "QM3",
               publishSource: "ACTIVITY",
               activityCode: "SECKILL001",
-              cardItems: [{ label: "活动名称", value: { text: "电竞陪玩秒杀" } }],
+              cardItems: [
+                { label: "活动名称", value: { text: "电竞大神秒杀" } },
+              ],
             },
           },
           { id: 92, grabStatus: "SUCCESS", request: { requestNo: "QM4" } },
@@ -132,7 +141,7 @@ describe("派单详情/抢单响应：活动字段透传", () => {
         requestNo: "QM5",
         publishSource: "ACTIVITY",
         activityCode: "SECKILL001",
-        cardItems: [{ label: "活动名称", value: { text: "电竞陪玩秒杀" } }],
+        cardItems: [{ label: "活动名称", value: { text: "电竞大神秒杀" } }],
         maxSelectableCount: 1,
       },
     });
@@ -148,7 +157,7 @@ describe("派单详情/抢单响应：活动字段透传", () => {
     expect(grabbed).toMatchObject({
       requestNo: "QM5",
       activityCode: "SECKILL001",
-      cardItems: [{ label: "活动名称", value: { text: "电竞陪玩秒杀" } }],
+      cardItems: [{ label: "活动名称", value: { text: "电竞大神秒杀" } }],
     });
 
     vi.mocked(apiClient).mockResolvedValue({

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  KNOWN_RONG_COMMAND_NAMES,
-  parseOrderNotifyPopup,
-  parseQuickMatchExpired,
-  parseQuickMatchNotice,
+    KNOWN_RONG_COMMAND_NAMES,
+    parseOrderNotifyPopup,
+    parseQuickMatchExpired,
+    parseQuickMatchNotice,
 } from "./rongcloud-commands";
 
 describe("parseQuickMatchNotice", () => {
@@ -16,7 +16,7 @@ describe("parseQuickMatchNotice", () => {
       gameName: "王者荣耀",
       modeName: "上分",
       levelName: "钻石",
-      serviceName: "陪玩",
+      serviceName: "大神",
       expireTime: "2026-10-20 12:30:00",
     });
     expect(payload).toEqual({
@@ -26,13 +26,15 @@ describe("parseQuickMatchNotice", () => {
       gameName: "王者荣耀",
       modeName: "上分",
       levelName: "钻石",
-      serviceName: "陪玩",
+      serviceName: "大神",
       expireAtMs: new Date("2026-10-20T12:30:00").getTime(),
     });
   });
 
   it("解析 notifyRound", () => {
-    expect(parseQuickMatchNotice({ requestNo: "QM1", notifyRound: 3 })?.notifyRound).toBe(3);
+    expect(
+      parseQuickMatchNotice({ requestNo: "QM1", notifyRound: 3 })?.notifyRound,
+    ).toBe(3);
   });
 
   it.each([
@@ -94,15 +96,14 @@ describe("parseQuickMatchNotice", () => {
 
 describe("parseQuickMatchExpired", () => {
   it("解析 requestNo", () => {
-    expect(parseQuickMatchExpired({ requestNo: "QM1" })).toEqual({ requestNo: "QM1" });
+    expect(parseQuickMatchExpired({ requestNo: "QM1" })).toEqual({
+      requestNo: "QM1",
+    });
   });
 
-  it.each([[{}], [{ requestNo: "" }]])(
-    "缺 requestNo 返回 null",
-    (data) => {
-      expect(parseQuickMatchExpired(data)).toBeNull();
-    },
-  );
+  it.each([[{}], [{ requestNo: "" }]])("缺 requestNo 返回 null", (data) => {
+    expect(parseQuickMatchExpired(data)).toBeNull();
+  });
 });
 
 describe("parseOrderNotifyPopup", () => {
@@ -125,7 +126,9 @@ describe("parseOrderNotifyPopup", () => {
   });
 
   it("orderId 字符串数字可解析", () => {
-    expect(parseOrderNotifyPopup({ orderId: "678", orderNo: "PZ1" })?.orderId).toBe("678");
+    expect(
+      parseOrderNotifyPopup({ orderId: "678", orderNo: "PZ1" })?.orderId,
+    ).toBe("678");
   });
 
   it.each([

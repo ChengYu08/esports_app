@@ -2,8 +2,8 @@ import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { CachedImage } from "@/shared/ui/CachedImage";
-import type { MessageListItemModel } from "../message.types";
 import { formatUnreadCount } from "../message-unread";
+import type { MessageListItemModel } from "../message.types";
 
 export { formatUnreadCount } from "../message-unread";
 
@@ -32,7 +32,11 @@ export const MessageListItem = memo(function MessageListItem({
       ]}
     >
       <View style={styles.avatarWrap}>
-        <CachedImage source={item.avatar} style={styles.avatar} contentFit="cover" />
+        <CachedImage
+          source={item.avatar}
+          style={styles.avatar}
+          contentFit="cover"
+        />
         {item.isOnline ? (
           <View style={styles.onlineDot}>
             <View style={styles.onlineDotCore} />
@@ -124,7 +128,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   // 设计稿 70-41035：昵称右侧「官方客服」标签，0.5px Brand-04 描边、圆角2、10px Brand-07 文字；
-  // 高度按设计 14 在 Android 会裁掉文字底部，与 CompanionCard 陪玩 Tag 一致抬高到 16
+  // 高度按设计 14 在 Android 会裁掉文字底部，与 CompanionCard 大神 Tag 一致抬高到 16
   csTag: {
     height: 16,
     paddingHorizontal: 2,

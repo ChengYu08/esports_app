@@ -675,7 +675,7 @@ export default function VoiceRoomScreen() {
         </View>
 
         {/* <View style={styles.roomMeta}>
-          <Text style={styles.roomName}>{room?.roomName || '陪玩开黑语音房'}</Text>
+          <Text style={styles.roomName}>{room?.roomName || '大神开黑语音房'}</Text>
           <Text style={styles.roomId}>房间号 {roomId || '--'}</Text>
         </View> */}
 

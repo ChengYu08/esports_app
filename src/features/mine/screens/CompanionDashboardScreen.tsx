@@ -3,21 +3,21 @@ import { ChevronRight16Regular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import {
-  router,
-  useFocusEffect,
-  useIsFocused,
-  useLocalSearchParams,
+    router,
+    useFocusEffect,
+    useIsFocused,
+    useLocalSearchParams,
 } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
+    ActivityIndicator,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    useWindowDimensions,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -29,18 +29,18 @@ import { EmptyState } from "@/shared/ui/AsyncStates";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { companionManagementApi as api } from "../api/companion-management.api";
 import {
-  formatManagementNumber as format,
-  sortManagedServices,
-  type ManagedImage,
-  type ManagedService,
+    formatManagementNumber as format,
+    sortManagedServices,
+    type ManagedImage,
+    type ManagedService,
 } from "../api/companion-management.contract";
 import { newestCompanionImages } from "../companion-image-order";
 import { CompanionAgreementSheet } from "../components/CompanionAgreementSheet";
 import { CompanionDashboardHeader } from "../components/CompanionDashboardHeader";
 import { CompanionImagePreview } from "../components/CompanionImagePreview";
 import {
-  useCompanionOverview,
-  useManagedGame,
+    useCompanionOverview,
+    useManagedGame,
 } from "../hooks/use-companion-management";
 import { useCompanionVoiceUpload } from "../hooks/use-companion-voice-upload";
 
@@ -119,7 +119,7 @@ export default function CompanionDashboardScreen() {
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      <CompanionDashboardHeader title="陪玩中心" />
+      <CompanionDashboardHeader title="大神中心" />
       <ScrollView
         contentInsetAdjustmentBehavior="never"
         automaticallyAdjustContentInsets={false}
@@ -346,7 +346,7 @@ export default function CompanionDashboardScreen() {
               </>
             ) : null}
             <View>
-              <SectionHeading title="陪玩服务" />
+              <SectionHeading title="大神服务" />
               {managed.services.isError ? (
                 <QueryState
                   message={managed.services.error.message}

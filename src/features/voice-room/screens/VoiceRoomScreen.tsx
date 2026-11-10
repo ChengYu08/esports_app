@@ -1,47 +1,51 @@
-import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
+import { useUserProfileStore } from "@/features/auth/user-profile-store";
 import { fetchActiveQuickMatch } from "@/features/match/api/match.api";
 import {
-  isOwnActiveActivityRequest,
-  isQuickMatchActive,
-  type QuickMatchRequestDetail,
+    isOwnActiveActivityRequest,
+    isQuickMatchActive,
+    type QuickMatchRequestDetail,
 } from "@/features/match/api/match.types";
-import { useQuickMatchEndSignals } from "@/features/match/quick-match-end-signals";
 import { ClubQuickMatchSheet } from "@/features/match/components/ClubQuickMatchSheet";
-import { useUserProfileStore } from "@/features/auth/user-profile-store";
+import { useQuickMatchEndSignals } from "@/features/match/quick-match-end-signals";
 import { messageStore } from "@/features/message/message-store";
+import { showToast } from "@/shared/ui/app-toast";
 import { useAuthStore } from "@esports/auth";
+import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import {
-  getRecordingPermissionsAsync,
-  requestRecordingPermissionsAsync,
+    getRecordingPermissionsAsync,
+    requestRecordingPermissionsAsync,
 } from "expo-audio";
 import { Image } from "expo-image";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { memo, useCallback, useEffect, useId, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  Keyboard,
-  LayoutAnimation,
-  Linking,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  UIManager,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Keyboard,
+    LayoutAnimation,
+    Linking,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    UIManager,
+    View,
 } from "react-native";
-import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { getConversationAvatarUri } from "@/features/message/message-avatar";
 import type { MessageListItemModel } from "@/features/message/message.types";
+import { useAppConfirm } from "@/shared/ui/app-confirm";
 
-import { VoiceRoomBackground, VOICE_ROOM_BG_BASE } from "../components/VoiceRoomBackground";
-import { VoiceRoomCommentPanel } from "../components/VoiceRoomCommentPanel";
+import { uploadChatImage } from "@/features/message/chat-image-upload";
 import { ChatSheet, type ChatSheetConversation } from "../components/ChatSheet";
+import {
+    VOICE_ROOM_BG_BASE,
+    VoiceRoomBackground,
+} from "../components/VoiceRoomBackground";
+import { VoiceRoomCommentPanel } from "../components/VoiceRoomCommentPanel";
 import { VoiceRoomConversationsSheet } from "../components/VoiceRoomConversationsSheet";
 import { VoiceRoomExitDialog } from "../components/VoiceRoomExitDialog";
 import { VoiceRoomMemberSheet } from "../components/VoiceRoomMemberSheet";
@@ -49,36 +53,35 @@ import { VoiceRoomSpeakingWaves } from "../components/VoiceRoomSpeakingWaves";
 import { VoiceRoomToolbar } from "../components/VoiceRoomToolbar";
 import { exitVoiceRoom } from "../exit-voice-room";
 import {
-  buildMemberChangeMessage,
-  memberChangeNoticeKey,
-  resolveMemberChangeNickname,
-  shouldSkipMemberChangeNotice,
-  type MemberChangeAction,
+    buildMemberChangeMessage,
+    memberChangeNoticeKey,
+    resolveMemberChangeNickname,
+    shouldSkipMemberChangeNotice,
+    type MemberChangeAction,
 } from "../member-change-notice";
 import {
-  applyChatRoomMemberActions,
-  normalizeMembers,
+    applyChatRoomMemberActions,
+    normalizeMembers,
 } from "../member-normalize";
 import { useCustomerServiceCall } from "../use-customer-service-call";
 import { useSelectCompanionGrabCount } from "../use-select-companion-grab-count";
-import { useVoiceRoomMessages } from "../use-voice-room-messages";
 import { useVoiceRoomMembersReconcile } from "../use-voice-room-members-reconcile";
+import { useVoiceRoomMessages } from "../use-voice-room-messages";
 import { useVoiceRoomReception } from "../use-voice-room-reception";
 import { useVoiceRoomRtc } from "../use-voice-room-rtc";
-import { useVoiceRoomSessionStore } from "../voice-room-session";
-import { uploadChatImage } from "@/features/message/chat-image-upload";
 import {
-  sendVoiceChatImage,
-  sendVoiceChatMessage,
-  subscribeVoiceChatMembers,
-  subscribeVoiceChatMessages,
+    sendVoiceChatImage,
+    sendVoiceChatMessage,
+    subscribeVoiceChatMembers,
+    subscribeVoiceChatMessages,
 } from "../voice-room-rongcloud";
 import { muteVoiceRtc } from "../voice-room-rtc";
+import { useVoiceRoomSessionStore } from "../voice-room-session";
 import type {
-  VoiceRoomDetail,
-  VoiceRoomMember,
-  VoiceRoomMemberRole,
-  VoiceRoomMessage,
+    VoiceRoomDetail,
+    VoiceRoomMember,
+    VoiceRoomMemberRole,
+    VoiceRoomMessage,
 } from "../voice-room.types";
 
 /** 麦位槽位高度（含昵称），对齐 Figma Component 7 */
@@ -147,7 +150,9 @@ const MemberSlot = memo(function MemberSlot({
           <View style={styles.inviteAvatar}>
             <Image
               source={
-                inviteLabel === "接待邀请中" ? inviteIcon : invitePlaceholderIcon
+                inviteLabel === "接待邀请中"
+                  ? inviteIcon
+                  : invitePlaceholderIcon
               }
               style={styles.invitePlaceholderIcon}
             />
@@ -199,7 +204,9 @@ export default function VoiceRoomScreen() {
   const routeGameName = paramStr(params.gameName);
   const routeGameIconUrl = paramStr(params.gameIconUrl);
   const shouldAutoCallService = paramStr(params.callService) === "1";
-  const sessionActiveRoom = useVoiceRoomSessionStore((state) => state.activeRoom);
+  const sessionActiveRoom = useVoiceRoomSessionStore(
+    (state) => state.activeRoom,
+  );
   const [room, setRoom] = useState<VoiceRoomDetail | null>(null);
   const [members, setMembers] = useState<VoiceRoomMember[]>(() =>
     normalizeMembers(undefined, currentUser || undefined),
@@ -453,7 +460,7 @@ export default function VoiceRoomScreen() {
   const quickMatchCreatedRequestNo =
     quickMatchCreatedFromSession?.matchRequestNo || undefined;
 
-  // 「选择陪玩」与「呼叫接待」互斥（对齐 PC）：进行中的派单已包含呼叫客服语义，该位置让给「选择陪玩」。
+  // 「选择大神」与「呼叫接待」互斥（对齐 PC）：进行中的派单已包含呼叫客服语义，该位置让给「选择大神」。
   // 覆盖三类进行中派单：试音自发、客服代发（QUICK_MATCH_CREATED）、活动需求（activity/publish）
   const showSelectCompanion =
     (isOwner &&
@@ -499,14 +506,14 @@ export default function VoiceRoomScreen() {
       return;
     }
     useVoiceRoomSessionStore.getState().setActiveRoom({
-        roomId: current.roomId,
-        roomVersion: current.roomVersion,
-        rongChatroomId: current.rongChatroomId,
-        roomName: current.roomName,
-        creatorUserId: current.creatorUserId,
-        ownerName: current.ownerName,
-        ownerAvatar: current.ownerAvatar,
-      });
+      roomId: current.roomId,
+      roomVersion: current.roomVersion,
+      rongChatroomId: current.rongChatroomId,
+      roomName: current.roomName,
+      creatorUserId: current.creatorUserId,
+      ownerName: current.ownerName,
+      ownerAvatar: current.ownerAvatar,
+    });
   }, []);
 
   /** 仅清除 quickMatchCreated 场景标记，不影响 audition */
@@ -537,9 +544,7 @@ export default function VoiceRoomScreen() {
       if (!reason) return;
       clearAuditionSessionMarkers(roomId);
       clearQuickMatchCreatedSessionMarkers(roomId);
-      showToast(
-        reason === "expired" ? "派单已超时自动取消" : "派单已取消",
-      );
+      showToast(reason === "expired" ? "派单已超时自动取消" : "派单已取消");
     };
     consumeEndSignal();
     return useQuickMatchEndSignals.subscribe(consumeEndSignal);
@@ -813,8 +818,9 @@ export default function VoiceRoomScreen() {
           if (cancelled) {
             return;
           }
-          const own =
-            isOwnActiveActivityRequest(active, currentUser?.id) ? active : null;
+          const own = isOwnActiveActivityRequest(active, currentUser?.id)
+            ? active
+            : null;
           setActivityRequest(own);
           // 进房检测到自己是活动需求发起人时插入一次性系统提示
           if (own && !activityTipShownRef.current) {
@@ -851,7 +857,12 @@ export default function VoiceRoomScreen() {
     kickedRef.current = false;
     return useVoiceRoomSessionStore.subscribe((state, previous) => {
       const kicked = state.lastKickedRoom;
-      if (!kicked || kicked === previous.lastKickedRoom || kicked.roomId !== roomId) return;
+      if (
+        !kicked ||
+        kicked === previous.lastKickedRoom ||
+        kicked.roomId !== roomId
+      )
+        return;
       const version = roomRef.current?.roomVersion ?? invitedRoomVersion;
       if (version != null && String(version) !== kicked.roomVersion) return;
       kickedRef.current = true;
@@ -866,7 +877,14 @@ export default function VoiceRoomScreen() {
       Keyboard.dismiss();
       if (focusedRef.current) minimize();
     });
-  }, [invitedRoomVersion, minimize, roomId, roomRef, setMicState, setRtcReadyRoomId]);
+  }, [
+    invitedRoomVersion,
+    minimize,
+    roomId,
+    roomRef,
+    setMicState,
+    setRtcReadyRoomId,
+  ]);
 
   useEffect(() => {
     if (!chatroomId) return;
@@ -890,8 +908,7 @@ export default function VoiceRoomScreen() {
       void refreshServiceUserId();
 
       const selfId = currentUser?.id ? String(currentUser.id) : "";
-      const version =
-        roomRef.current?.roomVersion ?? invitedRoomVersion ?? "1";
+      const version = roomRef.current?.roomVersion ?? invitedRoomVersion ?? "1";
       const tips: VoiceRoomMessage[] = [];
       const placeholderTips: { messageId: string; userId: string }[] = [];
       if (roomId) {
@@ -930,7 +947,9 @@ export default function VoiceRoomScreen() {
       }
       if (placeholderTips.length > 0 && accessToken) {
         // 占位昵称统一走全局资料缓存批量补全，避免逐条 N+1 直查
-        const userIds = Array.from(new Set(placeholderTips.map((tip) => tip.userId)));
+        const userIds = Array.from(
+          new Set(placeholderTips.map((tip) => tip.userId)),
+        );
         void useUserProfileStore
           .getState()
           .hydrateProfiles(userIds, accessToken)
@@ -944,7 +963,9 @@ export default function VoiceRoomScreen() {
             if (nicknameById.size === 0) return;
             setMessages((items) =>
               items.map((item) => {
-                const tip = placeholderTips.find((entry) => entry.messageId === item.id);
+                const tip = placeholderTips.find(
+                  (entry) => entry.messageId === item.id,
+                );
                 if (!tip) return item;
                 const nickname = nicknameById.get(tip.userId);
                 return nickname ? { ...item, nickname } : item;
@@ -1056,7 +1077,9 @@ export default function VoiceRoomScreen() {
       // 先上传自家 OSS 拿公网地址，再预置到消息 remote 发送：
       // 融云私有存储的 URL 对方直接访问会 401
       await uploadChatImage(accessToken, imageUri)
-        .then((imageUrl) => sendVoiceChatImage(chatroomId, imageUri, imageUrl, buildChatSender()))
+        .then((imageUrl) =>
+          sendVoiceChatImage(chatroomId, imageUri, imageUrl, buildChatSender()),
+        )
         .catch(() => {
           void useAppConfirm.getState().confirm({
             title: "发送失败",
@@ -1205,12 +1228,19 @@ export default function VoiceRoomScreen() {
             hitSlop={12}
             style={styles.headerButton}
           >
-            <ChevronLeft24Regular color="white" width={24} height={24} style={styles.headerIcon} />
+            <ChevronLeft24Regular
+              color="white"
+              width={24}
+              height={24}
+              style={styles.headerIcon}
+            />
           </Pressable>
           <Text style={styles.title}>{roomTitle}</Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={room ? (isOwner ? "解散语聊房" : "退出语聊房") : "退出语聊房"}
+            accessibilityLabel={
+              room ? (isOwner ? "解散语聊房" : "退出语聊房") : "退出语聊房"
+            }
             disabled={leaving}
             onPress={() => {
               Keyboard.dismiss();
@@ -1229,7 +1259,7 @@ export default function VoiceRoomScreen() {
         </View>
 
         {/* <View style={styles.roomMeta}>
-          <Text style={styles.roomName}>{room?.roomName || '陪玩开黑语音房'}</Text>
+          <Text style={styles.roomName}>{room?.roomName || '大神开黑语音房'}</Text>
           <Text style={styles.roomId}>房间号 {roomId || '--'}</Text>
         </View> */}
 
@@ -1365,7 +1395,7 @@ export default function VoiceRoomScreen() {
         }
         room={room}
         roomId={roomId}
-        /** 活动需求进行中：MemberSheet「主页」入口替换为提示文案，下单统一走「选择陪玩」选人页 */
+        /** 活动需求进行中：MemberSheet「主页」入口替换为提示文案，下单统一走「选择大神」选人页 */
         orderEntryBlockedText={
           activityRequest
             ? "活动需求进行中，请点击「匹配中」按钮选人下单"

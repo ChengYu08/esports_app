@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createCompanionAgreementApi } from "./companion-agreement.contract.ts";
 
-const protocol = { id: 17, code: "user_playmate", title: "陪玩师协议", version: "2", content: "<p>协议正文</p>" };
+const protocol = {
+  id: 17,
+  code: "user_playmate",
+  title: "大神协议",
+  version: "2",
+  content: "<p>协议正文</p>",
+};
 
 test("accepted accounts need no protocol; status uses authenticated Web endpoint", async () => {
   const api = createCompanionAgreementApi(async (path, options) => {
@@ -12,7 +18,10 @@ test("accepted accounts need no protocol; status uses authenticated Web endpoint
     assert.deepEqual(options.body, { code: "user_playmate" });
     return { code: "SUCCESS", data: { accepted: true, protocol: null } };
   });
-  assert.deepEqual(await api.status("account-a"), { accepted: true, protocol: null });
+  assert.deepEqual(await api.status("account-a"), {
+    accepted: true,
+    protocol: null,
+  });
 });
 
 test("iOS requests and accepts the iOS protocol code", async () => {
@@ -23,7 +32,10 @@ test("iOS requests and accepts the iOS protocol code", async () => {
       return { code: "SUCCESS", data: true };
     }
     assert.deepEqual(options.body, { code });
-    return { code: "SUCCESS", data: { accepted: false, protocol: { ...protocol, code } } };
+    return {
+      code: "SUCCESS",
+      data: { accepted: false, protocol: { ...protocol, code } },
+    };
   }, "ios");
   const result = await api.status("account-a");
   assert.equal(result.protocol.code, "user_playmate_ios");
@@ -34,11 +46,18 @@ test("first confirmation persists exact protocol and is independent per account"
   const accepted = new Set();
   const api = createCompanionAgreementApi(async (path, options) => {
     if (path.endsWith("/accept")) {
-      assert.deepEqual(options.body, { code: "user_playmate", agreementId: 17, version: "2" });
+      assert.deepEqual(options.body, {
+        code: "user_playmate",
+        agreementId: 17,
+        version: "2",
+      });
       accepted.add(options.token);
       return { code: "SUCCESS", data: true };
     }
-    return { code: "SUCCESS", data: { accepted: accepted.has(options.token), protocol } };
+    return {
+      code: "SUCCESS",
+      data: { accepted: accepted.has(options.token), protocol },
+    };
   });
   const first = await api.status("account-a");
   assert.equal(first.accepted, false);
@@ -57,7 +76,10 @@ test("rejected confirmations and unavailable protocols never count as success", 
     const api = createCompanionAgreementApi(async () => response);
     await assert.rejects(api.accept("account-a", protocol), /协议/);
   }
-  const api = createCompanionAgreementApi(async () => ({ code: "SUCCESS", data: { accepted: false, protocol: null } }));
+  const api = createCompanionAgreementApi(async () => ({
+    code: "SUCCESS",
+    data: { accepted: false, protocol: null },
+  }));
   await assert.rejects(api.status("account-a"), /暂未发布/);
   await assert.rejects(api.status(""), /登录/);
   await assert.rejects(api.accept("", protocol), /登录/);

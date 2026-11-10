@@ -34,7 +34,10 @@ export type Banner = {
   linkConfig?: BannerJumpConfig;
 };
 
-export type HomeBannerSlotCode = "APP_HOME_FLOOR1" | "APP_HOME_FLOOR2" | "APP_HOME_FLOOR3";
+export type HomeBannerSlotCode =
+  | "APP_HOME_FLOOR1"
+  | "APP_HOME_FLOOR2"
+  | "APP_HOME_FLOOR3";
 
 export type HomeBannerSlot = {
   code: HomeBannerSlotCode;
@@ -70,7 +73,7 @@ export type Club = {
   clubTag?: string;
   clubGames?: { iconUrl?: string }[];
   games?: ClubGameIcon[];
-  /** 启用的游戏 ID，包含没有配置图标的游戏，用于统计在线陪玩。 */
+  /** 启用的游戏 ID，包含没有配置图标的游戏，用于统计在线大神。 */
   gameIds?: number[];
 };
 
@@ -121,7 +124,7 @@ export type Companion = {
   gameStatus: number;
   price: number;
   gameName: string;
-  /** 卡内陪玩标签名（明星/魔王pro 等），空表示不展示标签 */
+  /** 卡内大神标签名（明星/魔王pro 等），空表示不展示标签 */
   tagName: string;
   /** 标签通用背景色（对齐 PC 端 tagBackgroundColor），后台未配置时为空串由 UI 兜底 */
   tagBackgroundColor: string;

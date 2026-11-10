@@ -1,32 +1,32 @@
 import { buildAfterSalePayload } from "@/features/order/after-sale-card";
 import {
-  computeFreeStarAmount,
-  computeFreeSubmitAmount,
-  computeOrderPayableStars,
+    computeFreeStarAmount,
+    computeFreeSubmitAmount,
+    computeOrderPayableStars,
 } from "@/features/order/free-amount";
+import { needsMultiCompanionSelect } from "@/features/order/multi-companion";
 import { imageSourceUri } from "@/features/order/order-detail-format";
 import {
-  invalidateOrderQueries,
-  refreshOrderAfterAction,
+    invalidateOrderQueries,
+    refreshOrderAfterAction,
 } from "@/features/order/order-query";
 import {
-  acceptOrder,
-  cancelOrder,
-  completeOrder,
-  fetchAfterSaleMembers,
-  fetchMultiCompanionCandidates,
-  fetchOrderReview,
-  freeOrderService,
-  rejectOrder,
-  selectMultiCompanions,
-  startOrderService,
-  submitOrderReview,
-  type AfterSaleMember,
-  type MultiCompanionCandidate,
-  type OrderReview,
-  type OrderReviewInput,
+    acceptOrder,
+    cancelOrder,
+    completeOrder,
+    fetchAfterSaleMembers,
+    fetchMultiCompanionCandidates,
+    fetchOrderReview,
+    freeOrderService,
+    rejectOrder,
+    selectMultiCompanions,
+    startOrderService,
+    submitOrderReview,
+    type AfterSaleMember,
+    type MultiCompanionCandidate,
+    type OrderReview,
+    type OrderReviewInput,
 } from "@/features/order/order.api";
-import { needsMultiCompanionSelect } from "@/features/order/multi-companion";
 import type { OrderAction, OrderItemModel } from "@/features/order/order.types";
 import { requireLogin } from "@/shared/navigation/require-login";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
@@ -84,11 +84,18 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
     await refetch();
   };
 
-  const handleChat = (companion?: { userId: string; nickname?: string; headImage?: string; clubId?: number }) => {
+  const handleChat = (companion?: {
+    userId: string;
+    nickname?: string;
+    headImage?: string;
+    clubId?: number;
+  }) => {
     if (!order) return;
     if (!requireLogin()) return;
     const chatUserId =
-      scope === "accept" ? order.buyerUserId : companion?.userId ?? order.receiverUserId;
+      scope === "accept"
+        ? order.buyerUserId
+        : (companion?.userId ?? order.receiverUserId);
     if (!chatUserId || chatUserId === "0") {
       setPrompt({
         title: "暂时无法聊天",
@@ -100,9 +107,15 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
       pathname: "/chat/[id]",
       params: {
         id: chatUserId,
-        title: companion ? companion.nickname || "陪玩师" : order.sellerName,
-        avatar: companion ? companion.headImage || "" : imageSourceUri(order.sellerAvatar),
-        clubId: companion?.clubId ? String(companion.clubId) : !companion && order.clubId ? String(order.clubId) : "",
+        title: companion ? companion.nickname || "大神" : order.sellerName,
+        avatar: companion
+          ? companion.headImage || ""
+          : imageSourceUri(order.sellerAvatar),
+        clubId: companion?.clubId
+          ? String(companion.clubId)
+          : !companion && order.clubId
+            ? String(order.clubId)
+            : "",
       },
     });
   };
@@ -130,7 +143,7 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
       setCompletePromptVisible(true);
       return;
     }
-    // 一单多陪且参与陪玩未选满：先弹选人弹窗，确认后再开始服务
+    // 一单多陪且参与大神未选满：先弹选人弹窗，确认后再开始服务
     if (action === "start" && needsMultiCompanionSelect(order)) {
       setMultiSelectVisible(true);
       setMultiSelectLoading(true);
@@ -138,7 +151,7 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
         .then(setMultiSelectCandidates)
         .catch(() => {
           setMultiSelectCandidates([]);
-          showToast("获取可选陪玩失败，请稍后重试");
+          showToast("获取可选大神失败，请稍后重试");
         })
         .finally(() => setMultiSelectLoading(false));
       return;
@@ -159,7 +172,7 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
     }
   };
 
-  /** 一单多陪选人确认：提交参与陪玩后立即开始服务 */
+  /** 一单多陪选人确认：提交参与大神后立即开始服务 */
   const confirmMultiCompanions = async (userIds: number[]) => {
     if (!order || !token || actionPending) return;
     setActionPending(true);
@@ -290,7 +303,7 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
       );
   };
 
-  /** 陪玩方视角的完成服务：确认弹窗提交中不可关闭，成功后就地刷新列表 */
+  /** 大神方视角的完成服务：确认弹窗提交中不可关闭，成功后就地刷新列表 */
   const confirmCompleteAccept = async () => {
     if (!order || !token || actionPending) return;
     setActionPending(true);

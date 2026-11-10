@@ -1,29 +1,29 @@
 import {
-  ChevronDoubleRight16Regular,
-  Dismiss16Regular,
-  DismissCircle16Filled,
+    ChevronDoubleRight16Regular,
+    Dismiss16Regular,
+    DismissCircle16Filled,
 } from "@fluentui/react-native-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRef, useState, type ReactNode } from "react";
 import {
-  Keyboard,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  useWindowDimensions,
-  View,
+    Keyboard,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    useWindowDimensions,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
-  computeFreeStarAmount,
-  computeOrderPayableStars,
-  formatStar,
-  parseHoursLive,
-  roundStar,
-  sanitizeHoursText,
+    computeFreeStarAmount,
+    computeOrderPayableStars,
+    formatStar,
+    parseHoursLive,
+    roundStar,
+    sanitizeHoursText,
 } from "@/features/order/free-amount";
 import type { OrderItemModel } from "@/features/order/order.types";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
@@ -69,11 +69,14 @@ export function OrderCompleteConfirmSheet({
   const inputRef = useRef<TextInput>(null);
   const [freeHoursText, setFreeHoursText] = useState("");
   const freeHours = freeOrder ? parseHoursLive(freeHoursText) : null;
-  const freeStars = freeOrder ? computeFreeStarAmount(order, freeHours ?? 0) : null;
+  const freeStars = freeOrder
+    ? computeFreeStarAmount(order, freeHours ?? 0)
+    : null;
   const basePayableStars = computeOrderPayableStars(order);
   const exceedsQuantity = freeHours != null && freeHours > order.quantity;
   const exceedsAmount = freeStars != null && freeStars > basePayableStars;
-  const freeValid = freeOrder && freeStars != null && !exceedsQuantity && !exceedsAmount;
+  const freeValid =
+    freeOrder && freeStars != null && !exceedsQuantity && !exceedsAmount;
   const freeError = exceedsQuantity
     ? "免单时长不能超过订单时长"
     : exceedsAmount
@@ -144,7 +147,7 @@ export function OrderCompleteConfirmSheet({
               avatar={buyerAvatar ?? order.sellerAvatar}
             />
             <Participant
-              label="接单陪玩"
+              label="接单大神"
               name={companionName}
               avatar={companionAvatar ?? fallbackAvatar}
             />
@@ -171,7 +174,7 @@ export function OrderCompleteConfirmSheet({
             </View>
           </DetailRow>
           <DetailRow label="服务">
-            <Text style={styles.value}>{order.serviceName || "陪玩服务"}</Text>
+            <Text style={styles.value}>{order.serviceName || "大神服务"}</Text>
           </DetailRow>
           <DetailRow label="数量">
             <Text style={styles.value}>
@@ -188,7 +191,9 @@ export function OrderCompleteConfirmSheet({
                   editable={!loading}
                   keyboardType="decimal-pad"
                   maxLength={8}
-                  onChangeText={(text) => setFreeHoursText(sanitizeHoursText(text))}
+                  onChangeText={(text) =>
+                    setFreeHoursText(sanitizeHoursText(text))
+                  }
                   placeholder="请输入免单时长"
                   placeholderTextColor="#CCCCCC"
                   selectionColor="#FE1F4C"
@@ -222,7 +227,9 @@ export function OrderCompleteConfirmSheet({
           {freeOrder && freeValid && freeStars != null ? (
             <DetailRow label="本次免单">
               <View style={styles.totalValue}>
-                <Text style={styles.freePreviewValue}>{formatStar(freeStars)}</Text>
+                <Text style={styles.freePreviewValue}>
+                  {formatStar(freeStars)}
+                </Text>
                 <CachedImage source={diamondIcon} style={styles.diamondIcon} />
               </View>
             </DetailRow>
@@ -263,11 +270,7 @@ export function OrderCompleteConfirmSheet({
               style={styles.confirmGradient}
             >
               <Text style={styles.confirmText}>
-                {loading
-                  ? "处理中..."
-                  : freeOrder
-                    ? "确认免单"
-                    : "确认完成"}
+                {loading ? "处理中..." : freeOrder ? "确认免单" : "确认完成"}
               </Text>
             </LinearGradient>
           </Pressable>

@@ -1,17 +1,19 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  applyGrabSelection,
-  isActivityQuickMatch,
-  isMultiCompanionRequest,
-  isOwnActiveActivityRequest,
-  pruneSelectedIds,
-  resolveMaxSelectableCount,
-  type QuickMatchGrabItem,
-  type QuickMatchRequestDetail,
+    applyGrabSelection,
+    isActivityQuickMatch,
+    isMultiCompanionRequest,
+    isOwnActiveActivityRequest,
+    pruneSelectedIds,
+    resolveMaxSelectableCount,
+    type QuickMatchGrabItem,
+    type QuickMatchRequestDetail,
 } from "./match.types";
 
-function detail(overrides: Partial<QuickMatchRequestDetail> = {}): QuickMatchRequestDetail {
+function detail(
+  overrides: Partial<QuickMatchRequestDetail> = {},
+): QuickMatchRequestDetail {
   return {
     requestNo: "QM1",
     ...overrides,
@@ -20,7 +22,9 @@ function detail(overrides: Partial<QuickMatchRequestDetail> = {}): QuickMatchReq
 
 describe("isActivityQuickMatch", () => {
   it("activityCode 非空即活动模式", () => {
-    expect(isActivityQuickMatch(detail({ activityCode: "SECKILL001" }))).toBe(true);
+    expect(isActivityQuickMatch(detail({ activityCode: "SECKILL001" }))).toBe(
+      true,
+    );
   });
 
   it("activityCode 缺省或空串均为普通模式", () => {
@@ -38,7 +42,9 @@ describe("isActivityQuickMatch", () => {
 describe("resolveMaxSelectableCount", () => {
   it("活动模式取 maxSelectableCount（秒杀=1）", () => {
     expect(
-      resolveMaxSelectableCount(detail({ activityCode: "S1", maxSelectableCount: 1 })),
+      resolveMaxSelectableCount(
+        detail({ activityCode: "S1", maxSelectableCount: 1 }),
+      ),
     ).toBe(1);
   });
 
@@ -54,7 +60,9 @@ describe("resolveMaxSelectableCount", () => {
 
 describe("applyGrabSelection", () => {
   it("活动单选：选 A 后选 B → 仅 B（点其他直接切换）", () => {
-    const max = resolveMaxSelectableCount(detail({ activityCode: "S1", maxSelectableCount: 1 }));
+    const max = resolveMaxSelectableCount(
+      detail({ activityCode: "S1", maxSelectableCount: 1 }),
+    );
     const afterA = applyGrabSelection([], "A", max);
     expect(afterA).toEqual({ ids: ["A"], overLimit: false });
     const afterB = applyGrabSelection(afterA.ids, "B", max);
@@ -62,11 +70,17 @@ describe("applyGrabSelection", () => {
   });
 
   it("活动单选：再次点击已选中的人 → 取消选中", () => {
-    expect(applyGrabSelection(["B"], "B", 1)).toEqual({ ids: [], overLimit: false });
+    expect(applyGrabSelection(["B"], "B", 1)).toEqual({
+      ids: [],
+      overLimit: false,
+    });
   });
 
   it("普通模式多选：未达上限时追加", () => {
-    expect(applyGrabSelection(["A"], "B", 3)).toEqual({ ids: ["A", "B"], overLimit: false });
+    expect(applyGrabSelection(["A"], "B", 3)).toEqual({
+      ids: ["A", "B"],
+      overLimit: false,
+    });
     expect(applyGrabSelection(["A", "B", "C"], "A", 3)).toEqual({
       ids: ["B", "C"],
       overLimit: false,
@@ -91,7 +105,9 @@ describe("applyGrabSelection", () => {
 describe("isMultiCompanionRequest（普通模式既有判定回归）", () => {
   it("companionPreference 缺失仍视为一陪多单", () => {
     expect(isMultiCompanionRequest(detail())).toBe(true);
-    expect(isMultiCompanionRequest(detail({ companionPreference: 1 }))).toBe(false);
+    expect(isMultiCompanionRequest(detail({ companionPreference: 1 }))).toBe(
+      false,
+    );
   });
 });
 
@@ -110,35 +126,69 @@ describe("isOwnActiveActivityRequest（语聊房「派单匹配中」判定）",
   }
 
   it("进行中 + ACTIVITY + 本人 → true", () => {
-    expect(isOwnActiveActivityRequest(activeActivity(), activityUser)).toBe(true);
+    expect(isOwnActiveActivityRequest(activeActivity(), activityUser)).toBe(
+      true,
+    );
   });
 
   it("进行中 + ACTIVITY + buyerUserId 缺省（active/detail 仅返回本人需求）→ true", () => {
     expect(
-      isOwnActiveActivityRequest(activeActivity({ buyerUserId: undefined }), activityUser),
+      isOwnActiveActivityRequest(
+        activeActivity({ buyerUserId: undefined }),
+        activityUser,
+      ),
     ).toBe(true);
   });
 
   it("他人需求（buyerUserId 与当前用户不一致）→ false", () => {
-    expect(isOwnActiveActivityRequest(activeActivity({ buyerUserId: "2002" }), activityUser)).toBe(false);
+    expect(
+      isOwnActiveActivityRequest(
+        activeActivity({ buyerUserId: "2002" }),
+        activityUser,
+      ),
+    ).toBe(false);
   });
 
   it("普通需求（publishSource 非 ACTIVITY 或缺省）→ false", () => {
     expect(
-      isOwnActiveActivityRequest(activeActivity({ publishSource: "QUICK_MATCH" }), activityUser),
+      isOwnActiveActivityRequest(
+        activeActivity({ publishSource: "QUICK_MATCH" }),
+        activityUser,
+      ),
     ).toBe(false);
-    expect(isOwnActiveActivityRequest(activeActivity({ publishSource: undefined }), activityUser)).toBe(false);
+    expect(
+      isOwnActiveActivityRequest(
+        activeActivity({ publishSource: undefined }),
+        activityUser,
+      ),
+    ).toBe(false);
   });
 
   it("publishSource 缺省但 activityCode 非空（与详情页判定同源）→ true", () => {
     expect(
-      isOwnActiveActivityRequest(activeActivity({ publishSource: undefined, activityCode: "SECKILL001" }), activityUser),
+      isOwnActiveActivityRequest(
+        activeActivity({
+          publishSource: undefined,
+          activityCode: "SECKILL001",
+        }),
+        activityUser,
+      ),
     ).toBe(true);
   });
 
   it("已结束（status 非 MATCHING）→ false", () => {
-    expect(isOwnActiveActivityRequest(activeActivity({ status: "ORDERED" }), activityUser)).toBe(false);
-    expect(isOwnActiveActivityRequest(activeActivity({ status: "CANCELLED" }), activityUser)).toBe(false);
+    expect(
+      isOwnActiveActivityRequest(
+        activeActivity({ status: "ORDERED" }),
+        activityUser,
+      ),
+    ).toBe(false);
+    expect(
+      isOwnActiveActivityRequest(
+        activeActivity({ status: "CANCELLED" }),
+        activityUser,
+      ),
+    ).toBe(false);
   });
 
   it("已过期（expireTime 已过）→ false", () => {
@@ -159,13 +209,16 @@ describe("isOwnActiveActivityRequest（语聊房「派单匹配中」判定）",
 });
 
 function grab(id: string): QuickMatchGrabItem {
-  return { id, nickname: "陪玩", sex: 0 };
+  return { id, nickname: "大神", sex: 0 };
 }
 
 describe("pruneSelectedIds", () => {
   it("剔除已消失的候选人", () => {
     const candidates = [grab("g1"), grab("g3")];
-    expect(pruneSelectedIds(["g1", "g2", "g3"], candidates)).toEqual(["g1", "g3"]);
+    expect(pruneSelectedIds(["g1", "g2", "g3"], candidates)).toEqual([
+      "g1",
+      "g3",
+    ]);
   });
 
   it("全部消失时清空选择", () => {
@@ -177,4 +230,3 @@ describe("pruneSelectedIds", () => {
     expect(pruneSelectedIds(["g1", "g2"], candidates)).toEqual(["g1", "g2"]);
   });
 });
-

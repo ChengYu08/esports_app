@@ -8,7 +8,7 @@ import type { SearchCategory } from "../search.types";
 const indicator = require("../../../../assets/svgs/tab-indicator.svg");
 const categories: { value: SearchCategory; label: string }[] = [
   { value: "club", label: "俱乐部" },
-  { value: "user", label: "陪玩师" },
+  { value: "user", label: "大神" },
 ];
 
 export function SearchCategoryTabs({
@@ -31,8 +31,12 @@ export function SearchCategoryTabs({
             onPress={() => onChange(category.value)}
             style={styles.tab}
           >
-            <Text style={[styles.label, selected && styles.selected]}>{category.label}</Text>
-            {selected ? <Image source={indicator} style={styles.indicator} /> : null}
+            <Text style={[styles.label, selected && styles.selected]}>
+              {category.label}
+            </Text>
+            {selected ? (
+              <Image source={indicator} style={styles.indicator} />
+            ) : null}
           </Pressable>
         );
       })}
@@ -41,8 +45,19 @@ export function SearchCategoryTabs({
 }
 
 const styles = StyleSheet.create({
-  tabs: { flexDirection: "row", alignItems: "center", gap: 24, paddingHorizontal: spacing.lg, paddingTop: 12, paddingBottom: 8 },
-  tab: { alignItems: "center", justifyContent: "center", paddingVertical: spacing.xs },
+  tabs: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 24,
+    paddingHorizontal: spacing.lg,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  tab: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing.xs,
+  },
   label: { ...searchTypography.regular14, color: "#656566" },
   selected: { ...searchTypography.semibold16, color: "#0D0D0F" },
   indicator: { position: "absolute", bottom: 0, width: 12, height: 3 },

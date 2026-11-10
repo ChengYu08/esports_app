@@ -30,7 +30,7 @@ export async function invalidateOrderQueries(orderId?: string | number) {
 }
 
 /**
- * 陪玩侧的状态变更（接单/开始/完成等）通过融云 ORDER_NOTIFY 推送到用户端；
+ * 大神侧的状态变更（接单/开始/完成等）通过融云 ORDER_NOTIFY 推送到用户端；
  * 收到即失效并立即重拉当前激活的订单列表与详情，避免详情页停留在旧状态。
  * orderIds 需同时传订单 id 与单号：详情缓存 key 是数字 id，而通知可能只带单号。
  */

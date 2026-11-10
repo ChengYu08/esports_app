@@ -6,22 +6,22 @@ import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
-  fetchActiveQuickMatch,
-  publishQuickMatch,
+    fetchActiveQuickMatch,
+    publishQuickMatch,
 } from "@/features/match/api/match.api";
 import { isQuickMatchActive } from "@/features/match/api/match.types";
 import { ClubSelectSheet } from "@/features/match/components/ClubSelectSheet";
@@ -34,21 +34,21 @@ import { MatchStepper } from "@/features/match/components/MatchStepper";
 import { openAuditionRoom } from "@/features/match/enter-audition-room";
 import { isExistingDispatchConflictMessage } from "@/features/match/existing-dispatch-hint";
 import {
-  MATCH_COMPANION_PREFERENCE_OPTIONS,
-  MATCH_GENDER_OPTIONS,
-  MATCH_REMARK_MAX,
-  MATCH_VOICE_OPTIONS,
-  useMatchForm,
+    MATCH_COMPANION_PREFERENCE_OPTIONS,
+    MATCH_GENDER_OPTIONS,
+    MATCH_REMARK_MAX,
+    MATCH_VOICE_OPTIONS,
+    useMatchForm,
 } from "@/features/match/hooks/use-match-form";
 import { useRestoreActiveMatch } from "@/features/match/hooks/use-quick-match-session";
 import {
-  ensureRealNameBeforeVoiceRoomEnter,
-  promptSelfRealNameIfNeeded,
+    ensureRealNameBeforeVoiceRoomEnter,
+    promptSelfRealNameIfNeeded,
 } from "@/features/voice-room/ensure-real-name-before-enter";
 import { exitVoiceRoom } from "@/features/voice-room/exit-voice-room";
 import {
-  resolveVoiceRoomId,
-  voiceRoomApi,
+    resolveVoiceRoomId,
+    voiceRoomApi,
 } from "@/features/voice-room/voice-room.api";
 import type { VoiceRoomDetail } from "@/features/voice-room/voice-room.types";
 import { getDDinProStyle } from "@/shared/theme/typography";
@@ -226,7 +226,7 @@ export default function MatchPublishScreen() {
 
       const selectedGame = form.games.find((item) => item.id === form.gameId);
       if (needVoice) {
-        // 需试音：直接进试音房，不落匹配等待页；选人由房内「选择陪玩」再 push
+        // 需试音：直接进试音房，不落匹配等待页；选人由房内「选择大神」再 push
         // replace：替换发布页，避免语聊房返回又回到发布表单（与不试音 goMatching 一致）
         await openAuditionRoom(result.requestNo, form.token, {
           expireTime: result.expireTime,
@@ -517,7 +517,7 @@ export default function MatchPublishScreen() {
 
                 {form.showCompanionPreference ? (
                   <View style={styles.field}>
-                    <FieldLabel label="陪玩人数" required />
+                    <FieldLabel label="大神人数" required />
                     <View style={styles.options}>
                       {MATCH_COMPANION_PREFERENCE_OPTIONS.map((option) => (
                         <MatchOptionChip
@@ -606,7 +606,7 @@ export default function MatchPublishScreen() {
               >
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="立即发布，匹配陪玩"
+                  accessibilityLabel="立即发布，匹配大神"
                   disabled={submitting || form.remarkOverLimit}
                   onPress={handlePublish}
                   style={({ pressed }) => [
@@ -625,7 +625,7 @@ export default function MatchPublishScreen() {
                     ]}
                   >
                     <Text style={styles.publishText}>
-                      {submitting ? "发布中..." : "立即发布，匹配陪玩"}
+                      {submitting ? "发布中..." : "立即发布，匹配大神"}
                     </Text>
                   </MatchLinearGradient>
                 </Pressable>

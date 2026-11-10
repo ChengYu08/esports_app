@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  actionNotice,
-  getActionNoticeHandlers,
-  resetActionNoticeStore,
-  useActionNoticeStore,
-} from "@/shared/ui/action-notice/action-notice-store";
 import type { RongCommand } from "@/features/message/rongcloud-command";
+import {
+    actionNotice,
+    getActionNoticeHandlers,
+    resetActionNoticeStore,
+    useActionNoticeStore,
+} from "@/shared/ui/action-notice/action-notice-store";
 
 vi.mock("react-native-root-toast", () => ({
   default: {
@@ -51,7 +51,8 @@ const {
   handleQuickMatchNotice,
   resetActionCommandDedupKeys,
 } = await import("./action-command-handlers");
-const { refreshDispatchForRemoteChange } = await import("@/features/order/order-query");
+const { refreshDispatchForRemoteChange } =
+  await import("@/features/order/order-query");
 const { logger } = await import("@/core/logging/logger");
 const { router } = await import("expo-router");
 const { acceptOrder } = await import("@/features/order/order.api");
@@ -86,7 +87,7 @@ describe("handleQuickMatchNotice", () => {
         gameName: "王者荣耀",
         modeName: "上分",
         levelName: "钻石",
-        serviceName: "陪玩",
+        serviceName: "大神",
         expireTime: "2026-10-20 12:30:00",
       }),
       NOW,
@@ -124,16 +125,26 @@ describe("handleQuickMatchNotice", () => {
   });
 
   it("expireTime 不可解析时按 15 秒兜底", () => {
-    handleQuickMatchNotice(command("QUICK_MATCH_NOTICE", { requestNo: "QM1" }), NOW);
-    expect(useActionNoticeStore.getState().items[0]?.expireAt).toBe(NOW + 15_000);
+    handleQuickMatchNotice(
+      command("QUICK_MATCH_NOTICE", { requestNo: "QM1" }),
+      NOW,
+    );
+    expect(useActionNoticeStore.getState().items[0]?.expireAt).toBe(
+      NOW + 15_000,
+    );
   });
 
   it("服务字段全空时降级文案", () => {
     handleQuickMatchNotice(
-      command("QUICK_MATCH_NOTICE", { requestNo: "QM1", expireTime: "2026-10-20 12:30:00" }),
+      command("QUICK_MATCH_NOTICE", {
+        requestNo: "QM1",
+        expireTime: "2026-10-20 12:30:00",
+      }),
       NOW,
     );
-    expect(useActionNoticeStore.getState().items[0]?.text).toBe("「老板」发布了快速匹配需求");
+    expect(useActionNoticeStore.getState().items[0]?.text).toBe(
+      "「老板」发布了快速匹配需求",
+    );
   });
 
   it("非平台发送方忽略", () => {
@@ -303,7 +314,10 @@ describe("handleQuickMatchNotice", () => {
   });
 
   it("expireTime 缺失时日志标记 missingFields", () => {
-    handleQuickMatchNotice(command("QUICK_MATCH_NOTICE", { requestNo: "QM1" }), NOW);
+    handleQuickMatchNotice(
+      command("QUICK_MATCH_NOTICE", { requestNo: "QM1" }),
+      NOW,
+    );
     expect(logger.info).toHaveBeenCalledWith(
       "QUICK_MATCH_NOTICE",
       expect.objectContaining({
@@ -363,9 +377,8 @@ describe("handleQuickMatchNotice", () => {
   });
 
   it("活动通知点击仍走既有抢单链路", async () => {
-    const { grabQuickMatchAndEnterAudition } = await import(
-      "@/features/match/grab-quick-match-flow"
-    );
+    const { grabQuickMatchAndEnterAudition } =
+      await import("@/features/match/grab-quick-match-flow");
     vi.mocked(grabQuickMatchAndEnterAudition).mockResolvedValue({
       status: "success",
     } as never);
@@ -433,8 +446,14 @@ describe("handleOrderNotifyPopup", () => {
   });
 
   it("orderId 无效丢弃", () => {
-    handleOrderNotifyPopup(command("ORDER_NOTIFY", { ...payload, orderId: 0 }), NOW);
-    handleOrderNotifyPopup(command("ORDER_NOTIFY", { ...payload, orderNo: "" }), NOW);
+    handleOrderNotifyPopup(
+      command("ORDER_NOTIFY", { ...payload, orderId: 0 }),
+      NOW,
+    );
+    handleOrderNotifyPopup(
+      command("ORDER_NOTIFY", { ...payload, orderNo: "" }),
+      NOW,
+    );
     expect(useActionNoticeStore.getState().items).toHaveLength(0);
   });
 
@@ -491,10 +510,13 @@ describe("handleQuickMatchExpired", () => {
   it("写终止信号并撤对应抢单通知条，同时刷新派单中心", () => {
     const notifyEnded = vi.fn();
     const dismissQuickMatchBar = vi.fn();
-    handleQuickMatchExpired(command("QUICK_MATCH_EXPIRED", { requestNo: "QM1" }), {
-      notifyEnded,
-      dismissQuickMatchBar,
-    });
+    handleQuickMatchExpired(
+      command("QUICK_MATCH_EXPIRED", { requestNo: "QM1" }),
+      {
+        notifyEnded,
+        dismissQuickMatchBar,
+      },
+    );
     expect(notifyEnded).toHaveBeenCalledWith("QM1", "expired");
     expect(dismissQuickMatchBar).toHaveBeenCalledWith("QM1");
     expect(refreshDispatchForRemoteChange).toHaveBeenCalledTimes(1);
@@ -503,10 +525,13 @@ describe("handleQuickMatchExpired", () => {
   it("QUICK_MATCH_CANCELLED 映射为 cancelled", () => {
     const notifyEnded = vi.fn();
     const dismissQuickMatchBar = vi.fn();
-    handleQuickMatchExpired(command("QUICK_MATCH_CANCELLED", { requestNo: "QM1" }), {
-      notifyEnded,
-      dismissQuickMatchBar,
-    });
+    handleQuickMatchExpired(
+      command("QUICK_MATCH_CANCELLED", { requestNo: "QM1" }),
+      {
+        notifyEnded,
+        dismissQuickMatchBar,
+      },
+    );
     expect(notifyEnded).toHaveBeenCalledWith("QM1", "cancelled");
     expect(dismissQuickMatchBar).toHaveBeenCalledWith("QM1");
   });
@@ -533,10 +558,13 @@ describe("handleQuickMatchExpired", () => {
   it("其它命令名忽略", () => {
     const notifyEnded = vi.fn();
     const dismissQuickMatchBar = vi.fn();
-    handleQuickMatchExpired(command("QUICK_MATCH_NOTICE", { requestNo: "QM1" }), {
-      notifyEnded,
-      dismissQuickMatchBar,
-    });
+    handleQuickMatchExpired(
+      command("QUICK_MATCH_NOTICE", { requestNo: "QM1" }),
+      {
+        notifyEnded,
+        dismissQuickMatchBar,
+      },
+    );
     expect(notifyEnded).not.toHaveBeenCalled();
     expect(dismissQuickMatchBar).not.toHaveBeenCalled();
     expect(refreshDispatchForRemoteChange).not.toHaveBeenCalled();
@@ -553,14 +581,15 @@ describe("handleActivityRoomNotice", () => {
       command("ACTIVITY_ROOM_NOTICE", {
         commandName: "ACTIVITY_ROOM_NOTICE",
         requestNo: "QM2119632871408664578",
-        content: "恭喜参与秒杀活动，请尽快在语聊房中选定陪玩并支付，锁定秒杀名额",
+        content:
+          "恭喜参与秒杀活动，请尽快在语聊房中选定大神并支付，锁定秒杀名额",
         roomId: 30100020,
         roomVersion: 25,
       }),
       NOW,
     );
     expect(Toast.show).toHaveBeenCalledWith(
-      "恭喜参与秒杀活动，请尽快在语聊房中选定陪玩并支付，锁定秒杀名额",
+      "恭喜参与秒杀活动，请尽快在语聊房中选定大神并支付，锁定秒杀名额",
       expect.objectContaining({ duration: 10000 }),
     );
   });

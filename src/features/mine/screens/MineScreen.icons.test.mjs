@@ -8,11 +8,14 @@ test("我的页菜单使用动态入口与设计稿 SVG 图标", async () => {
   const source = await readFile(sourceUrl, "utf8");
 
   assert.doesNotMatch(source, /@expo\/vector-icons/);
-  assert.match(source, /title: (openingVoiceRoom \? "正在进入房间" : )?"我的房间"/);
+  assert.match(
+    source,
+    /title: (openingVoiceRoom \? "正在进入房间" : )?"我的房间"/,
+  );
   assert.match(source, /case "BECOME_PLAYMATE"/);
-  assert.match(source, /title: "成为陪玩"/);
+  assert.match(source, /title: "成为大神"/);
   assert.match(source, /case "PLAYMATE_MANAGE"/);
-  assert.match(source, /title: "陪玩中心"/);
+  assert.match(source, /title: "大神中心"/);
   assert.match(source, /title: "基础设置"/);
   assert.match(source, /title: "在线客服"/);
   assert.match(source, /icon: menuIcon\(menuRoomIcon\)/);

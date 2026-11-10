@@ -7,7 +7,7 @@ import { fetchQuickMatchGrabList } from "@/features/match/api/match.api";
 const POLL_INTERVAL_MS = 4000;
 
 /**
- * 语聊房「选择陪玩」按钮抢单人数：仅轮询列表长度，不接管选人/结束逻辑。
+ * 语聊房「选择大神」按钮抢单人数：仅轮询列表长度，不接管选人/结束逻辑。
  */
 export function useSelectCompanionGrabCount(
   requestNo: string | undefined,

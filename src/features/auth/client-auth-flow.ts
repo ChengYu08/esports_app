@@ -1,16 +1,22 @@
-import type { SsoToken } from '@esports/sso-sdk';
-import type { AuthUser } from '@esports/auth';
-import { clientAuthApi, type ClientUserInfo } from './client-auth.api';
-import { saveAuthSession } from './session-persistence';
-import { fetchUserDetail } from './api/companion.api';
-import { logger } from '@/core/logging/logger';
-import type { CompanionProfile } from '@/types/companion';
-import { resolveAuthPhone } from './auth-phone';
+import { logger } from "@/core/logging/logger";
+import type { CompanionProfile } from "@/types/companion";
+import type { AuthUser } from "@esports/auth";
+import type { SsoToken } from "@esports/sso-sdk";
+import { fetchUserDetail } from "./api/companion.api";
+import { resolveAuthPhone } from "./auth-phone";
+import { clientAuthApi, type ClientUserInfo } from "./client-auth.api";
+import { saveAuthSession } from "./session-persistence";
 
 type SetSession = (session: { accessToken: string; user: AuthUser }) => void;
-type SetCompanionStatus = (isCompanion: boolean, profile: CompanionProfile | null) => void;
+type SetCompanionStatus = (
+  isCompanion: boolean,
+  profile: CompanionProfile | null,
+) => void;
 
-export function toAuthUser(profile: ClientUserInfo, fallbackPhone?: string): AuthUser {
+export function toAuthUser(
+  profile: ClientUserInfo,
+  fallbackPhone?: string,
+): AuthUser {
   return {
     id: String(profile.id),
     nickname: profile.nickname,
@@ -36,25 +42,36 @@ export async function completeClientLogin(
   setCompanionStatus?: SetCompanionStatus,
   fallbackPhone?: string,
 ) {
-  if (!ssoToken.id_token) throw new Error('统一登录未返回 idToken');
-  const login = await clientAuthApi.exchangeIdToken(ssoToken.id_token, registerWay);
-  if (!login.token) throw new Error('业务 token 为空');
+  if (!ssoToken.id_token) throw new Error("统一登录未返回 idToken");
+  const login = await clientAuthApi.exchangeIdToken(
+    ssoToken.id_token,
+    registerWay,
+  );
+  if (!login.token) throw new Error("业务 token 为空");
   const profile = await clientAuthApi.fetchCurrentUser(login.token);
-  const session = { accessToken: login.token, user: toAuthUser(profile, fallbackPhone ?? ssoToken.phone) };
+  const session = {
+    accessToken: login.token,
+    user: toAuthUser(profile, fallbackPhone ?? ssoToken.phone),
+  };
   await saveAuthSession(session);
   setSession(session);
 
-  // 检查陪玩身份
+  // 检查大神身份
   if (setCompanionStatus) {
     try {
       const userDetail = await fetchUserDetail(String(profile.id), login.token);
-      const isCompanion = profile.positions?.some((position) => position.code === 'COMPANION') ?? false;
+      const isCompanion =
+        profile.positions?.some((position) => position.code === "COMPANION") ??
+        false;
       setCompanionStatus(isCompanion, userDetail.companionProfile ?? null);
-      logger.debug('companion.status_checked', { userId: profile.id, isCompanion });
-    } catch (error) {
-      logger.warn('companion.status_check_failed', {
+      logger.debug("companion.status_checked", {
         userId: profile.id,
-        error: error instanceof Error ? error.message : String(error)
+        isCompanion,
+      });
+    } catch (error) {
+      logger.warn("companion.status_check_failed", {
+        userId: profile.id,
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   }

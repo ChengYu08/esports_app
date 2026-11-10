@@ -3,13 +3,19 @@ import { afterEach, expect, it, vi } from "vitest";
 
 import { apiClient } from "@/core/network/api-client";
 import { queryClient } from "@/core/query/query-client";
-import { computeFreeSubmitAmount, computeOrderPayableStars, formatOrderFreeSummary } from "./free-amount";
+import {
+    computeFreeSubmitAmount,
+    computeOrderPayableStars,
+    formatOrderFreeSummary,
+} from "./free-amount";
 import { filterOrders } from "./order.filter";
 
 vi.mock("@/core/network/api-client", () => ({ apiClient: vi.fn() }));
 // 原生图片在金额映射测试中只需要保留资源句柄。
 const require = createRequire(import.meta.url);
-require.extensions[".svg"] = (module) => { module.exports = 1; };
+require.extensions[".svg"] = (module) => {
+  module.exports = 1;
+};
 const { mapOrder, freeOrderService } = await import("./order.api");
 const { refreshOrderAfterAction } = await import("./order-query");
 
@@ -29,21 +35,24 @@ const partialFreeOrder = {
   refundAmount: 470,
 };
 
-it.each([1, 10])("派单取消支付后，单价为 %i 的待支付订单展示订单总价而非零实付", (price) => {
-  const order = mapOrder({
-    id: 42,
-    orderStatus: "PENDING_PAY",
-    price,
-    quantity: 1,
-    totalPrice: price,
-    realPayAmount: 0,
-  });
-  expect(order.status).toBe("pendingPayment");
-  expect(order.unitPrice).toBe(String(price));
-  expect(order.totalPrice).toBe(String(price));
-  expect(computeOrderPayableStars(order)).toBe(price);
-  expect(order.actions.map(({ key }) => key)).toEqual(["cancel", "pay"]);
-});
+it.each([1, 10])(
+  "派单取消支付后，单价为 %i 的待支付订单展示订单总价而非零实付",
+  (price) => {
+    const order = mapOrder({
+      id: 42,
+      orderStatus: "PENDING_PAY",
+      price,
+      quantity: 1,
+      totalPrice: price,
+      realPayAmount: 0,
+    });
+    expect(order.status).toBe("pendingPayment");
+    expect(order.unitPrice).toBe(String(price));
+    expect(order.totalPrice).toBe(String(price));
+    expect(computeOrderPayableStars(order)).toBe(price);
+    expect(order.actions.map(({ key }) => key)).toEqual(["cancel", "pay"]);
+  },
+);
 
 it("订单总价保留接口的小数和数量口径，不使用实付金额覆盖", () => {
   const order = mapOrder({
@@ -58,24 +67,54 @@ it("订单总价保留接口的小数和数量口径，不使用实付金额覆�
 });
 
 it("已支付订单同样按订单总价展示合计，真实零总价也不会被实付金额替换", () => {
-  expect(mapOrder({ orderStatus: "PAID", totalPrice: 100, realPayAmount: 80 }).totalPrice).toBe("100");
-  expect(mapOrder({ orderStatus: "PAID", totalPrice: 0, realPayAmount: 80 }).totalPrice).toBe("0");
+  expect(
+    mapOrder({ orderStatus: "PAID", totalPrice: 100, realPayAmount: 80 })
+      .totalPrice,
+  ).toBe("100");
+  expect(
+    mapOrder({ orderStatus: "PAID", totalPrice: 0, realPayAmount: 80 })
+      .totalPrice,
+  ).toBe("0");
 });
 
 it("部分免单同时保留原价与免单后的应收金额", () => {
-  const order = mapOrder({ id: 42, orderStatus: "IN_SERVICE", realPayAmount: 800, isFreeOrder: true, refundAmount: 200 }, 0, "accept");
+  const order = mapOrder(
+    {
+      id: 42,
+      orderStatus: "IN_SERVICE",
+      realPayAmount: 800,
+      isFreeOrder: true,
+      refundAmount: 200,
+    },
+    0,
+    "accept",
+  );
   expect(order.totalPrice).toBe("800");
   expect(order.freeAmount).toBe("200");
   expect(computeOrderPayableStars(order)).toBe(600);
 });
 
 it("全额免单后的零金额不会回退到原价", () => {
-  const order = mapOrder({ id: 42, orderStatus: "REFUNDED", realPayAmount: 800, isFreeOrder: true, refundAmount: 800 }, 0, "accept");
+  const order = mapOrder(
+    {
+      id: 42,
+      orderStatus: "REFUNDED",
+      realPayAmount: 800,
+      isFreeOrder: true,
+      refundAmount: 800,
+    },
+    0,
+    "accept",
+  );
   expect(computeOrderPayableStars(order)).toBe(0);
 });
 
-it("取消订单的退款不显示为陪玩免单", () => {
-  const order = mapOrder({ id: 42, orderStatus: "CANCELED", realPayAmount: 800, refundAmount: 800 }, 0, "accept");
+it("取消订单的退款不显示为大神免单", () => {
+  const order = mapOrder(
+    { id: 42, orderStatus: "CANCELED", realPayAmount: 800, refundAmount: 800 },
+    0,
+    "accept",
+  );
   expect(order.freeAmount).toBeUndefined();
   expect(computeOrderPayableStars(order)).toBe(800);
 });
@@ -89,16 +128,33 @@ it("免单一小时后展示免单时长、剩余金额与部分免单状态，�
     expect(order.quantity).toBe(2);
     expect(formatOrderFreeSummary(order)).toBe("1小时（470钻石）");
     expect(computeOrderPayableStars(order)).toBe(470);
-    expect(order.actions.some(({ key }) => ["pay", "free", "start", "complete"].includes(key))).toBe(false);
+    expect(
+      order.actions.some(({ key }) =>
+        ["pay", "free", "start", "complete"].includes(key),
+      ),
+    ).toBe(false);
     expect(filterOrders([order], "completed")).toEqual([order]);
     expect(filterOrders([order], "inProgress")).toEqual([]);
     expect(filterOrders([order], "cancelled")).toEqual([]);
   }
-  expect(place.actions.map(({ key }) => key)).toEqual(["afterSales", "review", "reorder"]);
+  expect(place.actions.map(({ key }) => key)).toEqual([
+    "afterSales",
+    "review",
+    "reorder",
+  ]);
 });
 
 it("一小时订单全额免单显示已免单及零应收，并归入已取消列表", () => {
-  const order = mapOrder({ ...partialFreeOrder, orderStatus: "REFUNDED", quantity: 1, realPayAmount: 470 }, 0, "accept");
+  const order = mapOrder(
+    {
+      ...partialFreeOrder,
+      orderStatus: "REFUNDED",
+      quantity: 1,
+      realPayAmount: 470,
+    },
+    0,
+    "accept",
+  );
   expect(order.statusLabel).toBe("已免单");
   expect(formatOrderFreeSummary(order)).toBe("1小时（470钻石）");
   expect(computeOrderPayableStars(order)).toBe(0);
@@ -114,7 +170,16 @@ it("普通部分退款使用退款文案，不冒充免单", () => {
 
 it("活动订单透传 productId/activityId/discountAmount/refundBaseAmount 与实付金额", () => {
   const order = mapOrder(
-    { id: 42, orderStatus: "PAID", totalPrice: 900, realPayAmount: 800, productId: 11, activityId: 22, discountAmount: 100, refundBaseAmount: 900 },
+    {
+      id: 42,
+      orderStatus: "PAID",
+      totalPrice: 900,
+      realPayAmount: 800,
+      productId: 11,
+      activityId: 22,
+      discountAmount: 100,
+      refundBaseAmount: 900,
+    },
     0,
     "place",
   );
@@ -125,7 +190,7 @@ it("活动订单透传 productId/activityId/discountAmount/refundBaseAmount 与�
   expect(order.realPayAmount).toBe("800");
 });
 
-it("orderType=ACTIVITY：透传类型与三金额字段，合计按玩家/陪玩视角分流", () => {
+it("orderType=ACTIVITY：透传类型与三金额字段，合计按玩家/大神视角分流", () => {
   const raw = {
     id: 1869,
     orderType: "ACTIVITY",
@@ -146,13 +211,17 @@ it("orderType=ACTIVITY：透传类型与三金额字段，合计按玩家/陪玩
   expect(place.discountAmount).toBe(690);
   expect(place.realPayAmount).toBe("990");
   expect(place.billingUnitName).toBe("次");
-  // 玩家合计=实付，陪玩合计=price
+  // 玩家合计=实付，大神合计=price
   expect(place.totalPrice).toBe("990");
   expect(accept.totalPrice).toBe("1680");
 });
 
 it("普通订单不输出活动字段，金额展示保持不变", () => {
-  const order = mapOrder({ id: 42, orderStatus: "PAID", totalPrice: 500 }, 0, "place");
+  const order = mapOrder(
+    { id: 42, orderStatus: "PAID", totalPrice: 500 },
+    0,
+    "place",
+  );
   expect(order.productId).toBeUndefined();
   expect(order.activityId).toBeUndefined();
   expect(order.discountAmount).toBeUndefined();
@@ -161,18 +230,32 @@ it("普通订单不输出活动字段，金额展示保持不变", () => {
   expect(order.totalPrice).toBe("500");
 });
 
-it("金额视角：普通订单按总价展示，活动订单陪玩侧取订单总价", () => {
-  const raw = { id: 42, orderStatus: "PAID", totalPrice: 900, realPayAmount: 800 };
+it("金额视角：普通订单按总价展示，活动订单大神侧取订单总价", () => {
+  const raw = {
+    id: 42,
+    orderStatus: "PAID",
+    totalPrice: 900,
+    realPayAmount: 800,
+  };
   // 普通订单合计优先订单总价（待支付实付为 0 不能覆盖应付）
   expect(mapOrder(raw, 0, "place").totalPrice).toBe("900");
   expect(mapOrder(raw, 0, "accept").totalPrice).toBe("900");
-  expect(mapOrder({ id: 42, orderStatus: "PAID", totalPrice: 500 }, 0, "accept").totalPrice).toBe("500");
-  // 活动订单（productId 存在）陪玩侧统一订单总价口径
-  expect(mapOrder({ ...raw, productId: 11 }, 0, "accept").totalPrice).toBe("900");
+  expect(
+    mapOrder({ id: 42, orderStatus: "PAID", totalPrice: 500 }, 0, "accept")
+      .totalPrice,
+  ).toBe("500");
+  // 活动订单（productId 存在）大神侧统一订单总价口径
+  expect(mapOrder({ ...raw, productId: 11 }, 0, "accept").totalPrice).toBe(
+    "900",
+  );
   // discountAmount 为 0 也算活动字段（字段存在即活动订单）
-  expect(mapOrder({ ...raw, discountAmount: 0 }, 0, "accept").totalPrice).toBe("900");
+  expect(mapOrder({ ...raw, discountAmount: 0 }, 0, "accept").totalPrice).toBe(
+    "900",
+  );
   // refundBaseAmount 存在同样视为活动订单
-  expect(mapOrder({ ...raw, refundBaseAmount: 900 }, 0, "accept").totalPrice).toBe("900");
+  expect(
+    mapOrder({ ...raw, refundBaseAmount: 900 }, 0, "accept").totalPrice,
+  ).toBe("900");
 });
 
 it("免单提交口径：活动订单按原价退款基数折算，普通订单维持时长×单价计算值", () => {
@@ -188,46 +271,87 @@ it("最终确认免单向真实业务接口提交钻石金额，失败时向上�
   expect(apiClient).toHaveBeenCalledWith("/client/v1/order/free", {
     method: "POST",
     token: "order-token",
-    body: { action: { orderId: 42, freeAmount: 470, actionType: "COMPANION_FREE", reason: "陪玩服务免单" } },
+    body: {
+      action: {
+        orderId: 42,
+        freeAmount: 470,
+        actionType: "COMPANION_FREE",
+        reason: "大神服务免单",
+      },
+    },
   });
-  vi.mocked(apiClient).mockResolvedValueOnce({ code: "FAIL", info: "订单已结账，无法免单" });
-  await expect(freeOrderService("42", 470, "order-token")).rejects.toThrow("订单已结账，无法免单");
+  vi.mocked(apiClient).mockResolvedValueOnce({
+    code: "FAIL",
+    info: "订单已结账，无法免单",
+  });
+  await expect(freeOrderService("42", 470, "order-token")).rejects.toThrow(
+    "订单已结账，无法免单",
+  );
 });
 
 it("免单后以详情替换列表缓存，部分免单留在已完成，不会误归到待支付", async () => {
-  const stale = mapOrder({ ...partialFreeOrder, orderStatus: "COMPLETED", isFreeOrder: false, refundAmount: 0 }, 0, "accept");
+  const stale = mapOrder(
+    {
+      ...partialFreeOrder,
+      orderStatus: "COMPLETED",
+      isFreeOrder: false,
+      refundAmount: 0,
+    },
+    0,
+    "accept",
+  );
   const finishedKey = ["orders", "accept", "completed", "51"];
   const progressKey = ["orders", "accept", "inProgress", "51"];
   const otherAccountKey = ["orders", "accept", "completed", "other"];
-  const cached = { pages: [{ items: [stale], hasMore: false }], pageParams: [1] };
+  const cached = {
+    pages: [{ items: [stale], hasMore: false }],
+    pageParams: [1],
+  };
   queryClient.setQueryData(finishedKey, cached);
   queryClient.setQueryData(progressKey, cached);
   queryClient.setQueryData(otherAccountKey, cached);
-  vi.mocked(apiClient).mockResolvedValueOnce({ code: "SUCCESS", data: partialFreeOrder });
+  vi.mocked(apiClient).mockResolvedValueOnce({
+    code: "SUCCESS",
+    data: partialFreeOrder,
+  });
 
   await refreshOrderAfterAction("42", "order-token", "51");
 
   const finished = queryClient.getQueryData<typeof cached>(finishedKey)!;
   expect(finished.pages[0].items[0].status).toBe("partiallyRefunded");
   expect(finished.pages[0].items[0].freeAmount).toBe("470");
-  expect(queryClient.getQueryData<typeof cached>(progressKey)?.pages[0].items).toEqual([]);
+  expect(
+    queryClient.getQueryData<typeof cached>(progressKey)?.pages[0].items,
+  ).toEqual([]);
   expect(queryClient.getQueryData(otherAccountKey)).toEqual(cached);
 });
 
-it("订单详情保留主陪玩以外的参与陪玩及其聊天资料", () => {
+it("订单详情保留主大神以外的参与大神及其聊天资料", () => {
   const order = mapOrder({
     id: 42,
     receiverUserId: 10,
-    receiverNickname: "主陪玩",
+    receiverNickname: "主大神",
     multiCompanionList: [
-      { userId: 10, nickname: "主陪玩", headImage: "main.png" },
-      { userId: 11, nickname: "参与陪玩", headImage: "other.png", clubId: 20, clubName: "示例俱乐部" },
-      { userId: 12, nickname: "另一位陪玩" },
+      { userId: 10, nickname: "主大神", headImage: "main.png" },
+      {
+        userId: 11,
+        nickname: "参与大神",
+        headImage: "other.png",
+        clubId: 20,
+        clubName: "示例俱乐部",
+      },
+      { userId: 12, nickname: "另一位大神" },
     ],
   });
   expect(order.receiverUserId).toBe("10");
   expect(order.companions).toEqual([
-    { userId: "11", nickname: "参与陪玩", headImage: "other.png", clubId: 20, clubName: "示例俱乐部" },
-    { userId: "12", nickname: "另一位陪玩", headImage: undefined },
+    {
+      userId: "11",
+      nickname: "参与大神",
+      headImage: "other.png",
+      clubId: 20,
+      clubName: "示例俱乐部",
+    },
+    { userId: "12", nickname: "另一位大神", headImage: undefined },
   ]);
 });

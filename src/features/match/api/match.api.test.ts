@@ -3,11 +3,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { apiClient } from "@/core/network/api-client";
 
 import {
-  batchPayQuickMatch,
-  fetchQuickMatchDetail,
-  fetchQuickMatchPaymentPreview,
-  selectAndCreateOrder,
-  StarNotEnoughError,
+    batchPayQuickMatch,
+    fetchQuickMatchDetail,
+    fetchQuickMatchPaymentPreview,
+    selectAndCreateOrder,
+    StarNotEnoughError,
 } from "./match.api";
 
 vi.mock("@/core/network/api-client", () => ({ apiClient: vi.fn() }));
@@ -25,7 +25,7 @@ describe("快速匹配详情：活动字段透传", () => {
         activityCode: " SECKILL001 ",
         activityType: " SECKILL ",
         cardItems: [
-          { label: " 活动名称 ", value: { text: " 电竞陪玩秒杀 " } },
+          { label: " 活动名称 ", value: { text: " 电竞大神秒杀 " } },
           { label: "活动价", value: { text: "9.9 星钻/小时" } },
         ],
         discountAmount: "5.00",
@@ -45,7 +45,7 @@ describe("快速匹配详情：活动字段透传", () => {
     expect(result.activityType).toBe("SECKILL");
     expect(result.publishSource).toBe("ACTIVITY");
     expect(result.cardItems).toEqual([
-      { label: "活动名称", value: { text: "电竞陪玩秒杀" } },
+      { label: "活动名称", value: { text: "电竞大神秒杀" } },
       { label: "活动价", value: { text: "9.9 星钻/小时" } },
     ]);
     expect(result.discountAmount).toBe(5);
@@ -78,9 +78,14 @@ describe("快速匹配详情：活动字段透传", () => {
   });
 
   it("信封业务失败时抛出后端 info", async () => {
-    vi.mocked(apiClient).mockResolvedValue({ code: "FAILED", info: "需求不存在" });
+    vi.mocked(apiClient).mockResolvedValue({
+      code: "FAILED",
+      info: "需求不存在",
+    });
 
-    await expect(fetchQuickMatchDetail("QM1", "token")).rejects.toThrow("需求不存在");
+    await expect(fetchQuickMatchDetail("QM1", "token")).rejects.toThrow(
+      "需求不存在",
+    );
   });
 });
 
@@ -98,13 +103,16 @@ describe("selectAndCreateOrder：请求只带 requestNo 与 grabIds", () => {
 
     const result = await selectAndCreateOrder("QM1", ["101"], "token");
 
-    expect(apiClient).toHaveBeenCalledWith("/client/v1/quickMatch/selectAndCreateOrder", {
-      method: "POST",
-      token: "token",
-      body: {
-        action: { requestNo: "QM1", grabIds: ["101"] },
+    expect(apiClient).toHaveBeenCalledWith(
+      "/client/v1/quickMatch/selectAndCreateOrder",
+      {
+        method: "POST",
+        token: "token",
+        body: {
+          action: { requestNo: "QM1", grabIds: ["101"] },
+        },
       },
-    });
+    );
     expect(result).toEqual({
       totalPrice: 9.9,
       discountAmount: 5,
@@ -121,11 +129,14 @@ describe("selectAndCreateOrder：请求只带 requestNo 与 grabIds", () => {
 
     const result = await selectAndCreateOrder("QM2", ["102", "103"], "token");
 
-    expect(apiClient).toHaveBeenCalledWith("/client/v1/quickMatch/selectAndCreateOrder", {
-      method: "POST",
-      token: "token",
-      body: { action: { requestNo: "QM2", grabIds: ["102", "103"] } },
-    });
+    expect(apiClient).toHaveBeenCalledWith(
+      "/client/v1/quickMatch/selectAndCreateOrder",
+      {
+        method: "POST",
+        token: "token",
+        body: { action: { requestNo: "QM2", grabIds: ["102", "103"] } },
+      },
+    );
     expect(result).toEqual({
       totalPrice: 20,
       discountAmount: undefined,
@@ -175,7 +186,10 @@ describe("fetchQuickMatchPaymentPreview", () => {
   });
 
   it("paymentMethods 缺省时返回空数组", async () => {
-    vi.mocked(apiClient).mockResolvedValue({ code: "SUCCESS", data: { totalPrice: 30 } });
+    vi.mocked(apiClient).mockResolvedValue({
+      code: "SUCCESS",
+      data: { totalPrice: 30 },
+    });
 
     await expect(
       fetchQuickMatchPaymentPreview("QM1", ["g1"], "token"),
@@ -186,7 +200,10 @@ describe("fetchQuickMatchPaymentPreview", () => {
   });
 
   it("非成功包络抛出服务端 info", async () => {
-    vi.mocked(apiClient).mockResolvedValue({ code: "FAIL", info: "需求已结束" });
+    vi.mocked(apiClient).mockResolvedValue({
+      code: "FAIL",
+      info: "需求已结束",
+    });
 
     await expect(
       fetchQuickMatchPaymentPreview("QM1", ["g1"], "token"),
@@ -196,9 +213,14 @@ describe("fetchQuickMatchPaymentPreview", () => {
 
 describe("batchPayQuickMatch", () => {
   it("STAR_NOT_ENOUGH 抛出 StarNotEnoughError", async () => {
-    vi.mocked(apiClient).mockResolvedValue({ code: "STAR_NOT_ENOUGH", info: "钻石余额不足" });
+    vi.mocked(apiClient).mockResolvedValue({
+      code: "STAR_NOT_ENOUGH",
+      info: "钻石余额不足",
+    });
 
-    const error = await batchPayQuickMatch("QM1", "token").catch((e: unknown) => e);
+    const error = await batchPayQuickMatch("QM1", "token").catch(
+      (e: unknown) => e,
+    );
     expect(error).toBeInstanceOf(StarNotEnoughError);
     expect((error as Error).message).toBe("钻石余额不足");
   });
@@ -210,10 +232,17 @@ describe("batchPayQuickMatch", () => {
   });
 
   it("其他失败抛出 info 或兜底文案", async () => {
-    vi.mocked(apiClient).mockResolvedValue({ code: "FAIL", info: "订单状态已变化" });
-    await expect(batchPayQuickMatch("QM1", "token")).rejects.toThrow("订单状态已变化");
+    vi.mocked(apiClient).mockResolvedValue({
+      code: "FAIL",
+      info: "订单状态已变化",
+    });
+    await expect(batchPayQuickMatch("QM1", "token")).rejects.toThrow(
+      "订单状态已变化",
+    );
 
     vi.mocked(apiClient).mockResolvedValue({ code: "FAIL" });
-    await expect(batchPayQuickMatch("QM1", "token")).rejects.toThrow("支付失败");
+    await expect(batchPayQuickMatch("QM1", "token")).rejects.toThrow(
+      "支付失败",
+    );
   });
 });

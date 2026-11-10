@@ -42,7 +42,7 @@ export type CompanionCardProps = {
   onPress: () => void;
 };
 
-/** 陪玩师卡片（大神列表 / 俱乐部主页共用）：纯 UI 组件，跳转、语音播放与第三行标签的文案取色均由父级注入 */
+/** 大神卡片（大神列表 / 俱乐部主页共用）：纯 UI 组件，跳转、语音播放与第三行标签的文案取色均由父级注入 */
 export const CompanionCard = memo(function CompanionCard({
   nickname,
   avatar,
@@ -90,22 +90,34 @@ export const CompanionCard = memo(function CompanionCard({
             contentFit="cover"
           />
         </AvatarTarget>
-        {voiceUrl && (blurAvailable ? (
-          <BlurView
-            blurTarget={blurTargetRef}
-            blurMethod="dimezisBlurViewSdk31Plus"
-            intensity={35}
-            tint="light"
-            style={styles.voicePill}
-          >
-            <VoicePlayButton url={voiceUrl} duration={voiceDurationSeconds} tone="light" playingUrl={voicePlayingUrl} onToggleVoice={onToggleVoice} />
-          </BlurView>
-        ) : (
-          <View style={[styles.voicePill, styles.voicePillFallback]}>
-            <VoicePlayButton url={voiceUrl} duration={voiceDurationSeconds} tone="light" playingUrl={voicePlayingUrl} onToggleVoice={onToggleVoice} />
-          </View>
-        ))}
-
+        {voiceUrl &&
+          (blurAvailable ? (
+            <BlurView
+              blurTarget={blurTargetRef}
+              blurMethod="dimezisBlurViewSdk31Plus"
+              intensity={35}
+              tint="light"
+              style={styles.voicePill}
+            >
+              <VoicePlayButton
+                url={voiceUrl}
+                duration={voiceDurationSeconds}
+                tone="light"
+                playingUrl={voicePlayingUrl}
+                onToggleVoice={onToggleVoice}
+              />
+            </BlurView>
+          ) : (
+            <View style={[styles.voicePill, styles.voicePillFallback]}>
+              <VoicePlayButton
+                url={voiceUrl}
+                duration={voiceDurationSeconds}
+                tone="light"
+                playingUrl={voicePlayingUrl}
+                onToggleVoice={onToggleVoice}
+              />
+            </View>
+          ))}
       </View>
       <View style={styles.cardRight}>
         <View style={styles.cardContent}>
@@ -296,7 +308,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   levelTag: {
-    // 设计稿 Tag/陪玩：水平 padding 2、圆角 2，高度较 14 增加 2 单位
+    // 设计稿 Tag/大神：水平 padding 2、圆角 2，高度较 14 增加 2 单位
     borderRadius: 2,
     paddingHorizontal: 2,
     height: 16,

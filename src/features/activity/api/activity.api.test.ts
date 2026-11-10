@@ -26,7 +26,7 @@ describe("秒杀活动详情接口", () => {
       data: {
         activityId: 10086,
         activityCode: " SECKILL001 ",
-        mainTitle: " 电竞陪玩秒杀 ",
+        mainTitle: " 电竞大神秒杀 ",
         subTitle: "限时 5 折",
         displayTag: " 限时秒杀 ",
         actionText: " 马上抢 ",
@@ -34,7 +34,11 @@ describe("秒杀活动详情接口", () => {
         startTime: "2026-10-20T10:00:00+08:00",
         endTime: "2026-10-20T12:00:00+08:00",
         serverTime: "2026-10-20T09:00:00+08:00",
-        product: { originalPrice: "20.00", activityPrice: 9.9, billingUnitName: " 小时 " },
+        product: {
+          originalPrice: "20.00",
+          activityPrice: 9.9,
+          billingUnitName: " 小时 ",
+        },
         stock: { remainingStock: 8 },
         buttonStatus: "ACTIVE",
         disabledReason: "  ",
@@ -46,7 +50,7 @@ describe("秒杀活动详情接口", () => {
     expect(detail).toEqual({
       activityId: "10086",
       activityCode: "SECKILL001",
-      mainTitle: "电竞陪玩秒杀",
+      mainTitle: "电竞大神秒杀",
       subTitle: "限时 5 折",
       displayTag: "限时秒杀",
       actionText: "马上抢",
@@ -54,7 +58,11 @@ describe("秒杀活动详情接口", () => {
       startTime: "2026-10-20T10:00:00+08:00",
       endTime: "2026-10-20T12:00:00+08:00",
       serverTime: "2026-10-20T09:00:00+08:00",
-      product: { originalPrice: 20, activityPrice: 9.9, billingUnitName: "小时" },
+      product: {
+        originalPrice: 20,
+        activityPrice: 9.9,
+        billingUnitName: "小时",
+      },
       remainingStock: 8,
       buttonStatus: "ACTIVE",
       disabledReason: undefined,
@@ -80,28 +88,47 @@ describe("秒杀活动详情接口", () => {
 
     expect(detail.displayTag).toBe("活动");
     expect(detail.actionText).toBe("立即参与");
-    expect(detail.product).toEqual({ originalPrice: 0, activityPrice: 0, billingUnitName: "" });
+    expect(detail.product).toEqual({
+      originalPrice: 0,
+      activityPrice: 0,
+      billingUnitName: "",
+    });
     expect(detail.remainingStock).toBe(0);
   });
 
   it("信封 code 非 SUCCESS 时抛出后端 info", async () => {
-    vi.mocked(apiClient).mockResolvedValue({ code: "FAILED", info: "活动不存在" });
+    vi.mocked(apiClient).mockResolvedValue({
+      code: "FAILED",
+      info: "活动不存在",
+    });
 
-    await expect(fetchActivityDetail("SECKILL001")).rejects.toThrow("活动不存在");
+    await expect(fetchActivityDetail("SECKILL001")).rejects.toThrow(
+      "活动不存在",
+    );
   });
 
-  it.each([undefined, null])("成功包络 data 缺失（%j）时兜底抛错，不返回残缺数据", async (data) => {
-    vi.mocked(apiClient).mockResolvedValue({ code: "SUCCESS", data });
+  it.each([undefined, null])(
+    "成功包络 data 缺失（%j）时兜底抛错，不返回残缺数据",
+    async (data) => {
+      vi.mocked(apiClient).mockResolvedValue({ code: "SUCCESS", data });
 
-    await expect(fetchActivityDetail("SECKILL001")).rejects.toThrow("活动信息加载失败");
-  });
+      await expect(fetchActivityDetail("SECKILL001")).rejects.toThrow(
+        "活动信息加载失败",
+      );
+    },
+  );
 });
 
 describe("参与活动（发布活动派单）接口", () => {
   it("需登录接口显式携带 token，请求体为 {action:{activityId}}", async () => {
     vi.mocked(apiClient).mockResolvedValue({
       code: "SUCCESS",
-      data: { requestNo: "REQ001", roomId: 9001, roomVersion: 3, expireTime: "2026-10-20T12:00:00+08:00" },
+      data: {
+        requestNo: "REQ001",
+        roomId: 9001,
+        roomVersion: 3,
+        expireTime: "2026-10-20T12:00:00+08:00",
+      },
     });
 
     await publishActivity("10086", "token-abc");
@@ -118,7 +145,12 @@ describe("参与活动（发布活动派单）接口", () => {
   it("映射发布结果，roomId/roomVersion 为空时保留 null", async () => {
     vi.mocked(apiClient).mockResolvedValue({
       code: "SUCCESS",
-      data: { requestNo: "REQ001", roomId: null, roomVersion: null, expireTime: "" },
+      data: {
+        requestNo: "REQ001",
+        roomId: null,
+        roomVersion: null,
+        expireTime: "",
+      },
     });
 
     expect(await publishActivity("1", "token-abc")).toEqual({
@@ -132,11 +164,16 @@ describe("参与活动（发布活动派单）接口", () => {
   it("requestNo 缺失视为发布失败，兜底抛错", async () => {
     vi.mocked(apiClient).mockResolvedValue({ code: "SUCCESS", data: {} });
 
-    await expect(publishActivity("1", "token-abc")).rejects.toThrow("参与活动失败");
+    await expect(publishActivity("1", "token-abc")).rejects.toThrow(
+      "参与活动失败",
+    );
   });
 
   it("信封业务失败时抛出后端 info", async () => {
-    vi.mocked(apiClient).mockResolvedValue({ code: "NOT_LOGGED_IN", info: "请先登录" });
+    vi.mocked(apiClient).mockResolvedValue({
+      code: "NOT_LOGGED_IN",
+      info: "请先登录",
+    });
 
     await expect(publishActivity("1", "token-abc")).rejects.toThrow("请先登录");
   });

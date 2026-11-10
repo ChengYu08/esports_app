@@ -1,6 +1,6 @@
-const COMPANION_REAL_NAME_REQUIRED_MESSAGE = "陪玩未进行实名认证";
+const COMPANION_REAL_NAME_REQUIRED_MESSAGE = "大神未进行实名认证";
 
-/** 老板本人未实名（后端 BussinessException 的 info 精确文案，须与「陪玩未进行实名认证」区分） */
+/** 老板本人未实名（后端 BussinessException 的 info 精确文案，须与「大神未进行实名认证」区分） */
 const SELF_REAL_NAME_REQUIRED_MESSAGE = "未进行实名认证";
 
 export function requiresRealNameVerification(message: string) {

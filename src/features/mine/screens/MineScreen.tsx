@@ -1,44 +1,47 @@
+import { showToast } from "@/shared/ui/app-toast";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
-  ChevronRight16Regular,
-  ChevronRight20Regular,
-  Dismiss24Regular,
+    ChevronRight16Regular,
+    ChevronRight20Regular,
+    Dismiss24Regular,
 } from "@fluentui/react-native-icons";
 import { Image, type ImageSource } from "expo-image";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as MediaLibrary from "expo-media-library";
 import { router, useFocusEffect } from "expo-router";
-import { type ReactNode, useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import {
-  ActivityIndicator,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    Modal,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
-import { showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { logger } from "@/core/logging/logger";
 import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { fetchStarBalance } from "@/features/mine/api/companion-order.api";
-import { resolveMineMenuKeys, type MineMenuKey } from "@/features/mine/mine-menu";
-import { calculateAge } from "@/features/mine/profile-utils";
 import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
 import { useUserFollowCount } from "@/features/mine/hooks/use-user-follow";
 import {
-  ensureRealNameBeforeVoiceRoomEnter,
-  promptSelfRealNameIfNeeded,
-} from "@/features/voice-room/ensure-real-name-before-enter";
+    resolveMineMenuKeys,
+    type MineMenuKey,
+} from "@/features/mine/mine-menu";
+import { calculateAge } from "@/features/mine/profile-utils";
 import {
-  resolveVoiceRoomId,
-  voiceRoomApi,
-} from "@/features/voice-room/voice-room.api";
+    ensureRealNameBeforeVoiceRoomEnter,
+    promptSelfRealNameIfNeeded,
+} from "@/features/voice-room/ensure-real-name-before-enter";
 import { navigateToVoiceRoom } from "@/features/voice-room/navigate-voice-room";
+import {
+    resolveVoiceRoomId,
+    voiceRoomApi,
+} from "@/features/voice-room/voice-room.api";
 import { requireLogin } from "@/shared/navigation/require-login";
 
 const avatar = require("../../../../assets/mine/mine-avatar.png");
@@ -106,7 +109,10 @@ export default function MineScreen() {
               signature: profile.signature ?? state.user.signature,
               isRealName: profile.isRealName ?? state.user.isRealName,
               realName: profile.realName ?? state.user.realName,
-              clubInfo: profile.clubInfo === undefined ? state.user.clubInfo : profile.clubInfo,
+              clubInfo:
+                profile.clubInfo === undefined
+                  ? state.user.clubInfo
+                  : profile.clubInfo,
               positions: profile.positions ?? state.user.positions,
               sidebarMenus: profile.sidebarMenus ?? state.user.sidebarMenus,
             };
@@ -222,14 +228,14 @@ export default function MineScreen() {
       case "BECOME_PLAYMATE":
         return {
           key,
-          title: "成为陪玩",
+          title: "成为大神",
           icon: menuIcon(menuCompanionIcon),
           onPress: () => setQrCodeVisible(true),
         };
       case "PLAYMATE_MANAGE":
         return {
           key,
-          title: "陪玩中心",
+          title: "大神中心",
           icon: menuIcon(menuCompanionIcon),
           onPress: () => router.push("/companion-dashboard"),
         };
@@ -346,12 +352,20 @@ export default function MineScreen() {
                 {user?.clubInfo?.clubName ? (
                   <View style={styles.clubLine}>
                     <Image source={clubFlag} style={styles.clubFlag} />
-                    <Text numberOfLines={1} ellipsizeMode="tail" style={styles.signatureText}>
+                    <Text
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      style={styles.signatureText}
+                    >
                       {user.clubInfo.clubName}
                     </Text>
                   </View>
                 ) : (
-                  <Text numberOfLines={1} ellipsizeMode="tail" style={styles.signatureText}>
+                  <Text
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    style={styles.signatureText}
+                  >
                     {user?.signature || "保持一点神秘感..."}
                   </Text>
                 )}
@@ -481,7 +495,7 @@ function ClubQrModal({
           onPress={onClose}
           style={StyleSheet.absoluteFill}
         />
-        {/* 与成为陪玩师弹窗同版式：标题 + 说明 + 120 二维码 + 保存按钮，无关闭叉号 */}
+        {/* 与成为大神弹窗同版式：标题 + 说明 + 120 二维码 + 保存按钮，无关闭叉号 */}
         <View accessibilityViewIsModal style={styles.qrEntryCard}>
           <View style={styles.qrEntryContent}>
             <Text style={styles.qrEntryTitle}>俱乐部入驻</Text>
@@ -541,20 +555,20 @@ function CompanionQrModal({
     >
       <View style={styles.qrModalBackdrop}>
         <Pressable
-          accessibilityLabel="关闭成为陪玩师弹窗"
+          accessibilityLabel="关闭成为大神弹窗"
           onPress={onClose}
           style={StyleSheet.absoluteFill}
         />
         {/* 设计稿 571-59485：295 宽白卡，标题+说明+120 二维码+单个保存按钮，无关闭叉号 */}
         <View accessibilityViewIsModal style={styles.qrEntryCard}>
           <View style={styles.qrEntryContent}>
-            <Text style={styles.qrEntryTitle}>成为陪玩师</Text>
+            <Text style={styles.qrEntryTitle}>成为大神</Text>
             <Text style={styles.qrEntryBody}>
               加入盼之电竞自营俱乐部，赚取丰厚报酬
             </Text>
             <View style={styles.qrEntryImageWrap}>
               <Image
-                accessibilityLabel="成为陪玩师二维码"
+                accessibilityLabel="成为大神二维码"
                 contentFit="contain"
                 source={companionEntryQrCode}
                 style={styles.qrEntryCode}

@@ -3,27 +3,27 @@ import { Image } from "expo-image";
 import { router, useIsFocused } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Animated,
-  Easing,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View,
+    Animated,
+    Easing,
+    FlatList,
+    Pressable,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
-  fetchGodPage,
-  GOD_EMPTY_FILTERS,
-  type GodFilters,
-  type GodListItem,
+    fetchGodPage,
+    GOD_EMPTY_FILTERS,
+    type GodFilters,
+    type GodListItem,
 } from "@/features/god/api/god.api";
 import { fetchGames } from "@/features/home/api/home.api";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
-import { ListFallbackState, LoadingState } from "@/shared/ui/AsyncStates";
 import { useIsOffline } from "@/shared/hooks/use-is-offline";
+import { ListFallbackState, LoadingState } from "@/shared/ui/AsyncStates";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { CompanionCard } from "@/shared/ui/CompanionCard";
 import { PaginationFooter } from "@/shared/ui/PaginationFooter";
@@ -108,7 +108,10 @@ function FilterMenu({
     }).start();
   }, [progress]);
 
-  const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] });
+  const translateY = progress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-8, 0],
+  });
 
   return (
     <>
@@ -119,7 +122,9 @@ function FilterMenu({
           style={styles.menuOverlayPress}
         />
       </Animated.View>
-      <Animated.View style={[styles.menuPanel, { transform: [{ translateY }] }]}>
+      <Animated.View
+        style={[styles.menuPanel, { transform: [{ translateY }] }]}
+      >
         <View style={styles.menuOptions}>
           {options.map((option) => {
             const selected = option.value === value;
@@ -129,9 +134,17 @@ function FilterMenu({
                 accessibilityRole="button"
                 accessibilityState={{ selected }}
                 onPress={() => onSelect(option.value)}
-                style={[styles.menuOption, selected && styles.menuOptionSelected]}
+                style={[
+                  styles.menuOption,
+                  selected && styles.menuOptionSelected,
+                ]}
               >
-                <Text style={[styles.menuOptionText, selected && styles.menuOptionTextSelected]}>
+                <Text
+                  style={[
+                    styles.menuOptionText,
+                    selected && styles.menuOptionTextSelected,
+                  ]}
+                >
                   {option.label}
                 </Text>
               </Pressable>
@@ -143,7 +156,7 @@ function FilterMenu({
   );
 }
 
-/** 标签兜底配色：后台未下发移动端背景色时使用（对齐设计稿 Tag/陪玩 组件色板 node 1126-176457） */
+/** 标签兜底配色：后台未下发移动端背景色时使用（对齐设计稿 Tag/大神 组件色板 node 1126-176457） */
 function levelTagColor(tagName: string) {
   // 注意顺序：魔王pro 要先于 魔王 判断
   if (tagName.includes("魔王pro")) return "#BB3EFA";
@@ -234,7 +247,7 @@ export default function GodListScreen({ active = true }: { active?: boolean }) {
   };
 
   const activeFilterDef = active
-    ? FILTER_DEFS.find((def) => def.key === openFilter) ?? null
+    ? (FILTER_DEFS.find((def) => def.key === openFilter) ?? null)
     : null;
 
   const games = useQuery({
@@ -274,10 +287,19 @@ export default function GodListScreen({ active = true }: { active?: boolean }) {
     queryKey: ["god-list", gameId, filters],
     enabled: active && focused,
     queryFn: ({ pageParam, signal }) =>
-      fetchGodPage({ gameId, filters, page: pageParam, pageSize: PAGE_SIZE, signal }),
+      fetchGodPage({
+        gameId,
+        filters,
+        page: pageParam,
+        pageSize: PAGE_SIZE,
+        signal,
+      }),
     initialPageParam: 1,
     getNextPageParam: (lastPage, allPages) => {
-      const fetched = allPages.reduce((sum, page) => sum + page.items.length, 0);
+      const fetched = allPages.reduce(
+        (sum, page) => sum + page.items.length,
+        0,
+      );
       return fetched < lastPage.total ? allPages.length + 1 : undefined;
     },
   });
@@ -287,7 +309,8 @@ export default function GodListScreen({ active = true }: { active?: boolean }) {
     [godList.data],
   );
 
-  const hasFilter = gameKey !== ALL_GAME_KEY || Object.values(filters).some(Boolean);
+  const hasFilter =
+    gameKey !== ALL_GAME_KEY || Object.values(filters).some(Boolean);
 
   const handleItemPress = useCallback(
     (item: GodListItem) => {
@@ -330,12 +353,18 @@ export default function GodListScreen({ active = true }: { active?: boolean }) {
 
   return (
     <View style={styles.screen}>
-      <GamePillRow items={gamePillItems} activeKey={gameKey} onSelect={selectGame} />
+      <GamePillRow
+        items={gamePillItems}
+        activeKey={gameKey}
+        onSelect={selectGame}
+      />
       <View style={styles.listSheet}>
         <View style={styles.filterBar}>
           {FILTER_DEFS.map((def) => {
             const filterSelected = Boolean(filters[def.key]);
-            const selected = def.options.find((option) => option.value === filters[def.key]);
+            const selected = def.options.find(
+              (option) => option.value === filters[def.key],
+            );
             const open = active && openFilter === def.key;
             return (
               <View key={def.key} style={styles.filterWrap}>
@@ -352,10 +381,14 @@ export default function GodListScreen({ active = true }: { active?: boolean }) {
                       open && styles.filterTextOpen,
                     ]}
                   >
-                    {filterSelected ? `${def.label}·${selected?.label ?? ""}` : def.label}
+                    {filterSelected
+                      ? `${def.label}·${selected?.label ?? ""}`
+                      : def.label}
                   </Text>
                   <Image
-                    source={def.arrow === "sort" ? arrowUpDownIcon : arrowDownIcon}
+                    source={
+                      def.arrow === "sort" ? arrowUpDownIcon : arrowDownIcon
+                    }
                     style={[
                       styles.filterArrowIcon,
                       (filterSelected || open) && styles.filterArrowActive,
@@ -402,7 +435,10 @@ export default function GodListScreen({ active = true }: { active?: boolean }) {
             ) : null
           }
           // 与首页俱乐部列表同口径：悬浮 tab 栏高 58 + 底部安全区，24 不足会被遮末行
-          contentContainerStyle={{ flexGrow: 1, paddingBottom: 100 + insets.bottom }}
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingBottom: 100 + insets.bottom,
+          }}
           refreshControl={
             <RefreshControl
               refreshing={godList.isRefetching && !godList.isFetchingNextPage}
@@ -426,7 +462,10 @@ export default function GodListScreen({ active = true }: { active?: boolean }) {
             options={activeFilterDef.options}
             value={filters[activeFilterDef.key]}
             onSelect={(value) => {
-              setFilters((current) => ({ ...current, [activeFilterDef.key]: value }));
+              setFilters((current) => ({
+                ...current,
+                [activeFilterDef.key]: value,
+              }));
               closeFilterMenu();
             }}
             onClose={closeFilterMenu}
@@ -462,11 +501,23 @@ const GamePill = memo(function GamePill({
       style={[styles.gamePill, active && styles.gamePillSelected]}
     >
       {iconUrl ? (
-        <CachedImage source={{ uri: iconUrl }} style={styles.gameIcon} contentFit="cover" />
+        <CachedImage
+          source={{ uri: iconUrl }}
+          style={styles.gameIcon}
+          contentFit="cover"
+        />
       ) : (
-        <Image source={allGamesIcon} style={styles.gameIcon} contentFit="cover" />
+        <Image
+          source={allGamesIcon}
+          style={styles.gameIcon}
+          contentFit="cover"
+        />
       )}
-      <Text style={[styles.gamePillText, active && styles.gamePillTextSelected]}>{label}</Text>
+      <Text
+        style={[styles.gamePillText, active && styles.gamePillTextSelected]}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 });
@@ -602,7 +653,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   menuOptionSelected: { backgroundColor: "#FFF5F5" },
-  menuOptionText: { color: "#0A0A0A", fontSize: 12, lineHeight: 18, textAlign: "center" },
+  menuOptionText: {
+    color: "#0A0A0A",
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: "center",
+  },
   menuOptionTextSelected: { color: "#FE1F4C", fontWeight: "500" },
   divider: {
     height: StyleSheet.hairlineWidth,

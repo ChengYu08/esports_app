@@ -1,12 +1,12 @@
 import {
-  batchPayQuickMatch,
-  fetchQuickMatchPayable,
-  selectAndCreateOrder,
-  StarNotEnoughError,
+    batchPayQuickMatch,
+    fetchQuickMatchPayable,
+    selectAndCreateOrder,
+    StarNotEnoughError,
 } from "@/features/match/api/match.api";
 import type {
-  QuickMatchCreatedOrder,
-  QuickMatchPayable,
+    QuickMatchCreatedOrder,
+    QuickMatchPayable,
 } from "@/features/match/api/match.types";
 import { showToast } from "@/shared/ui/app-toast";
 
@@ -38,7 +38,9 @@ export type ConfirmPayDeps = {
   onPaid: (orders: QuickMatchCreatedOrder[]) => void;
 };
 
-async function fetchPayable(deps: ConfirmPayDeps): Promise<QuickMatchPayable | null> {
+async function fetchPayable(
+  deps: ConfirmPayDeps,
+): Promise<QuickMatchPayable | null> {
   try {
     return await fetchQuickMatchPayable(deps.requestNo, deps.token);
   } catch (error) {
@@ -57,7 +59,7 @@ export async function confirmQuickMatchPay(
   deps: ConfirmPayDeps,
 ): Promise<ConfirmPayState> {
   if (!deps.selectionMatchesSnapshot()) {
-    showToast("陪玩选择已变化，请重新确认");
+    showToast("大神选择已变化，请重新确认");
     deps.onSelectionChanged();
     return state;
   }
@@ -66,7 +68,11 @@ export async function confirmQuickMatchPay(
   let orders = state.orders;
   if (!ordersCreated) {
     try {
-      const created = await selectAndCreateOrder(deps.requestNo, deps.grabIds, deps.token);
+      const created = await selectAndCreateOrder(
+        deps.requestNo,
+        deps.grabIds,
+        deps.token,
+      );
       ordersCreated = true;
       orders = created.orders;
       deps.onOrdersCreated();
@@ -82,7 +88,10 @@ export async function confirmQuickMatchPay(
   }
   // 对齐 PC：优先实付 realPayAmount，无则回退原价 totalPrice
   const currentTotal = payable.realPayAmount ?? payable.totalPrice;
-  if (payable.orderCount > 0 && Math.abs(currentTotal - state.expectedTotal) > 0.001) {
+  if (
+    payable.orderCount > 0 &&
+    Math.abs(currentTotal - state.expectedTotal) > 0.001
+  ) {
     showToast("待支付金额已更新，请核对后重新确认支付");
     return { ordersCreated, expectedTotal: currentTotal, orders };
   }

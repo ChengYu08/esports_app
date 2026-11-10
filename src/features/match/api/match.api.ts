@@ -1,23 +1,28 @@
 import { apiClient } from "@/core/network/api-client";
 
 import type {
-  MatchClub,
-  MatchGame,
-  MatchLevel,
-  MatchMode,
-  MatchService,
-  PublishQuickMatchPayload,
-  QuickMatchAuditionRoom,
-  QuickMatchCreatedOrder,
-  QuickMatchCreatedOrders,
-  QuickMatchGrabItem,
-  QuickMatchPayable,
-  QuickMatchPaymentPreview,
-  QuickMatchPublishResult,
-  QuickMatchRequestDetail,
+    MatchClub,
+    MatchGame,
+    MatchLevel,
+    MatchMode,
+    MatchService,
+    PublishQuickMatchPayload,
+    QuickMatchAuditionRoom,
+    QuickMatchCreatedOrder,
+    QuickMatchCreatedOrders,
+    QuickMatchGrabItem,
+    QuickMatchPayable,
+    QuickMatchPaymentPreview,
+    QuickMatchPublishResult,
+    QuickMatchRequestDetail,
 } from "./match.types";
 
-type ApiEnvelope<T> = { success?: boolean; code?: string; info?: string; data?: T };
+type ApiEnvelope<T> = {
+  success?: boolean;
+  code?: string;
+  info?: string;
+  data?: T;
+};
 
 type ApiGame = {
   id: number | string;
@@ -148,7 +153,10 @@ function requireSuccess<T>(response: ApiEnvelope<T>, fallback: string): T {
   return response.data;
 }
 
-function requireVoidSuccess(response: ApiEnvelope<unknown>, fallback: string): void {
+function requireVoidSuccess(
+  response: ApiEnvelope<unknown>,
+  fallback: string,
+): void {
   if (response.code !== "SUCCESS") {
     throw new Error(response.info || fallback);
   }
@@ -159,13 +167,17 @@ function toNumber(value: number | string | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-function toOptionalString(value: number | string | null | undefined): string | undefined {
+function toOptionalString(
+  value: number | string | null | undefined,
+): string | undefined {
   if (value === null || value === undefined || value === "") return undefined;
   return String(value);
 }
 
 /** trim 后为空串的字符串视为缺省（活动字段普通需求不输出） */
-function toTrimmedOptional(value: string | null | undefined): string | undefined {
+function toTrimmedOptional(
+  value: string | null | undefined,
+): string | undefined {
   const trimmed = (value || "").trim();
   return trimmed === "" ? undefined : trimmed;
 }
@@ -187,12 +199,16 @@ function mapCardItems(
 }
 
 /** 金额类字段：缺省（null/undefined）不输出；存在但非法兜底 0 */
-function toOptionalNumber(value: number | string | null | undefined): number | undefined {
+function toOptionalNumber(
+  value: number | string | null | undefined,
+): number | undefined {
   if (value === null || value === undefined || value === "") return undefined;
   return toNumber(value);
 }
 
-function mapRequestDetail(item: ApiRequestDetail | null | undefined): QuickMatchRequestDetail | null {
+function mapRequestDetail(
+  item: ApiRequestDetail | null | undefined,
+): QuickMatchRequestDetail | null {
   if (!item?.requestNo) return null;
   return {
     requestNo: String(item.requestNo),
@@ -239,7 +255,7 @@ function mapGrabItem(item: ApiGrab): QuickMatchGrabItem {
     requestNo: item.requestNo,
     companionUserId: toOptionalString(item.companionUserId),
     companionServiceId: toOptionalString(item.companionServiceId),
-    nickname: item.nickname || "陪玩",
+    nickname: item.nickname || "大神",
     headImage: item.headImage,
     sex,
     grabStatus: item.grabStatus as QuickMatchGrabItem["grabStatus"],
@@ -443,12 +459,18 @@ export async function fetchQuickMatchGrabList(
   return (list ?? []).map(mapGrabItem);
 }
 
-export async function cancelQuickMatch(requestNo: string, token: string): Promise<void> {
-  const response = await apiClient<ApiEnvelope<unknown>>("/client/v1/quickMatch/cancel", {
-    method: "POST",
-    token,
-    body: { action: { requestNo } },
-  });
+export async function cancelQuickMatch(
+  requestNo: string,
+  token: string,
+): Promise<void> {
+  const response = await apiClient<ApiEnvelope<unknown>>(
+    "/client/v1/quickMatch/cancel",
+    {
+      method: "POST",
+      token,
+      body: { action: { requestNo } },
+    },
+  );
   requireVoidSuccess(response, "取消派单失败，请稍后重试");
 }
 
@@ -509,11 +531,14 @@ export async function fetchQuickMatchPaymentPreview(
   grabIds: string[],
   token: string,
 ): Promise<QuickMatchPaymentPreview> {
-  const response = await apiClient<ApiEnvelope<ApiPaymentPreview>>("/client/v1/pay/preview", {
-    method: "POST",
-    token,
-    body: { action: { requestNo, grabIds } },
-  });
+  const response = await apiClient<ApiEnvelope<ApiPaymentPreview>>(
+    "/client/v1/pay/preview",
+    {
+      method: "POST",
+      token,
+      body: { action: { requestNo, grabIds } },
+    },
+  );
   const data = requireSuccess(response, "支付明细预览获取失败");
   const paymentMethods = (data.paymentMethods ?? []).map((item) => ({
     code: item.code ?? "DIAMOND",
@@ -525,12 +550,18 @@ export async function fetchQuickMatchPaymentPreview(
   return { totalPrice: toNumber(data.totalPrice), paymentMethods };
 }
 
-export async function batchPayQuickMatch(requestNo: string, token: string): Promise<void> {
-  const response = await apiClient<ApiEnvelope<unknown>>("/client/v1/quickMatch/batchPay", {
-    method: "POST",
-    token,
-    body: { action: { requestNo } },
-  });
+export async function batchPayQuickMatch(
+  requestNo: string,
+  token: string,
+): Promise<void> {
+  const response = await apiClient<ApiEnvelope<unknown>>(
+    "/client/v1/quickMatch/batchPay",
+    {
+      method: "POST",
+      token,
+      body: { action: { requestNo } },
+    },
+  );
   if (response.code === "STAR_NOT_ENOUGH") {
     throw new StarNotEnoughError(response.info);
   }
@@ -565,6 +596,7 @@ export async function ensureAuditionRoom(
     id,
     roomVersion: (data.roomVersion as string | number | undefined) ?? undefined,
     roomName: typeof data.roomName === "string" ? data.roomName : undefined,
-    creatorUserId: (data.creatorUserId as string | number | undefined) ?? undefined,
+    creatorUserId:
+      (data.creatorUserId as string | number | undefined) ?? undefined,
   };
 }

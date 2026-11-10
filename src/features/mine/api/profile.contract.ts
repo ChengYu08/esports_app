@@ -1,9 +1,9 @@
 import type {
-  ProfileDetail,
-  ProfileGameDetail,
-  ProfileGameRouteParams,
-  ProfileReviewPage,
-  ProfileRouteParams,
+    ProfileDetail,
+    ProfileGameDetail,
+    ProfileGameRouteParams,
+    ProfileReviewPage,
+    ProfileRouteParams,
 } from "./profile.types";
 
 type ApiEnvelope<T> = {
@@ -179,7 +179,10 @@ function mapGameDetail(data: ApiProfileGameDetail): ProfileGameDetail {
       clubGameServiceId: card.clubGameServiceId ?? 0,
       price: Number(card.price) || 0,
       orderCount: card.orderCount ?? 0,
-      goodRate: card.goodRate === null || card.goodRate === undefined ? null : Number(card.goodRate),
+      goodRate:
+        card.goodRate === null || card.goodRate === undefined
+          ? null
+          : Number(card.goodRate),
     })),
   };
 }
@@ -207,16 +210,23 @@ function mapReviews(data: ApiProfileReviewPage): ProfileReviewPage {
   };
 }
 
-export function getProfileRouteParams(params: {
-  clubId?: string | string[];
-  userId?: string | string[];
-}, currentUserId?: string): ProfileRouteParams | null {
+export function getProfileRouteParams(
+  params: {
+    clubId?: string | string[];
+    userId?: string | string[];
+  },
+  currentUserId?: string,
+): ProfileRouteParams | null {
   const userId = params.userId ?? currentUserId;
   if (typeof userId !== "string" || !userId.trim()) {
     return null;
   }
-  if (params.clubId !== undefined && typeof params.clubId !== "string") return null;
-  const clubId = typeof params.clubId === "string" && params.clubId.trim() ? params.clubId : undefined;
+  if (params.clubId !== undefined && typeof params.clubId !== "string")
+    return null;
+  const clubId =
+    typeof params.clubId === "string" && params.clubId.trim()
+      ? params.clubId
+      : undefined;
   return { ...(clubId ? { clubId } : {}), userId };
 }
 
@@ -228,48 +238,65 @@ export function createProfileContract(requester: ProfileRequester) {
   return {
     async fetchProfileDetail(params: ProfileRouteParams, signal?: AbortSignal) {
       const data = requireSuccess(
-        await requester<ApiProfileDetail>("/client/v1/companion/public/detail", {
-          method: "POST",
-          body: { userId: toId(params.userId, "用户ID") },
-          ...(signal ? { signal } : {}),
-        }),
+        await requester<ApiProfileDetail>(
+          "/client/v1/companion/public/detail",
+          {
+            method: "POST",
+            body: { userId: toId(params.userId, "用户ID") },
+            ...(signal ? { signal } : {}),
+          },
+        ),
         "个人主页加载失败",
       );
       return mapProfileDetail(data);
     },
 
-    async fetchProfileGameDetail(params: ProfileGameRouteParams, signal?: AbortSignal) {
+    async fetchProfileGameDetail(
+      params: ProfileGameRouteParams,
+      signal?: AbortSignal,
+    ) {
       const data = requireSuccess(
-        await requester<ApiProfileGameDetail>("/client/v1/companion/public/game/detail", {
-          method: "POST",
-          body: {
-            clubId: toId(params.clubId, "俱乐部ID"),
-            userId: toId(params.userId, "用户ID"),
-            gameId: toId(params.gameId, "游戏ID"),
+        await requester<ApiProfileGameDetail>(
+          "/client/v1/companion/public/game/detail",
+          {
+            method: "POST",
+            body: {
+              clubId: toId(params.clubId, "俱乐部ID"),
+              userId: toId(params.userId, "用户ID"),
+              gameId: toId(params.gameId, "游戏ID"),
+            },
+            ...(signal ? { signal } : {}),
           },
-          ...(signal ? { signal } : {}),
-        }),
+        ),
         "游戏技能加载失败",
       );
       return mapGameDetail(data);
     },
 
-    async fetchProfileReviews(params: { companionUserId: string; page?: number; pageSize?: number; signal?: AbortSignal }) {
+    async fetchProfileReviews(params: {
+      companionUserId: string;
+      page?: number;
+      pageSize?: number;
+      signal?: AbortSignal;
+    }) {
       const page = params.page ?? 1;
       const pageSize = params.pageSize ?? 20;
       const data = requireSuccess(
-        await requester<ApiProfileReviewPage>("/client/v1/afterSale/public/review/page", {
-          method: "POST",
-          body: {
-            page,
-            pageSize,
-            action: {
-              // 评价按陪玩师整体拉取，不做游戏分类过滤
-              companionUserId: toId(params.companionUserId, "用户ID"),
+        await requester<ApiProfileReviewPage>(
+          "/client/v1/afterSale/public/review/page",
+          {
+            method: "POST",
+            body: {
+              page,
+              pageSize,
+              action: {
+                // 评价按大神整体拉取，不做游戏分类过滤
+                companionUserId: toId(params.companionUserId, "用户ID"),
+              },
             },
+            ...(params.signal ? { signal: params.signal } : {}),
           },
-          ...(params.signal ? { signal: params.signal } : {}),
-        }),
+        ),
         "评价加载失败",
       );
       return mapReviews(data);

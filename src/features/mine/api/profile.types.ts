@@ -33,7 +33,7 @@ export type ProfileDetail = {
   orderCount: number;
   onlineStatus: number;
   gameStatus: number;
-  /** 陪玩大神标签（如“明星打手”），空表示不展示 */
+  /** 大神大神标签（如“明星打手”），空表示不展示 */
   tagName: string;
   /** 标签背景色：优先移动端色值，缺失时 UI 兜底 */
   tagColor: string;

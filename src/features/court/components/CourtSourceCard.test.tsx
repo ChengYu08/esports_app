@@ -36,8 +36,8 @@ const source: CourtSource = {
   gameName: "三角洲行动",
   modeName: "排位",
   levelName: "钻石",
-  serviceName: "陪玩",
-  companionNickname: "测试陪玩师",
+  serviceName: "大神",
+  companionNickname: "测试大神",
   companionAvatar: "https://cdn.example.com/avatar.png",
   defendantId: 200,
   defendantNickname: "测试用户",
@@ -121,9 +121,9 @@ describe("CourtSourceCard rendering", () => {
 
   it("keeps the local game icon failure fallback", async () => {
     await update(card(vi.fn()));
-    const image = renderer?.root.findAllByType(CachedImageHost).find(
-      (node) => node.props.recyclingKey === source.gameIconUrl,
-    );
+    const image = renderer?.root
+      .findAllByType(CachedImageHost)
+      .find((node) => node.props.recyclingKey === source.gameIconUrl);
 
     await act(async () => image?.props.onError());
 

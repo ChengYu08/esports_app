@@ -1,7 +1,13 @@
 import type { ImageSource } from "expo-image";
 
 export type OrderScope = "dispatch" | "accept" | "place";
-export type OrderFilter = "all" | "inProgress" | "completed" | "cancelled" | "grabbing" | "history";
+export type OrderFilter =
+  | "all"
+  | "inProgress"
+  | "completed"
+  | "cancelled"
+  | "grabbing"
+  | "history";
 
 export type OrderStatus =
   | "pendingPayment"
@@ -70,7 +76,7 @@ export type OrderItemModel = {
   unitPrice: string;
   quantity: number;
   totalPrice: string;
-  /** 订单类型（ACTIVITY=活动单，COMPANION=普通陪玩单等） */
+  /** 订单类型（ACTIVITY=活动单，COMPANION=普通大神单等） */
   orderType?: string;
   /** 实付金额（买家视角合计口径，活动订单为折后金额） */
   realPayAmount?: string;
@@ -99,7 +105,7 @@ export type OrderItemModel = {
   multiCompanion?: boolean;
   /** 一单多陪总人数（含主单，2~4） */
   multiCompanionCount?: number;
-  /** 参与陪玩（不含主单）；未选满时开始服务需先弹选人 */
+  /** 参与大神（不含主单）；未选满时开始服务需先弹选人 */
   companions?: MultiCompanionCandidateModel[];
   actions: readonly OrderAction[];
 };

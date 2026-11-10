@@ -5,21 +5,21 @@ import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
+    Pressable,
+    StyleSheet,
+    Text,
+    View,
+    useWindowDimensions,
 } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { fetchQuickMatchPaymentPreview } from "@/features/match/api/match.api";
 import {
-  isMultiCompanionRequest,
-  type MatchGame,
-  type QuickMatchCreatedOrder,
-  type QuickMatchPaymentPreview,
+    isMultiCompanionRequest,
+    type MatchGame,
+    type QuickMatchCreatedOrder,
+    type QuickMatchPaymentPreview,
 } from "@/features/match/api/match.types";
 import { MatchCelebrationOverlay } from "@/features/match/components/MatchCelebrationOverlay";
 import { MatchPaySheet } from "@/features/match/components/MatchPaySheet";
@@ -48,7 +48,9 @@ export default function MatchMatchingScreen({
   const token = useAuthStore((state) => state.accessToken);
   const [payVisible, setPayVisible] = useState(false);
   /** 建单前支付明细预览（对齐 PC：先看明细，确认支付才建单） */
-  const [payPreview, setPayPreview] = useState<QuickMatchPaymentPreview | null>(null);
+  const [payPreview, setPayPreview] = useState<QuickMatchPaymentPreview | null>(
+    null,
+  );
   /** 预览时的选择快照，建单与订单匹配均按快照执行 */
   const [selectionSnapshot, setSelectionSnapshot] = useState<string[]>([]);
   /** 每次发起预览自增，作为支付弹窗的 key 强制重置内部状态 */
@@ -76,7 +78,7 @@ export default function MatchMatchingScreen({
 
   const hasCandidates = session.candidates.length > 0;
 
-  // 首个陪玩出现时短暂播一段庆祝动效（一次性）
+  // 首个大神出现时短暂播一段庆祝动效（一次性）
   useEffect(() => {
     if (!hasCandidates || celebratedRef.current) return;
     celebratedRef.current = true;
@@ -97,7 +99,7 @@ export default function MatchMatchingScreen({
       return;
     }
     if (!session.selectedGrabIds.length) {
-      showToast("请先选择陪玩");
+      showToast("请先选择大神");
       return;
     }
     session.setSubmitting(true);
@@ -113,7 +115,9 @@ export default function MatchMatchingScreen({
       session.setSelectionLocked(true);
       setPayVisible(true);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "支付明细预览获取失败");
+      showToast(
+        error instanceof Error ? error.message : "支付明细预览获取失败",
+      );
     } finally {
       session.setSubmitting(false);
     }
@@ -157,7 +161,7 @@ export default function MatchMatchingScreen({
       const firstCandidate = session.candidates.find(
         (item) => item.companionUserId === firstCompanionId,
       );
-      // replace：用聊天页替换匹配页；多陪玩时仅打开首位会话，其余只发消息
+      // replace：用聊天页替换匹配页；多大神时仅打开首位会话，其余只发消息
       void afterOrderPaidOpenChat({
         companionUserIds,
         token,
@@ -207,7 +211,7 @@ export default function MatchMatchingScreen({
             entering={FadeIn.duration(220)}
             style={styles.navTitle}
           >
-            {hasCandidates ? "选择陪玩" : "一键匹配"}
+            {hasCandidates ? "选择大神" : "一键匹配"}
           </Animated.Text>
           {hasCandidates ? (
             <View style={styles.navRight}>

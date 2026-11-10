@@ -1,10 +1,10 @@
 import { apiClient } from "@/core/network/api-client";
 import { readOrderTimeFields } from "./order-time-fields";
 import type {
-  OrderFilter,
-  OrderItemModel,
-  OrderQueryStatus,
-  OrderScope,
+    OrderFilter,
+    OrderItemModel,
+    OrderQueryStatus,
+    OrderScope,
 } from "./order.types";
 
 type ApiEnvelope<T> = { code?: string; info?: string; data?: T };
@@ -88,20 +88,39 @@ export function mapOrder(
     ORDER_STATUS_BY_RAW[rawStatus ?? ""] ?? "pendingPayment";
   const id = stringValue(item, "id", "orderId", "orderNo") ?? `order-${index}`;
   const orderType = stringValue(item, "orderType");
-  // ACTIVITY：玩家合计=realPayAmount，陪玩合计=price；其它订单保持原口径。
-  // 非 ACTIVITY 但带活动字段时，陪玩侧仍取订单总价（兼容旧数据）。
+  // ACTIVITY：玩家合计=realPayAmount，大神合计=price；其它订单保持原口径。
+  // 非 ACTIVITY 但带活动字段时，大神侧仍取订单总价（兼容旧数据）。
   const isActivityType = orderType === "ACTIVITY";
-  const isActivityOrder = numberValue(item, "discountAmount") !== undefined
-    || numberValue(item, "refundBaseAmount") !== undefined
-    || numberValue(item, "productId") !== undefined;
+  const isActivityOrder =
+    numberValue(item, "discountAmount") !== undefined ||
+    numberValue(item, "refundBaseAmount") !== undefined ||
+    numberValue(item, "productId") !== undefined;
   // 普通订单合计优先取订单总价；待支付订单的实付金额为零，不能用它覆盖应付总价。
   const total = isActivityType
-    ? (scope === "accept"
-      ? stringValue(item, "price", "unitPrice", "totalPrice") ?? "0"
-      : stringValue(item, "realPayAmount", "totalPrice", "payAmount", "amount") ?? "0")
+    ? scope === "accept"
+      ? (stringValue(item, "price", "unitPrice", "totalPrice") ?? "0")
+      : (stringValue(
+          item,
+          "realPayAmount",
+          "totalPrice",
+          "payAmount",
+          "amount",
+        ) ?? "0")
     : scope === "accept" && isActivityOrder
-      ? stringValue(item, "totalPrice", "realPayAmount", "payAmount", "amount") ?? "0"
-      : stringValue(item, "totalPrice", "realPayAmount", "payAmount", "amount") ?? "0";
+      ? (stringValue(
+          item,
+          "totalPrice",
+          "realPayAmount",
+          "payAmount",
+          "amount",
+        ) ?? "0")
+      : (stringValue(
+          item,
+          "totalPrice",
+          "realPayAmount",
+          "payAmount",
+          "amount",
+        ) ?? "0");
   // 接口分别返回模式、等级和服务，不能只取服务名或用旧标题覆盖。
   const serviceParts = ["gameModeName", "gameLevelName", "serviceName"]
     .map((key) => stringValue(item, key)?.trim())
@@ -149,7 +168,7 @@ export function mapOrder(
               ]
             : [];
   const times = readOrderTimeFields(item);
-  // 一单多陪：列表 companions 已是「参与陪玩」语义；详情 multiCompanionList 含主单（首位），需按接单人 ID 排除
+  // 一单多陪：列表 companions 已是「参与大神」语义；详情 multiCompanionList 含主单（首位），需按接单人 ID 排除
   const mainUserId = numberValue(item, "receiverUserId");
   const companionsRaw: ApiOrder[] =
     Array.isArray(item.companions) && (item.companions as ApiOrder[]).length > 0
@@ -217,7 +236,7 @@ export function mapOrder(
     receiverName: stringValue(item, "receiverNickname", "companionName"),
     receiverAvatar: receiverAvatar ? { uri: receiverAvatar } : undefined,
     clubId: numberValue(item, "companionClubId", "clubId", "receiverClubId"),
-    // 只认陪玩师本人所属俱乐部；订单归属 clubName（如自营渠道单）不是打手所在俱乐部，不能兜底。
+    // 只认大神本人所属俱乐部；订单归属 clubName（如自营渠道单）不是打手所在俱乐部，不能兜底。
     clubName: stringValue(item, "companionClubName"),
     reviewId,
     reviewExists,
@@ -245,7 +264,7 @@ export function mapOrder(
     serviceName:
       serviceParts.join("-") ||
       stringValue(item, "title", "productName") ||
-      "陪玩服务",
+      "大神服务",
     gameName: stringValue(item, "gameName") ?? "未知游戏",
     gameModeName: stringValue(item, "gameModeName"),
     gameLevelName: stringValue(item, "gameLevelName"),
@@ -353,7 +372,7 @@ export type MultiCompanionCandidate = {
   headImage?: string;
 };
 
-/** 一单多陪：查询可选参与陪玩列表 */
+/** 一单多陪：查询可选参与大神列表 */
 export async function fetchMultiCompanionCandidates(
   orderId: string | number,
   token: string,
@@ -363,11 +382,11 @@ export async function fetchMultiCompanionCandidates(
     { method: "GET", token },
   );
   if (response.code !== "SUCCESS")
-    throw new Error(response.info || "获取可选陪玩失败");
+    throw new Error(response.info || "获取可选大神失败");
   return Array.isArray(response.data) ? response.data : [];
 }
 
-/** 一单多陪：选择参与陪玩 */
+/** 一单多陪：选择参与大神 */
 export async function selectMultiCompanions(
   orderId: string | number,
   companionUserIds: number[],
@@ -382,7 +401,7 @@ export async function selectMultiCompanions(
     },
   );
   if (response.code !== "SUCCESS")
-    throw new Error(response.info || "选择陪玩失败");
+    throw new Error(response.info || "选择大神失败");
 }
 
 export async function freeOrderService(
@@ -400,7 +419,7 @@ export async function freeOrderService(
           orderId: Number(orderId),
           freeAmount,
           actionType: "COMPANION_FREE",
-          reason: "陪玩服务免单",
+          reason: "大神服务免单",
         },
       },
     },
@@ -510,7 +529,11 @@ export async function fetchOrderClub(
   signal?: AbortSignal,
 ): Promise<OrderClubBrief | null> {
   const response = await apiClient<
-    ApiEnvelope<{ id?: number | string; clubName?: string; logoUrl?: string | null }>
+    ApiEnvelope<{
+      id?: number | string;
+      clubName?: string;
+      logoUrl?: string | null;
+    }>
   >(`/client/v1/club/public/detail?id=${encodeURIComponent(clubId)}`, {
     method: "GET",
     signal,
@@ -520,7 +543,11 @@ export async function fetchOrderClub(
   }
   const data = response.data;
   if (!data?.id) return null;
-  return { id: Number(data.id), name: data.clubName || "未命名俱乐部", logoUrl: data.logoUrl || undefined };
+  return {
+    id: Number(data.id),
+    name: data.clubName || "未命名俱乐部",
+    logoUrl: data.logoUrl || undefined,
+  };
 }
 
 export async function fetchOrderPage(

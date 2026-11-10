@@ -31,10 +31,7 @@ function ImageMessage({
           onPress={() =>
             router.push({
               pathname: "/image-preview",
-              params: createImagePreviewParams(
-                [message.imageUrl as string],
-                0,
-              ),
+              params: createImagePreviewParams([message.imageUrl as string], 0),
             })
           }
         >
@@ -61,7 +58,7 @@ export function MessageRoleTag({ role }: { role?: VoiceRoomMemberRole }) {
   if (role === "player") {
     return (
       <View style={[styles.msgRoleTag, styles.msgRoleTagPlayer]}>
-        <Text style={styles.msgRoleTagText}>陪玩</Text>
+        <Text style={styles.msgRoleTagText}>大神</Text>
       </View>
     );
   }
@@ -93,11 +90,7 @@ export function displayMessage(
   // 图片消息独立样式（Figma 51:16950）；纯文本按原有行内布局
   if (message.imageUrl) {
     return (
-      <ImageMessage
-        message={message}
-        memberRole={memberRole}
-        name={name}
-      />
+      <ImageMessage message={message} memberRole={memberRole} name={name} />
     );
   }
   return (

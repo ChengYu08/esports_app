@@ -1,14 +1,17 @@
 import { useAuthStore } from "@esports/auth";
-import { ChevronLeft24Regular, DismissCircle16Filled } from "@fluentui/react-native-icons";
+import {
+    ChevronLeft24Regular,
+    DismissCircle16Filled,
+} from "@fluentui/react-native-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    FlatList,
+    Pressable,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -19,8 +22,8 @@ import { useMessageStore } from "@/features/message/message-store";
 import { getConversationDisplayTitle } from "@/features/message/message-title";
 import type { MessageListItemModel } from "@/features/message/message.types";
 import {
-  isSelfConversationId,
-  normalizeSystemConversationId,
+    isSelfConversationId,
+    normalizeSystemConversationId,
 } from "@/features/message/system-conversations";
 import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
 import type { SearchUser } from "../api/search.api";
@@ -32,9 +35,12 @@ import { UserSearchCard } from "../components/UserSearchCard";
 import { useClubSearch } from "../hooks/use-club-search";
 import { useSearchHistory } from "../hooks/use-search-history";
 import { useUserSearch } from "../hooks/use-user-search";
-import { getSearchHistoryEntry, type SearchHistoryEntry } from "../search-history";
-import type { SearchCategory, SearchType } from "../search.types";
+import {
+    getSearchHistoryEntry,
+    type SearchHistoryEntry,
+} from "../search-history";
 import { searchTypography } from "../search-typography";
+import type { SearchCategory, SearchType } from "../search.types";
 
 type SearchResult = Club | SearchUser | MessageListItemModel;
 
@@ -59,7 +65,9 @@ export default function ClubSearchScreen() {
     type?: SearchType;
     clubId?: string;
   }>();
-  const [category, setCategory] = useState<SearchCategory>(type === "user" ? "user" : "club");
+  const [category, setCategory] = useState<SearchCategory>(
+    type === "user" ? "user" : "club",
+  );
   // 从俱乐部/个人主页弹回本页时 dismissTo 会更新参数，渲染期同步切换分类（避免 effect 里 setState）
   const [lastType, setLastType] = useState(type);
   if (type !== lastType) {
@@ -75,7 +83,9 @@ export default function ClubSearchScreen() {
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const userId = useAuthStore((state) => state.user?.id);
   const conversations = useMessageStore((state) => state.conversations);
-  const blacklistedUserIds = useMessageStore((state) => state.blacklistedUserIds);
+  const blacklistedUserIds = useMessageStore(
+    (state) => state.blacklistedUserIds,
+  );
   const clubSearch = useClubSearch(searchType === "club" ? keyword : "");
   const userSearch = useUserSearch(searchType === "user" ? keyword : "");
 
@@ -113,8 +123,14 @@ export default function ClubSearchScreen() {
     }
     setInput(next);
     setKeyword(next);
-    const results = searchType === "club" ? clubSearch.data?.items : userSearch.data?.items;
-    addHistory(getSearchHistoryEntry(next, searchType === "message" ? [] : results ?? []));
+    const results =
+      searchType === "club" ? clubSearch.data?.items : userSearch.data?.items;
+    addHistory(
+      getSearchHistoryEntry(
+        next,
+        searchType === "message" ? [] : (results ?? []),
+      ),
+    );
   };
 
   const handleSubmit = () => {
@@ -138,30 +154,49 @@ export default function ClubSearchScreen() {
     addHistory({ ...entry, keyword: next });
   };
 
-  const recordClub = useCallback((club: Club) => {
-    addHistory({ keyword: club.name, avatarUrl: club.coverUrl, entityId: club.id, category: "club" });
-  }, [addHistory]);
+  const recordClub = useCallback(
+    (club: Club) => {
+      addHistory({
+        keyword: club.name,
+        avatarUrl: club.coverUrl,
+        entityId: club.id,
+        category: "club",
+      });
+    },
+    [addHistory],
+  );
 
-  const recordUser = useCallback((user: SearchUser) => {
-    addHistory({ keyword: user.nickname, avatarUrl: user.headImage, entityId: String(user.userId), category: "user" });
-  }, [addHistory]);
+  const recordUser = useCallback(
+    (user: SearchUser) => {
+      addHistory({
+        keyword: user.nickname,
+        avatarUrl: user.headImage,
+        entityId: String(user.userId),
+        category: "user",
+      });
+    },
+    [addHistory],
+  );
 
   const searching = searchType === "message" || keyword.length > 0;
   const messageItems = useMemo<MessageListItemModel[]>(
     () =>
-      filterMessageConversations(conversations, keyword, userId, blacklistedUserIds).map(
-        (conversation) => ({
-          ...conversation,
-          id: normalizeSystemConversationId(conversation.id),
-          title: getConversationDisplayTitle(
-            conversation.id,
-            conversation.title,
-            conversation.note,
-          ),
-          kind: "conversation",
-          avatar: conversation.avatar || defaultConversationAvatar,
-        }),
-      ),
+      filterMessageConversations(
+        conversations,
+        keyword,
+        userId,
+        blacklistedUserIds,
+      ).map((conversation) => ({
+        ...conversation,
+        id: normalizeSystemConversationId(conversation.id),
+        title: getConversationDisplayTitle(
+          conversation.id,
+          conversation.title,
+          conversation.note,
+        ),
+        kind: "conversation",
+        avatar: conversation.avatar || defaultConversationAvatar,
+      })),
     [blacklistedUserIds, conversations, keyword, userId],
   );
   const search = searchType === "club" ? clubSearch : userSearch;
@@ -171,7 +206,8 @@ export default function ClubSearchScreen() {
       searchType === "message" ? messageItems : (search.data?.items ?? []),
     [searchType, messageItems, search.data],
   );
-  const placeholder = searchType === "message" ? "搜索聊天用户" : "搜索俱乐部或陪玩";
+  const placeholder =
+    searchType === "message" ? "搜索聊天用户" : "搜索俱乐部或大神";
 
   const retrySearch = () => {
     search.refetch();
@@ -191,7 +227,12 @@ export default function ClubSearchScreen() {
   };
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <View
+      style={[
+        styles.screen,
+        { paddingTop: insets.top, paddingBottom: insets.bottom },
+      ]}
+    >
       <View style={styles.nav}>
         <Pressable
           accessibilityLabel="返回"
@@ -233,7 +274,10 @@ export default function ClubSearchScreen() {
         >
           <Text
             numberOfLines={1}
-            style={[styles.submitText, input.trim().length > 0 && styles.submitActive]}
+            style={[
+              styles.submitText,
+              input.trim().length > 0 && styles.submitActive,
+            ]}
           >
             搜索
           </Text>
@@ -245,7 +289,10 @@ export default function ClubSearchScreen() {
       {searching ? (
         <FlatList<SearchResult>
           key={searchType}
-          contentContainerStyle={[styles.results, items.length === 0 && styles.emptyResults]}
+          contentContainerStyle={[
+            styles.results,
+            items.length === 0 && styles.emptyResults,
+          ]}
           data={items as SearchResult[]}
           keyExtractor={(item) =>
             searchType === "club"
@@ -260,16 +307,29 @@ export default function ClubSearchScreen() {
             ) : search.isLoading ? (
               <LoadingState messageStyle={searchTypography.regular12} />
             ) : search.isError ? (
-              <ErrorState onRetry={retrySearch} messageStyle={searchTypography.regular14} retryTextStyle={searchTypography.regular12} />
+              <ErrorState
+                onRetry={retrySearch}
+                messageStyle={searchTypography.regular14}
+                retryTextStyle={searchTypography.regular12}
+              />
             ) : (
               <SearchEmptyState />
             )
           }
           renderItem={({ item, index }) =>
             searchType === "club" ? (
-              <ClubSearchCard club={item as Club} keyword={keyword} onSelect={recordClub} />
+              <ClubSearchCard
+                club={item as Club}
+                keyword={keyword}
+                onSelect={recordClub}
+              />
             ) : searchType === "user" ? (
-              <UserSearchCard user={item as SearchUser} clubId={clubId} keyword={keyword} onSelect={recordUser} />
+              <UserSearchCard
+                user={item as SearchUser}
+                clubId={clubId}
+                keyword={keyword}
+                onSelect={recordUser}
+              />
             ) : (
               <MessageListItem
                 item={item as MessageListItemModel}
@@ -278,14 +338,21 @@ export default function ClubSearchScreen() {
               />
             )
           }
-          ItemSeparatorComponent={searchType === "message" ? MessageSearchSeparator : undefined}
+          ItemSeparatorComponent={
+            searchType === "message" ? MessageSearchSeparator : undefined
+          }
           initialNumToRender={searchType === "message" ? undefined : 8}
           windowSize={searchType === "message" ? undefined : 5}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         />
       ) : (
-        <SearchHistory history={history} type={searchType} onSearch={searchHistory} onClear={clearHistory} />
+        <SearchHistory
+          history={history}
+          type={searchType}
+          onSearch={searchHistory}
+          onClear={clearHistory}
+        />
       )}
     </View>
   );
@@ -298,7 +365,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  back: { width: 56, height: 44, alignItems: "center", justifyContent: "center" },
+  back: {
+    width: 56,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   inputBox: {
     flex: 1,
     height: 36,
@@ -317,7 +389,12 @@ const styles = StyleSheet.create({
     color: "#111",
     textAlignVertical: "center",
   },
-  clearInput: { width: 20, height: 36, alignItems: "center", justifyContent: "center" },
+  clearInput: {
+    width: 20,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   // 不写死宽度：固定 56 减去左右内边距后只剩 28pt，两个 14pt 汉字会被挤成两行
   submit: {
     height: 44,

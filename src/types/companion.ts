@@ -1,5 +1,5 @@
 /**
- * 陪玩资料类型定义
+ * 大神资料类型定义
  */
 
 export interface CompanionGame {

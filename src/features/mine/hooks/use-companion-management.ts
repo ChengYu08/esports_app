@@ -23,7 +23,7 @@ export function useManagementAccount() {
       : !clubId
         ? "当前账号未加入俱乐部"
         : !isCompanion
-          ? "当前账号没有陪玩管理权限"
+          ? "当前账号没有大神管理权限"
           : null,
   };
 }

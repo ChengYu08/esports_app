@@ -1,79 +1,71 @@
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
-  ChevronLeft24Regular,
-  MoreHorizontal24Regular,
-  Star16Filled,
-  Star16Regular,
+    ChevronLeft24Regular,
+    MoreHorizontal24Regular,
+    Star16Filled,
+    Star16Regular,
 } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useIsFocused, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import {
-  memo,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ComponentProps,
-  type ReactElement,
+    memo,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type ComponentProps,
+    type ReactElement,
 } from "react";
-import {
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
-  Extrapolation,
-  interpolate,
-  runOnJS,
-  useAnimatedScrollHandler,
-  useAnimatedStyle,
-  useSharedValue,
-  type SharedValue,
+    Extrapolation,
+    interpolate,
+    runOnJS,
+    useAnimatedScrollHandler,
+    useAnimatedStyle,
+    useSharedValue,
+    type SharedValue,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
-  getFirstProfileGameId,
-  getProfileRouteParams,
+    getFirstProfileGameId,
+    getProfileRouteParams,
 } from "@/features/mine/api/profile.contract";
 import type {
-  ProfileDetail,
-  ProfileGame,
-  ProfileGameDetail,
-  ProfileReview,
-  ProfileSkillCard,
+    ProfileDetail,
+    ProfileGame,
+    ProfileGameDetail,
+    ProfileReview,
+    ProfileSkillCard,
 } from "@/features/mine/api/profile.types";
 import {
-  addToBlacklist,
-  isUserBlacklisted,
-  removeFromBlacklist,
-  subscribeBlacklist,
+    addToBlacklist,
+    isUserBlacklisted,
+    removeFromBlacklist,
+    subscribeBlacklist,
 } from "@/features/mine/blacklist";
 import { CompanionOrderSheet } from "@/features/mine/components/CompanionOrderSheet";
 import { ProfileActionsSheet } from "@/features/mine/components/ProfileActionsSheet";
 import {
-  ProfileGameSkeleton,
-  ProfileSkeleton,
+    ProfileGameSkeleton,
+    ProfileSkeleton,
 } from "@/features/mine/components/ProfileSkeleton";
 import { StarPaymentSheet } from "@/features/mine/components/StarPaymentSheet";
 import {
-  useProfileDetail,
-  useProfileGameDetail,
-  useProfileReviews,
+    useProfileDetail,
+    useProfileGameDetail,
+    useProfileReviews,
 } from "@/features/mine/hooks/use-profile-data";
 import {
-  useToggleUserFollow,
-  useUserFollowState,
+    useToggleUserFollow,
+    useUserFollowState,
 } from "@/features/mine/hooks/use-user-follow";
-import {
-  createImagePreviewParams,
-} from "@/features/mine/image-preview.params";
+import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import { createProfileAvatarPreviewParams } from "@/features/mine/profile-avatar-preview";
 import { createProfileChatParams } from "@/features/mine/profile-chat";
 import { calculateAge } from "@/features/mine/profile-utils";
@@ -111,22 +103,19 @@ function useHeaderFade(
   topInset: number,
   inverse: boolean,
 ) {
-  return useAnimatedStyle(
-    () => {
-      if (coverHeight === 0) {
-        return { opacity: inverse ? 1 : 0 };
-      }
-      const fadeStart = coverHeight - topInset - NAV_BAR_CONTENT_HEIGHT;
-      const progress = interpolate(
-        scrollY.value,
-        [fadeStart - 1, fadeStart],
-        [0, 1],
-        Extrapolation.CLAMP,
-      );
-      return { opacity: inverse ? 1 - progress : progress };
-    },
-    [coverHeight, inverse, scrollY, topInset],
-  );
+  return useAnimatedStyle(() => {
+    if (coverHeight === 0) {
+      return { opacity: inverse ? 1 : 0 };
+    }
+    const fadeStart = coverHeight - topInset - NAV_BAR_CONTENT_HEIGHT;
+    const progress = interpolate(
+      scrollY.value,
+      [fadeStart - 1, fadeStart],
+      [0, 1],
+      Extrapolation.CLAMP,
+    );
+    return { opacity: inverse ? 1 - progress : progress };
+  }, [coverHeight, inverse, scrollY, topInset]);
 }
 
 export default function ProfileScreen() {
@@ -212,7 +201,10 @@ export default function ProfileScreen() {
     (game) => String(game.gameId) === selectedGameId,
   )
     ? selectedGameId
-    : String(detail?.games.find((game) => game.gameName === route.reorderGame)?.gameId ?? firstGameId);
+    : String(
+        detail?.games.find((game) => game.gameName === route.reorderGame)
+          ?.gameId ?? firstGameId,
+      );
 
   const gameDetailQuery = useProfileGameDetail(
     routeParams && (detail?.clubId || routeParams.clubId) && activeGameId
@@ -224,7 +216,7 @@ export default function ProfileScreen() {
       : null,
     focused,
   );
-  // 评价按陪玩师整体拉取（全部游戏），不做游戏分类过滤
+  // 评价按大神整体拉取（全部游戏），不做游戏分类过滤
   const reviewQuery = useProfileReviews(
     tab === "评价" && routeParams
       ? { companionUserId: routeParams.userId }
@@ -392,7 +384,9 @@ export default function ProfileScreen() {
     if (!route.reorderGame || reorderHandled.current || !detail) {
       return;
     }
-    const matchingGames = detail.games.filter((game) => game.gameName === route.reorderGame);
+    const matchingGames = detail.games.filter(
+      (game) => game.gameName === route.reorderGame,
+    );
     if (matchingGames.length !== 1) {
       reorderHandled.current = true;
       showToast("原订单游戏已变更，请重新选择服务");
@@ -410,8 +404,10 @@ export default function ProfileScreen() {
     if (!gameDetail || String(gameDetail.gameId) !== gameId) {
       return;
     }
-    const cards = gameDetail.skillCards.filter((card) =>
-      card.modeName === route.reorderMode && card.levelName === route.reorderLevel,
+    const cards = gameDetail.skillCards.filter(
+      (card) =>
+        card.modeName === route.reorderMode &&
+        card.levelName === route.reorderLevel,
     );
     const levelIds = new Set(cards.map((card) => card.gameLevelId));
     if (levelIds.size !== 1 || !route.reorderService) {
@@ -424,12 +420,42 @@ export default function ProfileScreen() {
       setReorderActive(true);
       openOrder(cards[0]);
     });
-  }, [activeGameId, detail, gameDetail, gameDetailQuery.isError, openOrder, route.reorderGame, route.reorderLevel, route.reorderMode, route.reorderService]);
-  const navbarBgFadeStyle = useHeaderFade(scrollY, coverHeight, insets.top, false);
-  const compactIdentityFadeStyle = useHeaderFade(scrollY, coverHeight, insets.top, false);
-  const navTabsFadeStyle = useHeaderFade(scrollY, coverHeight, insets.top, false);
+  }, [
+    activeGameId,
+    detail,
+    gameDetail,
+    gameDetailQuery.isError,
+    openOrder,
+    route.reorderGame,
+    route.reorderLevel,
+    route.reorderMode,
+    route.reorderService,
+  ]);
+  const navbarBgFadeStyle = useHeaderFade(
+    scrollY,
+    coverHeight,
+    insets.top,
+    false,
+  );
+  const compactIdentityFadeStyle = useHeaderFade(
+    scrollY,
+    coverHeight,
+    insets.top,
+    false,
+  );
+  const navTabsFadeStyle = useHeaderFade(
+    scrollY,
+    coverHeight,
+    insets.top,
+    false,
+  );
   // 默认头部中的标签栏:紧凑头部淡入时反向淡出
-  const listTabsInverseFadeStyle = useHeaderFade(scrollY, coverHeight, insets.top, true);
+  const listTabsInverseFadeStyle = useHeaderFade(
+    scrollY,
+    coverHeight,
+    insets.top,
+    true,
+  );
 
   // 列表项拆成独立 memo：item 对象引用跨无关 state 变化保持稳定，FlatList cell 才能整体 bail out。
   // 旧写法一整个 useMemo，compactActive/playingVoiceUrl/blacklistStatus 任一变化都会整份重建所有 item。
@@ -556,7 +582,7 @@ export default function ProfileScreen() {
         content: (
           <View style={[styles.scrollBody, dimStyle]}>
             <Text style={[styles.sectionTitle, styles.serviceTitle]}>
-              陪玩服务
+              大神服务
             </Text>
           </View>
         ),
@@ -639,10 +665,7 @@ export default function ProfileScreen() {
           key: "reviews-empty",
           content: (
             <View style={styles.scrollBody}>
-              <EmptyState
-                message="暂无评价"
-                hint="完成订单后会显示评价内容"
-              />
+              <EmptyState message="暂无评价" hint="完成订单后会显示评价内容" />
             </View>
           ),
         },
@@ -655,7 +678,11 @@ export default function ProfileScreen() {
   }, [reviewLoading, reviewError, reviewItems, refetchReviews]);
 
   const profileListItems = useMemo<ProfileListItem[]>(
-    () => [coverItem, tabsItem, ...(tab === "技能" ? skillItems : reviewListItems)],
+    () => [
+      coverItem,
+      tabsItem,
+      ...(tab === "技能" ? skillItems : reviewListItems),
+    ],
     [coverItem, tabsItem, skillItems, reviewListItems, tab],
   );
 
@@ -864,7 +891,9 @@ export default function ProfileScreen() {
                   showToast("已取消拉黑");
                 })
                 .catch((error: unknown) => {
-                  showToast(error instanceof Error ? error.message : "操作失败");
+                  showToast(
+                    error instanceof Error ? error.message : "操作失败",
+                  );
                 });
             } else {
               setBlacklistPromptVisible(true);
@@ -916,7 +945,9 @@ export default function ProfileScreen() {
           }}
           token={accessToken}
           initialServiceName={reorderActive ? route.reorderService : undefined}
-          initialQuantity={reorderActive ? Number(route.reorderQuantity) : undefined}
+          initialQuantity={
+            reorderActive ? Number(route.reorderQuantity) : undefined
+          }
           onClose={() => {
             setOrderCard(null);
             setReorderActive(false);
@@ -1093,7 +1124,9 @@ const ProfileCover = memo(function ProfileCover({
             // 收起态下可见行数达到 2 行说明被截断，此时才展示展开/收起按钮
             if (introExpanded) return;
             const overflows = event.nativeEvent.lines.length >= 2;
-            setIntroOverflows((prev) => (prev === overflows ? prev : overflows));
+            setIntroOverflows((prev) =>
+              prev === overflows ? prev : overflows,
+            );
           }}
         >
           {profile.signature || "暂无个人简介"}
@@ -1858,7 +1891,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  // 大神标签：与陪玩卡片标签保持一致的尺寸与排版
+  // 大神标签：与大神卡片标签保持一致的尺寸与排版
   companionTag: {
     borderRadius: 2,
     paddingHorizontal: 2,
@@ -1990,7 +2023,13 @@ const styles = StyleSheet.create({
   },
   // paddingBottom 1：部分 Android 屏幕密度下 32dp 取整后最后 1px 物理行落在
   // 横向滚动裁剪区外，选中态的圆角边框底部会被裁掉，留 1px 余量兼容
-  gameTags: { flexDirection: "row", gap: 10, marginTop: 12, paddingRight: 16, paddingBottom: 1 },
+  gameTags: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 12,
+    paddingRight: 16,
+    paddingBottom: 1,
+  },
   gameTag: {
     height: 32,
     paddingHorizontal: 6,
@@ -2099,7 +2138,7 @@ const styles = StyleSheet.create({
   serviceTitle: { marginTop: 28 },
   serviceCard: {
     minHeight: 67,
-    // 卡片之间间距 8；首张与上方「陪玩服务」标题间距 12
+    // 卡片之间间距 8；首张与上方「大神服务」标题间距 12
     marginTop: 8,
     padding: 12,
     borderRadius: 8,

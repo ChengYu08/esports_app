@@ -1,14 +1,14 @@
-# 陪玩师卡片公共组件化 实施计划
+# 大神卡片公共组件化 实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 把大神列表的陪玩师卡片（GodCard，已按最新设计稿实现）抽取为 `src/shared/ui/CompanionCard.tsx` 公共组件，首页大神列表与俱乐部主页陪玩师列表共用，俱乐部数据补充新字段对齐展示。
+**Goal:** 把大神列表的大神卡片（GodCard，已按最新设计稿实现）抽取为 `src/shared/ui/CompanionCard.tsx` 公共组件，首页大神列表与俱乐部主页大神列表共用，俱乐部数据补充新字段对齐展示。
 
 **Architecture:** 按 AGENTS.md 跨 feature 复用规则，卡片提升为 `shared/ui` 无业务语义纯 UI 组件：展示与交互全部由 props 驱动（跳转、语音播放由父级注入）。`god.api.ts` 的 `GodListItem` 与 `home` 的 `Companion` 各自显式映射为卡片 props。俱乐部接口 `/client/v1/companion/public/page` 已实测返回与大神接口相同的新字段（tagName/tagMobileBackgroundColor/modeName/levelName/clubGameServiceName/gameName），扩展 `ApiCompanion`/`Companion` 映射即可。
 
 **Tech Stack:** Expo SDK 57 + RN 0.86、expo-image、vitest（仅纯逻辑单测）。
 
-**Spec:** 用户需求（2026-10-30 会话）：以大神陪玩师卡片为唯一基准抽取公共组件，大神与俱乐部主页两处复用，数据字段展示以大神卡片为准，注意数据兼容性。
+**Spec:** 用户需求（2026-10-30 会话）：以大神大神卡片为唯一基准抽取公共组件，大神与俱乐部主页两处复用，数据字段展示以大神卡片为准，注意数据兼容性。
 
 ## Global Constraints
 
@@ -28,40 +28,77 @@
 
 ---
 
-### Task 1: 扩展俱乐部陪玩数据字段（TDD）
+### Task 1: 扩展俱乐部大神数据字段（TDD）
 
 **Files:**
+
 - Test: `src/features/home/api/home.api.test.ts`
 - Modify: `src/features/home/api/home.types.ts:91-104`（`Companion`）
 - Modify: `src/features/home/api/home.api.ts:92`（`ApiCompanion`）、`home.api.ts:130-136`（`fetchCompanionPage` 映射）
 
 **Interfaces:**
+
 - Consumes: 现有 `fetchCompanionPage(filters, page, pageSize?, signal?)` 返回 `CompanionPage`。
 - Produces: `Companion` 新增字段（与 `GodListItem` 同名同语义）：`tagName: string`、`tagColor: string`、`gameName: string`、`modeName: string`、`levelName: string`、`serviceName: string`、`age: number | null`；`signature` 保留。
 
-- [ ] **Step 1: 写失败测试** —— 在 `home.api.test.ts` 新增 describe「俱乐部陪玩列表字段映射」，mock `apiClient` 返回含新字段与缺省字段的混合 records，断言：
+- [ ] **Step 1: 写失败测试** —— 在 `home.api.test.ts` 新增 describe「俱乐部大神列表字段映射」，mock `apiClient` 返回含新字段与缺省字段的混合 records，断言：
   - `tagName/tagColor` 映射（`tagColor` 取 `tagMobileBackgroundColor`，缺失时回退 `tagBackgroundColor`，均无则为 `""`）；
   - `modeName/levelName` 直映、`serviceName` 取 `clubGameServiceName`、`gameName` 缺省为 `""`；
   - `age` 缺省为 `null`、有值时为 `Number`；
   - 旧字段（price/orderCount 等）映射不回归。
 
 ```ts
-it("陪玩列表映射标签与模式/等级/服务字段，缺省时兜底空值", async () => {
+it("大神列表映射标签与模式/等级/服务字段，缺省时兜底空值", async () => {
   vi.mocked(apiClient).mockResolvedValue({
     code: "SUCCESS",
-    data: { page: 1, totalPages: 1, records: [
-      { profileId: 29, userId: 50100075, nickname: "哈吉蜂", sex: 1, age: 21,
-        tagName: "明星", tagBackgroundColor: "#138666", tagMobileBackgroundColor: "#FE4267",
-        gameName: "三角洲行动手游", modeName: "大乱斗", levelName: "星耀", clubGameServiceName: "陪玩",
-        orderCount: 10, onlineStatus: 1, gameStatus: 1, price: 112 },
-      { profileId: 68, nickname: "盼友", sex: 2, orderCount: 0 },
-    ] },
+    data: {
+      page: 1,
+      totalPages: 1,
+      records: [
+        {
+          profileId: 29,
+          userId: 50100075,
+          nickname: "哈吉蜂",
+          sex: 1,
+          age: 21,
+          tagName: "明星",
+          tagBackgroundColor: "#138666",
+          tagMobileBackgroundColor: "#FE4267",
+          gameName: "三角洲行动手游",
+          modeName: "大乱斗",
+          levelName: "星耀",
+          clubGameServiceName: "大神",
+          orderCount: 10,
+          onlineStatus: 1,
+          gameStatus: 1,
+          price: 112,
+        },
+        { profileId: 68, nickname: "盼友", sex: 2, orderCount: 0 },
+      ],
+    },
   });
   const page = await fetchCompanionPage({ clubId: "1000006", gameId: "11" });
-  expect(page.items[0]).toMatchObject({ tagName: "明星", tagColor: "#FE4267", gameName: "三角洲行动手游",
-    modeName: "大乱斗", levelName: "星耀", serviceName: "陪玩", age: 21, price: 112 });
-  expect(page.items[1]).toMatchObject({ tagName: "", tagColor: "", gameName: "", modeName: "",
-    levelName: "", serviceName: "", age: null, signature: "", onlineStatus: 0 });
+  expect(page.items[0]).toMatchObject({
+    tagName: "明星",
+    tagColor: "#FE4267",
+    gameName: "三角洲行动手游",
+    modeName: "大乱斗",
+    levelName: "星耀",
+    serviceName: "大神",
+    age: 21,
+    price: 112,
+  });
+  expect(page.items[1]).toMatchObject({
+    tagName: "",
+    tagColor: "",
+    gameName: "",
+    modeName: "",
+    levelName: "",
+    serviceName: "",
+    age: null,
+    signature: "",
+    onlineStatus: 0,
+  });
 });
 ```
 
@@ -71,14 +108,16 @@ it("陪玩列表映射标签与模式/等级/服务字段，缺省时兜底空�
 
 - [ ] **Step 4: 运行确认通过** —— 同 Step 2 命令，全部 PASS。
 
-- [ ] **Step 5: 提交** —— `git add src/features/home/api/ && git commit -m "feat: 俱乐部陪玩列表接口补充标签与模式/等级/服务字段映射"`
+- [ ] **Step 5: 提交** —— `git add src/features/home/api/ && git commit -m "feat: 俱乐部大神列表接口补充标签与模式/等级/服务字段映射"`
 
 ### Task 2: 创建公共卡片组件 `shared/ui/CompanionCard`
 
 **Files:**
+
 - Create: `src/shared/ui/CompanionCard.tsx`
 
 **Interfaces:**
+
 - Consumes: `@/shared/audio/VoicePlayButton`（tone="light"）、`@/shared/audio/use-voice-player` 的类型约定（`playingUrl: string | null`、`onToggleVoice: (url: string) => void`）、既有切图资源（`assets/svgs/male.svg`、`assets/svgs/mine-female.svg`、`assets/mine/mine-avatar.png`、`assets/svgs/club-status-playing.svg`、`assets/svgs/club-status-idle.svg`，相对路径改为 `../../../assets/...`）。
 - Produces: `export function CompanionCard(props: CompanionCardProps)`（`memo` 包裹导出），props 类型如下，供 Task 3/4 消费：
 
@@ -112,35 +151,39 @@ export type CompanionCardProps = {
 
 - [ ] **Step 2: 类型与静态检查** —— `npx tsc --noEmit` 通过（新文件暂无消费方，允许）。
 
-- [ ] **Step 3: 提交** —— `git add src/shared/ui/CompanionCard.tsx && git commit -m "feat: 新增陪玩师公共卡片组件 CompanionCard（迁移自大神列表）"`
+- [ ] **Step 3: 提交** —— `git add src/shared/ui/CompanionCard.tsx && git commit -m "feat: 新增大神公共卡片组件 CompanionCard（迁移自大神列表）"`
 
 ### Task 3: 大神列表接入公共组件
 
 **Files:**
+
 - Modify: `src/features/god/screens/GodListScreen.tsx`（`renderCard` 约 193-210 行、删除本地 `GodCard`/`levelTagColor` 及相关样式与资源 import）
 
 **Interfaces:**
+
 - Consumes: Task 2 的 `CompanionCard` / `CompanionCardProps`。
 - Produces: 无（`GodListItem` 字段为 `CompanionCardProps` 的超集，`renderCard` 直接透传 + `gameIconUrl`）。
 
 - [ ] **Step 1: 替换渲染** —— `renderCard` 改为渲染 `CompanionCard`（`item` 字段逐个透传、`gameIconUrl={gameIconByName.get(item.gameName)}`、语音与 onPress 原样）。
 - [ ] **Step 2: 清理** —— 删除本地 `GodCard` 函数、`levelTagColor`、仅卡片使用的样式键与 `maleIcon/femaleIcon/diamondIcon/emptyAvatar/statusPlayingIcon/statusIdleIcon` 中不再被引用的 require（`arrowDown/arrowUpDown/allGames` 等仍被筛选栏使用，保留）。
 - [ ] **Step 3: 验证** —— `npx tsc --noEmit` 通过；`npx expo lint 2>&1 | grep -c god` 为 0。
-- [ ] **Step 4: 提交** —— `git commit -am "refactor: 大神列表改用公共陪玩师卡片组件"`
+- [ ] **Step 4: 提交** —— `git commit -am "refactor: 大神列表改用公共大神卡片组件"`
 
 ### Task 4: 俱乐部主页接入公共组件
 
 **Files:**
+
 - Modify: `src/features/home/screens/ClubDetailScreen.tsx`（`renderMember` 157-185 行、删除 `MemberCard` 828-940 行、`StatusTag` 777-797 行、`MemberStatus` 类型及相关样式；FlatList 约 390 行加 `ItemSeparatorComponent`）
 
 **Interfaces:**
+
 - Consumes: Task 1 的 `Companion` 新字段、Task 2 的 `CompanionCard`。
 
 - [ ] **Step 1: 替换渲染** —— `renderMember` 改为渲染 `CompanionCard`，映射：`avatar: item.headImage ?? ""`、`sex: item.sex ?? 0`、`age: item.age ?? null`、`tagName/tagColor/modeName/levelName/serviceName` 直映、`gameName: item.gameName || selectedGameInfo?.name`、`gameIconUrl: selectedGameInfo?.iconUrl`（接口记录不带游戏图标，沿用所选游戏图标）、`voiceUrl: item.voiceUrl ?? null`、`voiceDurationSeconds: item.voiceDurationSeconds ?? null`、语音与 `onPress`（保持 `/profile` 只带 `clubId/userId`）原样。
 - [ ] **Step 2: 分割线** —— FlatList 增加 `ItemSeparatorComponent`（`hairlineWidth` 高、`COLORS.border`、`marginHorizontal: 16`），替代原卡片内绝对定位 `memberDivider`。
 - [ ] **Step 3: 清理** —— 删除 `MemberCard`、`StatusTag`、`MemberStatus`（确认无其他引用）及仅其使用的样式键（member*、statusTag* 等）与 `statusPlayingIcon/statusIdleIcon` 中失效的 require/导入。
 - [ ] **Step 4: 验证** —— `npx tsc --noEmit` 通过；`npx expo lint 2>&1 | grep -c "home/screens/ClubDetail"` 为 0。
-- [ ] **Step 5: 提交** —— `git commit -am "refactor: 俱乐部主页陪玩师列表改用公共卡片组件并对齐新字段展示"`
+- [ ] **Step 5: 提交** —— `git commit -am "refactor: 俱乐部主页大神列表改用公共卡片组件并对齐新字段展示"`
 
 ### Task 5: 全量校验收尾
 

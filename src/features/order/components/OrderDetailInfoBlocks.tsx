@@ -1,15 +1,22 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { CachedImage } from "@/shared/ui/CachedImage";
-import type { MultiCompanionCandidateModel, OrderItemModel } from "@/features/order/order.types";
-import { SYSTEM_FONT } from "@/shared/theme/typography";
-import { computeOrderPayableStars, formatOrderFreeSummary, formatStar } from "@/features/order/free-amount";
 import { OrderDetailInfoRow } from "@/features/order/components/OrderDetailInfoRow";
 import {
-  formatOrderTime,
-  formatServiceTime,
+    computeOrderPayableStars,
+    formatOrderFreeSummary,
+    formatStar,
+} from "@/features/order/free-amount";
+import {
+    formatOrderTime,
+    formatServiceTime,
 } from "@/features/order/order-detail-format";
+import type {
+    MultiCompanionCandidateModel,
+    OrderItemModel,
+} from "@/features/order/order.types";
+import { SYSTEM_FONT } from "@/shared/theme/typography";
+import { CachedImage } from "@/shared/ui/CachedImage";
 
 /** 订单信息区：服务信息块（卖家 + 游戏服务单价）+ 订单信息块（编号 + 时间） */
 export function OrderDetailInfoBlocks({
@@ -24,10 +31,13 @@ export function OrderDetailInfoBlocks({
 }: {
   order: OrderItemModel;
   scope: "accept" | "place";
-  /** 陪玩师所属俱乐部名（详情接口只回 id，由外部解析后传入） */
+  /** 大神所属俱乐部名（详情接口只回 id，由外部解析后传入） */
   clubName?: string;
   clubLogoUrl?: string;
-  companionClubs: Record<string, { clubId: number; clubName: string; logoUrl?: string } | undefined>;
+  companionClubs: Record<
+    string,
+    { clubId: number; clubName: string; logoUrl?: string } | undefined
+  >;
   orderNumber: string;
   onCopy: () => void;
   onChat: (companion?: MultiCompanionCandidateModel) => void;
@@ -38,12 +48,15 @@ export function OrderDetailInfoBlocks({
   return (
     <>
       <View
-        style={[
-          styles.infoBlock,
-          scope === "accept" && styles.acceptInfoBlock,
-        ]}
+        style={[styles.infoBlock, scope === "accept" && styles.acceptInfoBlock]}
       >
-        <View style={[styles.sellerRow, scope === "accept" && styles.acceptSellerRow, multiple && styles.multiSellerRow]}>
+        <View
+          style={[
+            styles.sellerRow,
+            scope === "accept" && styles.acceptSellerRow,
+            multiple && styles.multiSellerRow,
+          ]}
+        >
           <CachedImage
             contentFit="cover"
             source={order.sellerAvatar}
@@ -60,7 +73,11 @@ export function OrderDetailInfoBlocks({
               {order.sellerName}
             </Text>
             {clubName ? (
-              <ClubLabel key={clubLogoUrl || "no-logo"} name={clubName} logoUrl={clubLogoUrl} />
+              <ClubLabel
+                key={clubLogoUrl || "no-logo"}
+                name={clubName}
+                logoUrl={clubLogoUrl}
+              />
             ) : null}
           </View>
           <Pressable
@@ -81,32 +98,57 @@ export function OrderDetailInfoBlocks({
             </Text>
           </Pressable>
         </View>
-        {scope === "place" && order.companions?.map((companion, index) => (
-          <View key={`${companion.userId}-${index}`} style={[styles.sellerRow, styles.multiSellerRow]}>
-            <CachedImage
-              contentFit="cover"
-              source={companion.headImage ? { uri: companion.headImage } : require("../../../../assets/images/avatar_default.webp")}
-              style={styles.avatar}
-            />
-            <View style={styles.sellerCopy}>
-              <Text numberOfLines={1} style={styles.sellerName}>
-                {companion.nickname || "陪玩师"}
-              </Text>
-              {(companion.clubName || companionClubs[companion.userId]?.clubName) && (
-                <ClubLabel key={companionClubs[companion.userId]?.logoUrl || "no-logo"} name={companion.clubName || companionClubs[companion.userId]!.clubName} logoUrl={companionClubs[companion.userId]?.logoUrl} />
-              )}
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`联系${companion.nickname || "陪玩师"}`}
-              onPress={() => onChat({ ...companion, clubId: companion.clubId ?? companionClubs[companion.userId]?.clubId })}
-              style={styles.chatButton}
+        {scope === "place" &&
+          order.companions?.map((companion, index) => (
+            <View
+              key={`${companion.userId}-${index}`}
+              style={[styles.sellerRow, styles.multiSellerRow]}
             >
-              <Text style={styles.chatText}>聊一聊</Text>
-            </Pressable>
-          </View>
-        ))}
-        <View style={[styles.divider, scope === "accept" && styles.acceptDivider]} />
+              <CachedImage
+                contentFit="cover"
+                source={
+                  companion.headImage
+                    ? { uri: companion.headImage }
+                    : require("../../../../assets/images/avatar_default.webp")
+                }
+                style={styles.avatar}
+              />
+              <View style={styles.sellerCopy}>
+                <Text numberOfLines={1} style={styles.sellerName}>
+                  {companion.nickname || "大神"}
+                </Text>
+                {(companion.clubName ||
+                  companionClubs[companion.userId]?.clubName) && (
+                  <ClubLabel
+                    key={companionClubs[companion.userId]?.logoUrl || "no-logo"}
+                    name={
+                      companion.clubName ||
+                      companionClubs[companion.userId]!.clubName
+                    }
+                    logoUrl={companionClubs[companion.userId]?.logoUrl}
+                  />
+                )}
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`联系${companion.nickname || "大神"}`}
+                onPress={() =>
+                  onChat({
+                    ...companion,
+                    clubId:
+                      companion.clubId ??
+                      companionClubs[companion.userId]?.clubId,
+                  })
+                }
+                style={styles.chatButton}
+              >
+                <Text style={styles.chatText}>聊一聊</Text>
+              </Pressable>
+            </View>
+          ))}
+        <View
+          style={[styles.divider, scope === "accept" && styles.acceptDivider]}
+        />
         <View style={scope === "accept" && styles.acceptRows}>
           <OrderDetailInfoRow
             acceptStyle={scope === "accept"}
@@ -148,7 +190,11 @@ export function OrderDetailInfoBlocks({
           ) : null}
           {freeSummary ? (
             <>
-              <OrderDetailInfoRow acceptStyle={scope === "accept"} label="免单" value={freeSummary} />
+              <OrderDetailInfoRow
+                acceptStyle={scope === "accept"}
+                label="免单"
+                value={freeSummary}
+              />
               <OrderDetailInfoRow
                 acceptStyle={scope === "accept"}
                 label={`${amountLabel}(免单后)`}
@@ -180,7 +226,7 @@ export function OrderDetailInfoBlocks({
         {scope === "accept" ? (
           <OrderDetailInfoRow
             acceptStyle
-            // 派单时间：单子排到陪玩侧的时间；普通单即支付完成进入接单池的时间
+            // 派单时间：单子排到大神侧的时间；普通单即支付完成进入接单池的时间
             label="派单时间"
             value={formatOrderTime(order.dispatchTime ?? order.paidTime)}
           />
@@ -218,9 +264,16 @@ function ClubLabel({ name, logoUrl }: { name: string; logoUrl?: string }) {
   return (
     <View style={styles.clubLine}>
       {logoUrl && !failed && (
-        <CachedImage source={{ uri: logoUrl }} style={styles.clubLogo} contentFit="cover" onError={() => setFailed(true)} />
+        <CachedImage
+          source={{ uri: logoUrl }}
+          style={styles.clubLogo}
+          contentFit="cover"
+          onError={() => setFailed(true)}
+        />
       )}
-      <Text numberOfLines={1} style={styles.muted}>{name}</Text>
+      <Text numberOfLines={1} style={styles.muted}>
+        {name}
+      </Text>
     </View>
   );
 }
@@ -234,11 +287,29 @@ const styles = StyleSheet.create({
     borderTopColor: "#F7F7F7",
     backgroundColor: "#FFF",
   },
-  acceptInfoBlock: { borderTopWidth: 8, paddingVertical: 0, backgroundColor: "#FFF" },
-  acceptDetailsBlock: { borderTopWidth: 8, paddingVertical: 6, backgroundColor: "#FFF" },
+  acceptInfoBlock: {
+    borderTopWidth: 8,
+    paddingVertical: 0,
+    backgroundColor: "#FFF",
+  },
+  acceptDetailsBlock: {
+    borderTopWidth: 8,
+    paddingVertical: 6,
+    backgroundColor: "#FFF",
+  },
   acceptRows: { paddingVertical: 6 },
-  sellerRow: { flexDirection: "row", alignItems: "center", minHeight: 56, paddingVertical: 12 },
-  multiSellerRow: { backgroundColor: "#F7F7F7", borderRadius: 8, paddingHorizontal: 12, marginTop: 8 },
+  sellerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: 56,
+    paddingVertical: 12,
+  },
+  multiSellerRow: {
+    backgroundColor: "#F7F7F7",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    marginTop: 8,
+  },
   clubLine: { flexDirection: "row", alignItems: "center", gap: 2 },
   clubLogo: { width: 12, height: 12, borderRadius: 2 },
   acceptSellerRow: { minHeight: 56, paddingVertical: 12 },
@@ -252,8 +323,19 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     lineHeight: 22,
   },
-  acceptSellerName: { color: "#0A0A0A", fontSize: 14, fontWeight: "500", lineHeight: 22 },
-  muted: { flexShrink: 1, color: "#999", fontFamily: SYSTEM_FONT, fontSize: 11, lineHeight: 14 },
+  acceptSellerName: {
+    color: "#0A0A0A",
+    fontSize: 14,
+    fontWeight: "500",
+    lineHeight: 22,
+  },
+  muted: {
+    flexShrink: 1,
+    color: "#999",
+    fontFamily: SYSTEM_FONT,
+    fontSize: 11,
+    lineHeight: 14,
+  },
   chatButton: {
     backgroundColor: "#FE1F4C",
     borderRadius: 20,
@@ -269,7 +351,12 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontWeight: "500",
   },
-  acceptChatButton: { height: 26, borderRadius: 13, paddingHorizontal: 12, backgroundColor: "#FE1F4C" },
+  acceptChatButton: {
+    height: 26,
+    borderRadius: 13,
+    paddingHorizontal: 12,
+    backgroundColor: "#FE1F4C",
+  },
   acceptChatText: { fontSize: 12, fontWeight: "500", lineHeight: 18 },
   divider: {
     height: StyleSheet.hairlineWidth,

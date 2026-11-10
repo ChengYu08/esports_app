@@ -3,36 +3,36 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  Animated,
-  Easing,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    Animated,
+    Easing,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MatchLinearGradient } from "@/features/match/components/MatchLinearGradient";
 import {
-  buildCreateOrderAction,
-  createCompanionOrder,
-  fetchCompanionServices,
-  type CompanionOrderContext,
-  type CompanionServiceOption,
+    buildCreateOrderAction,
+    createCompanionOrder,
+    fetchCompanionServices,
+    type CompanionOrderContext,
+    type CompanionServiceOption,
 } from "@/features/mine/api/companion-order.api";
 import type {
-  ProfileDetail,
-  ProfileSkillCard,
+    ProfileDetail,
+    ProfileSkillCard,
 } from "@/features/mine/api/profile.types";
 import {
-  handleOrderFailurePromptConfirm,
-  requiresRealNameVerification,
-  requiresSelfRealNameVerification,
+    handleOrderFailurePromptConfirm,
+    requiresRealNameVerification,
+    requiresSelfRealNameVerification,
 } from "@/features/mine/order-real-name";
 import { calculateAge } from "@/features/mine/profile-utils";
 import { getDDinProStyle } from "@/shared/theme/typography";
@@ -274,7 +274,7 @@ export function CompanionOrderSheet({
             ]}
           >
             <View style={styles.orderModalHeader}>
-              <Text style={styles.orderModalTitle}>陪玩下单</Text>
+              <Text style={styles.orderModalTitle}>大神下单</Text>
               <Pressable
                 accessibilityLabel="关闭"
                 hitSlop={8}

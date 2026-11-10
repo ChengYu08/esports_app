@@ -1,9 +1,9 @@
 import { showToast } from "@/shared/ui/app-toast";
 import { useAuthStore } from "@esports/auth";
-import { useQuery } from "@tanstack/react-query";
-import { LinearGradient } from "expo-linear-gradient";
-import * as Clipboard from "expo-clipboard";
 import { Copy16Regular } from "@fluentui/react-native-icons";
+import { useQuery } from "@tanstack/react-query";
+import * as Clipboard from "expo-clipboard";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -12,7 +12,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { grabQuickMatchAndEnterAudition } from "@/features/match/grab-quick-match-flow";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
-import { fetchDispatchDetail, isActivityDispatchRequest } from "../dispatch.api";
+import {
+    fetchDispatchDetail,
+    isActivityDispatchRequest,
+} from "../dispatch.api";
 
 const DEFAULT_AVATAR = require("../../../../assets/svgs/order-seller-avatar.svg");
 const GAME_FALLBACK = require("../../../../assets/svgs/game.svg");
@@ -71,12 +74,12 @@ export function DispatchDetailScreen({ requestNo }: { requestNo: string }) {
     [request.modeName, request.levelName, request.serviceName]
       .map((part) => String(part ?? "").trim())
       .filter(Boolean)
-      .join("-") || "陪玩服务";
+      .join("-") || "大神服务";
   const statusLabel = getStatusLabel(status, grabStatus, hasGrabbed);
   const stateDescription = getStateDescription(status, grabStatus, hasGrabbed);
   /** 活动派单判定：activityCode 非空即活动需求；普通需求渲染零变化 */
   const isActivity = isActivityDispatchRequest(request);
-  const cardItems = isActivity ? request.cardItems ?? [] : [];
+  const cardItems = isActivity ? (request.cardItems ?? []) : [];
 
   const copyOrderNumber = async () => {
     try {
@@ -184,7 +187,9 @@ export function DispatchDetailScreen({ requestNo }: { requestNo: string }) {
               {cardItems.map((item, index) => (
                 <View key={`${item.label}-${index}`} style={styles.activityRow}>
                   <Text style={styles.activityLabel}>{item.label}</Text>
-                  <Text numberOfLines={1} style={styles.activityValue}>{item.value?.text ?? ""}</Text>
+                  <Text numberOfLines={1} style={styles.activityValue}>
+                    {item.value?.text ?? ""}
+                  </Text>
                 </View>
               ))}
             </View>
@@ -219,7 +224,12 @@ export function DispatchDetailScreen({ requestNo }: { requestNo: string }) {
             <Text style={styles.label}>订单编号</Text>
             <View style={styles.orderNumberValue}>
               <Text style={styles.value}>{request.requestNo || requestNo}</Text>
-              <Pressable accessibilityRole="button" accessibilityLabel="复制订单编号" hitSlop={8} onPress={copyOrderNumber}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="复制订单编号"
+                hitSlop={8}
+                onPress={copyOrderNumber}
+              >
                 <Copy16Regular color="#808080" width={16} height={16} />
               </Pressable>
             </View>
@@ -289,11 +299,11 @@ function getStateDescription(
   if (status === "EXPIRED") return "本次派单已超过有效时间";
   if (status === "ORDERED")
     return grabStatus === "FAILED"
-      ? "老板已选择其他陪玩下单"
+      ? "老板已选择其他大神下单"
       : "老板已完成下单";
   if (grabStatus === "SUCCESS") return "抢单成功，等待订单开始";
-  if (grabStatus === "FAILED") return "老板已选择其他陪玩下单";
-  return hasGrabbed ? "已提交抢单，等待老板选择陪玩师" : "该需求当前尚未被抢单";
+  if (grabStatus === "FAILED") return "老板已选择其他大神下单";
+  return hasGrabbed ? "已提交抢单，等待老板选择大神" : "该需求当前尚未被抢单";
 }
 
 function InfoRow({
@@ -393,14 +403,36 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 12,
   },
-  gameValue: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 4 },
+  gameValue: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 4,
+  },
   gameIcon: { width: 20, height: 20 },
   gameName: { flexShrink: 1, color: "#222", fontSize: 12, lineHeight: 20 },
-  activityCard: { gap: 6, padding: 12, borderRadius: 8, backgroundColor: "#FFF5F6" },
+  activityCard: {
+    gap: 6,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: "#FFF5F6",
+  },
   activityCardTitle: { color: "#FE1F4C", fontSize: 13, fontWeight: "600" },
-  activityRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },
+  activityRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
   activityLabel: { width: 70, color: "#B98A90", fontSize: 12, lineHeight: 20 },
-  activityValue: { flex: 1, color: "#FE1F4C", fontSize: 12, lineHeight: 20, textAlign: "right" },
+  activityValue: {
+    flex: 1,
+    color: "#FE1F4C",
+    fontSize: 12,
+    lineHeight: 20,
+    textAlign: "right",
+  },
   infoRow: {
     minHeight: 34,
     flexDirection: "row",
@@ -409,7 +441,13 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   multilineRow: { minHeight: 44 },
-  orderNumberValue: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 8 },
+  orderNumberValue: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 8,
+  },
   label: {
     width: 70,
     color: "#999",

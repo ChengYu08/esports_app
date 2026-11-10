@@ -16,8 +16,13 @@ type ClubOnlineCountQuery = {
   queryKey: readonly ["club-online-count", string, number[]];
 };
 
-function buildQueries(clubs: readonly Club[], gameIds?: readonly number[]): ClubOnlineCountQuery[] {
-  const uniqueClubs = Array.from(new Map(clubs.map((club) => [club.id, club])).values());
+function buildQueries(
+  clubs: readonly Club[],
+  gameIds?: readonly number[],
+): ClubOnlineCountQuery[] {
+  const uniqueClubs = Array.from(
+    new Map(clubs.map((club) => [club.id, club])).values(),
+  );
   return uniqueClubs.map((club) => {
     const countedGames = Array.from(new Set(club.gameIds ?? []))
       .filter((id) => !gameIds || gameIds.includes(id))
@@ -32,7 +37,9 @@ function buildQueries(clubs: readonly Club[], gameIds?: readonly number[]): Club
 
 /** 俱乐部集合与游戏范围未变化时签名不变，避免列表刷新导致重复请求。 */
 function buildSignature(queries: ClubOnlineCountQuery[]) {
-  return queries.map((query) => `${query.clubId}:${query.countedGames.join(",")}`).join("|");
+  return queries
+    .map((query) => `${query.clubId}:${query.countedGames.join(",")}`)
+    .join("|");
 }
 
 function readCachedCounts(
@@ -47,17 +54,24 @@ function readCachedCounts(
   return counts;
 }
 
-function sameCounts(current: Record<string, number>, next: Record<string, number>) {
+function sameCounts(
+  current: Record<string, number>,
+  next: Record<string, number>,
+) {
   const currentKeys = Object.keys(current);
   if (currentKeys.length !== Object.keys(next).length) return false;
   return currentKeys.every((key) => current[key] === next[key]);
 }
 
 /**
- * 首页在线陪玩按当前游戏范围统计，返回首页或下拉刷新时同步重新查询。
+ * 首页在线大神按当前游戏范围统计，返回首页或下拉刷新时同步重新查询。
  * 查询结果先落缓存，全部结束后统一写回一次，避免每个查询各自返回时触发整页重渲染。
  */
-export function useClubOnlineCounts(clubs: readonly Club[], gameIds?: readonly number[], enabled = true) {
+export function useClubOnlineCounts(
+  clubs: readonly Club[],
+  gameIds?: readonly number[],
+  enabled = true,
+) {
   const focused = useIsFocused();
   const queryClient = useQueryClient();
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -77,38 +91,55 @@ export function useClubOnlineCounts(clubs: readonly Club[], gameIds?: readonly n
   }, [queryClient]);
 
   // 分批请求：每批结束后让出事件循环；自动聚焦复用 30 秒新鲜缓存，手动下拉仍强制刷新。
-  const fetchAll = useCallback(async (force = false) => {
-    const runId = ++runIdRef.current;
-    const activeQueries = queriesRef.current;
-    if (activeQueries.length === 0) return;
-    if (force) {
-      setIsRefetching(true);
-    }
-    try {
-      for (let index = 0; index < activeQueries.length; index += ONLINE_COUNT_BATCH_SIZE) {
-        if (runIdRef.current !== runId) return;
-        const batch = activeQueries.slice(index, index + ONLINE_COUNT_BATCH_SIZE);
-        await Promise.allSettled(
-          batch.map((query) =>
-            queryClient.fetchQuery({
-              queryKey: query.queryKey,
-              queryFn: ({ signal }) => fetchClubOnlineCount(query.clubId, query.countedGames, signal),
-              staleTime: force ? 0 : ONLINE_COUNT_STALE_TIME_MS,
-              retry: 1,
-            }),
-          ),
-        );
-        if (runIdRef.current !== runId) return;
-        if (index + ONLINE_COUNT_BATCH_SIZE < activeQueries.length) {
-          await new Promise((resolve) => setTimeout(resolve, ONLINE_COUNT_BATCH_GAP_MS));
+  const fetchAll = useCallback(
+    async (force = false) => {
+      const runId = ++runIdRef.current;
+      const activeQueries = queriesRef.current;
+      if (activeQueries.length === 0) return;
+      if (force) {
+        setIsRefetching(true);
+      }
+      try {
+        for (
+          let index = 0;
+          index < activeQueries.length;
+          index += ONLINE_COUNT_BATCH_SIZE
+        ) {
+          if (runIdRef.current !== runId) return;
+          const batch = activeQueries.slice(
+            index,
+            index + ONLINE_COUNT_BATCH_SIZE,
+          );
+          await Promise.allSettled(
+            batch.map((query) =>
+              queryClient.fetchQuery({
+                queryKey: query.queryKey,
+                queryFn: ({ signal }) =>
+                  fetchClubOnlineCount(
+                    query.clubId,
+                    query.countedGames,
+                    signal,
+                  ),
+                staleTime: force ? 0 : ONLINE_COUNT_STALE_TIME_MS,
+                retry: 1,
+              }),
+            ),
+          );
+          if (runIdRef.current !== runId) return;
+          if (index + ONLINE_COUNT_BATCH_SIZE < activeQueries.length) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, ONLINE_COUNT_BATCH_GAP_MS),
+            );
+          }
+        }
+      } finally {
+        if (force && runIdRef.current === runId) {
+          setIsRefetching(false);
         }
       }
-    } finally {
-      if (force && runIdRef.current === runId) {
-        setIsRefetching(false);
-      }
-    }
-  }, [queryClient]);
+    },
+    [queryClient],
+  );
 
   useEffect(() => {
     if (!enabled || !focused) {
