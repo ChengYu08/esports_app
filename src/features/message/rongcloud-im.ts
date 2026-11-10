@@ -247,17 +247,31 @@ function toLocalMediaUri(path: string) {
   return `file://${path.startsWith('/') ? '' : '/'}${path}`;
 }
 
+/** 融云私有存储的媒体 URL 直连会 401，只能经 SDK 下载 */
+function isRongHubUrl(url: string) {
+  return /^https?:\/\/[^/]*ronghub\.com\//i.test(url);
+}
+
 export async function downloadRongImageMessage(message: ManagedMessage): Promise<string> {
   if (message.kind !== 'image') throw new Error('消息不是图片');
+  // 发图前已把自家 OSS 公网地址预置进 remote，公网地址直接预览即可。
+  // 不能送融云 SDK 下载：iOS wrapper 的 downloadMediaMessage 只认本地库
+  // messageId，REMOTE 策略拉取的历史消息不在本地库（messageId=0），
+  // SDK 下载必报 34204（RC_INVALID_PARAMETER_MESSAGE_ID）
+  if (/^https?:\/\//i.test(message.imageUrl) && !isRongHubUrl(message.imageUrl)) {
+    return message.imageUrl;
+  }
   if (/^(?:file|content):\/\//i.test(message.imageUrl)) return message.imageUrl;
   const mediaMessage = message.mediaSource as RCIMIWMediaMessage | undefined;
   if (!mediaMessage) {
-    if (/^https?:\/\/[^/]*ronghub\.com\//i.test(message.imageUrl)) {
+    if (isRongHubUrl(message.imageUrl)) {
       throw new Error('缺少融云媒体消息数据，无法通过 SDK 下载图片');
     }
     return message.imageUrl;
   }
-  if (mediaMessage.local) return toLocalMediaUri(mediaMessage.local);
+  // 接收消息里的 local 是对方设备上的文件路径、本机并不存在，只有自己
+  // 发出的消息 local 才指向本机文件
+  if (message.isMine && mediaMessage.local) return toLocalMediaUri(mediaMessage.local);
 
   const currentEngine = requireConnected();
   return new Promise((resolve, reject) => {

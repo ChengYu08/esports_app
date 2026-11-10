@@ -633,9 +633,16 @@ export function ChatConversation({
     if (isNearBottom.current) scrollToLatest();
   }, [scrollToLatest]);
 
+  // iOS：设置弹窗的原生 Modal 退场完成前立刻挂备注弹窗会触发原生呈现竞争导致页面卡死，
+  // 先收设置弹窗，等 BottomSheet 的 onExited 下一帧再挂备注
+  const pendingNoteEditorRef = useRef(false);
   const openNoteEditor = () => {
     setNoteDraft(conversation?.note || "");
     setSettingsVisible(false);
+    if (Platform.OS === "ios") {
+      pendingNoteEditorRef.current = true;
+      return;
+    }
     setNoteVisible(true);
   };
 
@@ -858,6 +865,11 @@ export function ChatConversation({
       <BottomSheet
         visible={settingsVisible}
         onClose={() => setSettingsVisible(false)}
+        onExited={() => {
+          if (!pendingNoteEditorRef.current) return;
+          pendingNoteEditorRef.current = false;
+          setNoteVisible(true);
+        }}
         scrollable
         contentStyle={[
           styles.settingsSheet,

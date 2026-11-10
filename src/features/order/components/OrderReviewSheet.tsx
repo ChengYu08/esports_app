@@ -1,9 +1,8 @@
 import { Add24Regular } from "@fluentui/react-native-icons";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -14,15 +13,15 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import {
   KeyboardAwareScrollView,
-  KeyboardAvoidingView,
+  KeyboardStickyView,
 } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "@esports/auth";
 
+import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
-import { ImagePreview } from "@/shared/ui/ImagePreview";
 import type { OrderReview, OrderReviewInput } from "../order.api";
 import { uploadReviewImage } from "../order-review-upload";
 
@@ -37,6 +36,8 @@ type Props = {
   detail?: OrderReview | null;
   onClose: () => void;
   onSubmit: (input: OrderReviewInput) => Promise<void>;
+  /** 跳转相册/预览前回调：弹窗是原生 Modal 会盖住 push 出来的路由页，父组件需先收起弹窗，返回时再恢复 */
+  onSuppress?: () => void;
 };
 
 export function OrderReviewSheet({
@@ -45,6 +46,7 @@ export function OrderReviewSheet({
   detail,
   onClose,
   onSubmit,
+  onSuppress,
 }: Props) {
   const insets = useSafeAreaInsets();
   const accessToken = useAuthStore((state) => state.accessToken);
@@ -53,7 +55,20 @@ export function OrderReviewSheet({
   const [images, setImages] = useState<string[]>([]);
   const [anonymous, setAnonymous] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const [footerHeight, setFooterHeight] = useState(0);
+  // 因跳转相册/预览临时收起弹窗时置位，恢复显示时跳过草稿重置
+  const suppressResetRef = useRef(false);
+
+  const suppressSheet = useCallback(() => {
+    suppressResetRef.current = true;
+    onSuppress?.();
+  }, [onSuppress]);
+
+  // 用户主动关闭弹窗后，下次打开必须重置草稿（suppress 标记只服务「跳转返回」场景）
+  const handleClose = useCallback(() => {
+    suppressResetRef.current = false;
+    onClose();
+  }, [onClose]);
 
   useEffect(() => {
     if (detail) {
@@ -63,10 +78,14 @@ export function OrderReviewSheet({
       setContent(detail.content || "");
       setImages(detail.imageUrls?.slice(0, MAX_IMAGES) ?? []);
     } else if (visible && !readonly) {
-      setRating(5);
-      setContent("");
-      setImages([]);
-      setAnonymous(true);
+      if (suppressResetRef.current) {
+        suppressResetRef.current = false;
+      } else {
+        setRating(5);
+        setContent("");
+        setImages([]);
+        setAnonymous(true);
+      }
     }
   }, [detail, readonly, visible]);
 
@@ -108,6 +127,7 @@ export function OrderReviewSheet({
     if (readonly || submitting || images.length >= MAX_IMAGES) return;
     // 相册选择页内部处理权限，选图结果经会话桥接回传
     const pickPending = beginMediaPick();
+    suppressSheet();
     router.push({
       pathname: "/media-picker",
       params: { max: String(MAX_IMAGES - images.length) },
@@ -117,6 +137,14 @@ export function OrderReviewSheet({
     setImages((current) => [...current, ...picked].slice(0, MAX_IMAGES));
   };
 
+  const openPreview = (index: number) => {
+    suppressSheet();
+    router.push({
+      pathname: "/image-preview",
+      params: createImagePreviewParams(images, index),
+    });
+  };
+
   // 与 Web 端 canSubmit 口径一致：评分有效即可提交，评价内容与图片均为选填
   const canSubmit = rating >= 1 && rating <= 5;
 
@@ -124,11 +152,11 @@ export function OrderReviewSheet({
     <BottomSheet
       fullScreen
       visible={visible}
-      onClose={onClose}
+      onClose={handleClose}
       dismissOnBackdropPress={!submitting}
       contentStyle={styles.frame}
     >
-      <KeyboardAvoidingView behavior="padding" style={styles.keyboardFrame}>
+      <View style={styles.keyboardFrame}>
         <View style={styles.screen}>
           <View style={[styles.header, { paddingTop: insets.top }]}>
             <Pressable
@@ -136,7 +164,7 @@ export function OrderReviewSheet({
               accessibilityRole="button"
               disabled={submitting}
               hitSlop={8}
-              onPress={onClose}
+              onPress={handleClose}
               style={styles.backButton}
             >
               <Text style={styles.backIcon}>‹</Text>
@@ -146,8 +174,12 @@ export function OrderReviewSheet({
           </View>
 
           <KeyboardAwareScrollView
-            bounces={false}
+            // 与小法庭表单同一套键盘栈：滚动区自动避让（避开底部提交栏），
+            // 提交栏由 KeyboardStickyView 单独跟随键盘，不再叠加 KAV 双重避让
+            bottomOffset={footerHeight + 12}
+            extraKeyboardSpace={footerHeight + 12}
             contentContainerStyle={styles.form}
+            keyboardDismissMode="on-drag"
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
@@ -221,7 +253,7 @@ export function OrderReviewSheet({
                       <Pressable
                         accessibilityLabel={`预览第${index + 1}张评价图片`}
                         accessibilityRole="button"
-                        onPress={() => setPreviewIndex(index)}
+                        onPress={() => openPreview(index)}
                       >
                         <Image contentFit="cover" source={{ uri }} style={styles.thumbnail} />
                       </Pressable>
@@ -289,7 +321,10 @@ export function OrderReviewSheet({
           </KeyboardAwareScrollView>
 
           {!readonly && (
-            <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+            <KeyboardStickyView
+              onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
+              style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}
+            >
               <Pressable
                 accessibilityRole="button"
                 accessibilityState={{ disabled: submitting || !canSubmit, busy: submitting }}
@@ -303,15 +338,10 @@ export function OrderReviewSheet({
                   <Text style={styles.submitText}>发布评价</Text>
                 )}
               </Pressable>
-            </View>
+            </KeyboardStickyView>
           )}
         </View>
-      </KeyboardAvoidingView>
-      <Modal visible={previewIndex !== null} animationType="fade" onRequestClose={() => setPreviewIndex(null)}>
-        {previewIndex !== null && (
-          <ImagePreview images={images} index={previewIndex} onClose={() => setPreviewIndex(null)} />
-        )}
-      </Modal>
+      </View>
     </BottomSheet>
   );
 }
