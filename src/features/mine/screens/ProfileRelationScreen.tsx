@@ -1,6 +1,6 @@
 import { useAuthStore } from "@esports/auth";
 import { Person24Regular } from "@fluentui/react-native-icons";
-import { useLocalSearchParams, router } from "expo-router";
+import { useLocalSearchParams, router, useIsFocused } from "expo-router";
 import { memo, useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -148,6 +148,7 @@ export default function ProfileRelationScreen() {
   const requestedType =
     typeof route.type === "string" ? route.type : route.type?.[0];
   const type: UserFollowType = requestedType === "fans" ? "fans" : "following";
+  const focused = useIsFocused();
   const query = useUserFollowPage(userId, type);
   const followMutation = useToggleUserFollow();
   const [followedBackIds, setFollowedBackIds] = useState<Set<string>>(
@@ -304,7 +305,9 @@ export default function ProfileRelationScreen() {
         }}
         onEndReachedThreshold={0.35}
         onRefresh={() => void refetchRelations()}
-        refreshing={query.isRefetching && !query.isFetchingNextPage}
+        // focused 防御：下拉刷新进行中跳转他人主页时，离屏期间不让
+        // RefreshControl 维持 refreshing（iOS 离屏置 true 会卡在顶部）
+        refreshing={focused && query.isRefetching && !query.isFetchingNextPage}
         ListEmptyComponent={
           query.isLoading ? (
             <ActivityIndicator style={styles.emptyLoading} color="#FE1F4C" />

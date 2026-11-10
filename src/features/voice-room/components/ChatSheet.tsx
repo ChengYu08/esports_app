@@ -22,6 +22,8 @@ type ChatSheetProps = {
   onBeforeNavigate: (restorable: boolean) => void;
   /** 相册选图结束后重新拉起弹窗 */
   onAfterPickImages: () => void;
+  /** 退场动画结束、Modal 卸载后回调：iOS 上供宿主串行恢复列表弹窗 */
+  onExited?: () => void;
 };
 
 /** 开黑房内从底部拉起的私聊弹窗，复用 message 领域的 ChatConversation。 */
@@ -31,6 +33,7 @@ export function ChatSheet({
   onClose,
   onBeforeNavigate,
   onAfterPickImages,
+  onExited,
 }: ChatSheetProps) {
   const { height: windowHeight } = useWindowDimensions();
   const [lastConversation, setLastConversation] =
@@ -52,6 +55,7 @@ export function ChatSheet({
       visible={Boolean(conversation)}
       keyboardAvoiding
       onClose={onClose}
+      onExited={onExited}
       onRequestClose={() => {
         if (backInterceptorRef.current?.()) return;
         onBack();

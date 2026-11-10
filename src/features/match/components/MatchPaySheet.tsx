@@ -113,6 +113,29 @@ export function MatchPaySheet({
           styles.sheet,
           { paddingBottom: Math.max(insets.bottom, 12) + 12 },
         ]}
+        overlay={
+          <AppPrompt
+            inline
+            visible={Boolean(prompt)}
+            title={prompt?.title}
+            message={prompt?.message ?? ""}
+            confirmText={prompt?.title === "余额不足" ? "去充值" : "知道了"}
+            cancelText={prompt?.title === "余额不足" ? "取消" : undefined}
+            onCancel={
+              prompt?.title === "余额不足" ? () => setPrompt(null) : undefined
+            }
+            onConfirm={() => {
+              const goRecharge = prompt?.title === "余额不足";
+              setPrompt(null);
+              if (!goRecharge) {
+                return;
+              }
+              // 去充值前先关掉支付弹窗，否则原生 Modal 会盖住跳转后的充值页
+              onClose(state.ordersCreated ? "ordersCreated" : "previewing");
+              router.push("/star-recharge");
+            }}
+          />
+        }
       >
         <View style={styles.header}>
           <View style={styles.headerText}>
@@ -210,22 +233,6 @@ export function MatchPaySheet({
           </MatchLinearGradient>
         </Pressable>
       </BottomSheet>
-
-      <AppPrompt
-        visible={Boolean(prompt)}
-        title={prompt?.title}
-        message={prompt?.message ?? ""}
-        confirmText={prompt?.title === "余额不足" ? "去充值" : "知道了"}
-        cancelText={prompt?.title === "余额不足" ? "取消" : undefined}
-        onCancel={
-          prompt?.title === "余额不足" ? () => setPrompt(null) : undefined
-        }
-        onConfirm={() => {
-          const goRecharge = prompt?.title === "余额不足";
-          setPrompt(null);
-          if (goRecharge) router.push("/star-recharge");
-        }}
-      />
     </>
   );
 }

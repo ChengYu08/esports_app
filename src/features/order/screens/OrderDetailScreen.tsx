@@ -74,8 +74,11 @@ export function OrderDetailScreen({
   });
   const hasFocused = useRef(false);
   const refetchDetail = detail.refetch;
+  // 评价弹窗跳转相册/预览时临时收起，返回本页（focus）时恢复
+  const [reviewSuppressed, setReviewSuppressed] = useState(false);
   useFocusEffect(
     useCallback(() => {
+      setReviewSuppressed(false);
       if (!hasFocused.current) {
         hasFocused.current = true;
         return;
@@ -303,10 +306,11 @@ export function OrderDetailScreen({
         onConfirm={actions.confirmMultiCompanions}
       />
       <OrderReviewSheet
-        visible={actions.reviewVisible}
+        visible={actions.reviewVisible && !reviewSuppressed}
         readonly={Boolean(order.reviewExists)}
         detail={actions.reviewDetail}
         onClose={() => actions.setReviewVisible(false)}
+        onSuppress={() => setReviewSuppressed(true)}
         onSubmit={actions.submitReview}
       />
       <StarPaymentPrompt

@@ -2,9 +2,13 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { logger } from "@/core/logging/logger";
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 
 import type { VoiceRoomMemberRole, VoiceRoomMessage } from "./voice-room.types";
+
+/** 缺昵称兜底「用户」只打一次，避免 FlatList 重渲染刷屏 */
+const loggedFallbackNicknameIds = new Set<string>();
 
 /**
  * 图片消息渲染（Figma 551:126993 / 组件 51:16950「种类=图片」）：
@@ -86,7 +90,20 @@ export function displayMessage(
       </View>
     );
   }
-  const name = message.nickname || "用户";
+  const isPlatformNotice = String(message.userId) === "50000000";
+  const name =
+    message.nickname || (isPlatformNotice ? "平台通知" : "用户");
+  if (!message.nickname && !loggedFallbackNicknameIds.has(message.id)) {
+    loggedFallbackNicknameIds.add(message.id);
+    logger.info("voice_room.message_fallback_nickname", {
+      userId: message.userId,
+      messageId: message.id,
+      kind: message.kind,
+      displayName: name,
+      text: message.text?.slice(0, 40),
+      hasImage: Boolean(message.imageUrl),
+    });
+  }
   // 图片消息独立样式（Figma 51:16950）；纯文本按原有行内布局
   if (message.imageUrl) {
     return (

@@ -1,6 +1,6 @@
 import {
-    ClubDetailMemberSkeletonList,
-    ClubDetailSkeleton,
+  ClubDetailMemberSkeletonList,
+  ClubDetailSkeleton,
 } from "@/features/home/components/ClubDetailSkeleton";
 import { fetchClubGameLevels } from "@/features/match/api/match.api";
 import { ClubQuickMatchSheet } from "@/features/match/components/ClubQuickMatchSheet";
@@ -16,8 +16,8 @@ import { CompanionCard } from "@/shared/ui/CompanionCard";
 import { PaginationFooter } from "@/shared/ui/PaginationFooter";
 import { useAuthStore } from "@esports/auth";
 import {
-    ChevronLeft24Regular,
-    Search24Regular,
+  ChevronLeft24Regular,
+  Search24Regular,
 } from "@fluentui/react-native-icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
@@ -26,33 +26,33 @@ import { router, useIsFocused, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-    Animated,
-    Easing,
-    FlatList,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    useWindowDimensions,
-    View,
-    type LayoutChangeEvent,
-    type NativeScrollEvent,
-    type NativeSyntheticEvent,
+  Animated,
+  Easing,
+  FlatList,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { fetchCompanionTags } from "../api/home.api";
 import type {
-    ClubDetailGame,
-    Companion,
-    CompanionFilters,
-    GameKey,
+  ClubDetailGame,
+  Companion,
+  CompanionFilters,
+  GameKey,
 } from "../api/home.types";
 import {
-    useClubCompanions,
-    useClubDetail,
-    useClubGameModes,
-    usePriceList,
+  useClubCompanions,
+  useClubDetail,
+  useClubGameModes,
+  usePriceList,
 } from "../hooks/use-home-data";
 
 // 切图资源（新设计稿：俱乐部主页 455-68151 / 490-84520 / 557-88105）
@@ -1056,7 +1056,7 @@ export default function ClubDetailScreen() {
           { paddingBottom: Math.max(insets.bottom, 8) },
         ]}
       >
-        <Pressable
+        {/* <Pressable
           style={styles.priceButton}
           onPress={() => {
             // 未配置价目表链接，或链接指向的页面配置已删除/停用（预拉结果为空）时，弹"暂无价目表"提示
@@ -1074,7 +1074,7 @@ export default function ClubDetailScreen() {
           }}
         >
           <Text style={styles.priceButtonText}>价目表</Text>
-        </Pressable>
+        </Pressable> */}
         <Pressable
           style={styles.matchButton}
           onPress={() => {

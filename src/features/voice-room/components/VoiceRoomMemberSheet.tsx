@@ -4,9 +4,11 @@ import { useMutation, useQueries } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
+    InteractionManager,
+    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -108,6 +110,22 @@ export function VoiceRoomMemberSheet({
   });
 
   const [orderTarget, setOrderTarget] = useState<OrderTarget | null>(null);
+  // iOS：同一呈现链上同时挂两个原生 Modal，后挂的弹窗会因原生第二次 present 失败而卡死；
+  // 下单/支付期间先收起成员弹窗（suspended），各自退场后再串行恢复
+  const [suspended, setSuspended] = useState(false);
+  const pendingOrderTargetRef = useRef<OrderTarget | null>(null);
+  const promptPendingRef = useRef(false);
+  // 去充值导航离开当前屏：跳过 iOS 成员弹窗恢复，避免恢复后盖住充值页
+  const rechargeRestoreSkipRef = useRef(false);
+  useEffect(() => {
+    if (visible) return;
+    // 宿主整体关闭成员弹窗（含支付成功后经 onClose 关闭）：清挂起态，下次打开回到初始
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSuspended(false);
+    pendingOrderTargetRef.current = null;
+    promptPendingRef.current = false;
+    rechargeRestoreSkipRef.current = false;
+  }, [visible]);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [paymentOrder, setPaymentOrder] = useState<{
     orderId: number;
@@ -221,6 +239,12 @@ export function VoiceRoomMemberSheet({
       return;
     }
     if (!requireLogin() || !profile) return;
+    if (Platform.OS === "ios") {
+      // 先收成员弹窗，退场完成后由 onExited 挂下单弹窗
+      pendingOrderTargetRef.current = item;
+      setSuspended(true);
+      return;
+    }
     setOrderTarget(item);
   }
 
@@ -238,8 +262,15 @@ export function VoiceRoomMemberSheet({
   return (
     <>
       <BottomSheet
-        visible={visible}
+        visible={visible && !suspended}
         onClose={onClose}
+        onExited={() => {
+          // iOS：成员弹窗退场完成后串行挂下单弹窗
+          const pending = pendingOrderTargetRef.current;
+          if (!pending) return;
+          pendingOrderTargetRef.current = null;
+          setOrderTarget(pending);
+        }}
         contentStyle={styles.sheet}
         backdropStyle={styles.backdrop}
       >
@@ -450,14 +481,28 @@ export function VoiceRoomMemberSheet({
             buyerUserId: Number(viewer?.id) || 0,
           }}
           token={token}
-          onClose={() => setOrderTarget(null)}
-          onRealNameVerificationRequired={() =>
-            router.push("/account-settings")
-          }
+          onClose={() => {
+            setOrderTarget(null);
+            if (Platform.OS === "ios") {
+              // 下单弹窗卸载后的下一轮再恢复成员弹窗，避免与退场同帧竞争
+              InteractionManager.runAfterInteractions(() => {
+                if (promptPendingRef.current) return;
+                setSuspended(false);
+              });
+            }
+          }}
+          onRealNameVerificationRequired={() => router.push("/account-settings")}
           onOrderCreated={(order) => {
             setOrderTarget(null);
             setPaymentError(null);
             setPaymentOrder(order);
+            if (Platform.OS === "ios") {
+              // 先卸载下单 Modal，下一轮再挂支付弹窗
+              InteractionManager.runAfterInteractions(() => {
+                setPaymentSheetVisible(true);
+              });
+              return;
+            }
             setPaymentSheetVisible(true);
           }}
         />
@@ -472,6 +517,18 @@ export function VoiceRoomMemberSheet({
             setPaymentSheetVisible(false);
             setPaymentOrder(null);
             invalidateOrderQueries(orderId);
+            if (Platform.OS === "ios") {
+              // 支付弹窗卸载后的下一轮再恢复成员弹窗；有错误提示待弹时先提示、确认后再恢复；
+              // 去充值导航离开当前屏时跳过恢复，避免成员弹窗盖住充值页
+              InteractionManager.runAfterInteractions(() => {
+                if (promptPendingRef.current) return;
+                if (rechargeRestoreSkipRef.current) return;
+                setSuspended(false);
+              });
+            }
+          }}
+          onGoRecharge={() => {
+            rechargeRestoreSkipRef.current = true;
           }}
           onPaid={() => {
             const paidOrderId = paymentOrder.orderId;
@@ -482,6 +539,7 @@ export function VoiceRoomMemberSheet({
             const chatAvatar = profile?.headImage || member.avatar;
             const chatClubId = profile?.clubId;
             const accessToken = useAuthStore.getState().accessToken;
+            pendingOrderTargetRef.current = null;
             setPaymentSheetVisible(false);
             setPaymentOrder(null);
             setPaymentError(null);
@@ -498,14 +556,35 @@ export function VoiceRoomMemberSheet({
               beforeNavigate: onClose,
             });
           }}
-          onPaymentFailed={(message) => setPaymentError(message)}
+          onPaymentFailed={(message) => {
+            if (Platform.OS === "ios") {
+              // 先收支付弹窗，卸载后的下一轮单独弹错误提示，确认后再恢复成员弹窗
+              promptPendingRef.current = true;
+              setPaymentSheetVisible(false);
+              setPaymentOrder(null);
+              InteractionManager.runAfterInteractions(() => {
+                setPaymentError(message);
+              });
+              return;
+            }
+            setPaymentError(message);
+          }}
         />
       ) : null}
       <AppPrompt
         visible={Boolean(paymentError)}
         title="支付失败"
         message={paymentError ?? ""}
-        onConfirm={() => setPaymentError(null)}
+        onConfirm={() => {
+          setPaymentError(null);
+          if (Platform.OS === "ios") {
+            promptPendingRef.current = false;
+            // 提示弹窗收起后的下一轮再恢复成员弹窗
+            InteractionManager.runAfterInteractions(() => {
+              setSuspended(false);
+            });
+          }
+        }}
       />
     </>
   );

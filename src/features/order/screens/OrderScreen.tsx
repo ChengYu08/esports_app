@@ -153,6 +153,13 @@ export default function OrderScreen() {
         );
     }, [token, currentUserId, scope, visibleFilter]),
   );
+  // 评价弹窗跳转相册/预览时临时收起，返回本页（focus）时恢复（评价草稿在弹窗组件内保留）
+  const [reviewSuppressed, setReviewSuppressed] = useState(false);
+  useFocusEffect(
+    useCallback(() => {
+      setReviewSuppressed(false);
+    }, []),
+  );
   const [cancelTarget, setCancelTarget] = useState<OrderItemModel | null>(null);
   const [completeTarget, setCompleteTarget] = useState<OrderItemModel | null>(
     null,
@@ -682,10 +689,11 @@ export default function OrderScreen() {
         onConfirm={confirmMultiCompanions}
       />
       <OrderReviewSheet
-        visible={Boolean(reviewTarget)}
+        visible={Boolean(reviewTarget) && !reviewSuppressed}
         readonly={Boolean(reviewTarget?.reviewExists)}
         detail={reviewDetail}
         onClose={() => setReviewTarget(null)}
+        onSuppress={() => setReviewSuppressed(true)}
         onSubmit={async (input) => {
           if (!reviewTarget || !token) return;
           await submitOrderReview(
