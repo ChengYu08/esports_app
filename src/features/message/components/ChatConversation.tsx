@@ -702,6 +702,9 @@ export function ChatConversation({
         }
         renderItem={renderChatRow}
         showsVerticalScrollIndicator={false}
+        // 键盘弹起时若保持默认 never，列表会在捕获阶段吞掉触摸（只用来收键盘），
+        // 气泡的长按/点击都收不到；handled 让子级处理后不再收键盘
+        keyboardShouldPersistTaps="handled"
         // 聊天行大多带图，收窄挂载窗口可减少同时挂载、同时解码的图片数量
         initialNumToRender={8}
         maxToRenderPerBatch={6}
@@ -1266,9 +1269,22 @@ const ChatBubble = memo(function ChatBubble({
     );
   }, [copyableText]);
   const openCopyMenu = useCallback(() => {
-    bubbleRef.current?.measureInWindow((x, y, width, height) => {
-      setCopyMenuAnchor({ x, y, width, height });
+    const measure = () => {
+      bubbleRef.current?.measureInWindow((x, y, width, height) => {
+        setCopyMenuAnchor({ x, y, width, height });
+      });
+    };
+    if (!Keyboard.isVisible()) {
+      measure();
+      return;
+    }
+    // 菜单 Modal 的 Dialog 会抢走输入框焦点让键盘自动收起，窗口高度恢复后旧坐标失效，
+    // 菜单会飘到错误位置；先主动收键盘，等布局恢复再按气泡新位置挂菜单
+    const subscription = Keyboard.addListener("keyboardDidHide", () => {
+      subscription.remove();
+      requestAnimationFrame(measure);
     });
+    Keyboard.dismiss();
   }, []);
   const knownRatio = item.kind === "image" ? item.imageAspectRatio : undefined;
   const [loadedRatio, setLoadedRatio] = useState<number | null>(null);
