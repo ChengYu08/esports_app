@@ -22,7 +22,8 @@ import {
 } from "@/features/god/api/god.api";
 import { fetchGames } from "@/features/home/api/home.api";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
-import { EmptyState, LoadingState } from "@/shared/ui/AsyncStates";
+import { ListFallbackState, LoadingState } from "@/shared/ui/AsyncStates";
+import { useIsOffline } from "@/shared/hooks/use-is-offline";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { CompanionCard } from "@/shared/ui/CompanionCard";
 import { PaginationFooter } from "@/shared/ui/PaginationFooter";
@@ -203,6 +204,7 @@ const GodCard = memo(function GodCard({
 
 export default function GodListScreen({ active = true }: { active?: boolean }) {
   const insets = useSafeAreaInsets();
+  const offline = useIsOffline();
   const focused = useIsFocused();
   const voicePlayer = useVoicePlayer();
 
@@ -284,6 +286,8 @@ export default function GodListScreen({ active = true }: { active?: boolean }) {
     () => godList.data?.pages.flatMap((page) => page.items) ?? [],
     [godList.data],
   );
+
+  const hasFilter = gameKey !== ALL_GAME_KEY || Object.values(filters).some(Boolean);
 
   const handleItemPress = useCallback(
     (item: GodListItem) => {
@@ -372,7 +376,18 @@ export default function GodListScreen({ active = true }: { active?: boolean }) {
             godList.isLoading ? (
               <LoadingState />
             ) : (
-              <EmptyState message="暂无大神，换个筛选条件试试" />
+              <ListFallbackState
+                kind={
+                  godList.isError || (offline && godList.data === undefined)
+                    ? offline
+                      ? "offline"
+                      : "loadFailed"
+                    : hasFilter
+                      ? "filterEmpty"
+                      : "empty"
+                }
+                onRetry={godList.refetch}
+              />
             )
           }
           ListFooterComponent={

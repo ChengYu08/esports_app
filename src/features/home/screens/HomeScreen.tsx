@@ -23,7 +23,8 @@ import {
   useHomeGameCategories,
   useHomeGames,
 } from "@/features/home/hooks/use-home-data";
-import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
+import { ListFallbackState, LoadingState } from "@/shared/ui/AsyncStates";
+import { useIsOffline } from "@/shared/hooks/use-is-offline";
 import { PaginationFooter } from "@/shared/ui/PaginationFooter";
 import { router, useFocusEffect, useIsFocused, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -41,6 +42,7 @@ const RANKING_GRADIENT_BODY = 188;
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const offline = useIsOffline();
   const focused = useIsFocused();
   const { reviewerApplied, ticketSubmitted } = useLocalSearchParams<{
     reviewerApplied?: string;
@@ -283,6 +285,14 @@ export default function HomeScreen() {
   );
   const isHomeLoading = games.isLoading || categories.isLoading;
 
+  // 列表兜底态：首屏失败或断网未加载出走失败/无网络态，否则走空态
+  const clubsFallbackKind =
+    clubs.isError || (offline && clubs.data === undefined)
+      ? offline
+        ? "offline"
+        : "loadFailed"
+      : "empty";
+
   return (
     <View
       style={[
@@ -340,10 +350,12 @@ export default function HomeScreen() {
                 ListEmptyComponent={
                   clubs.isLoading ? (
                     <LoadingState />
-                  ) : clubs.isError ? (
-                    <ErrorState onRetry={clubs.refetch} />
                   ) : (
-                    <EmptyState message="暂无俱乐部" />
+                    <ListFallbackState
+                      kind={clubsFallbackKind}
+                      message={clubsFallbackKind === "empty" ? "暂无俱乐部" : undefined}
+                      onRetry={clubs.refetch}
+                    />
                   )
                 }
                 ListFooterComponent={
