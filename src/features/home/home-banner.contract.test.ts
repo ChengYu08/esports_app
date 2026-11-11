@@ -39,8 +39,8 @@ describe("资源位素材点击行为", () => {
 /** 按端跳转协议样例：PC 外链，IOS/ANDROID 走 App 内路由。 */
 const jumpConfig = {
   PC: { jumpType: "URL", jumpUrl: "https://www.baodi.com", params: {} },
-  IOS: { jumpType: "ROUTE", jumpUrl: "/clubs", params: { aaaaa: "1" } },
-  ANDROID: { jumpType: "ROUTE", jumpUrl: "/clubs", params: { id: "1" } },
+  IOS: { jumpType: "ROUTE", jumpUrl: "/club/[id]", params: { id: "1", aaaaa: "1" } },
+  ANDROID: { jumpType: "ROUTE", jumpUrl: "/club/[id]", params: { id: "1" } },
 };
 
 describe("parseBannerJump 按端跳转协议", () => {
@@ -48,13 +48,17 @@ describe("parseBannerJump 按端跳转协议", () => {
     platformState.os = "android";
   });
 
-  it("ANDROID 端取 ANDROID 配置解析为路由动作", () => {
-    expect(parseBannerJump(jumpConfig)).toEqual({ type: "route", path: "/clubs", params: { id: "1" } });
+  it("ANDROID 端取 ANDROID 配置解析为俱乐部首页路由", () => {
+    expect(parseBannerJump(jumpConfig)).toEqual({ type: "route", path: "/club/[id]", params: { id: "1" } });
   });
 
-  it("IOS 端取 IOS 配置解析为路由动作", () => {
+  it("IOS 端取 IOS 配置解析为俱乐部首页路由", () => {
     platformState.os = "ios";
-    expect(parseBannerJump(jumpConfig)).toEqual({ type: "route", path: "/clubs", params: { aaaaa: "1" } });
+    expect(parseBannerJump(jumpConfig)).toEqual({
+      type: "route",
+      path: "/club/[id]",
+      params: { id: "1", aaaaa: "1" },
+    });
   });
 
   it("jumpType 为 URL 时解析为外链动作", () => {
@@ -62,17 +66,44 @@ describe("parseBannerJump 按端跳转协议", () => {
       .toEqual({ type: "url", url: "https://www.baodi.com" });
   });
 
-  it("ROUTE 未配置 params 时返回空参数", () => {
-    expect(parseBannerJump({ ANDROID: { jumpType: "ROUTE", jumpUrl: "/clubs" } })).toEqual({
+  it("俱乐部首页缺 id 仍解析为 route（缺参由目标页兜底）", () => {
+    expect(parseBannerJump({ ANDROID: { jumpType: "ROUTE", jumpUrl: "/club/[id]", params: {} } })).toEqual({
       type: "route",
-      path: "/clubs",
+      path: "/club/[id]",
       params: {},
     });
   });
 
+  it("活动落地页无 activityCode 仍解析为 route", () => {
+    expect(parseBannerJump({ ANDROID: { jumpType: "ROUTE", jumpUrl: "/activity", params: {} } })).toEqual({
+      type: "route",
+      path: "/activity",
+      params: {},
+    });
+  });
+
+  it("未登记路径 /clubs 允许通过解析", () => {
+    expect(parseBannerJump({ ANDROID: { jumpType: "ROUTE", jumpUrl: "/clubs", params: { id: "1" } } })).toEqual({
+      type: "route",
+      path: "/clubs",
+      params: { id: "1" },
+    });
+  });
+
   it("params 含非字符串值时只保留字符串项", () => {
-    expect(parseBannerJump({ ANDROID: { jumpType: "ROUTE", jumpUrl: "/clubs", params: { id: "1", count: 2 } } }))
-      .toEqual({ type: "route", path: "/clubs", params: { id: "1" } });
+    expect(
+      parseBannerJump({
+        ANDROID: { jumpType: "ROUTE", jumpUrl: "/club/[id]", params: { id: "1", count: 2 } },
+      }),
+    ).toEqual({ type: "route", path: "/club/[id]", params: { id: "1" } });
+  });
+
+  it.each([
+    ["/web-view"],
+    ["/account-cancellation"],
+    ["/forgot-password"],
+  ])("敏感路径 %s 命中黑名单返回 none", (jumpUrl) => {
+    expect(parseBannerJump({ ANDROID: { jumpType: "ROUTE", jumpUrl, params: {} } })).toEqual({ type: "none" });
   });
 
   it.each([
@@ -80,10 +111,10 @@ describe("parseBannerJump 按端跳转协议", () => {
     ["undefined", undefined],
     ["null", null],
     ["端节点非对象", { ANDROID: "ROUTE" }],
-    ["缺当前端 key", { PC: { jumpType: "ROUTE", jumpUrl: "/clubs", params: {} } }],
-    ["缺 jumpType", { ANDROID: { jumpUrl: "/clubs", params: {} } }],
-    ["jumpType 非 ROUTE|URL", { ANDROID: { jumpType: "SCHEME", jumpUrl: "/clubs", params: {} } }],
-    ["ROUTE 跳转地址非 / 开头", { ANDROID: { jumpType: "ROUTE", jumpUrl: "clubs", params: {} } }],
+    ["缺当前端 key", { PC: { jumpType: "ROUTE", jumpUrl: "/club/[id]", params: { id: "1" } } }],
+    ["缺 jumpType", { ANDROID: { jumpUrl: "/club/[id]", params: { id: "1" } } }],
+    ["jumpType 非 ROUTE|URL", { ANDROID: { jumpType: "SCHEME", jumpUrl: "/club/[id]", params: { id: "1" } } }],
+    ["ROUTE 跳转地址非 / 开头", { ANDROID: { jumpType: "ROUTE", jumpUrl: "club/[id]", params: { id: "1" } } }],
     ["URL 跳转地址非法", { ANDROID: { jumpType: "URL", jumpUrl: "javascript:alert(1)", params: {} } }],
   ])("%s 时返回 none", (_name, linkConfig) => {
     expect(parseBannerJump(linkConfig as never)).toEqual({ type: "none" });
@@ -97,7 +128,7 @@ describe("getBannerAction 接入跳转协议", () => {
 
   it("协议为 ROUTE 时返回路由动作，优先于内容图", () => {
     expect(getBannerAction({ ...banner, contentImageUrl: "https://cdn.example.com/content.jpg", linkConfig: jumpConfig }))
-      .toEqual({ type: "route", path: "/clubs", params: { id: "1" } });
+      .toEqual({ type: "route", path: "/club/[id]", params: { id: "1" } });
   });
 
   it("协议为 URL 时返回外链动作，优先于内容图", () => {

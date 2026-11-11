@@ -35,7 +35,7 @@
 | 序号 | SDK / 组件名称 | 所属机构 / 厂商 | 涉及平台 | 使用目的 | 是否实际使用 |
 |---|---|---|---|---|---|
 | 1 | 融云 IM SDK | 北京云中融信科技有限公司 | 双端 | 即时通讯、语聊房消息/信令 | 是 |
-| 2 | 融云推送 SDK + 厂商推送通道 | 融云及小米/华为/OPPO/VIVO/荣耀/魅族等 | 主要为 Android（iOS 使用 APNs） | 离线消息推送 | 是 |
+| 2 | 融云推送 SDK + 厂商推送通道 | 融云及小米/华为/OPPO/VIVO/荣耀等 | 主要为 Android（iOS 使用 APNs） | 离线消息推送 | 是 |
 | 3 | 声网 Agora RTC SDK | 上海声网网络科技股份有限公司 | 双端 | 语聊房实时语音 | 是 |
 | 4 | Pushy 热更新 SDK（`react-native-update`） | 武汉青罗科技有限公司 | **仅 Android** | 热更新（JS Bundle） | 是（Android Release） |
 | 5 | 阿里云号码认证 SDK | 阿里云计算有限公司 | 双端 | 本机号码一键登录 | 是 |
@@ -74,15 +74,15 @@
 | 项 | 说明 |
 |---|---|
 | 产品名称 | 融云 Push 2.0 及厂商通道 |
-| 所属机构 | 融云；以及小米、华为、OPPO、VIVO、荣耀、魅族等手机厂商 |
+| 所属机构 | 融云；以及小米、华为、OPPO、VIVO、荣耀等手机厂商 |
 | 工程配置 | `plugins/withRongCloudPush.js` 等 |
-| Android 原生依赖（版本约 5.34.2） | `cn.rongcloud.sdk.push:rong` / `xiaomi` / `huawei` / `oppo` / `vivo` / `honor` / `meizu` |
+| Android 原生依赖（版本约 5.34.2） | `cn.rongcloud.sdk.push:rong` / `xiaomi` / `huawei` / `oppo` / `vivo` / `honor` |
 | iOS | APNs + 融云 `setDeviceToken` 相关集成 |
 | 涉及平台 | Android 厂商通道；iOS APNs |
 | 使用目的 | 应用关闭或处于后台时，仍能及时接收即时消息等推送 |
 | 可能收集的个人信息类型 | 推送 Token / 注册标识；设备相关标识（以各厂商推送隐私政策为准）；基础设备与网络信息 |
-| 权限注意 | 工程合并 Manifest 中，**魅族推送通道可能引入 `READ_PHONE_STATE`（读取电话状态）权限声明**；非业务代码主动申请读取。对外披露时建议写明「因厂商推送 SDK 声明」 |
-| 各厂商隐私政策 | 请法务分别引用小米推送、华为推送、OPPO 推送、vivo 推送、荣耀推送、魅族推送现行隐私政策链接 |
+| 权限注意 | 现有厂商通道（小米/华为/OPPO/vivo/荣耀）的合并 Manifest **不再声明 `READ_PHONE_STATE`（读取电话状态）权限**；后续新增厂商 SDK 需重新评估其权限声明。对外披露时建议写明「因厂商推送 SDK 声明」 |
+| 各厂商隐私政策 | 请法务分别引用小米推送、华为推送、OPPO 推送、vivo 推送、荣耀推送现行隐私政策链接 |
 
 ---
 
@@ -245,7 +245,7 @@
 | SDK 名称 | 第三方主体 | 使用目的 | 收集个人信息类型（摘要） | 隐私政策链接 |
 |---|---|---|---|---|
 | 融云 IM SDK | 北京云中融信科技有限公司 | 即时通讯、语聊房消息 | 设备信息、网络信息、用户标识、消息内容、推送标识等 | https://docs.rongcloud.cn/guides/privacy |
-| 融云推送及厂商推送 SDK | 融云及小米/华为/OPPO/VIVO/荣耀/魅族等 | 离线消息推送 | 推送 Token、设备相关标识等 | 各厂商推送隐私政策 |
+| 融云推送及厂商推送 SDK | 融云及小米/华为/OPPO/VIVO/荣耀等 | 离线消息推送 | 推送 Token、设备相关标识等 | 各厂商推送隐私政策 |
 | 声网 Agora RTC SDK | 上海声网网络科技股份有限公司 | 语聊房实时语音 | 设备信息、网络信息、频道标识；传感器（本地适配） | https://www.shengwang.cn/SDK-privacy-policy/ |
 | Pushy 热更新 SDK | 武汉青罗科技有限公司 | Android 热更新 | 设备型号与系统、IMEI/MAC/设备识别码（以其协议为准）、IP、更新日志等 | https://pushy.reactnative.cn/agreement/ |
 | 阿里云号码认证 SDK | 阿里云计算有限公司 | 本机号一键登录 | IP、设备型号与系统、SIM/运营商信息等 | https://terms.aliyun.com/legal-agreement/terms/suit_bu1_ali_cloud/suit_bu1_ali_cloud202112211045_86198.html |
@@ -258,7 +258,7 @@
 ## 8. 法务复核清单（建议）
 
 - [ ] 核验各官方隐私政策链接是否仍有效，字段是否与现行版本一致  
-- [ ] 确认厂商推送（尤其是魅族 `READ_PHONE_STATE`）是否在对外清单与权限说明中单独披露  
+- [ ] 确认现有厂商推送（小米/华为/OPPO/vivo/荣耀）权限声明一致；魅族通道已移除，若后续恢复需重新评估 `READ_PHONE_STATE` 与隐私披露  
 - [ ] 确认 Pushy「IMEI / MAC」表述是否需按「SDK 可能收集」而非「我们主动收集」措辞  
 - [ ] 确认剪贴板仅写入、不读取的表述与产品规划一致  
 - [ ] 确认 iOS 相机用途说明是否与真实功能一致  
@@ -272,6 +272,7 @@
 | 日期 | 变更说明 | 维护人 |
 |---|---|---|
 | 2026-11-05 | 初稿：基于 `esports_app` 代码与原生依赖盘点生成 | 研发协助整理（供法务审核） |
+| 2026-11-10 | 移除融云魅族推送通道（`cn.rongcloud.sdk.push:meizu`），消除 `READ_PHONE_STATE` 权限声明；魅族设备回落 RongPush 兜底通道 | 研发协助整理（供法务审核） |
 
 ---
 

@@ -89,7 +89,8 @@ class VoiceRoomBackgroundService : Service() {
     }
 
     builder
-      .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+      // 使用基于 app icon 生成的白色剪影，Android 通知小图标必须是纯 alpha 图，彩色图标会被压成灰色色块
+      .setSmallIcon(R.drawable.ic_stat_voice_room)
       .setContentTitle(if (microphoneEnabled) "$title（说话中）" else title)
       .setContentText("语音连接正在后台保持")
       .setCategory(Notification.CATEGORY_CALL)

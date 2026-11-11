@@ -5,6 +5,8 @@ import { toManagedMessage } from "./rongcloud-im";
 
 vi.mock("@/core/logging/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn() } }));
 vi.mock("@/core/config/env", () => ({ env: { apiBaseUrl: "https://example.com" } }));
+// 隔离 rongcloud-im → image-compat → expo-file-system/react-native 的原生依赖链
+vi.mock("@/shared/media-picker/image-compat", () => ({ isGifImage: vi.fn(() => false) }));
 
 describe("mapRongMessage", () => {
   it("maps a RongCloud image message to a renderable chat image", () => {

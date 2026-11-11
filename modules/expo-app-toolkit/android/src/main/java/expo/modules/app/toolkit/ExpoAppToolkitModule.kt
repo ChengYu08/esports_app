@@ -23,6 +23,13 @@ class ExpoAppToolkitModule : Module() {
     AsyncFunction("md5File") Coroutine { uri: String ->
       withContext(Dispatchers.IO) { md5File(uri) }
     }
+
+    Function("markPrivacyConsentAccepted") {
+      val context = appContext?.reactContext
+        ?: throw CodedException("ERR_MISSING_CONTEXT", "React context is not available", null)
+      PrivacyConsentState.markAccepted(context)
+      RongPushHook.tryInit()
+    }
   }
 
   /**

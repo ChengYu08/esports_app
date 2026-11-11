@@ -24,6 +24,25 @@ export function VoiceWaveform({
   compact?: boolean;
   barOpacity?: number;
 }) {
+  if (!playing) {
+    // 未播放时波形静止，用普通 View 渲染同样的 4 根柱，避免 reanimated 动画节点常驻
+    return (
+      <View style={[styles.wave, compact && styles.compactWave]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        {BAR_HEIGHTS.map((height) => (
+          <View
+            key={height}
+            style={[
+              styles.bar,
+              {
+                height: compact ? Math.round(height * 0.75) : height,
+                opacity: barOpacity,
+              },
+            ]}
+          />
+        ))}
+      </View>
+    );
+  }
   return (
     <View style={[styles.wave, compact && styles.compactWave]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       {BAR_HEIGHTS.map((height, index) => (

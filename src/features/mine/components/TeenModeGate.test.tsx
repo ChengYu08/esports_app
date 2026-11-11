@@ -9,7 +9,7 @@ import { publishTeenModeStatus } from "@/features/mine/teen-mode-store";
 import { TeenModeGate } from "./TeenModeGate";
 
 const { apiMock, storageMock, authState, appStateMock } = vi.hoisted(() => ({
-  apiMock: { status: vi.fn(), fetchTeenModeConfig: vi.fn() },
+  apiMock: { status: vi.fn() },
   storageMock: {
     get: vi.fn(),
     set: vi.fn(),
@@ -59,7 +59,6 @@ vi.mock("@/features/auth/api/companion.api", () => ({
 }));
 vi.mock("@/features/mine/api/teen-mode.api", () => ({
   teenModeApi: apiMock,
-  fetchTeenModeConfig: apiMock.fetchTeenModeConfig,
 }));
 vi.mock("@/features/mine/screens/TeenModeScreen", () => ({
   default: "LockedTeenModeScreen",
@@ -80,12 +79,6 @@ beforeEach(() => {
   appStateMock.activeHandler = null;
   storageMock.get.mockResolvedValue("false");
   storageMock.set.mockResolvedValue(undefined);
-  apiMock.fetchTeenModeConfig.mockResolvedValue({
-    lockEnabled: true,
-    mode: "same-day",
-    lockStartHour: 9,
-    lockEndHour: 23,
-  });
 });
 
 afterEach(async () => {
@@ -98,6 +91,15 @@ afterEach(async () => {
 
 function lockedScreenCount() {
   return renderer?.root.findAllByType(LockedScreenHost).length;
+}
+
+function statusOf(enabled: boolean, isoTime: string): TeenModeStatus {
+  return {
+    enabled,
+    passwordSet: true,
+    remainingAttempts: 10,
+    serverTime: Date.parse(isoTime),
+  };
 }
 
 describe("TeenModeGate 独立设置页状态同步", () => {
@@ -113,24 +115,15 @@ describe("TeenModeGate 独立设置页状态同步", () => {
     });
     expect(lockedScreenCount()).toBe(0);
 
-    const enabled: TeenModeStatus = {
-      enabled: true,
-      passwordSet: true,
-      remainingAttempts: 10,
-      serverTime: Date.parse("2026-11-03T18:00:00+08:00"),
-    };
+    const enabled = statusOf(true, "2026-11-09T18:00:00+08:00");
     await act(async () => publishTeenModeStatus(enabled, "token-a"));
     expect(lockedScreenCount()).toBe(1);
 
-    await act(async () => resolveStatus({
-      ...enabled,
-      enabled: false,
-      serverTime: Date.parse("2026-11-03T18:01:00+08:00"),
-    }));
+    await act(async () => resolveStatus(statusOf(false, "2026-11-09T18:01:00+08:00")));
     expect(lockedScreenCount()).toBe(1);
 
     await act(async () => publishTeenModeStatus(
-      { ...enabled, enabled: false },
+      statusOf(false, "2026-11-09T18:02:00+08:00"),
       "token-a",
     ));
     expect(lockedScreenCount()).toBe(0);
@@ -139,23 +132,30 @@ describe("TeenModeGate 独立设置页状态同步", () => {
     expect(lockedScreenCount()).toBe(0);
   });
 
-  it("回前台后旧校准立即失效，刷新失败时已开启账号保持锁定", async () => {
-    const enabled: TeenModeStatus = {
-      enabled: true,
-      passwordSet: true,
-      remainingAttempts: 10,
-      // 23:30 在服务端配置窗口 9:00-23:00 之外
-      serverTime: Date.parse("2026-11-03T23:30:00+08:00"),
-    };
-    apiMock.status.mockResolvedValue(enabled);
+  it("开启青少年模式后覆盖层立即出现，无需重启 App", async () => {
+    apiMock.status.mockResolvedValue(statusOf(false, "2026-11-09T10:00:00+08:00"));
     await act(async () => {
       renderer = create(<TeenModeGate />);
     });
     expect(lockedScreenCount()).toBe(0);
 
-    apiMock.status.mockRejectedValue(new Error("离线"));
-    await act(async () => appStateMock.activeHandler?.("active"));
+    // 设置页开启成功后同步广播，覆盖层当帧出现
+    await act(async () => publishTeenModeStatus(
+      statusOf(true, "2026-11-09T10:01:00+08:00"),
+      "token-a",
+    ));
+    expect(lockedScreenCount()).toBe(1);
+  });
 
+  it("存储镜像已开启时启动即锁定，回前台刷新失败也保持锁定", async () => {
+    storageMock.get.mockResolvedValue("true");
+    apiMock.status.mockRejectedValue(new Error("离线"));
+    await act(async () => {
+      renderer = create(<TeenModeGate />);
+    });
+    expect(lockedScreenCount()).toBe(1);
+
+    await act(async () => appStateMock.activeHandler?.("active"));
     expect(lockedScreenCount()).toBe(1);
   });
 
@@ -173,15 +173,10 @@ describe("TeenModeGate 独立设置页状态同步", () => {
     expect(lockedScreenCount()).toBe(1);
 
     await act(async () => appStateMock.activeHandler?.("active"));
-    await act(async () => resolvers[0]({
-      enabled: true,
-      passwordSet: true,
-      remainingAttempts: 10,
-      serverTime: Date.parse("2026-11-03T23:31:00+08:00"),
-    }));
-
-    expect(apiMock.status).toHaveBeenCalledTimes(2);
+    // 旧请求返回 disabled：已被前台失效处理丢弃，不能解除锁定
+    await act(async () => resolvers[0](statusOf(false, "2026-11-09T10:00:00+08:00")));
     expect(lockedScreenCount()).toBe(1);
+    expect(apiMock.status).toHaveBeenCalledTimes(2);
   });
 
   it("用户ID未知时不同 token 的状态发布不能解除当前账号锁定", async () => {
@@ -192,35 +187,17 @@ describe("TeenModeGate 独立设置页状态同步", () => {
     });
     expect(lockedScreenCount()).toBe(1);
 
-    const disabled: TeenModeStatus = {
-      enabled: false,
-      passwordSet: true,
-      remainingAttempts: 10,
-      serverTime: Date.parse("2026-11-03T12:00:00+08:00"),
-    };
-    await act(async () => publishTeenModeStatus(disabled, "token-b"));
+    await act(async () => publishTeenModeStatus(
+      statusOf(false, "2026-11-09T12:00:00+08:00"),
+      "token-b",
+    ));
     expect(lockedScreenCount()).toBe(1);
 
-    await act(async () => publishTeenModeStatus(disabled, "token-a"));
+    await act(async () => publishTeenModeStatus(
+      statusOf(false, "2026-11-09T12:00:00+08:00"),
+      "token-a",
+    ));
     expect(lockedScreenCount()).toBe(0);
-  });
-
-  it("首次取得服务端时间后立即按下一锁定边界重排定时器", async () => {
-    vi.spyOn(performance, "now").mockReturnValue(1_000);
-    const timeoutSpy = vi.spyOn(globalThis, "setTimeout");
-    apiMock.status.mockResolvedValue({
-      enabled: true,
-      passwordSet: true,
-      remainingAttempts: 10,
-      // 22:59:30 距服务端配置窗口 9:00-23:00 的下一边界 23:00 还有 30 秒
-      serverTime: Date.parse("2026-11-03T22:59:30+08:00"),
-    } satisfies TeenModeStatus);
-
-    await act(async () => {
-      renderer = create(<TeenModeGate />);
-    });
-
-    expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Function), 30_000);
   });
 
   it("新装登录当次启动：走真实 completeClientLogin 登录后未开启且无弹窗记录时立即弹介绍弹窗", async () => {
@@ -231,7 +208,7 @@ describe("TeenModeGate 独立设置页状态同步", () => {
       enabled: false,
       passwordSet: false,
       remainingAttempts: 5,
-      serverTime: Date.parse("2026-11-03T12:00:00+08:00"),
+      serverTime: Date.parse("2026-11-09T12:00:00+08:00"),
     } satisfies TeenModeStatus);
     vi.mocked(clientAuthApi.exchangeIdToken).mockResolvedValue({
       token: "token-a",
@@ -258,72 +235,5 @@ describe("TeenModeGate 独立设置页状态同步", () => {
 
     const promoHost = "TeenModePromoDialog" as unknown as ElementType;
     expect(renderer?.root.findAllByType(promoHost).length).toBe(1);
-  });
-
-  it("服务端配置到达后按配置时段重判：配置外解除锁定", async () => {
-    let resolveConfig!: (config: {
-      lockEnabled: boolean;
-      mode?: "same-day" | "cross-day";
-      lockStartHour?: number;
-      lockEndHour?: number;
-    }) => void;
-    apiMock.fetchTeenModeConfig.mockImplementation(
-      () => new Promise((resolve) => {
-        resolveConfig = resolve;
-      }),
-    );
-    // 23:30 在服务端配置窗口 9:00-23:00 之外；配置未到达前 fail-closed 先锁定
-    apiMock.status.mockResolvedValue({
-      enabled: true,
-      passwordSet: true,
-      remainingAttempts: 10,
-      serverTime: Date.parse("2026-11-03T23:30:00+08:00"),
-    } satisfies TeenModeStatus);
-
-    await act(async () => {
-      renderer = create(<TeenModeGate />);
-    });
-    expect(lockedScreenCount()).toBe(1);
-
-    await act(async () => {
-      resolveConfig({
-        lockEnabled: true,
-        mode: "same-day",
-        lockStartHour: 9,
-        lockEndHour: 23,
-      });
-    });
-    expect(lockedScreenCount()).toBe(0);
-  });
-
-  it("服务端明确返回未配置时段（lockEnabled=false）时解除锁定", async () => {
-    apiMock.fetchTeenModeConfig.mockResolvedValue({ lockEnabled: false });
-    apiMock.status.mockResolvedValue({
-      enabled: true,
-      passwordSet: true,
-      remainingAttempts: 10,
-      // 任意时刻都不应锁定
-      serverTime: Date.parse("2026-11-03T12:00:00+08:00"),
-    } satisfies TeenModeStatus);
-
-    await act(async () => {
-      renderer = create(<TeenModeGate />);
-    });
-    expect(lockedScreenCount()).toBe(0);
-  });
-
-  it("配置请求失败时已开启账号保持 fail-closed", async () => {
-    apiMock.fetchTeenModeConfig.mockRejectedValue(new Error("网络异常"));
-    apiMock.status.mockResolvedValue({
-      enabled: true,
-      passwordSet: true,
-      remainingAttempts: 10,
-      serverTime: Date.parse("2026-11-03T12:00:00+08:00"),
-    } satisfies TeenModeStatus);
-
-    await act(async () => {
-      renderer = create(<TeenModeGate />);
-    });
-    expect(lockedScreenCount()).toBe(1);
   });
 });

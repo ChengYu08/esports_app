@@ -9,6 +9,23 @@ async function md5(file) {
   return hash.digest("hex");
 }
 
+/** 北京时间 YYYYMMDDHHmm（不依赖容器/本机 TZ） */
+function beijingTimestamp(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const get = (type) => parts.find((part) => part.type === type)?.value ?? "";
+  // en-GB 偶发把 00 点格式成 24，归一成 00
+  const hour = get("hour") === "24" ? "00" : get("hour");
+  return `${get("year")}${get("month")}${get("day")}${hour}${get("minute")}`;
+}
+
 async function archive() {
   const root = path.resolve(__dirname, "..");
   const { expo } = JSON.parse(
@@ -31,16 +48,8 @@ async function archive() {
   const source = path.join(output, path.basename(apk.outputFile));
   const checksum = await md5(source);
   const safe = (text) => String(text).replace(/[<>:"/\\|?*\x00-\x1f]/g, "_");
-  // 本地时间：年月日时分，例如 202610201430
-  const now = new Date();
-  const pad = (n) => String(n).padStart(2, "0");
-  const timestamp = [
-    now.getFullYear(),
-    pad(now.getMonth() + 1),
-    pad(now.getDate()),
-    pad(now.getHours()),
-    pad(now.getMinutes()),
-  ].join("");
+  // 固定东八区（Asia/Shanghai）：Drone 容器默认 UTC，避免文件名时间戳慢 8 小时
+  const timestamp = beijingTimestamp();
   const abiLabel = safe(process.env.APK_ABI_LABEL || "arm64");
   const envLabel = safe(process.env.APK_ENV_LABEL || "prod");
   const name = `${safe(expo.name)}-${safe(apk.versionName)}-${abiLabel}-${envLabel}-${timestamp}`;

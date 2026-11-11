@@ -6,7 +6,7 @@ type MediaLibraryPluginEntry = [
   string,
   {
     photosPermission: string;
-    savePhotosPermission: boolean;
+    savePhotosPermission: string;
     granularPermissions?: string[];
   },
 ];
@@ -34,9 +34,9 @@ describe("expo-media-library 相册权限配置（双端审核要求）", () => 
     expect(entry[1].photosPermission).toContain("照片");
   });
 
-  it("未配置保存到相册的多余权限（savePhotosPermission: false）", () => {
+  it("配置了保存图片到相册的中文权限文案", () => {
     const entry = findPlugin();
-    expect(entry[1].savePhotosPermission).toBe(false);
+    expect(entry[1].savePhotosPermission).toContain("相册");
   });
 
   it("只声明图片粒度权限（不申请音频/视频，保持权限最小化）", () => {

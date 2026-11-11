@@ -5,7 +5,7 @@ import { useAppConfirm } from "@/shared/ui/app-confirm";
 const mocks = vi.hoisted(() => ({
   authState: {
     accessToken: "token",
-    user: { id: "user-1" },
+    user: { id: "user-1", isRealName: 1 },
   },
   joinedRoom: null as Record<string, unknown> | null,
   joinedRoomAfterExit: null as Record<string, unknown> | null,

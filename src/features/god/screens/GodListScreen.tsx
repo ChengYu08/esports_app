@@ -8,7 +8,6 @@ import {
   FlatList,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -23,7 +22,9 @@ import {
 } from "@/features/god/api/god.api";
 import { fetchGames } from "@/features/home/api/home.api";
 import { useVoicePlayer } from "@/shared/audio/use-voice-player";
-import { EmptyState } from "@/shared/ui/AsyncStates";
+import { ListFallbackState, LoadingState } from "@/shared/ui/AsyncStates";
+import { useIsOffline } from "@/shared/hooks/use-is-offline";
+import { CachedImage } from "@/shared/ui/CachedImage";
 import { CompanionCard } from "@/shared/ui/CompanionCard";
 import { PaginationFooter } from "@/shared/ui/PaginationFooter";
 
@@ -75,6 +76,12 @@ const FILTER_DEFS: {
 ];
 
 const ALL_GAME_KEY = "all";
+
+type GamePillItem = {
+  id: string;
+  label: string;
+  iconUrl: string | null;
+};
 
 /** 筛选行高度与其底部的弹层/蒙层起点 */
 const FILTER_BAR_HEIGHT = 34;
@@ -197,6 +204,7 @@ const GodCard = memo(function GodCard({
 
 export default function GodListScreen({ active = true }: { active?: boolean }) {
   const insets = useSafeAreaInsets();
+  const offline = useIsOffline();
   const focused = useIsFocused();
   const voicePlayer = useVoicePlayer();
 
@@ -212,6 +220,10 @@ export default function GodListScreen({ active = true }: { active?: boolean }) {
   const [gameKey, setGameKey] = useState(ALL_GAME_KEY);
   const [filters, setFilters] = useState<GodFilters>(GOD_EMPTY_FILTERS);
   const [openFilter, setOpenFilter] = useState<FilterKey | null>(null);
+
+  const selectGame = useCallback((nextGameKey: string) => {
+    setGameKey(nextGameKey);
+  }, []);
 
   const openFilterMenu = (key: FilterKey) => {
     setOpenFilter((current) => (current === key ? null : key));
@@ -246,6 +258,18 @@ export default function GodListScreen({ active = true }: { active?: boolean }) {
     return map;
   }, [games.data]);
 
+  const gamePillItems = useMemo<GamePillItem[]>(
+    () => [
+      { id: ALL_GAME_KEY, label: "全部", iconUrl: null },
+      ...(games.data ?? []).map((game) => ({
+        id: String(game.id),
+        label: game.name,
+        iconUrl: game.iconUrl ?? null,
+      })),
+    ],
+    [games.data],
+  );
+
   const godList = useInfiniteQuery({
     queryKey: ["god-list", gameId, filters],
     enabled: active && focused,
@@ -262,6 +286,8 @@ export default function GodListScreen({ active = true }: { active?: boolean }) {
     () => godList.data?.pages.flatMap((page) => page.items) ?? [],
     [godList.data],
   );
+
+  const hasFilter = gameKey !== ALL_GAME_KEY || Object.values(filters).some(Boolean);
 
   const handleItemPress = useCallback(
     (item: GodListItem) => {
@@ -304,28 +330,7 @@ export default function GodListScreen({ active = true }: { active?: boolean }) {
 
   return (
     <View style={styles.screen}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.gameBar}
-        contentContainerStyle={styles.gameBarContent}
-      >
-        <GamePill
-          label="全部"
-          iconUrl={null}
-          selected={gameKey === ALL_GAME_KEY}
-          onPress={() => setGameKey(ALL_GAME_KEY)}
-        />
-        {(games.data ?? []).map((game) => (
-          <GamePill
-            key={game.id}
-            label={game.name}
-            iconUrl={game.iconUrl}
-            selected={gameKey === String(game.id)}
-            onPress={() => setGameKey(String(game.id))}
-          />
-        ))}
-      </ScrollView>
+      <GamePillRow items={gamePillItems} activeKey={gameKey} onSelect={selectGame} />
       <View style={styles.listSheet}>
         <View style={styles.filterBar}>
           {FILTER_DEFS.map((def) => {
@@ -368,8 +373,21 @@ export default function GodListScreen({ active = true }: { active?: boolean }) {
           renderItem={renderCard}
           ItemSeparatorComponent={CardDivider}
           ListEmptyComponent={
-            godList.isLoading ? null : (
-              <EmptyState message="暂无大神，换个筛选条件试试" />
+            godList.isLoading ? (
+              <LoadingState />
+            ) : (
+              <ListFallbackState
+                kind={
+                  godList.isError || (offline && godList.data === undefined)
+                    ? offline
+                      ? "offline"
+                      : "loadFailed"
+                    : hasFilter
+                      ? "filterEmpty"
+                      : "empty"
+                }
+                onRetry={godList.refetch}
+              />
             )
           }
           ListFooterComponent={
@@ -378,6 +396,8 @@ export default function GodListScreen({ active = true }: { active?: boolean }) {
                 loading={godList.isFetchingNextPage}
                 hasMore={godList.hasNextPage}
                 pageCount={godList.data?.pages.length}
+                failed={godList.isFetchNextPageError}
+                onRetry={godList.fetchNextPage}
               />
             ) : null
           }
@@ -421,33 +441,73 @@ function CardDivider() {
   return <View style={styles.divider} />;
 }
 
-function GamePill({
+const GamePill = memo(function GamePill({
+  id,
   label,
   iconUrl,
-  selected,
-  onPress,
+  active,
+  onSelect,
 }: {
+  id: string;
   label: string;
-  iconUrl: string | null | undefined;
-  selected: boolean;
-  onPress: () => void;
+  iconUrl: string | null;
+  active: boolean;
+  onSelect: (id: string) => void;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={[styles.gamePill, selected && styles.gamePillSelected]}
+      accessibilityState={{ selected: active }}
+      onPress={() => onSelect(id)}
+      style={[styles.gamePill, active && styles.gamePillSelected]}
     >
       {iconUrl ? (
-        <Image source={{ uri: iconUrl }} style={styles.gameIcon} contentFit="cover" />
+        <CachedImage source={{ uri: iconUrl }} style={styles.gameIcon} contentFit="cover" />
       ) : (
         <Image source={allGamesIcon} style={styles.gameIcon} contentFit="cover" />
       )}
-      <Text style={[styles.gamePillText, selected && styles.gamePillTextSelected]}>{label}</Text>
+      <Text style={[styles.gamePillText, active && styles.gamePillTextSelected]}>{label}</Text>
     </Pressable>
   );
-}
+});
+
+const GamePillRow = memo(function GamePillRow({
+  items,
+  activeKey,
+  onSelect,
+}: {
+  items: GamePillItem[];
+  activeKey: string;
+  onSelect: (id: string) => void;
+}) {
+  const renderItem = useCallback(
+    ({ item }: { item: GamePillItem }) => (
+      <GamePill
+        id={item.id}
+        label={item.label}
+        iconUrl={item.iconUrl}
+        active={activeKey === item.id}
+        onSelect={onSelect}
+      />
+    ),
+    [activeKey, onSelect],
+  );
+
+  return (
+    <FlatList
+      horizontal
+      data={items}
+      keyExtractor={(item) => item.id}
+      renderItem={renderItem}
+      showsHorizontalScrollIndicator={false}
+      style={styles.gameBar}
+      contentContainerStyle={styles.gameBarContent}
+      initialNumToRender={10}
+      maxToRenderPerBatch={10}
+      windowSize={5}
+    />
+  );
+});
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F5F6F7" },

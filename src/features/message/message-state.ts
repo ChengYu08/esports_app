@@ -35,17 +35,16 @@ export type MessageHistoryPage = {
   hasMore: boolean;
 };
 
-export function mergeConversations(
-  items: MessageConversation[],
+export function mergeConversationPair(
+  current: MessageConversation | undefined,
   updated: MessageConversation,
-) {
-  const current = items.find((item) => item.id === updated.id);
+): MessageConversation {
   const hasNewerMessage =
     !current ||
     updated.updatedAt > current.updatedAt ||
     (updated.updatedAt === current.updatedAt &&
       Boolean(updated.preview || updated.time));
-  const merged = {
+  return {
     ...current,
     ...updated,
     title:
@@ -68,11 +67,43 @@ export function mergeConversations(
         }
       : {}),
   };
+}
+
+export function mergeConversations(
+  items: MessageConversation[],
+  updated: MessageConversation,
+) {
+  const merged = mergeConversationPair(
+    items.find((item) => item.id === updated.id),
+    updated,
+  );
   return [...items.filter((item) => item.id !== updated.id), merged].sort(
     (left, right) =>
       Number(Boolean(right.isPinned)) - Number(Boolean(left.isPinned)) ||
       right.updatedAt - left.updatedAt,
   );
+}
+
+/**
+ * 快照合并结果与现有会话逐字段比较：内容完全一致时调用方复用原对象、跳过更新，
+ * 避免每次列表刷新都生成全新会话数组导致整列重渲染。
+ */
+export function isConversationContentEqual(
+  current: MessageConversation | undefined,
+  merged: MessageConversation,
+) {
+  if (!current) return false;
+  return current.title === merged.title
+    && current.preview === merged.preview
+    && current.time === merged.time
+    && current.avatar === merged.avatar
+    && current.unreadCount === merged.unreadCount
+    && current.updatedAt === merged.updatedAt
+    && current.isOnline === merged.isOnline
+    && current.clubId === merged.clubId
+    && current.note === merged.note
+    && current.isPinned === merged.isPinned
+    && current.isCustomerService === merged.isCustomerService;
 }
 
 function messageKey(item: ManagedMessage) {

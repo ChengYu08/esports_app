@@ -2,9 +2,10 @@ import type { ElementType } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { storageMock, linkingMock, linksMock } = vi.hoisted(() => ({
+const { storageMock, linkingMock, linksMock, toolkitMock } = vi.hoisted(() => ({
   storageMock: { set: vi.fn() },
   linkingMock: { openURL: vi.fn() },
+  toolkitMock: { markPrivacyConsentAccepted: vi.fn() },
   linksMock: {
     userAgreement: "https://example.test/protocols?code=user_server",
     privacyPolicy: "https://example.test/protocols?code=user_privacy",
@@ -39,6 +40,9 @@ vi.mock("@/shared/navigation/open-external-link", () => ({
 vi.mock("@/core/config/links", () => ({ APP_LINKS: linksMock }));
 vi.mock("@/core/storage/storage", () => ({ storage: storageMock }));
 vi.mock("@/shared/ui/ScreenHeader", () => ({ ScreenHeader: "ScreenHeader" }));
+vi.mock("../../../../modules/expo-app-toolkit", () => ({
+  default: toolkitMock,
+}));
 
 const { WEBVIEW_COMPAT_SCRIPT } = await import(
   "@/shared/navigation/webview-compat-script"

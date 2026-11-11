@@ -6,6 +6,7 @@ import { useAuthStore } from "@esports/auth";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { showToast } from "@/shared/ui/app-toast";
 
+import { ensureRealNameBeforeVoiceRoomEnter, promptSelfRealNameIfNeeded } from "./ensure-real-name-before-enter";
 import { exitVoiceRoom } from "./exit-voice-room";
 import { navigateToVoiceRoom } from "./navigate-voice-room";
 import { useVoiceRoomSessionStore } from "./voice-room-session";
@@ -104,6 +105,9 @@ export async function enterRoomFromInvite(
       showToast("请先登录");
       return { status: "failed", message: "请先登录" };
     }
+    if (!(await ensureRealNameBeforeVoiceRoomEnter())) {
+      return { status: "cancelled" };
+    }
     if (!roomId) {
       showToast("房间信息不完整");
       return { status: "failed", message: "房间信息不完整" };
@@ -116,9 +120,31 @@ export async function enterRoomFromInvite(
         showToast("语聊房已关闭");
         return { status: "failed", message: "语聊房已关闭" };
       }
+      // 对齐 PC：链接 v 与当前实例不一致则邀请已失效
+      if (
+        roomVersion &&
+        String(detail.roomVersion) !== String(roomVersion)
+      ) {
+        showToast("该邀请已失效");
+        return { status: "failed", message: "该邀请已失效" };
+      }
+      // 对齐 PC：进房前只读检查踢人封禁
+      const kicked = await voiceRoomApi.isVoiceRoomKicked(
+        roomId,
+        detail.roomVersion ?? roomVersion,
+        accessToken,
+      );
+      if (kicked) {
+        const message = "你已被移出房间，暂不可重新进入";
+        showToast(message);
+        return { status: "failed", message };
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "语聊房已关闭";
+      if (await promptSelfRealNameIfNeeded(message)) {
+        return { status: "failed", message };
+      }
       showToast(message);
       return { status: "failed", message };
     }

@@ -1,4 +1,5 @@
 import type { RCIMIWEngine, RCIMIWMessage, RCIMIWTextMessage } from '@rongcloud/react-native-im-wrapper';
+import { logger } from '@/core/logging/logger';
 import { pickRongImageUrl, type RongSdkMessage } from '@/features/message/chat-message';
 
 import {
@@ -11,6 +12,11 @@ import {
 } from '@/features/message/rongcloud-im';
 
 import { appendCachedVoiceChatMessage, clearVoiceChatMessageCache } from './voice-room-message-cache';
+
+/** 进房不拉本地历史（对齐 PC count:-1）；历史统一走 getChatRoomMessages 云端接口 */
+const JOIN_CHATROOM_MESSAGE_COUNT = -1;
+/** 云端历史单页上限（融云约束 0 < count ≤ 50） */
+const CHATROOM_HISTORY_PAGE_SIZE = 50;
 
 type RongSdk = typeof import('@rongcloud/react-native-im-wrapper');
 type RoomMessage = {
@@ -33,6 +39,10 @@ const roomMessageListeners = new Set<(chatroomId: string, message: RoomMessage) 
 const roomMemberListeners = new Set<(targetId: string, actions: { userId?: string; actionType?: number }[]) => void>();
 let listenersInstalled = false;
 const joinedChatroomIds = new Set<string>();
+// 融云聊天室成员事件不存离线：屏内无人订阅期间（最小化/首屏未挂载）先缓冲，
+// 首个订阅者挂载时冲刷，避免已加入/已离开的成员丢失
+const MAX_BUFFERED_MEMBER_ACTIONS = 100;
+const bufferedMemberActions = new Map<string, { userId?: string; actionType?: number }[]>();
 
 function loadSdk(): RongSdk | null {
   try {
@@ -46,9 +56,20 @@ function loadSdk(): RongSdk | null {
 function installRoomListeners() {
   if (listenersInstalled) return;
   const engine = getRongCloudEngine();
-  if (!engine || !loadSdk()) return;
+  // 转发链路不依赖 SDK 枚举（normalizeRoomMessage 内部自行 loadSdk），
+  // 引擎就绪即可安装；SDK 不可用时成员/连接事件仍需照常转发
+  if (!engine) return;
   listenersInstalled = true;
   subscribeRongChatRoomMembers((targetId, actions) => {
+    if (joinedChatroomIds.has(targetId) && roomMemberListeners.size === 0) {
+      const buffer = bufferedMemberActions.get(targetId) ?? [];
+      buffer.push(...actions);
+      if (buffer.length > MAX_BUFFERED_MEMBER_ACTIONS) {
+        buffer.splice(0, buffer.length - MAX_BUFFERED_MEMBER_ACTIONS);
+      }
+      bufferedMemberActions.set(targetId, buffer);
+      return;
+    }
     roomMemberListeners.forEach((listener) => listener(targetId, actions));
   });
   subscribeRongChatRoomMessages((_targetId, message: RCIMIWMessage) => {
@@ -74,10 +95,20 @@ function normalizeRoomMessage(message: RCIMIWMessage): RoomMessage | null {
   const isMine = sdk != null && message.direction === sdk.RCIMIWMessageDirection.SEND;
   const imageUrl = pickRongImageUrl(sdkMessage, isMine);
   if (!text && !(isImage && imageUrl)) return null;
+  const messageId = String(message.messageUId || message.messageId || message.sentTime);
+  const nickname = message.userInfo?.name;
+  if (!nickname) {
+    logger.info('voice_room.chat_message_missing_nickname', {
+      userId: message.senderUserId,
+      messageId,
+      text: text.slice(0, 40),
+      hasImage: Boolean(isImage && imageUrl),
+    });
+  }
   return {
-    id: String(message.messageUId || message.messageId || message.sentTime),
+    id: messageId,
     userId: message.senderUserId,
-    nickname: message.userInfo?.name,
+    nickname,
     avatar: message.userInfo?.portrait,
     text,
     ...(isImage && imageUrl ? { imageUrl } : {}),
@@ -94,7 +125,7 @@ export async function joinVoiceChatRoom(accessToken: string, chatroomId: string)
   installRoomListeners();
   const sdk = loadSdk();
   const code = await new Promise<number>((resolve, reject) => {
-    void engine.joinChatRoom(chatroomId, 50, false, {
+    void engine.joinChatRoom(chatroomId, JOIN_CHATROOM_MESSAGE_COUNT, false, {
       onChatRoomJoined: (result) => result === 0 ? resolve(result) : reject(new Error(`加入语聊房失败（${result}）`)),
     }).then((result) => {
       if (result !== 0) reject(new Error(`加入语聊房失败（${result}）`));
@@ -110,6 +141,7 @@ export async function leaveVoiceChatRoom(chatroomId: string) {
   // A kicked user may already be absent on the server; always discard the
   // local joined marker so a later permitted join actually reaches the SDK.
   joinedChatroomIds.delete(chatroomId);
+  bufferedMemberActions.delete(chatroomId);
   // 真正退房才清消息缓存；最小化只卸载屏组件、不退房，记录保留供重进恢复
   clearVoiceChatMessageCache(chatroomId);
   if (engine) await engine.leaveChatRoom(chatroomId);
@@ -118,7 +150,16 @@ export async function leaveVoiceChatRoom(chatroomId: string) {
 export async function getVoiceChatHistory(chatroomId: string) {
   const engine = getRongCloudEngine();
   const sdk = loadSdk();
-  if (!engine || !sdk || !isRongCloudConnected()) return [];
+  if (!engine || !sdk || !isRongCloudConnected()) {
+    logger.warn('voice_room.history_skipped', {
+      chatroomId,
+      hasEngine: Boolean(engine),
+      hasSdk: Boolean(sdk),
+      connected: isRongCloudConnected(),
+    });
+    return [];
+  }
+  logger.info('voice_room.history_fetch_start', { chatroomId, count: CHATROOM_HISTORY_PAGE_SIZE });
   return new Promise<RoomMessage[]>((resolve, reject) => {
     let settled = false;
     const finish = (messages: RoomMessage[] | Error) => {
@@ -131,17 +172,38 @@ export async function getVoiceChatHistory(chatroomId: string) {
       chatroomId,
       0,
       sdk.RCIMIWTimeOrder.BEFORE,
-      50,
+      CHATROOM_HISTORY_PAGE_SIZE,
       {
-        onSuccess: (messages) => finish((messages || [])
-          .map(normalizeRoomMessage)
-          .filter((message): message is RoomMessage => Boolean(message))
-          .sort((left, right) => left.sentAt - right.sentAt)),
-        onError: (code) => finish(new Error(`聊天室历史消息拉取失败（${code}）`)),
+        onSuccess: (messages) => {
+          const rawCount = messages?.length ?? 0;
+          const mapped = (messages || [])
+            .map(normalizeRoomMessage)
+            .filter((message): message is RoomMessage => Boolean(message))
+            .sort((left, right) => left.sentAt - right.sentAt);
+          logger.info('voice_room.history_fetch_success', {
+            chatroomId,
+            rawCount,
+            mappedCount: mapped.length,
+          });
+          finish(mapped);
+        },
+        onError: (code) => {
+          logger.warn('voice_room.history_fetch_error', { chatroomId, code });
+          finish(new Error(`聊天室历史消息拉取失败（${code}）`));
+        },
       },
     ).then((code) => {
-      if (code !== 0) finish(new Error(`聊天室历史消息拉取失败（${code}）`));
-    }).catch((error: unknown) => finish(error instanceof Error ? error : new Error('聊天室历史消息拉取失败')));
+      if (code !== 0) {
+        logger.warn('voice_room.history_fetch_invoke_failed', { chatroomId, code });
+        finish(new Error(`聊天室历史消息拉取失败（${code}）`));
+      }
+    }).catch((error: unknown) => {
+      logger.warn('voice_room.history_fetch_exception', {
+        chatroomId,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      finish(error instanceof Error ? error : new Error('聊天室历史消息拉取失败'));
+    });
   });
 }
 
@@ -212,6 +274,10 @@ export function subscribeVoiceChatMessages(listener: (chatroomId: string, messag
 }
 
 export function subscribeVoiceChatMembers(listener: (targetId: string, actions: { userId?: string; actionType?: number }[]) => void) {
+  if (roomMemberListeners.size === 0) {
+    bufferedMemberActions.forEach((actions, targetId) => listener(targetId, actions));
+    bufferedMemberActions.clear();
+  }
   roomMemberListeners.add(listener);
   return () => roomMemberListeners.delete(listener);
 }

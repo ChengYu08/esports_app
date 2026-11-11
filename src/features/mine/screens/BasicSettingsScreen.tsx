@@ -2,9 +2,10 @@ import { Delete24Regular } from "@fluentui/react-native-icons";
 import { Paths } from "expo-file-system";
 import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  InteractionManager,
   Modal,
   Platform,
   Pressable,
@@ -53,14 +54,30 @@ export default function BasicSettingsScreen() {
   const userId = useAuthStore((state) => state.user?.id ?? null);
   const [clearing, setClearing] = useState(false);
   const [cacheModalVisible, setCacheModalVisible] = useState(false);
-  const [cacheSize, setCacheSize] = useState<number | null>(() =>
-    readCacheSize(),
+  // undefined = 正在计算（展示转圈），null = 计算失败（展示"暂不可用"）
+  const [cacheSize, setCacheSize] = useState<number | null | undefined>(
+    undefined,
   );
   const [loggingOut, setLoggingOut] = useState(false);
   const [teenModeEnabled, setTeenModeEnabled] = useState(false);
 
   // 提前预热短信通知开关缓存，进入消息通知页时无需再等待加载
   useSmsNotifyStatus();
+
+  // 缓存大小要递归遍历整个缓存目录（同步调用），不能放在渲染期执行；
+  // 等进入本页的转场动画结束后再计算，避免卡住首帧
+  useEffect(() => {
+    let active = true;
+    const task = InteractionManager.runAfterInteractions(() => {
+      if (active) {
+        setCacheSize(readCacheSize());
+      }
+    });
+    return () => {
+      active = false;
+      task.cancel();
+    };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -91,7 +108,14 @@ export default function BasicSettingsScreen() {
           await Image.clearMemoryCache();
           if (!cleared) throw new Error("图片缓存暂时无法清理");
         }
-        queryClient.clear();
+        // 只丢没有观察者的页面级缓存（已卸载堆栈页的数据；iOS native-stack 会冻结
+        // 保留前序页面，这些页同样视为有观察者而保留）；常驻 tab（首页/订单/消息）
+        // 保留数据并 invalidate 后台刷新——tabs 常驻挂载且未接 focusManager，若直接
+        // queryClient.clear()，返回这些页会整页闪加载且之后不再自动刷新
+        queryClient.removeQueries({
+          predicate: (query) => query.getObserversCount() === 0,
+        });
+        queryClient.invalidateQueries();
         setCacheSize(readCacheSize());
         showToast("清理完成，可重新下载的缓存已清除");
       } catch (error) {
@@ -159,7 +183,8 @@ export default function BasicSettingsScreen() {
           />
           <SettingsRow
             label={clearing ? "正在清理缓存" : "清除缓存"}
-            value={formatBytes(cacheSize)}
+            value={cacheSize === undefined ? undefined : formatBytes(cacheSize)}
+            loading={cacheSize === undefined}
             disabled={clearing}
             onPress={clearCache}
           />
@@ -201,9 +226,7 @@ export default function BasicSettingsScreen() {
             </Text>
             <View style={styles.cacheSizePanel}>
               <Text style={styles.cacheSizeLabel}>可清理文件</Text>
-              <Text style={styles.cacheSizeValue}>
-                {formatBytes(cacheSize)}
-              </Text>
+              <CacheSizeValue size={cacheSize} />
             </View>
             <View style={styles.cacheModalActions}>
               <Pressable
@@ -243,11 +266,13 @@ export default function BasicSettingsScreen() {
 function SettingsRow({
   label,
   value,
+  loading,
   onPress,
   disabled,
 }: {
   label: string;
   value?: string;
+  loading?: boolean;
   onPress: () => void;
   disabled?: boolean;
 }) {
@@ -262,13 +287,25 @@ function SettingsRow({
       >
         <Text style={styles.rowLabel}>{label}</Text>
         <View style={styles.rowRight}>
-          {value ? <Text style={styles.rowValue}>{value}</Text> : null}
+          {loading ? (
+            <ActivityIndicator size="small" color="#999999" />
+          ) : value ? (
+            <Text style={styles.rowValue}>{value}</Text>
+          ) : null}
           <Image source={arrowIcon} style={styles.arrow} />
         </View>
       </Pressable>
       <View style={styles.rowDivider} />
     </View>
   );
+}
+
+// 缓存大小展示：计算中转圈，计算完成出数字，失败展示"暂不可用"
+function CacheSizeValue({ size }: { size: number | null | undefined }) {
+  if (size === undefined) {
+    return <ActivityIndicator size="small" color="#FE1F4C" />;
+  }
+  return <Text style={styles.cacheSizeValue}>{formatBytes(size)}</Text>;
 }
 
 const styles = StyleSheet.create({

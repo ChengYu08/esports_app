@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { apiClient } from "@/core/network/api-client";
-import { fetchBanners, fetchClubDetail, fetchClubGameCompanionCounts, fetchClubGameModes, fetchClubOnlineCount, fetchClubPage, fetchCompanionPage, fetchGameCategories, fetchGames } from "./home.api";
+import { fetchBanners, fetchClubDetail, fetchClubGameCompanionCounts, fetchClubGameModes, fetchClubOnlineCount, fetchClubPage, fetchCompanionPage, fetchGameCategories, fetchGames, fetchHomePopup } from "./home.api";
 
 vi.mock("@/core/network/api-client", () => ({ apiClient: vi.fn() }));
 
@@ -97,6 +97,56 @@ describe("首页活动轮播下发", () => {
     vi.mocked(apiClient).mockResolvedValue({ code: "FAILED", info: "活动加载失败" });
 
     await expect(fetchBanners()).rejects.toThrow("活动加载失败");
+  });
+});
+
+describe("首页开屏弹窗资源位", () => {
+  it("按 sort 映射多张素材并换算轮播间隔", async () => {
+    const controller = new AbortController();
+    vi.mocked(apiClient).mockResolvedValue({
+      code: "SUCCESS",
+      data: [{
+        slotCode: "APP_HOME_POPUP",
+        displayMode: "CAROUSEL",
+        intervalSec: 5,
+        items: [
+          { deliveryId: 1, materialId: 2, displayImageUrl: "https://cdn.example.com/b.jpg", sort: 2 },
+          { deliveryId: 1, materialId: 3, displayImageUrl: " https://cdn.example.com/a.jpg ", sort: 1,
+            linkConfig: { ANDROID: { jumpType: "ROUTE", jumpUrl: "/club/[id]", params: { id: "9" } } } },
+          { deliveryId: 1, materialId: 4, displayImageUrl: "  ", sort: 3 },
+        ],
+      }],
+    });
+
+    expect(await fetchHomePopup(controller.signal)).toEqual({
+      intervalMs: 5000,
+      items: [
+        expect.objectContaining({
+          id: "1-3",
+          imageUrl: "https://cdn.example.com/a.jpg",
+          linkConfig: { ANDROID: { jumpType: "ROUTE", jumpUrl: "/club/[id]", params: { id: "9" } } },
+        }),
+        expect.objectContaining({ id: "1-2", imageUrl: "https://cdn.example.com/b.jpg" }),
+      ],
+    });
+    expect(apiClient).toHaveBeenCalledWith("/client/v1/ad/slot/list", {
+      method: "POST",
+      body: { slotCodes: ["APP_HOME_POPUP"] },
+      signal: controller.signal,
+    });
+  });
+
+  it("无有效展示图时返回 null", async () => {
+    vi.mocked(apiClient).mockResolvedValue({
+      code: "SUCCESS",
+      data: [{ slotCode: "APP_HOME_POPUP", displayMode: "CAROUSEL", items: [] }],
+    });
+    expect(await fetchHomePopup()).toBeNull();
+  });
+
+  it("资源位缺失时返回 null", async () => {
+    vi.mocked(apiClient).mockResolvedValue({ code: "SUCCESS", data: [] });
+    expect(await fetchHomePopup()).toBeNull();
   });
 });
 

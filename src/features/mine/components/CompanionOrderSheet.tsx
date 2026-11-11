@@ -462,7 +462,9 @@ export function CompanionOrderSheet({
           </Animated.View>
         </Animated.View>
       </KeyboardAvoidingView>
+      {/* 内嵌在弹窗内渲染：iOS 无法同时呈现两个原生 Modal */}
       <AppPrompt
+        inline
         visible={Boolean(prompt)}
         title={prompt?.title}
         message={promptMessage}

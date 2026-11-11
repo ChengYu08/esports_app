@@ -24,6 +24,8 @@ import {
 } from './rongcloud-im';
 import {
   markMessageFailed,
+  isConversationContentEqual,
+  mergeConversationPair,
   mergeConversations,
   mergeMessages,
   prependHistory,
@@ -105,6 +107,8 @@ export type MessageStoreState = {
   initialize: (token: string) => Promise<void>;
   setChatForeground: (visible: boolean) => void;
   openConversation: (conversation: Pick<MessageConversation, 'id' | 'title' | 'avatar' | 'clubId' | 'isCustomerService'>) => Promise<void>;
+  /** 确保会话历史已加载：markRead + 首次拉取，嵌套打开同一会话的各层共用、不重复请求 */
+  ensureConversationHistory: (peerId: string) => Promise<void>;
   closeConversation: (peerId?: string) => void;
   loadOlder: (peerId: string) => Promise<void>;
   sendText: (peerId: string, text: string) => Promise<void>;
@@ -357,16 +361,34 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           && blockedUserIds.has(conversation.id),
         )
         .map((conversation) => conversation.id);
-      set((state) => ({
-        conversationError: null,
-        conversations: conversations
-          .map((conversation) =>
-            !isSystemConversationId(conversation.id) && blockedUserIds.has(conversation.id)
-              ? { ...conversation, unreadCount: 0 }
-              : conversation,
-          )
-          .reduce(mergeConversations, state.conversations),
-      }));
+      set((state) => {
+        const snapshot = conversations.map((conversation) =>
+          !isSystemConversationId(conversation.id) && blockedUserIds.has(conversation.id)
+            ? { ...conversation, unreadCount: 0 }
+            : conversation,
+        );
+        const nextById = new Map<string, MessageConversation>(
+          state.conversations.map((item) => [item.id, item]),
+        );
+        let changed = false;
+        for (const incoming of snapshot) {
+          const current = nextById.get(incoming.id);
+          const merged = mergeConversationPair(current, incoming);
+          // 快照内容与本地完全一致时保留原对象：不生成新数组，列表不重渲染
+          if (current && isConversationContentEqual(current, merged)) continue;
+          changed = true;
+          nextById.set(incoming.id, merged);
+        }
+        if (!changed && state.conversationError === null) return state;
+        return {
+          conversationError: null,
+          conversations: Array.from(nextById.values()).sort(
+            (left, right) =>
+              Number(Boolean(right.isPinned)) - Number(Boolean(left.isPinned))
+              || right.updatedAt - left.updatedAt,
+          ),
+        };
+      });
       if (onlineStatusToken) void get().refreshOnlineStatuses(onlineStatusToken);
       await Promise.allSettled(blockedConversationIds.map((peerId) => adapter.markRead(peerId)));
     };
@@ -708,6 +730,8 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
           return {
             activePeerId: conversation.id,
             chatForeground: true,
+            // 重复项即引用计数：主页→聊天→主页等嵌套打开同一会话时，
+            // 每层 ChatConversation 各持一项，close 时只有最后一层才清消息缓存
             openPeerIds: [...state.openPeerIds, conversation.id],
             conversations: mergeConversations(state.conversations, { ...(current || toConversationShell(conversation)), ...conversation }),
           };
@@ -715,22 +739,26 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         if (isNewConversation && onlineStatusToken) {
           void get().refreshOnlineStatuses(onlineStatusToken);
         }
-        // Update the local unread state immediately, even if IM is offline or
-        // history loading takes time. markRead forwards to the adapter when ready.
-        void get().markRead(conversation.id);
+        await get().ensureConversationHistory(conversation.id);
+      },
+
+      // 确保会话历史已拉取并补报已读；不触碰 openPeerIds/activePeerId/chatForeground，
+      // 供聊天页在「进入时 IM 未就绪 → 就绪」等场景单独补拉，嵌套打开同一会话也安全
+      ensureConversationHistory: async (peerId) => {
+        if (!peerId) return;
+        void get().markRead(peerId);
         if (get().connectionState !== 'ready') return;
-        const previous = get().historyByPeerId[conversation.id];
-        if (!previous) {
-          set((state) => ({ historyByPeerId: { ...state.historyByPeerId, [conversation.id]: { nextCursor: null, hasMore: true, loading: true } } }));
-          try { await loadHistory(conversation.id); } catch (error) {
-            set((state) => {
-              if (!state.openPeerIds.includes(conversation.id)) return state;
-              return {
-                historyByPeerId: { ...state.historyByPeerId, [conversation.id]: { nextCursor: null, hasMore: false, loading: false } },
-                lastError: error instanceof Error ? error.message : '历史消息加载失败',
-              };
-            });
-          }
+        const previous = get().historyByPeerId[peerId];
+        if (previous) return;
+        set((state) => ({ historyByPeerId: { ...state.historyByPeerId, [peerId]: { nextCursor: null, hasMore: true, loading: true } } }));
+        try { await loadHistory(peerId); } catch (error) {
+          set((state) => {
+            if (!state.openPeerIds.includes(peerId)) return state;
+            return {
+              historyByPeerId: { ...state.historyByPeerId, [peerId]: { nextCursor: null, hasMore: false, loading: false } },
+              lastError: error instanceof Error ? error.message : '历史消息加载失败',
+            };
+          });
         }
       },
 

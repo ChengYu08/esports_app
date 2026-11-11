@@ -1,12 +1,16 @@
 import { Platform } from "react-native";
 
 import type { Banner, BannerJumpConfig, HomeBannerSlot, HomeBannerSlotCode } from "./api/home.types";
+import { isDeniedBannerRoute } from "./banner-route-deny";
 
 export const HOME_BANNER_SLOT_CODES: HomeBannerSlotCode[] = [
   "APP_HOME_FLOOR1",
   "APP_HOME_FLOOR2",
   "APP_HOME_FLOOR3",
 ];
+
+/** 首页开屏弹窗资源位（与楼层 Banner 分离请求，不混入楼层渲染）。 */
+export const APP_HOME_POPUP_SLOT_CODE = "APP_HOME_POPUP";
 
 /** 按端跳转协议动作：route 为 App 内路由，url 为外链，none 为未配置或配置非法。 */
 export type BannerJump =
@@ -74,7 +78,8 @@ function parseJumpParams(raw: unknown): Record<string, string> {
 /**
  * 解析按端跳转协议：后台 linkConfig 独立结构化字段（如活动入口）。
  * 任何一步不合法（缺端 key / 缺或非法 jumpType / ROUTE 缺以 / 开头的
- * jumpUrl / URL 缺合法外链）一律返回 none，由调用方回退存量逻辑。
+ * jumpUrl / 命中敏感路径黑名单 / URL 缺合法外链）一律返回 none，
+ * 由调用方回退存量逻辑。缺参由目标页自行兜底。
  */
 export function parseBannerJump(linkConfig?: BannerJumpConfig | null): BannerJump {
   if (!linkConfig) {
@@ -87,6 +92,9 @@ export function parseBannerJump(linkConfig?: BannerJumpConfig | null): BannerJum
   const { jumpType, jumpUrl } = node as BannerJumpNode;
   if (jumpType === "ROUTE") {
     if (typeof jumpUrl !== "string" || !jumpUrl.startsWith("/")) {
+      return { type: "none" };
+    }
+    if (isDeniedBannerRoute(jumpUrl)) {
       return { type: "none" };
     }
     return { type: "route", path: jumpUrl, params: parseJumpParams((node as BannerJumpNode).params) };

@@ -1,6 +1,7 @@
 import { useAuthStore } from "@esports/auth";
 
 import { queryClient } from "@/core/query/query-client";
+import { clearActionCommandAccountState } from "@/features/message/action-command/action-command-handlers";
 import { messageStore } from "@/features/message/message-store";
 import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
 import { leaveVoiceChatRoom } from "@/features/voice-room/voice-room-rongcloud";
@@ -8,6 +9,7 @@ import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-sessi
 
 import { clientAuthApi } from "./client-auth.api";
 import { clearAuthSession } from "./session-persistence";
+import { useUserProfileStore } from "./user-profile-store";
 
 /** 对齐 PC chatStore.getAccountLogoutConfirmText：仅房主展示解散影响说明。 */
 export function getLogoutConfirmMessage(
@@ -59,6 +61,8 @@ export async function signOut(): Promise<void> {
       // 安全存储不可用时也要完成本地登出。
     }
     useAuthStore.getState().clearSession();
+    clearActionCommandAccountState();
+    useUserProfileStore.getState().reset();
     queryClient.clear();
     if (token) {
       await clientAuthApi.logout(token).catch(() => undefined);

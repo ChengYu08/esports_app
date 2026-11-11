@@ -6,6 +6,7 @@ import {
   fetchCompanionPage,
   fetchGameCategories,
   fetchGames,
+  fetchHomePopup,
   fetchPriceList,
 } from "@/features/home/api/home.api";
 import type {
@@ -20,6 +21,16 @@ export function useHomeBanners(tab: HomeTab, focused = true) {
     queryKey: ["home-banner-slots"],
     queryFn: ({ signal }) => fetchBanners(signal),
     enabled: tab === "home" && focused,
+  });
+}
+
+/** 首页开屏弹窗：仅在首页频道且聚焦时拉取。 */
+export function useHomePopup(enabled: boolean) {
+  return useQuery({
+    queryKey: ["home-popup"],
+    queryFn: ({ signal }) => fetchHomePopup(signal),
+    enabled,
+    staleTime: 60_000,
   });
 }
 

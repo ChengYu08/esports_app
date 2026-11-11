@@ -24,6 +24,7 @@ import {
 } from "@/features/auth/cancellation-cooling";
 import { saveCoolingRecord } from "@/features/auth/cancellation-cooling-store";
 import { clearAuthSession } from "@/features/auth/session-persistence";
+import { clearActionCommandAccountState } from "@/features/message/action-command/action-command-handlers";
 import { messageStore } from "@/features/message/message-store";
 import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
 import { leaveVoiceChatRoom } from "@/features/voice-room/voice-room-rongcloud";
@@ -159,6 +160,7 @@ export default function AccountCancellationScreen() {
       await messageStore.getState().reset().catch(() => undefined);
       await clearAuthSession().catch(() => undefined);
       clearSession();
+      clearActionCommandAccountState();
       showToast(
         `已进入${coolingDays}天冷静期，账号将于 ${formatCoolEndTime(record.coolEndTime)} 完成注销`,
         { duration: 5000 },

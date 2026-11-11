@@ -11,6 +11,21 @@ export type SearchHistoryEntry = {
 
 const MAX_HISTORY = 10;
 
+/**
+ * 关键词记录跨分类视为同一条（同一搜索词在两个 tab 下只留一条）；
+ * 带实体 ID 的记录必须按分类区分，避免俱乐部与陪玩师的同 ID 记录被合并。
+ */
+function isSameHistoryEntry(
+  item: SearchHistoryEntry,
+  entry: Pick<SearchHistoryEntry, "keyword" | "entityId" | "category">,
+) {
+  const keyword = entry.keyword.trim();
+  if (!entry.entityId) {
+    return !item.entityId && item.keyword === keyword;
+  }
+  return item.category === entry.category && (item.entityId === entry.entityId || (!item.entityId && item.keyword === keyword));
+}
+
 export function addSearchHistoryEntry(
   history: SearchHistoryEntry[],
   entry: SearchHistoryEntry,
@@ -19,9 +34,7 @@ export function addSearchHistoryEntry(
   if (!keyword) {
     return history;
   }
-  const isSameEntry = (item: SearchHistoryEntry) => item.category === entry.category && (entry.entityId
-    ? item.entityId === entry.entityId || (!item.entityId && item.keyword === keyword)
-    : !item.entityId && item.keyword === keyword);
+  const isSameEntry = (item: SearchHistoryEntry) => isSameHistoryEntry(item, entry);
   const previous = history.find(isSameEntry);
   return [
     { keyword, avatarUrl: entry.avatarUrl || previous?.avatarUrl, entityId: entry.entityId, category: entry.category },
@@ -44,15 +57,16 @@ export function parseSearchHistory(value: string | null, fallbackCategory?: Sear
       }
       const entityId = typeof entry?.entityId === "string" ? entry.entityId : undefined;
       const category = entry?.category === "club" || entry?.category === "user" ? entry.category : fallbackCategory;
-      if (history.some((item) => item.category === category && (entityId ? item.entityId === entityId : !item.entityId && item.keyword === keyword.trim()))) {
-        continue;
-      }
-      history.push({
+      const parsed: SearchHistoryEntry = {
         keyword: keyword.trim(),
         avatarUrl: typeof entry?.avatarUrl === "string" ? entry.avatarUrl : undefined,
         entityId,
         category,
-      });
+      };
+      if (history.some((item) => isSameHistoryEntry(item, parsed))) {
+        continue;
+      }
+      history.push(parsed);
       if (history.length === MAX_HISTORY) {
         break;
       }
@@ -68,12 +82,17 @@ export function mergeLegacySearchHistory(clubs: string | null, users: string | n
   const clubHistory = parseSearchHistory(clubs, "club");
   const userHistory = parseSearchHistory(users, "user");
   const merged: SearchHistoryEntry[] = [];
+  const append = (entry: SearchHistoryEntry) => {
+    if (!merged.some((item) => isSameHistoryEntry(item, entry))) {
+      merged.push(entry);
+    }
+  };
   for (let index = 0; index < Math.max(clubHistory.length, userHistory.length); index += 1) {
     if (clubHistory[index]) {
-      merged.push(clubHistory[index]);
+      append(clubHistory[index]);
     }
     if (userHistory[index]) {
-      merged.push(userHistory[index]);
+      append(userHistory[index]);
     }
   }
   return merged.slice(0, MAX_HISTORY);

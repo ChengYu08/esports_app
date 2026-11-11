@@ -5,8 +5,17 @@ const {
 
 const TAG = 'with-rongcloud-android-init';
 const MARKER = '// RongCloudPush:';
-const IMPORT_SNIPPET = 'import io.rong.push.RongPushPlugin';
-const INIT_SNIPPET = '    RongPushPlugin.init(this)';
+const IMPORT_SNIPPETS = [
+  'import io.rong.push.RongPushPlugin',
+  'import expo.modules.app.toolkit.PrivacyConsentState',
+  'import expo.modules.app.toolkit.RongPushHook',
+];
+// 隐私合规：融云及厂商推送 SDK 不得在用户同意隐私政策前初始化，
+// 仅注册初始化动作；同意状态由 PrivacyConsentState 持久化，JS 同意后经 ExpoAppToolkit 触发
+const INIT_SNIPPET = `    RongPushHook.initializer = { RongPushPlugin.init(this) }
+    if (PrivacyConsentState.isAccepted(this)) {
+      RongPushHook.tryInit()
+    }`;
 
 // Public method called by MainActivity to store push notification tap data
 const INTENT_HANDLER_METHOD = `
@@ -27,14 +36,14 @@ function withRongCloudAndroidInit(config) {
     }
     if (mod.modResults.contents.includes(MARKER)) return mod;
 
-    // Add import after the last existing import
+    // Add imports after the last existing import
     mod.modResults.contents = mod.modResults.contents.replace(
       /(import expo\.modules\.ApplicationLifecycleDispatcher)/,
-      `${IMPORT_SNIPPET}\n$1`,
+      `${IMPORT_SNIPPETS.join('\n')}\n$1`,
     );
 
-    // Insert RongPushPlugin.init(this) as the first statement in onCreate(),
-    // before loadReactNative(this) so it runs before the JS engine (and thus IM SDK) initializes
+    // Register the deferred init before loadReactNative(this);
+    // the push SDK only initializes once consent was accepted
     mod.modResults.contents = mod.modResults.contents.replace(
       /(override fun onCreate\(\) \{\n\s*super\.onCreate\(\)\n)/,
       `$1${INIT_SNIPPET}\n`,
@@ -54,4 +63,4 @@ function withRongCloudAndroidInit(config) {
   });
 }
 
-module.exports = createRunOncePlugin(withRongCloudAndroidInit, TAG, '1.0.0');
+module.exports = createRunOncePlugin(withRongCloudAndroidInit, TAG, '1.1.0');

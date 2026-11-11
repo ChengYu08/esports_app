@@ -44,6 +44,12 @@ export type HomeBannerSlot = {
   items: Banner[];
 };
 
+/** 首页开屏弹窗：排序后的可展示素材列表与轮播间隔。 */
+export type HomePopupContent = {
+  items: Banner[];
+  intervalMs: number;
+};
+
 export type ClubGameIcon = {
   id: number;
   name: string;

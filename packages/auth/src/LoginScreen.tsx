@@ -416,14 +416,20 @@ export function LoginScreen({
                 已阅读并同意{" "}
                 <Text
                   accessibilityRole="link"
-                  onPress={onUserAgreementPress}
+                  onPress={() => {
+                    setAgreementModalVisible(false);
+                    onUserAgreementPress?.();
+                  }}
                   style={styles.link}
                 >
                   《用户协议》
                 </Text>{" "}
                 <Text
                   accessibilityRole="link"
-                  onPress={onPrivacyPolicyPress}
+                  onPress={() => {
+                    setAgreementModalVisible(false);
+                    onPrivacyPolicyPress?.();
+                  }}
                   style={styles.link}
                 >
                   《隐私政策》

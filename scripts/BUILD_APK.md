@@ -30,7 +30,7 @@ node scripts/build_apk.cjs --abi all
 签名配置通过 Expo config plugin 注入，clean prebuild 后依然生效；release 不会回退使用 debug 签名。
 Kotlin 使用进程内非增量编译，避免本机缓存损坏后备用编译流程对中文项目路径的解析问题。
 
-输出到 `apks/应用名称-版本号-架构标签-年月日时分.apk`（本地时间，精确到分钟），例如：
+输出到 `apks/应用名称-版本号-架构标签-年月日时分.apk`（北京时间 Asia/Shanghai，精确到分钟），例如：
 
 ```text
 apks/盼之电竞-1.0.0-arm64-202610201430.apk

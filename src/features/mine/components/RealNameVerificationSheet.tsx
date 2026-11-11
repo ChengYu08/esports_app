@@ -95,6 +95,16 @@ export function RealNameVerificationSheet({
         visible={visible}
         onClose={close}
         contentStyle={[styles.card, { paddingBottom: 20 + insets.bottom }]}
+        overlay={
+          <AppPrompt
+            inline
+            visible={validationPromptVisible}
+            title="信息有误"
+            message="请输入姓名和正确的18位身份证号"
+            confirmText="我知道了"
+            onConfirm={() => setValidationPromptVisible(false)}
+          />
+        }
       >
         <Text style={styles.title}>实名认证</Text>
         <Text style={styles.notice}>
@@ -176,13 +186,6 @@ export function RealNameVerificationSheet({
           </Pressable>
         </View>
       </BottomSheet>
-      <AppPrompt
-        visible={validationPromptVisible}
-        title="信息有误"
-        message="请输入姓名和正确的18位身份证号"
-        confirmText="我知道了"
-        onConfirm={() => setValidationPromptVisible(false)}
-      />
     </>
   );
 }

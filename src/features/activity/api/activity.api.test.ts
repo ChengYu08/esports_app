@@ -111,6 +111,7 @@ describe("参与活动（发布活动派单）接口", () => {
       token: "token-abc",
       body: { action: { activityId: 10086 } },
       signal: undefined,
+      suppressRealNameRedirect: true,
     });
   });
 

@@ -10,6 +10,7 @@ import { showToast } from "@/shared/ui/app-toast";
 
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 
+import { ensureRealNameBeforeVoiceRoomEnter, promptSelfRealNameIfNeeded } from "./ensure-real-name-before-enter";
 import { exitVoiceRoom } from "./exit-voice-room";
 import { navigateToVoiceRoom } from "./navigate-voice-room";
 import { resolveVoiceRoomId, voiceRoomApi } from "./voice-room.api";
@@ -22,6 +23,9 @@ export function useCustomerDispatch() {
     const { accessToken, user } = useAuthStore.getState();
     if (!accessToken) {
       showToast("请先登录");
+      return;
+    }
+    if (!(await ensureRealNameBeforeVoiceRoomEnter())) {
       return;
     }
     if (dispatchingRef.current) return;
@@ -61,9 +65,12 @@ export function useCustomerDispatch() {
         callService: "1",
       });
     } catch (error) {
-      showToast(
-        error instanceof Error ? error.message : "接待派单失败，请稍后重试",
-      );
+      const message =
+        error instanceof Error ? error.message : "接待派单失败，请稍后重试";
+      if (await promptSelfRealNameIfNeeded(message)) {
+        return;
+      }
+      showToast(message);
     } finally {
       dispatchingRef.current = false;
     }

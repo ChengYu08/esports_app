@@ -7,17 +7,20 @@ import { useCallback, useEffect, useMemo } from "react";
 import { AppState, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { showToast } from "@/shared/ui/app-toast";
 import { layout } from "@/shared/theme/tokens";
 import { stripCustomerServiceTitlePrefix } from "../customer-service.api";
 import { MessageHeader } from "../components/MessageHeader";
 import { MessageListItem } from "../components/MessageListItem";
+import type { MessageConversation } from "../message-state";
 import {
   getConversationAvatarUri,
   resolveConversationAvatar,
 } from "../message-avatar";
 import { useMessageStore } from "../message-store";
-import { useOnlineStatusPolling } from "../hooks/use-online-status-polling";
+import {
+  ONLINE_STATUS_LIST_POLL_INTERVAL_MS,
+  useOnlineStatusPolling,
+} from "../hooks/use-online-status-polling";
 import { isVisibleMessageConversation } from "../message-unread";
 import { getConversationDisplayTitle } from "../message-title";
 import type { MessageListItemModel } from "../message.types";
@@ -29,6 +32,8 @@ import {
 
 const defaultConversationAvatar = require("../../../../assets/images/avatar_default.webp");
 const systemNotificationAvatar = require("../../../../assets/svgs/message-system-notice.svg");
+// 会话派生模型缓存（key = store 里的会话对象引用）
+const itemModelCache = new WeakMap<MessageConversation, MessageListItemModel>();
 // 设计稿 70-39249「消息页-无消息」：120×120 插画 + 8px 间距 + 12/18 #999 文案
 const messagePromptIllustration = (
   <Image
@@ -52,7 +57,6 @@ export default function MessageScreen() {
   const refreshConversations = useMessageStore((state) => state.refreshConversations);
   const retryIfEmpty = useMessageStore((state) => state.retryIfEmpty);
   const refreshOnlineStatuses = useMessageStore((state) => state.refreshOnlineStatuses);
-  const clearAllUnread = useMessageStore((state) => state.clearAllUnread);
 
   const isFocused = useIsFocused();
   // 只有存在真实会话时才轮询；纯系统会话（通知/订单助手）没有在线状态
@@ -60,12 +64,13 @@ export default function MessageScreen() {
     () => conversations.some((item) => !isSystemConversationId(item.id)),
     [conversations],
   );
-  useOnlineStatusPolling(isFocused && hasPeerConversations, accessToken);
-
-  const handleClear = async () => {
-    await clearAllUnread();
-    showToast("清理完成");
-  };
+  // 列表页轮询放宽到 15s：进页/App 回前台仍会立即查一次保时效，稳态少打接口
+  useOnlineStatusPolling(
+    isFocused && hasPeerConversations,
+    accessToken,
+    undefined,
+    ONLINE_STATUS_LIST_POLL_INTERVAL_MS,
+  );
 
   const handleRetry = async () => {
     if (!accessToken) return;
@@ -110,33 +115,43 @@ export default function MessageScreen() {
     return () => subscription.remove();
   }, [accessToken, refreshOnlineStatuses]);
 
-  const items = useMemo<MessageListItemModel[]>(
-    () =>
-      conversations
-        .filter((item) => isVisibleMessageConversation(item, userId, blacklistedUserIds))
-        .map((item) => {
-          const id = normalizeSystemConversationId(item.id);
-          // 客服会话打标后标题只展示昵称；入口写入的【官方客服】前缀去掉避免重复
-          const baseTitle = getConversationDisplayTitle(id, item.title, item.note);
-          const title = item.isCustomerService
-            ? stripCustomerServiceTitlePrefix(baseTitle)
-            : baseTitle;
-          const avatar = resolveConversationAvatar(
-            item.avatar,
-            isSystemConversationId(id)
-              ? systemNotificationAvatar
-              : defaultConversationAvatar,
-            id,
-          );
-          return {
-            ...item,
-            id,
-            title,
-            kind: "conversation",
-            avatar: typeof avatar === "string" ? { uri: avatar } : avatar,
-          };
-        }),
-    [blacklistedUserIds, conversations, userId],
+  // 列表项派生模型按会话对象引用缓存：store 更新（新消息/在线状态翻转）时未变化的
+  // 会话保持原引用，派生 model 直接复用，列表项 memo 才能命中，避免整列重渲染；
+  // model 内容只依赖会话对象本身（userId/黑名单只影响过滤），WeakMap 随 GC 回收
+  const items = useMemo<MessageListItemModel[]>(() => {
+    return conversations
+      .filter((item) => isVisibleMessageConversation(item, userId, blacklistedUserIds))
+      .map((item) => {
+        const cached = itemModelCache.get(item);
+        if (cached) return cached;
+        const id = normalizeSystemConversationId(item.id);
+        // 客服会话打标后标题只展示昵称；入口写入的【官方客服】前缀去掉避免重复
+        const baseTitle = getConversationDisplayTitle(id, item.title, item.note);
+        const title = item.isCustomerService
+          ? stripCustomerServiceTitlePrefix(baseTitle)
+          : baseTitle;
+        const avatar = resolveConversationAvatar(
+          item.avatar,
+          isSystemConversationId(id)
+            ? systemNotificationAvatar
+            : defaultConversationAvatar,
+          id,
+        );
+        const model: MessageListItemModel = {
+          ...item,
+          id,
+          title,
+          kind: "conversation",
+          avatar: typeof avatar === "string" ? { uri: avatar } : avatar,
+        };
+        itemModelCache.set(item, model);
+        return model;
+      });
+  }, [blacklistedUserIds, conversations, userId]);
+  // 固定引用避免每次渲染生成新对象触发 FlatList 重渲染
+  const listContentStyle = useMemo(
+    () => ({ paddingBottom: 80 + insets.bottom }),
+    [insets.bottom],
   );
   // useCallback 固定引用，配合 MessageListItem 的 memo，避免父组件重渲染击穿列表项
   const handleMessagePress = useCallback(
@@ -188,7 +203,6 @@ export default function MessageScreen() {
       <StatusBar style="dark" />
       <View style={[styles.navbar, { paddingTop: insets.top }]}>
         <MessageHeader
-          onClear={() => void handleClear()}
           onSearch={() =>
             router.push({ pathname: "/search", params: { type: "message" } })
           }
@@ -213,11 +227,16 @@ export default function MessageScreen() {
         </View>
       ) : (
         <FlatList
-          contentContainerStyle={{ paddingBottom: 80 + insets.bottom }}
+          contentContainerStyle={listContentStyle}
           data={items}
+          // 会话行轻量但数量可能上百：收窄挂载窗口，进入页面只渲染首屏，
+          // 滚动时分批挂载，避免一次性铺设全部行
+          initialNumToRender={12}
           keyExtractor={(item) => item.id}
+          maxToRenderPerBatch={10}
           renderItem={renderMessageItem}
           showsVerticalScrollIndicator={false}
+          windowSize={7}
         />
       )}
     </View>

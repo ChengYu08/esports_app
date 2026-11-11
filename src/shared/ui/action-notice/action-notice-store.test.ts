@@ -73,4 +73,27 @@ describe("actionNotice store", () => {
     actionNotice.dismiss("missing");
     expect(useActionNoticeStore.getState().items).toHaveLength(1);
   });
+
+  it("dismissByPrefix 撤掉前缀匹配的全部条并触发 onDisappear", () => {
+    const onA1 = vi.fn();
+    const onA2 = vi.fn();
+    const onB = vi.fn();
+    actionNotice.push(item("qm:QM1:1"), { onAction: vi.fn(), onDisappear: onA1 });
+    actionNotice.push(item("qm:QM1:2"), { onAction: vi.fn(), onDisappear: onA2 });
+    actionNotice.push(item("qm:QM2:1"), { onAction: vi.fn(), onDisappear: onB });
+
+    actionNotice.dismissByPrefix("qm:QM1:");
+    expect(onA1).toHaveBeenCalledTimes(1);
+    expect(onA2).toHaveBeenCalledTimes(1);
+    expect(onB).not.toHaveBeenCalled();
+    expect(useActionNoticeStore.getState().items.map((entry) => entry.id)).toEqual([
+      "qm:QM2:1",
+    ]);
+  });
+
+  it("dismissByPrefix 无匹配为 no-op", () => {
+    actionNotice.push(item("qm:QM1:1"), { onAction: vi.fn() });
+    actionNotice.dismissByPrefix("qm:QM9:");
+    expect(useActionNoticeStore.getState().items).toHaveLength(1);
+  });
 });

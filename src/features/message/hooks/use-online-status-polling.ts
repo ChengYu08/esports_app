@@ -5,19 +5,22 @@ import { useMessageStore } from "../message-store";
 
 /** 消息页可见时的在线状态轮询间隔 */
 export const ONLINE_STATUS_POLL_INTERVAL_MS = 5_000;
+/** 消息列表页轮询间隔：列表场景对在线态时效要求低，放宽省流量省电 */
+export const ONLINE_STATUS_LIST_POLL_INTERVAL_MS = 15_000;
 /** 连续失败后的最大退避间隔 */
 export const ONLINE_STATUS_POLL_MAX_BACKOFF_MS = 30_000;
 
 /**
  * 页面可见期间轮询会话对端在线状态。
  * 门控：仅 enabled（页面聚焦 + 有真实会话）且 App 前台时计时；
- * 串行：上一轮返回后才排下一轮；失败按 5s/10s/20s/30s 退避，成功立即回到 5s。
+ * 串行：上一轮返回后才排下一轮；失败按 2 倍递增退避封顶 30s，成功回到 intervalMs。
  * 传入 peerId 时只轮询该对端（聊天页），否则轮询全部真实会话（消息列表）。
  */
 export function useOnlineStatusPolling(
   enabled: boolean,
   token: string | null,
   peerId?: string | null,
+  intervalMs: number = ONLINE_STATUS_POLL_INTERVAL_MS,
 ) {
   const refreshOnlineStatuses = useMessageStore(
     (state) => state.refreshOnlineStatuses,
@@ -49,9 +52,9 @@ export function useOnlineStatusPolling(
         }
         failures = succeeded ? 0 : failures + 1;
         const nextDelay = failures === 0
-          ? ONLINE_STATUS_POLL_INTERVAL_MS
+          ? intervalMs
           : Math.min(
-              ONLINE_STATUS_POLL_INTERVAL_MS * 2 ** failures,
+              intervalMs * 2 ** failures,
               ONLINE_STATUS_POLL_MAX_BACKOFF_MS,
             );
         schedule(nextDelay);
@@ -66,5 +69,5 @@ export function useOnlineStatusPolling(
         clearTimeout(timer);
       }
     };
-  }, [appActive, enabled, peerId, refreshOnlineStatuses, token]);
+  }, [appActive, enabled, intervalMs, peerId, refreshOnlineStatuses, token]);
 }

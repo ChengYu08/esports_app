@@ -14,7 +14,8 @@ import {
   type PlatformTicket,
 } from "@/features/court/court.api";
 import { COURT_FONT_FAMILY } from "@/features/court/court.theme";
-import { EmptyState } from "@/shared/ui/AsyncStates";
+import { ListFallbackState } from "@/shared/ui/AsyncStates";
+import { useIsOffline } from "@/shared/hooks/use-is-offline";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { PaginationFooter } from "@/shared/ui/PaginationFooter";
 import { useAuthStore } from "@esports/auth";
@@ -57,6 +58,9 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreFailed, setLoadMoreFailed] = useState(false);
+  const [firstLoadFailed, setFirstLoadFailed] = useState(false);
+  const offline = useIsOffline();
   const [isReviewer, setIsReviewer] = useState(false);
   const [reviewerStats, setReviewerStats] = useState<{
     todayCount?: number;
@@ -126,6 +130,8 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
           );
         }
         setPage(next);
+        setLoadMoreFailed(false);
+        setFirstLoadFailed(false);
       } catch (error) {
         if (requestId !== loadRequestRef.current) {
           return;
@@ -133,8 +139,12 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
         if (!append && !preservePages) {
           setCases([]);
           setTickets([]);
+          setFirstLoadFailed(true);
+        } else {
+          setLoadMoreFailed(true);
+          // 首屏失败已展示兜底 UI，不重复弹 toast；刷新/加载更多失败仍需 toast 提示
+          showToast(error instanceof Error ? error.message : "加载失败");
         }
-        showToast(error instanceof Error ? error.message : "加载失败");
       } finally {
         if (requestId === loadRequestRef.current) {
           setLoading(false);
@@ -170,6 +180,8 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
           setCases([]);
           setTickets([]);
           setPage(1);
+          // 换 feed 后先清掉上一 feed 的首屏失败标记，避免加载前一帧闪旧失败态
+          setFirstLoadFailed(false);
         }
         loadRef.current(false, preservePages);
       }, 0);
@@ -523,16 +535,23 @@ export function CourtHomeScreen({ bottomInset, initialPage = "court" }: Props) {
           loading ? (
             <ActivityIndicator color="#FE1F4C" style={styles.loading} />
           ) : (
-            <EmptyState
-              style={styles.empty}
+            <ListFallbackState
+              kind={firstLoadFailed ? (offline ? "offline" : "loadFailed") : "empty"}
               messageStyle={styles.emptyMessage}
+              onRetry={() => void load()}
             />
           )
         }
         ListFooterComponent={
           <View>
             {data.length > 0 && (
-              <PaginationFooter loading={loadingMore} hasMore={hasMore} pageCount={page} />
+              <PaginationFooter
+                loading={loadingMore}
+                hasMore={hasMore}
+                pageCount={page}
+                failed={loadMoreFailed}
+                onRetry={() => void load(true)}
+              />
             )}
             <View
               style={{ height: (data.length === 0 ? 44 : 60) + bottomInset }}
@@ -718,7 +737,6 @@ const styles = StyleSheet.create({
     right: 12,
     top: 10,
   },
-  empty: { flex: 1, minHeight: 146, width: 247 },
   emptyMessage: {
     color: "#999999",
     fontFamily: COURT_FONT_FAMILY,

@@ -73,6 +73,20 @@ function dismiss(id: string) {
   });
 }
 
+/** 撤掉 id 以 prefix 开头的全部条（如 `qm:${requestNo}:` 覆盖同需求多轮次） */
+function dismissByPrefix(prefix: string) {
+  if (!prefix) return;
+  const { items } = useActionNoticeStore.getState();
+  const matched = items.filter((entry) => entry.id.startsWith(prefix));
+  if (matched.length === 0) return;
+  for (const item of matched) {
+    invokeDisappear(item.id);
+  }
+  useActionNoticeStore.setState({
+    items: items.filter((entry) => !entry.id.startsWith(prefix)),
+  });
+}
+
 function clear() {
   const { items } = useActionNoticeStore.getState();
   for (const item of items) {
@@ -94,5 +108,6 @@ export function resetActionNoticeStore() {
 export const actionNotice = {
   push,
   dismiss,
+  dismissByPrefix,
   clear,
 };

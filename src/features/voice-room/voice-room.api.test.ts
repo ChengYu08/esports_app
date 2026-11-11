@@ -46,4 +46,43 @@ describe("voice-room envelope unwrap", () => {
 
     await expect(voiceRoomApi.getJoinedRoom("token")).rejects.toThrow("房间已关闭");
   });
+
+  it("unwraps the members snapshot with placeholder nicknames", async () => {
+    request.mockResolvedValue({
+      success: true,
+      code: "SUCCESS",
+      data: {
+        roomVersion: 123,
+        members: [
+          { userId: "50100104", role: "owner" },
+          { userId: "50100105", role: "guest" },
+        ],
+      },
+    });
+
+    await expect(voiceRoomApi.getRoomMembers("30100051", "123", "token")).resolves.toEqual({
+      roomVersion: 123,
+      members: [
+        { userId: "50100104", nickname: "用户50100104", role: "owner" },
+        { userId: "50100105", nickname: "用户50100105", role: "guest" },
+      ],
+    });
+    expect(request).toHaveBeenCalledWith(
+      "/client/v1/voiceRoom/30100051/members?roomVersion=123",
+      { method: "POST", token: "token", body: undefined, suppressRealNameRedirect: undefined },
+    );
+  });
+
+  it("normalizes an empty members list to an empty array", async () => {
+    request.mockResolvedValue({
+      success: true,
+      code: "SUCCESS",
+      data: { roomVersion: "7", members: [] },
+    });
+
+    await expect(voiceRoomApi.getRoomMembers("30100051", 7, "token")).resolves.toEqual({
+      roomVersion: "7",
+      members: [],
+    });
+  });
 });

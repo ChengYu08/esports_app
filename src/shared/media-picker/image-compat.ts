@@ -1,5 +1,5 @@
 import { File, FileMode } from "expo-file-system";
-import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
+import { ImageManipulator, manipulateAsync, SaveFormat, type Action } from "expo-image-manipulator";
 
 export type ImageFormat = { extension: string; mimeType: string };
 
@@ -34,11 +34,52 @@ export function detectImageFormat(uri: string): ImageFormat | null {
   }
 }
 
-/** 用 image-manipulator 把图片重编码为 JPEG 缓存文件，返回新 uri。 */
-export async function convertToJpeg(uri: string, quality = 0.85): Promise<string> {
-  const result = await manipulateAsync(uri, [], {
+/** 读取图片原始宽高；读不到时返回 null（按不缩放处理）。renderAsync 只解码不编码。 */
+async function measureImage(uri: string): Promise<{ width: number; height: number } | null> {
+  try {
+    const rendered = await ImageManipulator.manipulate(uri).renderAsync();
+    return { width: rendered.width, height: rendered.height };
+  } catch {
+    return null;
+  }
+}
+
+/** 用 image-manipulator 把图片重编码为 JPEG 缓存文件；maxSize 限制最长边（等比缩小，不放大小图）。 */
+export async function convertToJpeg(uri: string, quality = 0.85, maxSize?: number): Promise<string> {
+  const actions: Action[] = [];
+  if (maxSize) {
+    const size = await measureImage(uri);
+    if (size && Math.max(size.width, size.height) > maxSize) {
+      actions.push(
+        size.width >= size.height
+          ? { resize: { width: maxSize } }
+          : { resize: { height: maxSize } },
+      );
+    }
+  }
+  const result = await manipulateAsync(uri, actions, {
     compress: quality,
     format: SaveFormat.JPEG,
   });
   return result.uri;
+}
+
+/** 是否为动图 GIF（按文件魔数判断）；读不到文件时按非动图处理。 */
+export function isGifImage(uri: string): boolean {
+  try {
+    return detectImageFormat(uri)?.mimeType === "image/gif";
+  } catch {
+    return false;
+  }
+}
+
+/** 消息图片是否 GIF：本地文件按魔数，远端按 URL 后缀（OSS 上传保留真实扩展名）。 */
+export function isGifMessageImage(uri: string): boolean {
+  if (/\.gif(?:[?#]|$)/i.test(uri)) {
+    return true;
+  }
+  if (/^(?:file|content):\/\//i.test(uri)) {
+    return isGifImage(uri);
+  }
+  return false;
 }

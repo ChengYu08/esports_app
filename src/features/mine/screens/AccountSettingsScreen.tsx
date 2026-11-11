@@ -26,6 +26,7 @@ import {
   saveAuthSession,
 } from "@/features/auth/session-persistence";
 import { getLogoutConfirmMessage } from "@/features/auth/sign-out";
+import { clearActionCommandAccountState } from "@/features/message/action-command/action-command-handlers";
 import { messageStore } from "@/features/message/message-store";
 import { RealNameVerificationSheet } from "@/features/mine/components/RealNameVerificationSheet";
 import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
@@ -217,6 +218,7 @@ export default function AccountSettingsScreen() {
         /* Keep the UI signed out. */
       }
       clearSession();
+      clearActionCommandAccountState();
       void messageStore
         .getState()
         .reset()
