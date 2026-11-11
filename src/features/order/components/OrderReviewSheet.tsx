@@ -19,8 +19,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "@esports/auth";
 
 import { createImagePreviewParams } from "@/features/mine/image-preview.params";
-import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
+import { pickCompanionGalleryImages } from "@/features/mine/companion-gallery-picker";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
+import { showToast } from "@/shared/ui/app-toast";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import type { OrderReview, OrderReviewInput } from "../order.api";
 import { uploadReviewImage } from "../order-review-upload";
@@ -58,11 +59,23 @@ export function OrderReviewSheet({
   const [footerHeight, setFooterHeight] = useState(0);
   // 因跳转相册/预览临时收起弹窗时置位，恢复显示时跳过草稿重置
   const suppressResetRef = useRef(false);
+  const pendingNavigationRef = useRef<(() => void) | null>(null);
 
-  const suppressSheet = useCallback(() => {
+  const suppressSheet = useCallback((navigate: () => void) => {
+    if (pendingNavigationRef.current) {
+      return;
+    }
+    pendingNavigationRef.current = navigate;
+    Keyboard.dismiss();
     suppressResetRef.current = true;
     onSuppress?.();
   }, [onSuppress]);
+
+  const handleExited = useCallback(() => {
+    const navigate = pendingNavigationRef.current;
+    pendingNavigationRef.current = null;
+    navigate?.();
+  }, []);
 
   // 用户主动关闭弹窗后，下次打开必须重置草稿（suppress 标记只服务「跳转返回」场景）
   const handleClose = useCallback(() => {
@@ -123,25 +136,30 @@ export function OrderReviewSheet({
     }
   };
 
-  const pickImages = async () => {
-    if (readonly || submitting || images.length >= MAX_IMAGES) return;
-    // 相册选择页内部处理权限，选图结果经会话桥接回传
-    const pickPending = beginMediaPick();
-    suppressSheet();
-    router.push({
-      pathname: "/media-picker",
-      params: { max: String(MAX_IMAGES - images.length) },
+  const pickImages = () => {
+    if (readonly || submitting || images.length >= MAX_IMAGES) {
+      return;
+    }
+    // 等评价弹窗退场后复用小法庭和陪玩中心的相册选择流程
+    suppressSheet(() => {
+      pickCompanionGalleryImages(MAX_IMAGES - images.length)
+        .then((picked) => {
+          if (picked.length) {
+            setImages((current) => [...current, ...picked.map((image) => image.uri)].slice(0, MAX_IMAGES));
+          }
+        })
+        .catch((error: unknown) => {
+          showToast(error instanceof Error ? error.message : "图片选择失败，请重试");
+        });
     });
-    const picked = await pickPending;
-    if (!picked?.length) return;
-    setImages((current) => [...current, ...picked].slice(0, MAX_IMAGES));
   };
 
   const openPreview = (index: number) => {
-    suppressSheet();
-    router.push({
-      pathname: "/image-preview",
-      params: createImagePreviewParams(images, index),
+    suppressSheet(() => {
+      router.push({
+        pathname: "/image-preview",
+        params: createImagePreviewParams(images, index),
+      });
     });
   };
 
@@ -153,6 +171,7 @@ export function OrderReviewSheet({
       fullScreen
       visible={visible}
       onClose={handleClose}
+      onExited={handleExited}
       dismissOnBackdropPress={!submitting}
       contentStyle={styles.frame}
     >
@@ -275,7 +294,7 @@ export function OrderReviewSheet({
                       accessibilityLabel="添加评价图片"
                       accessibilityRole="button"
                       disabled={submitting}
-                      onPress={() => void pickImages()}
+                      onPress={pickImages}
                       style={styles.addImage}
                     >
                       <View style={styles.addIcon}>
