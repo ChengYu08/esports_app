@@ -330,9 +330,17 @@ public class PzOneClickModule: Module {
     // checkBoxWH 默认 0，SDK 头文件要求"必须大于0"，不设置会渲染成零尺寸导致勾选框不可见
     model.checkBoxWH = 16
     model.checkBoxImages = [Self.makeCheckboxImage(checked: false), Self.makeCheckboxImage(checked: true)]
-    // 协议区距底部 56pt、左右 32pt
-    model.privacyFrameBlock = { _, superViewSize, frame in
-      CGRect(x: 32, y: superViewSize.height - 56 - frame.height, width: superViewSize.width - 64, height: frame.height)
+    // 新增未成年人提示后协议会多一行，主动预留三行高度，避免 SDK 按旧文案高度贴底后裁掉内容。
+    // 协议区距底部增加到 72pt，避免新增一行后贴近底部被安全区遮挡；左右仍为 32pt。
+    model.privacyFrameBlock = { _, superViewSize, _ in
+      let privacyHeight: CGFloat = 54
+      let privacyBottomSpacing: CGFloat = 72
+      return CGRect(
+        x: 32,
+        y: superViewSize.height - privacyBottomSpacing - privacyHeight,
+        width: superViewSize.width - 64,
+        height: privacyHeight
+      )
     }
 
     // 二次协议弹窗（Figma：白底 12pt 圆角，标题 16 #333，正文 14 #666，
@@ -364,10 +372,10 @@ public class PzOneClickModule: Module {
     }.resizableImage(withCapInsets: UIEdgeInsets(top: 8, left: 8, bottom: 8, right: 8), resizingMode: .stretch)
     model.privacyAlertBtnBackgroundImages = [alertBtnImage, alertBtnImage, alertBtnImage]
     model.privacyAlertBtnCornerRadius = 8
-    // Figma 弹窗固定为 295×174，避免 SDK 默认内容区在 iOS 上被拉伸到大半屏。
+    // 新增未成年人提示后正文会多一行，弹窗与正文区同步增高，给按钮保留独立空间。
     model.privacyAlertFrameBlock = { _, superViewSize, _ in
       let width = min(295, superViewSize.width - 32)
-      let height: CGFloat = 174
+      let height: CGFloat = 196
       return CGRect(
         x: (superViewSize.width - width) / 2,
         y: (superViewSize.height - height) / 2,
@@ -379,7 +387,7 @@ public class PzOneClickModule: Module {
       CGRect(x: 16, y: 16, width: superViewSize.width - 32, height: 24)
     }
     model.privacyAlertPrivacyContentFrameBlock = { _, superViewSize, _ in
-      CGRect(x: 16, y: 52, width: superViewSize.width - 32, height: 66)
+      CGRect(x: 16, y: 52, width: superViewSize.width - 32, height: 88)
     }
     // 按钮行：左按钮 86、间距 12、右按钮占满剩余宽度，距底部 16。
     model.privacyAlertButtonFrameBlock = { _, superViewSize, _ in

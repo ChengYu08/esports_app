@@ -177,12 +177,19 @@ export default function RootLayout() {
   }, [accessToken]);
 
   useEffect(() => {
+    // 启动和每次回前台都清除桌面角标；旧原生包没有该方法时保持兼容。
+    ExpoAppToolkit?.clearAppIconBadge?.();
     // 回前台时确认融云长连接：后台挂起/互踢断开后 SDK 未必自动恢复，
     // 以登录态为前提触发一次幂等重连（实际已连接时 initialize 会直接跳过）
     const subscription = AppState.addEventListener("change", (appState) => {
-      if (appState !== "active") return;
+      if (appState !== "active") {
+        return;
+      }
+      ExpoAppToolkit?.clearAppIconBadge?.();
       const token = useAuthStore.getState().accessToken;
-      if (!token) return;
+      if (!token) {
+        return;
+      }
       void messageStore.getState().initialize(token);
       // 温启动点击推送：后台时点击通知由原生暂存，回前台后补一次跳转
       void handlePendingPushClick();

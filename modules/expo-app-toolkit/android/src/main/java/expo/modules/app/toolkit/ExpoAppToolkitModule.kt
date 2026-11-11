@@ -31,20 +31,31 @@ class ExpoAppToolkitModule : Module() {
       RongPushHook.tryInit()
     }
 
-    AsyncFunction("getPendingPushClick") Coroutine {
+    AsyncFunction("getPendingPushClick") {
       val context = appContext?.reactContext
         ?: throw CodedException("ERR_MISSING_CONTEXT", "React context is not available", null)
       val prefs = context.getSharedPreferences(PUSH_CLICK_PREFS, android.content.Context.MODE_PRIVATE)
-      if (!prefs.getBoolean("pending_push_click_pending", false)) return@Coroutine null
-      prefs.getString("pending_push_click", null)
+      if (!prefs.getBoolean("pending_push_click_pending", false)) {
+        return@AsyncFunction null
+      }
+      return@AsyncFunction prefs.getString("pending_push_click", null)
     }
 
-    AsyncFunction("clearPendingPushClick") Coroutine {
-      val context = appContext?.reactContext ?: return@Coroutine
-      context.getSharedPreferences(PUSH_CLICK_PREFS, android.content.Context.MODE_PRIVATE)
-        .edit()
-        .clear()
-        .apply()
+    AsyncFunction("clearPendingPushClick") {
+      val context = appContext?.reactContext
+      if (context != null) {
+        context.getSharedPreferences(PUSH_CLICK_PREFS, android.content.Context.MODE_PRIVATE)
+          .edit()
+          .clear()
+          .apply()
+      }
+    }
+
+    Function("clearAppIconBadge") {
+      val context = appContext?.reactContext
+      if (context != null) {
+        clearRongPushNotifications(context)
+      }
     }
   }
 
@@ -63,6 +74,19 @@ class ExpoAppToolkitModule : Module() {
     val context = appContext?.reactContext
       ?: throw CodedException("ERR_MISSING_CONTEXT", "React context is not available", null)
     return context.packageManager.canRequestPackageInstalls()
+  }
+
+  /**
+   * 只清理融云展示的离线消息与后台广播推送，避免误删语音房前台服务通知。
+   * 使用反射隔离可选的融云 Push 依赖，未配置 Push 的构建也能正常加载本模块。
+   */
+  private fun clearRongPushNotifications(context: android.content.Context) {
+    runCatching {
+      val client = Class.forName("io.rong.push.RongPushClient")
+      val contextType = android.content.Context::class.java
+      client.getMethod("clearAllPushNotifications", contextType).invoke(null, context)
+      client.getMethod("clearAllPushServiceNotifications", contextType).invoke(null, context)
+    }
   }
 
   /** 流式计算文件 MD5（64KB 缓冲），返回小写 32 位 hex；downloadAsync 返回的 uri 含百分号编码，须经 Uri 解码为真实路径 */

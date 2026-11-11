@@ -17,6 +17,8 @@ declare class ExpoAppToolkitModule extends NativeModule {
   >;
   /** 清除原生暂存的推送点击数据 */
   clearPendingPushClick(): Promise<void>;
+  /** 清除桌面 App 图标角标及融云已展示的推送通知 */
+  clearAppIconBadge?(): void;
 }
 
 // Expo Go / 未重新 prebuild 的构建中不存在，保持 nullable 由调用方回退

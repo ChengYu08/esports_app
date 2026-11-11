@@ -1,4 +1,6 @@
 import ExpoModulesCore
+import UIKit
+import UserNotifications
 
 public class ExpoAppToolkitModule: Module {
   public func definition() -> ModuleDefinition {
@@ -11,6 +13,16 @@ public class ExpoAppToolkitModule: Module {
 
     AsyncFunction("clearPendingPushClick") {
       UserDefaults.standard.removeObject(forKey: "rongPushPendingClick")
+    }
+
+    Function("clearAppIconBadge") {
+      DispatchQueue.main.async {
+        if #available(iOS 16.0, *) {
+          UNUserNotificationCenter.current().setBadgeCount(0)
+        } else {
+          UIApplication.shared.applicationIconBadgeNumber = 0
+        }
+      }
     }
   }
 }
