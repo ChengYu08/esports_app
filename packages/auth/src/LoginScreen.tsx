@@ -483,7 +483,9 @@ function LoginMethod({
       <View style={styles.circle}>
         <Image source={icon} style={styles.methodIcon} contentFit="contain" />
       </View>
-      <Text style={styles.methodLabel}>{label}</Text>
+      <Text numberOfLines={1} style={styles.methodLabel}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -610,7 +612,9 @@ const styles = StyleSheet.create({
     gap: 24,
   },
   compactFooter: { paddingTop: 32 },
-  method: { width: 64, alignItems: "center" },
+  // 密码登录态下文案为「验证码登录」5 个字，固定 64dp 在系统字体放大时会折行；
+  // 改为 84dp 最小宽度并让容器随文字自然撑开，保证任意字号下都单行完整显示
+  method: { minWidth: 84, alignItems: "center" },
   circle: {
     width: 40,
     height: 40,
@@ -621,7 +625,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   methodIcon: { width: 22, height: 22 },
-  methodLabel: { color: "#808080", fontSize: 12 },
+  methodLabel: { color: "#808080", fontSize: 12, textAlign: "center" },
   agreement: {
     marginTop: 40,
     marginBottom: 22,
