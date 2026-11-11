@@ -300,9 +300,9 @@ export default function MineScreen() {
           >
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="基础设置"
+              accessibilityLabel={user ? "编辑资料" : "登录 / 注册"}
               hitSlop={8}
-              onPress={() => router.push("/basic-settings")}
+              onPress={() => router.push(user ? "/edit-profile" : "/login")}
               style={styles.toolbarButton}
             >
               <Image source={settingsIcon} style={styles.toolbarIcon} />
