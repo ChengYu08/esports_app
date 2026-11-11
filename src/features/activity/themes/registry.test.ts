@@ -21,8 +21,8 @@ describe("resolveActivityTheme", () => {
     expect(resolveActivityTheme(" ESPORTS_2026_SECKILL ")).toBe(MockSeckillLandingView);
   });
 
-  it("未知 code 返回 null", () => {
-    expect(resolveActivityTheme("UNKNOWN_CODE")).toBeNull();
+  it("未知 code 回退到秒杀 Theme", () => {
+    expect(resolveActivityTheme("UNKNOWN_CODE")).toBe(MockSeckillLandingView);
   });
 
   it("空串返回 null", () => {
