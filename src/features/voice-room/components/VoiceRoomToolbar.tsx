@@ -31,7 +31,7 @@ type VoiceRoomToolbarProps = {
   /** 当前用户为房间绑定接待时展示「客服派单」 */
   showServiceDispatch?: boolean;
   showSelectCompanion?: boolean;
-  /** 一键匹配抢单人数；>0 时按钮文案为「匹配中(N)」 */
+  /** 一键匹配抢单人数；>0 时按钮文案为「选择陪玩(N)」 */
   selectCompanionGrabCount?: number;
   /** 点击「聊聊」假输入胶囊，唤起键盘评论面板 */
   onCommentPress: () => void;
@@ -70,8 +70,8 @@ export function VoiceRoomToolbar({
   const compact = width < 360;
   const selectCompanionLabel =
     selectCompanionGrabCount > 0
-      ? `匹配中(${selectCompanionGrabCount})`
-      : "匹配中";
+      ? `选择陪玩(${selectCompanionGrabCount})`
+      : "选择陪玩";
 
   return (
     <View

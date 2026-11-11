@@ -851,7 +851,7 @@ export default function VoiceRoomScreen() {
                     {
                       id: "activity-match-tip",
                       kind: "notice" as const,
-                      text: "点击下方「匹配中」按钮查看抢单大神，勾选大神下单",
+                      text: "点击下方「选择陪玩」按钮查看抢单大神，勾选大神下单",
                       sentAt: Date.now(),
                     },
                   ].slice(-80),
@@ -1405,7 +1405,7 @@ export default function VoiceRoomScreen() {
         /** 活动需求进行中：MemberSheet「主页」入口替换为提示文案，下单统一走「选择陪玩」选人页 */
         orderEntryBlockedText={
           activityRequest
-            ? "活动需求进行中，请点击「匹配中」按钮选人下单"
+            ? "活动需求进行中，请点击「选择陪玩」按钮选人下单"
             : undefined
         }
         onClose={() => setMemberSheetVisible(false)}
