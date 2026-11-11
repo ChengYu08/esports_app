@@ -43,6 +43,10 @@ for source in (entitlements, profile_entitlements):
         sys.exit('IPA/profile must have get-task-allow=false for distribution')
     if source.get('application-identifier') != sys.argv[3] + '.' + sys.argv[2]:
         sys.exit('IPA/profile application-identifier does not match team and Bundle ID')
+if entitlements.get('aps-environment') != 'production':
+    sys.exit('Signed app entitlements must have aps-environment=production; without it registerForRemoteNotifications fails silently and RongCloud offline push never works. Check EAS_BUILD_PROFILE on the prebuild step and the Push Notifications capability in the provisioning profile.')
+if profile_entitlements.get('aps-environment') != 'production':
+    sys.exit('Provisioning profile must grant aps-environment=production (Push Notifications enabled on the App ID)')
 if 'ProvisionedDevices' in profile or profile.get('ProvisionsAllDevices'):
     sys.exit('IPA requires an App Store distribution profile')
 expiry = profile.get('ExpirationDate')

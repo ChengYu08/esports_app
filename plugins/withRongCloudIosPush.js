@@ -38,6 +38,14 @@ const DEVICE_TOKEN_HANDLER = `
   ) {
     RongCloudPushHandler.shared.didRegisterForRemoteNotifications(deviceToken: deviceToken)
   }
+
+  ${MARKER} log APNs registration failure (missing aps-environment entitlement, bad profile, etc.)
+  public override func application(
+    _ application: UIApplication,
+    didFailToRegisterForRemoteNotificationsWithError error: Error
+  ) {
+    print("[RongCloudPush] APNs registration failed: \\(error.localizedDescription)")
+  }
 `;
 
 // 3b. Capture cold-start notification from launchOptions (before JS is ready)
@@ -172,4 +180,4 @@ function withRongCloudIosPush(config) {
   return config;
 }
 
-module.exports = createRunOncePlugin(withRongCloudIosPush, TAG, '1.1.0');
+module.exports = createRunOncePlugin(withRongCloudIosPush, TAG, '1.2.0');
