@@ -6,7 +6,7 @@ declare class ExpoAppToolkitModule extends NativeModule {
   /** 流式计算本地文件 MD5，返回小写 32 位 hex；文件不存在时抛错 */
   md5File(uri: string): Promise<string>;
   /** 记录隐私政策已同意并触发融云/厂商推送 SDK 初始化；仅在用户同意后调用，进程内幂等 */
-  markPrivacyConsentAccepted(): void;
+  markPrivacyConsentAccepted?(): void;
   /**
    * 读取原生暂存的融云推送点击数据（AppDelegate/MainActivity 在通知点击时写入）。
    * iOS 返回 { targetId, conversationType } 对象；Android 返回 pushData JSON 字符串。

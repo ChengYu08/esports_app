@@ -5,10 +5,12 @@ import { WebView } from "react-native-webview";
 
 import { colors } from "@/shared/theme/tokens";
 import { APP_LINKS } from "@/core/config/links";
-import { savePrivacyConsent } from "@/features/privacy/privacy-consent";
+import {
+  notifyNativePrivacyConsentAccepted,
+  savePrivacyConsent,
+} from "@/features/privacy/privacy-consent";
 import { WEBVIEW_COMPAT_SCRIPT } from "@/shared/navigation/webview-compat-script";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
-import ExpoAppToolkit from "../../../../modules/expo-app-toolkit";
 
 type PrivacyConsentGateProps = {
   onAccepted: () => void;
@@ -26,17 +28,21 @@ export function PrivacyConsentGate({ onAccepted }: PrivacyConsentGateProps) {
   const [protocol, setProtocol] = useState<ProtocolDoc | null>(null);
 
   const handleAccept = useCallback(async () => {
-    if (saving) return;
+    if (saving) {
+      return;
+    }
     setSaving(true);
     try {
       await savePrivacyConsent();
-      // 同意后才允许初始化融云及厂商推送 SDK
-      ExpoAppToolkit?.markPrivacyConsentAccepted();
-      onAccepted();
     } catch {
-      // Keep the gate open when consent could not be persisted.
+      // 同意状态没有成功落盘时保留弹窗，允许用户重试
       setSaving(false);
+      return;
     }
+
+    // 同意后才允许初始化融云及厂商推送 SDK；原生异常不能阻止进入应用
+    notifyNativePrivacyConsentAccepted();
+    onAccepted();
   }, [onAccepted, saving]);
 
   const handleDecline = useCallback(() => {

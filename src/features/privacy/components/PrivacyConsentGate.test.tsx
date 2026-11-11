@@ -63,6 +63,7 @@ const { PrivacyConsentGate } = await import(
 const TextHost = "Text" as unknown as ElementType;
 const WebViewHost = "WebView" as unknown as ElementType;
 const ScreenHeaderHost = "ScreenHeader" as unknown as ElementType;
+const PressableHost = "Pressable" as unknown as ElementType;
 
 let renderer: ReactTestRenderer | undefined;
 
@@ -122,5 +123,29 @@ describe("PrivacyConsentGate 协议查看", () => {
     expect(renderer?.root.findAllByType(ScreenHeaderHost)[0]?.props.title).toBe(
       "用户协议",
     );
+  });
+});
+
+describe("PrivacyConsentGate 隐私同意", () => {
+  it("原生初始化抛错时仍保存同意状态并进入应用", async () => {
+    toolkitMock.markPrivacyConsentAccepted.mockImplementationOnce(() => {
+      throw new Error("native method unavailable");
+    });
+    const onAccepted = vi.fn();
+
+    await act(async () => {
+      renderer = create(<PrivacyConsentGate onAccepted={onAccepted} />);
+    });
+
+    const acceptButton = renderer?.root
+      .findAllByType(PressableHost)
+      .find((node) => node.props.accessibilityLabel === "同意并继续使用");
+    await act(async () => acceptButton?.props.onPress());
+
+    expect(storageMock.set).toHaveBeenCalledWith(
+      "esports.privacy.consent.v1",
+      "accepted",
+    );
+    expect(onAccepted).toHaveBeenCalledOnce();
   });
 });

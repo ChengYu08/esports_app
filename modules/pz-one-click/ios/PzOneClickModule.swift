@@ -331,10 +331,10 @@ public class PzOneClickModule: Module {
     model.checkBoxWH = 16
     model.checkBoxImages = [Self.makeCheckboxImage(checked: false), Self.makeCheckboxImage(checked: true)]
     // 新增未成年人提示后协议会多一行，主动预留三行高度，避免 SDK 按旧文案高度贴底后裁掉内容。
-    // 协议区距底部增加到 72pt，避免新增一行后贴近底部被安全区遮挡；左右仍为 32pt。
+    // 协议区距底部增加到 102pt，避免文案贴近底部；左右仍为 32pt。
     model.privacyFrameBlock = { _, superViewSize, _ in
       let privacyHeight: CGFloat = 54
-      let privacyBottomSpacing: CGFloat = 72
+      let privacyBottomSpacing: CGFloat = 102
       return CGRect(
         x: 32,
         y: superViewSize.height - privacyBottomSpacing - privacyHeight,

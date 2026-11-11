@@ -36,7 +36,10 @@ import { RongCommandHost } from "@/features/message/rong-command-dispatch/RongCo
 import { TeenModeGate } from "@/features/mine/components/TeenModeGate";
 import { OrderNotifySyncHost } from "@/features/order/order-notify-sync";
 import { PrivacyConsentGate } from "@/features/privacy/components/PrivacyConsentGate";
-import { readPrivacyConsent } from "@/features/privacy/privacy-consent";
+import {
+  notifyNativePrivacyConsentAccepted,
+  readPrivacyConsent,
+} from "@/features/privacy/privacy-consent";
 import ExpoAppToolkit from "../../modules/expo-app-toolkit";
 import { D_DIN_PRO_FONTS } from "@/shared/theme/typography";
 import { VoiceRoomKickListener } from "@/features/voice-room/components/VoiceRoomKickListener";
@@ -213,7 +216,7 @@ export default function RootLayout() {
         return;
       }
       // 老版本用户仅在 JS 侧留有同意记录：补写原生标记并初始化推送 SDK（进程内幂等）
-      ExpoAppToolkit?.markPrivacyConsentAccepted();
+      notifyNativePrivacyConsentAccepted();
       const session = await withStartupTimeout(readAuthSession(), null);
       if (!session) {
         if (active) setSessionReady(true);
