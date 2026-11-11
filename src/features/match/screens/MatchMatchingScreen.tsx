@@ -27,7 +27,7 @@ import { MatchPaySheet } from "@/features/match/components/MatchPaySheet";
 import { MatchingGrabListView } from "@/features/match/components/MatchingGrabListView";
 import { MatchingWaitingView } from "@/features/match/components/MatchingWaitingView";
 import { useQuickMatchSession } from "@/features/match/hooks/use-quick-match-session";
-import { afterOrderPaidOpenChat } from "@/features/order/notify-order-paid";
+import { afterOrderPaidOpenChat, afterQuickMatchPaidOpenRoom } from "@/features/order/notify-order-paid";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { showToast } from "@/shared/ui/app-toast";
 
@@ -158,6 +158,14 @@ export default function MatchMatchingScreen({
           continue;
         }
         companionUserIds.push(uid);
+      }
+      if (token && session.detail?.needVoice === false) {
+        afterQuickMatchPaidOpenRoom({
+          companionUserIds,
+          token,
+          clubId: session.detail.clubId,
+        });
+        return;
       }
       const firstCompanionId = companionUserIds[0];
       if (!firstCompanionId) {
