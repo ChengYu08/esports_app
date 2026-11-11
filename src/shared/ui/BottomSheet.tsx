@@ -23,6 +23,8 @@ type BottomSheetProps = {
   onClose: () => void;
   /** 安卓返回键的关闭行为，缺省同 onClose；多层弹窗时内层可传自定义处理 */
   onRequestClose?: () => void;
+  /** 弹窗退场并卸载后执行。 */
+  onExited?: () => void;
   children: ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
   backdropStyle?: StyleProp<ViewStyle>;
@@ -38,6 +40,7 @@ export function BottomSheet({
   visible,
   onClose,
   onRequestClose,
+  onExited,
   children,
   contentStyle,
   backdropStyle,
@@ -49,6 +52,11 @@ export function BottomSheet({
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const [mounted, setMounted] = useState(visible);
+  const onExitedRef = useRef(onExited);
+  const exitSequenceRef = useRef(0);
+  useEffect(() => {
+    onExitedRef.current = onExited;
+  }, [onExited]);
   const [backdropOpacity] = useState(() => new Animated.Value(0));
   const [sheetTranslateY] = useState(() => new Animated.Value(windowHeight));
   // Android 的 Modal 是独立 Dialog 窗口，键盘避让没有可靠的静态公式：
@@ -138,6 +146,7 @@ export function BottomSheet({
 
   useEffect(() => {
     if (visible) {
+      exitSequenceRef.current += 1;
       // Keep the native Modal mounted while the entrance animation starts.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setMounted(true);
@@ -177,7 +186,15 @@ export function BottomSheet({
         useNativeDriver: true,
       }),
     ]).start(({ finished }) => {
-      if (finished) setMounted(false);
+      if (finished) {
+        setMounted(false);
+        const sequence = exitSequenceRef.current;
+        requestAnimationFrame(() => {
+          if (exitSequenceRef.current === sequence) {
+            onExitedRef.current?.();
+          }
+        });
+      }
     });
   // `mounted` must not restart the entrance animation after it is set.
   // eslint-disable-next-line react-hooks/exhaustive-deps
