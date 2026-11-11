@@ -23,6 +23,12 @@ type BottomSheetProps = {
   onClose: () => void;
   /** 安卓返回键的关闭行为，缺省同 onClose；多层弹窗时内层可传自定义处理 */
   onRequestClose?: () => void;
+  /**
+   * 退场动画结束、Modal 真正卸载后的下一帧回调。
+   * iOS 上原生 Modal 呈现与上一个 Modal 的退场同帧竞争会让弹窗卡死，
+   * 「先关 A 再开 B」的调用方在此回调里再挂载下一个弹窗。
+   */
+  onExited?: () => void;
   children: ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
   backdropStyle?: StyleProp<ViewStyle>;
@@ -31,6 +37,8 @@ type BottomSheetProps = {
   /** Enable for forms and static content; lists keep their own scroll container. */
   scrollable?: boolean;
   fullScreen?: boolean;
+  /** 全屏覆盖内容（如内嵌 AppPrompt），渲染在弹层蒙层之上、与其同处一个原生 Modal 窗口内（iOS 无法叠加两个原生 Modal） */
+  overlay?: ReactNode;
 };
 
 /** Bottom sheets use the same timing as the club detail filter sheet. */
@@ -38,6 +46,7 @@ export function BottomSheet({
   visible,
   onClose,
   onRequestClose,
+  onExited,
   children,
   contentStyle,
   backdropStyle,
@@ -45,10 +54,18 @@ export function BottomSheet({
   keyboardAvoiding = false,
   scrollable = false,
   fullScreen = false,
+  overlay,
 }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const [mounted, setMounted] = useState(visible);
+  // 经 ref 读最新回调：退场完成时机在动画回调里，避免闭包拿到旧 props
+  const onExitedRef = useRef(onExited);
+  useEffect(() => {
+    onExitedRef.current = onExited;
+  }, [onExited]);
+  // 退场序号：卸载后、onExited 派发前弹窗被重新拉起时，作废旧回调
+  const exitSeqRef = useRef(0);
   const [backdropOpacity] = useState(() => new Animated.Value(0));
   const [sheetTranslateY] = useState(() => new Animated.Value(windowHeight));
   // Android 的 Modal 是独立 Dialog 窗口，键盘避让没有可靠的静态公式：
@@ -138,6 +155,8 @@ export function BottomSheet({
 
   useEffect(() => {
     if (visible) {
+      // 重新拉起使尚未派发的 onExited 失效
+      exitSeqRef.current += 1;
       // Keep the native Modal mounted while the entrance animation starts.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setMounted(true);
@@ -177,7 +196,16 @@ export function BottomSheet({
         useNativeDriver: true,
       }),
     ]).start(({ finished }) => {
-      if (finished) setMounted(false);
+      if (finished) {
+        setMounted(false);
+        // Modal 卸载提交后的下一帧再派发：调用方接着挂载下一个弹窗，
+        // 呈现请求才会落在卸载提交之后的原生事务里
+        const exitSeq = exitSeqRef.current;
+        requestAnimationFrame(() => {
+          if (exitSeqRef.current !== exitSeq) return;
+          onExitedRef.current?.();
+        });
+      }
     });
   // `mounted` must not restart the entrance animation after it is set.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -225,6 +253,11 @@ export function BottomSheet({
           children
         )}
       </Animated.View>
+      {overlay ? (
+        <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+          {overlay}
+        </View>
+      ) : null}
     </Animated.View>
   );
 

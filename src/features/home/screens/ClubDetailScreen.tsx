@@ -41,7 +41,7 @@ import {
   type NativeSyntheticEvent,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { fetchCompanionTags } from "../api/home.api";
+import { fetchCompanionTags, type CompanionTag } from "../api/home.api";
 import type { ClubDetailGame, Companion, CompanionFilters, GameKey } from "../api/home.types";
 import {
   useClubCompanions,
@@ -479,6 +479,34 @@ export default function ClubDetailScreen() {
     setSelectedMode(undefined);
     setSelectedLevel(undefined);
   }, []);
+  const renderTag = useCallback(
+    ({ item: tag }: { item: CompanionTag }) => {
+      const selected = selectedTag === tag.id;
+      return (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={tag.name}
+          accessibilityState={{ selected }}
+          style={[
+            styles.filterTagChip,
+            selected && styles.filterTagChipSelected,
+          ]}
+          onPress={() => setSelectedTag(selected ? undefined : tag.id)}
+        >
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.filterTagText,
+              selected && styles.filterTagTextSelected,
+            ]}
+          >
+            {tag.name}
+          </Text>
+        </Pressable>
+      );
+    },
+    [selectedTag],
+  );
   // 是否存在生效中的筛选项：筛选按钮据此显示红色/深色（与面板是否展开无关）
   const hasActiveFilters =
     priceSort !== "DEFAULT" ||
@@ -779,39 +807,18 @@ export default function ClubDetailScreen() {
       {/* 成员列表面板（白色圆角容器：固定筛选栏 + 卡片列表，筛选栏不随列表滚动） */}
       <View style={styles.listWrap} onLayout={handleListWrapLayout}>
         <View style={styles.filterBar}>
-          <ScrollView
+          <FlatList
             horizontal
+            data={tagsQuery.data ?? []}
+            keyExtractor={(tag) => String(tag.id)}
+            renderItem={renderTag}
             showsHorizontalScrollIndicator={false}
             style={styles.filterTagScroll}
             contentContainerStyle={styles.filterTagRow}
-          >
-            {tagsQuery.data?.map((tag) => {
-              const selected = selectedTag === tag.id;
-              return (
-                <Pressable
-                  key={tag.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={tag.name}
-                  accessibilityState={{ selected }}
-                  style={[
-                    styles.filterTagChip,
-                    selected && styles.filterTagChipSelected,
-                  ]}
-                  onPress={() => setSelectedTag(selected ? undefined : tag.id)}
-                >
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.filterTagText,
-                      selected && styles.filterTagTextSelected,
-                    ]}
-                  >
-                    {tag.name}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+            initialNumToRender={8}
+            maxToRenderPerBatch={8}
+            windowSize={5}
+          />
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="展开筛选"

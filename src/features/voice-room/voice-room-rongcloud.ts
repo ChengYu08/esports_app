@@ -95,10 +95,20 @@ function normalizeRoomMessage(message: RCIMIWMessage): RoomMessage | null {
   const isMine = sdk != null && message.direction === sdk.RCIMIWMessageDirection.SEND;
   const imageUrl = pickRongImageUrl(sdkMessage, isMine);
   if (!text && !(isImage && imageUrl)) return null;
+  const messageId = String(message.messageUId || message.messageId || message.sentTime);
+  const nickname = message.userInfo?.name;
+  if (!nickname) {
+    logger.info('voice_room.chat_message_missing_nickname', {
+      userId: message.senderUserId,
+      messageId,
+      text: text.slice(0, 40),
+      hasImage: Boolean(isImage && imageUrl),
+    });
+  }
   return {
-    id: String(message.messageUId || message.messageId || message.sentTime),
+    id: messageId,
     userId: message.senderUserId,
-    nickname: message.userInfo?.name,
+    nickname,
     avatar: message.userInfo?.portrait,
     text,
     ...(isImage && imageUrl ? { imageUrl } : {}),

@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@esports/auth";
+import { useIsFocused } from "expo-router";
 
 import type { ProfileDetail } from "@/features/mine/api/profile.types";
 import {
@@ -47,6 +48,7 @@ export function useUserFollowState(followUserId?: string, active = true) {
 }
 
 export function useUserFollowPage(userId: string | undefined, type: UserFollowType) {
+  const focused = useIsFocused();
   const token = useAuthStore((state) => state.accessToken);
   const viewerUserId = useAuthStore((state) => state.user?.id);
 
@@ -70,7 +72,9 @@ export function useUserFollowPage(userId: string | undefined, type: UserFollowTy
     initialPageParam: 1,
     getNextPageParam: (lastPage) =>
       lastPage.hasMore ? lastPage.page + 1 : undefined,
-    enabled: Boolean(userId),
+    // 路由堆栈下方仍保持挂载：失焦期间禁用查询，避免失效重拉把
+    // 离屏 RefreshControl 置为 refreshing（iOS 会卡死不消失），恢复焦点后再按失效标记重拉
+    enabled: Boolean(userId) && focused,
   });
 }
 
