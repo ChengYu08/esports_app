@@ -1,6 +1,7 @@
-import { NativeModules, Platform } from "react-native";
+import { Platform } from "react-native";
 import { router } from "expo-router";
 
+import ExpoAppToolkit from "../../../modules/expo-app-toolkit";
 import {
   getSystemConversationTitle,
   normalizeSystemConversationId,
@@ -8,8 +9,9 @@ import {
 
 /**
  * 系统推送点击后的路由跳转。
- * iOS：原生层将 targetId 存入 UserDefaults，JS 启动时读取并清除。
- * Android：原生层将 pushData JSON 存入 SharedPreferences，JS 启动时读取并清除。
+ * iOS：原生层将 targetId 存入 UserDefaults（AppDelegate），JS 读取并清除。
+ * Android：原生层将 pushData JSON 存入 SharedPreferences（MainActivity/MainApplication），JS 读取并清除。
+ * 桥接统一由 modules/expo-app-toolkit 提供（getPendingPushClick / clearPendingPushClick）。
  */
 
 export type PendingPushClick = {
@@ -24,46 +26,34 @@ function navigateToPushTarget(targetId: string, conversationType: string) {
   }
   const normalizedId = normalizeSystemConversationId(targetId);
   const title = getSystemConversationTitle(normalizedId, "");
-  router.push({ pathname: "/chat/[id]", params: { id: normalizedId, title } });
-}
-
-/** iOS：从 UserDefaults 读取待处理的推送点击 */
-async function handlePendingPushClickIos(): Promise<void> {
-  const raw = await NativeModules.RongCloudPushModule?.getPendingPushClick?.();
-  if (!raw?.targetId) return;
-  await NativeModules.RongCloudPushModule?.clearPendingPushClick?.().catch(
-    () => undefined,
-  );
-  navigateToPushTarget(raw.targetId, raw.conversationType ?? "");
-}
-
-/** Android：从 SharedPreferences 读取待处理的推送点击 */
-async function handlePendingPushClickAndroid(): Promise<void> {
-  const raw = await NativeModules.RongCloudPushModule?.getPendingPushClick?.();
-  if (!raw) return;
-  await NativeModules.RongCloudPushModule?.clearPendingPushClick?.().catch(
-    () => undefined,
-  );
-  try {
-    const data = JSON.parse(raw) as Partial<PendingPushClick>;
-    navigateToPushTarget(data.targetId ?? "", data.conversationType ?? "");
-  } catch {
-    // JSON 解析失败时静默忽略
-  }
+  router.push({
+    pathname: "/chat/[id]",
+    params: { id: normalizedId, title },
+  });
 }
 
 /**
- * App 启动时（IM 初始化完成后）调用：
- * 读取原生层暂存的推送点击数据并跳转。
+ * 读取原生暂存的推送点击数据并跳转。
+ * 冷启动：App 被推送杀死后点击通知 → launchOptions 捕获 → UserDefaults/SharedPreferences。
+ * 温启动：App 在后台点击通知 → didReceive/onNewIntent 暂存 → 调用方需在 AppState 回到 active 时再次调用本函数。
  */
 export async function handlePendingPushClick(): Promise<void> {
   try {
+    const raw = await ExpoAppToolkit?.getPendingPushClick?.();
+    if (!raw) return;
+    await ExpoAppToolkit?.clearPendingPushClick?.().catch(() => undefined);
     if (Platform.OS === "ios") {
-      await handlePendingPushClickIos();
-    } else if (Platform.OS === "android") {
-      await handlePendingPushClickAndroid();
+      const data = raw as Partial<PendingPushClick>;
+      navigateToPushTarget(data.targetId ?? "", data.conversationType ?? "");
+      return;
+    }
+    try {
+      const data = JSON.parse(raw as string) as Partial<PendingPushClick>;
+      navigateToPushTarget(data.targetId ?? "", data.conversationType ?? "");
+    } catch {
+      // JSON 解析失败时静默忽略
     }
   } catch {
-    // 原生模块未实现或调用失败时静默忽略
+    // 原生模块未实现（Expo Go / 未重新 prebuild）或调用失败时静默忽略
   }
 }

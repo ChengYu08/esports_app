@@ -184,6 +184,8 @@ export default function RootLayout() {
       const token = useAuthStore.getState().accessToken;
       if (!token) return;
       void messageStore.getState().initialize(token);
+      // 温启动点击推送：后台时点击通知由原生暂存，回前台后补一次跳转
+      void handlePendingPushClick();
     });
     return () => subscription.remove();
   }, []);

@@ -1,5 +1,8 @@
 {
-  "platforms": ["android"],
+  "platforms": ["android", "apple"],
+  "apple": {
+    "modules": ["ExpoAppToolkitModule"]
+  },
   "android": {
     "modules": ["expo.modules.app.toolkit.ExpoAppToolkitModule"]
   }

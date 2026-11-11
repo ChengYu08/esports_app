@@ -337,7 +337,7 @@ class PzOneClickModule : Module() {
       // 协议：默认未勾选（合规要求用户主动同意）
       .setPrivacyState(false)
       .setPrivacyBefore("已阅读并同意")
-      .setPrivacyEnd("，未注册用户在登录成功后自动创建账号")
+      .setPrivacyEnd("，未注册用户在登录成功后自动创建账号(未满18周岁用户禁止注册使用)")
       // 运营商协议是 SDK 内置占位符（点击会跳到对应运营商页面）
       .setVendorPrivacyPrefix("《运营商协议》")
       .setVendorPrivacySuffix("")
@@ -559,7 +559,7 @@ class PzOneClickModule : Module() {
     val operatorName = "《运营商协议》"
     val userName = "《用户协议》"
     val privacyName = "《隐私政策》"
-    val sufText = "，未注册用户在登录成功后自动创建账号"
+    val sufText = "，未注册用户在登录成功后自动创建账号(未满18周岁用户禁止注册使用)"
     val links = mapOf(
       operatorName to carrierProtocolUrl(),
       userName to USER_AGREEMENT_URL,

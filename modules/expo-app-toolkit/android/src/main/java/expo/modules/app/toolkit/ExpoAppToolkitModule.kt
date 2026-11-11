@@ -30,6 +30,27 @@ class ExpoAppToolkitModule : Module() {
       PrivacyConsentState.markAccepted(context)
       RongPushHook.tryInit()
     }
+
+    AsyncFunction("getPendingPushClick") Coroutine {
+      val context = appContext?.reactContext
+        ?: throw CodedException("ERR_MISSING_CONTEXT", "React context is not available", null)
+      val prefs = context.getSharedPreferences(PUSH_CLICK_PREFS, android.content.Context.MODE_PRIVATE)
+      if (!prefs.getBoolean("pending_push_click_pending", false)) return@Coroutine null
+      prefs.getString("pending_push_click", null)
+    }
+
+    AsyncFunction("clearPendingPushClick") Coroutine {
+      val context = appContext?.reactContext ?: return@Coroutine
+      context.getSharedPreferences(PUSH_CLICK_PREFS, android.content.Context.MODE_PRIVATE)
+        .edit()
+        .clear()
+        .apply()
+    }
+  }
+
+  private companion object {
+    /** 与 MainApplication.storePushClickData（plugins/withRongCloudAndroidInit.js 注入）共用 */
+    const val PUSH_CLICK_PREFS = "rong_push"
   }
 
   /**

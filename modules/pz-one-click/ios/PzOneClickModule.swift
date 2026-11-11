@@ -9,8 +9,9 @@ private let protocolBaseURL = "https://djpc.yingbowl.com"
 #else
 private let protocolBaseURL = "https://djpc.jlgkj.top"
 #endif
-private let userAgreementURL = "\(protocolBaseURL)/public/protocols?code=user_server"
-private let privacyPolicyURL = "\(protocolBaseURL)/public/protocols?code=user_privacy"
+// 协议编码按平台追加 `_ios` 后缀，与 RN 侧 links.ts 的 protocolCode 规则一致（后台按平台区分协议内容）
+private let userAgreementURL = "\(protocolBaseURL)/public/protocols?code=user_server_ios"
+private let privacyPolicyURL = "\(protocolBaseURL)/public/protocols?code=user_privacy_ios"
 
 public class PzOneClickModule: Module {
   private let authHandler = TXCommonHandler.sharedInstance()
@@ -314,7 +315,7 @@ public class PzOneClickModule: Module {
 
     // 协议：checkbox 16pt 默认未勾选，文案带「未注册用户在登录成功后自动创建账号」后缀
     model.privacyPreText = "已阅读并同意"
-    model.privacySufText = "，未注册用户在登录成功后自动创建账号"
+    model.privacySufText = "，未注册用户在登录成功后自动创建账号(未满18周岁用户禁止注册使用)"
     // 运营商协议走 SDK 内置占位符（点击跳到对应运营商官方页面），
     // 不要占用 privacyOne/Two/Three —— 那些槽位塞运营商协议会被 SDK 用自家 URL 覆盖，导致点击不生效
     model.privacyOperatorPreText = "《运营商协议》"
@@ -349,7 +350,7 @@ public class PzOneClickModule: Module {
     model.privacyAlertTwoColor = linkBlue
     model.privacyAlertContentAlignment = .left
     model.privacyAlertPreText = "已阅读并同意"
-    model.privacyAlertSufText = "，未注册用户在登录成功后自动创建账号"
+    model.privacyAlertSufText = "，未注册用户在登录成功后自动创建账号(未满18周岁用户禁止注册使用)"
     // SDK 自带单个确认按钮，把它定位到右半边充当「同意协议并继续」，
     // 左半边的「不同意」用 customViewBlock 自绘，点击只关弹窗不继续登录
     model.privacyAlertBtnContent = "同意协议并继续"

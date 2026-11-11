@@ -76,6 +76,7 @@ const NOTIFICATION_TAP_HANDLER = `
     withCompletionHandler completionHandler: @escaping () -> Void
   ) {
     let userInfo = response.notification.request.content.userInfo
+    print("[RongCloudPush] notification tap userInfo: \\(userInfo)")
     if let rcData = userInfo["rc"] as? [String: Any] {
       let targetId = rcData["tId"] as? String ?? ""
       let conversationType = rcData["cType"] as? String ?? ""
@@ -180,4 +181,4 @@ function withRongCloudIosPush(config) {
   return config;
 }
 
-module.exports = createRunOncePlugin(withRongCloudIosPush, TAG, '1.2.0');
+module.exports = createRunOncePlugin(withRongCloudIosPush, TAG, '1.3.0');

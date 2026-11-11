@@ -381,7 +381,8 @@ export function LoginScreen({
                 >
                   《隐私政策》
                 </Text>
-                ，未注册用户 在登录成功后自动创建账号
+                ，未注册用户
+                在登录成功后自动创建账号(未满18周岁用户禁止注册使用)
               </Text>
             </Pressable>
           </View>
@@ -432,7 +433,7 @@ export function LoginScreen({
                 >
                   《隐私政策》
                 </Text>
-                ，未注册用户在登录成功后自动创建账号
+                ，未注册用户在登录成功后自动创建账号(未满18周岁用户禁止注册使用)
               </Text>
             </ScrollView>
             <View style={styles.modalActions}>
