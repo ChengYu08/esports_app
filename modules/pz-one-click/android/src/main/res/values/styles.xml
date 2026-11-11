@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- 覆盖阿里云号码认证 SDK 的两个授权页主题（AAR res/values 中同名样式）。
+         系统深色模式下 Android 10+ 的 forceDark 会把白色背景压暗，而授权页的
+         号码文字与返回箭头是我们写死的深色（#1A1A1A），压暗后即不可见。
+         授权页全部配色均按浅色设计稿显式指定，这里统一禁止 forceDark，
+         保证深色模式下授权页仍按设计稿浅色渲染。 -->
+    <style name="authsdk_app_theme_day" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">false</item>
+        <item name="android:forceDarkAllowed" tools:targetApi="q">false</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+    </style>
+
+    <style name="authsdk_app_theme_light" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">false</item>
+        <item name="android:forceDarkAllowed" tools:targetApi="q">false</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+    </style>
+</resources>

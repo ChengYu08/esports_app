@@ -81,6 +81,8 @@ export default function CompanionIncomeScreen() {
                 loading={ledger.isFetchingNextPage}
                 hasMore={ledger.hasNextPage}
                 pageCount={ledger.data?.pages.length}
+                failed={ledger.isFetchNextPageError}
+                onRetry={ledger.fetchNextPage}
               />
             ) : null
           }

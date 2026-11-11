@@ -2,10 +2,10 @@
   "expo": {
     "name": "盼之电竞",
     "slug": "esportsapp",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "scheme": "esportsapp",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "android": {
       "softwareKeyboardLayoutMode": "resize",
       "predictiveBackGestureEnabled": false,
@@ -66,7 +66,7 @@
         "expo-media-library",
         {
           "photosPermission": "允许盼之电竞访问你的照片，用于选择头像及上传图片。",
-          "savePhotosPermission": false,
+          "savePhotosPermission": "允许盼之电竞保存图片到你的相册。",
           "granularPermissions": ["photo"]
         }
       ]

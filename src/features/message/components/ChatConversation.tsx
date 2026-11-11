@@ -4,6 +4,7 @@ import {
   ChevronRight16Regular,
   HeadphonesRegular,
 } from "@fluentui/react-native-icons";
+import * as Clipboard from "expo-clipboard";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -17,6 +18,7 @@ import {
   Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  PixelRatio,
   Platform,
   Pressable,
   StyleSheet,
@@ -28,12 +30,12 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EmojiKeyboard, type EmojiType } from "rn-emoji-keyboard";
+import { colors } from "@/shared/theme/tokens";
 
-import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import type { AfterSaleCardPayload } from "@/features/order/after-sale-card";
 import { afterSaleCardRows } from "@/features/order/after-sale-card";
 import { beginMediaPick } from "@/shared/media-picker/media-picker-session";
-import { convertToJpeg } from "@/shared/media-picker/image-compat";
+import { convertToJpeg, isGifImage, isGifMessageImage } from "@/shared/media-picker/image-compat";
 import { showToast } from "@/shared/ui/app-toast";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { EmptyState } from "@/shared/ui/AsyncStates";
@@ -43,6 +45,7 @@ import { enterRoomFromInvite } from "@/features/voice-room/enter-room-from-invit
 import { CsInviteCard } from "./CsInviteCard";
 import { MarkdownMessage } from "./MarkdownMessage";
 import { OrderNotifyCard } from "./OrderNotifyCard";
+import { openChatImagePreviewSession } from "../chat-image-preview-session";
 import { touchCustomerServiceSession } from "../customer-service.api";
 import { resolveConversationAvatar } from "../message-avatar";
 import type { ManagedMessage } from "../message-state";
@@ -59,6 +62,11 @@ import {
 
 // 聊天单次发送图片数量上限（相册多选防刷屏）
 const CHAT_IMAGE_MAX = 10;
+// 长按文案消息弹出的操作菜单：尺寸、与气泡的间距、指向气泡的箭头宽度（三角形高取一半）
+const COPY_MENU_WIDTH = 108;
+const COPY_MENU_HEIGHT = 44;
+const COPY_MENU_GAP = 8;
+const COPY_MENU_ARROW = 12;
 /** 输入框行高与最大行数：默认 44（单行 22 + 上下内边距 11），超过 4 行内部滚动 */
 const COMPOSER_LINE_HEIGHT = 22;
 const COMPOSER_MAX_CONTENT_HEIGHT = COMPOSER_LINE_HEIGHT * 4;
@@ -88,25 +96,54 @@ function formatMessageTimeSeparator(timestamp: number) {
   return `${month}-${day} ${hours}:${minutes}`;
 }
 
-function buildChatListRows(messages: ManagedMessage[]): ChatListRow[] {
-  return messages.flatMap((message, index) => {
-    const previousMessage = messages[index - 1];
-    const showTime =
-      !previousMessage ||
-      message.sentAt - previousMessage.sentAt > 5 * 60 * 1000;
-    return [
-      ...(showTime
-        ? [
-            {
-              key: `time-${message.id}`,
-              kind: "time" as const,
-              label: formatMessageTimeSeparator(message.sentAt),
-            },
-          ]
-        : []),
-      { key: message.id, kind: "message" as const, message },
-    ];
-  });
+type ChatRowCacheEntry = {
+  previous: ManagedMessage | null;
+  rows: ChatListRow[];
+};
+
+// 行对象按消息引用缓存：store 里未变化的消息保持同一引用，对应行对象直接复用，
+// 新消息到达时已挂载气泡的 props 不变，PureComponent 列表项才能跳过重渲染；
+// 消息对象不可变，WeakMap 挂在消息上随 GC 回收，多实例共享也只做确定性复用
+const chatRowCache = new WeakMap<ManagedMessage, ChatRowCacheEntry>();
+function buildChatListRows(
+  messages: ManagedMessage[],
+  cache: WeakMap<ManagedMessage, ChatRowCacheEntry>,
+): ChatListRow[] {
+  // 倒序列表直接按新→旧构建，省掉正向拼接再整体翻转的两次数组拷贝
+  const rows: ChatListRow[] = [];
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    const previousMessage = index > 0 ? messages[index - 1] : null;
+    let entry = cache.get(message);
+    if (!entry || entry.previous !== previousMessage) {
+      const messageRow: ChatListRow = {
+        key: message.id,
+        kind: "message",
+        message,
+      };
+      const showTime =
+        !previousMessage ||
+        message.sentAt - previousMessage.sentAt > 5 * 60 * 1000;
+      entry = {
+        previous: previousMessage,
+        rows: showTime
+          ? [
+              {
+                key: `time-${message.id}`,
+                kind: "time",
+                label: formatMessageTimeSeparator(message.sentAt),
+              },
+              messageRow,
+            ]
+          : [messageRow],
+      };
+      cache.set(message, entry);
+    }
+    for (let row = entry.rows.length - 1; row >= 0; row -= 1) {
+      rows.push(entry.rows[row]);
+    }
+  }
+  return rows;
 }
 
 type ChatConversationProps = {
@@ -154,8 +191,12 @@ export function ChatConversation({
 }: ChatConversationProps) {
   const isSheet = presentation === "sheet";
   const insets = useSafeAreaInsets();
+  // 窗口宽度在顶层取一次下传给气泡：避免每个气泡各自订阅尺寸/安全区，
+  // 尺寸变化或转屏时 N 个订阅同时触发全量重渲染
+  const { width: windowWidth } = useWindowDimensions();
   const accessToken = useAuthStore((state) => state.accessToken);
   const userId = useAuthStore((state) => state.user?.id);
+  const myClubId = useAuthStore((state) => state.user?.clubInfo?.id);
   const myAvatarUrl = useAuthStore((state) => state.user?.headImage);
   const myNickname = useAuthStore((state) => state.user?.nickname);
   const [afterSaleSending, setAfterSaleSending] = useState(false);
@@ -185,12 +226,15 @@ export function ChatConversation({
     [isPeerBlacklisted, messages],
   );
   const chatRows = useMemo(
-    () => buildChatListRows(visibleMessages).slice().reverse(),
+    () => buildChatListRows(visibleMessages, chatRowCache),
     [visibleMessages],
   );
   const connectionState = useMessageStore((state) => state.connectionState);
   const lastError = useMessageStore((state) => state.lastError);
   const openConversation = useMessageStore((state) => state.openConversation);
+  const ensureConversationHistory = useMessageStore(
+    (state) => state.ensureConversationHistory,
+  );
   const closeConversation = useMessageStore((state) => state.closeConversation);
   const sendText = useMessageStore((state) => state.sendText);
   const sendImage = useMessageStore((state) => state.sendImage);
@@ -343,27 +387,39 @@ export function ChatConversation({
       router.push({ pathname: "/order/[id]", params: { id: orderId } });
     });
   }, [navigateWithSheetDismiss]);
+  // 切房后原会话不再恢复弹窗；提成 useCallback 保持引用稳定，避免击穿气泡 memo
+  const handleEnterRoomInvite = useCallback(
+    (roomId: string, roomVersion: string) => {
+      navigateWithSheetDismiss(() => {
+        void enterRoomFromInvite(roomId, roomVersion);
+      }, false);
+    },
+    [navigateWithSheetDismiss],
+  );
   const openImagePreview = useCallback(
     async (message: ManagedMessage) => {
       try {
         const resolvedUri = await resolveImagePreview(message);
         // 连看列表：当前会话全部图片消息按时间序组装，点开哪张定位到哪张；
-        // 未点开的图片直接用气泡现有地址（远端或本地均可预览），不逐张触发下载
+        // 其余图片滑到前后页时再按消息对象逐张下载（融云远端地址直连会 401）
         const imageMessages = visibleMessages.filter(
           (item): item is Extract<ManagedMessage, { kind: "image" }> =>
             item.kind === "image",
-        );
-        const images = imageMessages.map((item) =>
-          item.id === message.id ? resolvedUri : item.imageUrl,
         );
         const index = Math.max(
           0,
           imageMessages.findIndex((item) => item.id === message.id),
         );
+        // 预览是独立路由页，消息对象经内存会话带过去，不再用 URL 字符串反查
+        const sessionId = openChatImagePreviewSession({
+          messages: imageMessages,
+          index,
+          resolvedUri,
+        });
         navigateWithSheetDismiss(() => {
           router.push({
             pathname: "/image-preview",
-            params: createImagePreviewParams(images, index),
+            params: { previewSessionId: sessionId },
           });
         });
       } catch (error) {
@@ -412,6 +468,21 @@ export function ChatConversation({
     isSheet,
     navigateWithSheetDismiss,
   ]);
+  // 右侧自己头像：进入自己的主页，参数与「我的」页 openHomepage 一致
+  const openMyProfile = useCallback(() => {
+    if (!userId) {
+      return;
+    }
+    navigateWithSheetDismiss(() => {
+      router.push({
+        pathname: "/profile" as const,
+        params: {
+          ...(myClubId ? { clubId: String(myClubId) } : {}),
+          userId: String(userId),
+        },
+      });
+    });
+  }, [myClubId, navigateWithSheetDismiss, userId]);
   const renderChatRow = useCallback(
     ({ item }: { item: ChatListRow }) =>
       item.kind === "time" ? (
@@ -425,14 +496,12 @@ export function ChatConversation({
           myAvatar={myAvatar}
           peerName={conversation?.title || title || "用户"}
           myName={myNickname || "我"}
-          onEnterRoomInvite={(roomId, roomVersion) => {
-            // 切房后原会话不再恢复弹窗
-            navigateWithSheetDismiss(() => {
-              void enterRoomFromInvite(roomId, roomVersion);
-            }, false);
-          }}
+          windowWidth={windowWidth}
+          insetsTop={insets.top}
+          onEnterRoomInvite={handleEnterRoomInvite}
           onRetry={handleRetryMessage}
           onOpenProfile={canViewProfile ? openProfile : undefined}
+          onOpenMyProfile={openMyProfile}
           onOpenOrder={isOrderAssistant ? openOrderDetail : undefined}
           onPreviewImage={openImagePreview}
         />
@@ -441,15 +510,18 @@ export function ChatConversation({
       canViewProfile,
       conversation?.title,
       conversationAvatar,
+      handleEnterRoomInvite,
       handleRetryMessage,
+      insets.top,
       isOrderAssistant,
       myAvatar,
       myNickname,
-      navigateWithSheetDismiss,
       openImagePreview,
+      openMyProfile,
       openOrderDetail,
       openProfile,
       title,
+      windowWidth,
     ],
   );
 
@@ -469,6 +541,27 @@ export function ChatConversation({
     onBackRef.current = onBack;
   }, [onBack]);
 
+  // openConversation 载荷里的标题/头像/备注等随 store 与 props 漂移，经 ref 读取最新值，
+  // 避免进入下方 effect 的 deps——否则会话快照/资料一到就 close+open，消息记录被清空重拉
+  const openPayloadRef = useRef({
+    title: conversationBaseTitle,
+    avatar:
+      typeof conversationAvatar === "string" ? conversationAvatar : undefined,
+    clubId: clubId || conversation?.clubId,
+    isCustomerService,
+  });
+  useEffect(() => {
+    openPayloadRef.current = {
+      title: conversationBaseTitle,
+      avatar:
+        typeof conversationAvatar === "string" ? conversationAvatar : undefined,
+      clubId: clubId || conversation?.clubId,
+      isCustomerService,
+    };
+  });
+
+  // 会话的生命周期只跟路由参数绑定：id/登录态变化才 open/close，
+  // 连接状态与资料字段的变化由下方 effect 单独兜底，不再整段重跑
   useEffect(() => {
     if (isSelfConversation) {
       if (isSheet) {
@@ -478,31 +571,39 @@ export function ChatConversation({
       }
       return () => closeConversation(conversationId);
     }
-    if (accessToken && conversationId)
+    if (accessToken && conversationId) {
+      const payload = openPayloadRef.current;
       void openConversation({
         id: conversationId,
-        title: conversationBaseTitle,
-        avatar:
-          typeof conversationAvatar === "string"
-            ? conversationAvatar
-            : undefined,
-        clubId: clubId || conversation?.clubId,
-        ...(isCustomerService ? { isCustomerService: true } : {}),
+        title: payload.title,
+        avatar: payload.avatar,
+        clubId: payload.clubId,
+        ...(payload.isCustomerService ? { isCustomerService: true } : {}),
       });
+    }
     return () => closeConversation(conversationId);
   }, [
     accessToken,
     closeConversation,
-    clubId,
-    connectionState,
-    conversation?.clubId,
-    conversationAvatar,
-    conversationBaseTitle,
     conversationId,
-    isCustomerService,
     isSelfConversation,
     isSheet,
     openConversation,
+  ]);
+
+  // 进入聊天页时 IM 尚未 ready：openConversation 只记账不拉历史，
+  // 连接就绪后在这里补开一次；ensureConversationHistory 内部按历史记录存在性判重，
+  // 嵌套打开同一会话的各层共用一次拉取，不重复请求。
+  useEffect(() => {
+    if (connectionState !== "ready" || isSelfConversation) return;
+    if (!accessToken || !conversationId) return;
+    void ensureConversationHistory(conversationId);
+  }, [
+    accessToken,
+    connectionState,
+    conversationId,
+    ensureConversationHistory,
+    isSelfConversation,
   ]);
 
   const handleScroll = useCallback(
@@ -532,9 +633,16 @@ export function ChatConversation({
     if (isNearBottom.current) scrollToLatest();
   }, [scrollToLatest]);
 
+  // iOS：设置弹窗的原生 Modal 退场完成前立刻挂备注弹窗会触发原生呈现竞争导致页面卡死，
+  // 先收设置弹窗，等 BottomSheet 的 onExited 下一帧再挂备注
+  const pendingNoteEditorRef = useRef(false);
   const openNoteEditor = () => {
     setNoteDraft(conversation?.note || "");
     setSettingsVisible(false);
+    if (Platform.OS === "ios") {
+      pendingNoteEditorRef.current = true;
+      return;
+    }
     setNoteVisible(true);
   };
 
@@ -673,6 +781,13 @@ export function ChatConversation({
         }
         renderItem={renderChatRow}
         showsVerticalScrollIndicator={false}
+        // 键盘弹起时若保持默认 never，列表会在捕获阶段吞掉触摸（只用来收键盘），
+        // 气泡的长按/点击都收不到；handled 让子级处理后不再收键盘
+        keyboardShouldPersistTaps="handled"
+        // 聊天行大多带图，收窄挂载窗口可减少同时挂载、同时解码的图片数量
+        initialNumToRender={8}
+        maxToRenderPerBatch={6}
+        windowSize={7}
         onContentSizeChange={keepLatestVisible}
         onLayout={keepLatestVisible}
         maintainVisibleContentPosition={{
@@ -750,6 +865,11 @@ export function ChatConversation({
       <BottomSheet
         visible={settingsVisible}
         onClose={() => setSettingsVisible(false)}
+        onExited={() => {
+          if (!pendingNoteEditorRef.current) return;
+          pendingNoteEditorRef.current = false;
+          setNoteVisible(true);
+        }}
         scrollable
         contentStyle={[
           styles.settingsSheet,
@@ -1011,10 +1131,11 @@ const ChatComposer = memo(function ChatComposer({
     setImageSending(true);
     let failed = 0;
     try {
-      // 逐张发送保持顺序；沿用旧照片选择器的行为：统一重编码为 JPEG，规避 HEIC 原图与超大原图直接发送
+      // 逐张发送保持顺序；静态图重编码为 JPEG 并把最长边压到 1080（与融云默认压缩后的尺寸一致，
+      // 避免原图上传过大的文件）。GIF 重编码会丢动画，原样发送
       for (const uri of picked) {
         try {
-          const sendUri = await convertToJpeg(uri);
+          const sendUri = isGifImage(uri) ? uri : await convertToJpeg(uri, 0.85, 1080);
           await onSendImage(sendUri);
         } catch {
           failed += 1;
@@ -1112,6 +1233,19 @@ const ChatComposer = memo(function ChatComposer({
           >
             <Image source={chatEmoji} style={styles.toolIcon} />
           </Pressable>
+          {/* 弹窗模式展开表情面板时键盘已收起，此时没有任何发送入口；
+              草稿非空时补一个发送按钮，空态保持设计稿的单行输入条布局 */}
+          {draft.trim() ? (
+            <Pressable
+              accessibilityLabel="发送消息"
+              accessibilityRole="button"
+              onPress={() => void sendMessage()}
+              style={[styles.sendButton, styles.sendButtonSheet]}
+            >
+              <Text style={styles.sendText}>发送</Text>
+              <Image source={chatSend} style={styles.sendIcon} />
+            </Pressable>
+          ) : null}
         </View>
         {emojiPanel}
       </View>
@@ -1194,9 +1328,12 @@ const ChatBubble = memo(function ChatBubble({
   myAvatar,
   peerName,
   myName,
+  windowWidth,
+  insetsTop,
   onEnterRoomInvite,
   onRetry,
   onOpenProfile,
+  onOpenMyProfile,
   onOpenOrder,
   onPreviewImage,
 }: {
@@ -1205,17 +1342,110 @@ const ChatBubble = memo(function ChatBubble({
   myAvatar: { uri: string } | number;
   peerName: string;
   myName: string;
+  /** 窗口宽度：气泡/图片尺寸与复制菜单定位用，由父层订阅下传 */
+  windowWidth: number;
+  /** 顶部安全区：复制菜单翻转到气泡下方时判断是否越界 */
+  insetsTop: number;
   onEnterRoomInvite: (roomId: string, roomVersion: string) => void;
   onRetry: (clientId: string) => void;
   onOpenProfile?: () => void;
+  onOpenMyProfile?: () => void;
   onOpenOrder?: (orderId: string) => void;
   onPreviewImage: (message: ManagedMessage) => void;
 }) {
-  const { width: windowWidth } = useWindowDimensions();
-  const [imageRatio, setImageRatio] = useState(1);
+  const bubbleRef = useRef<View | null>(null);
+  // 长按文案消息后菜单锚定的气泡位置（窗口坐标），菜单要挂在气泡正上方
+  const [copyMenuAnchor, setCopyMenuAnchor] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const copyableText = item.kind === "text" ? item.text : "";
+  const copyMessageText = useCallback(() => {
+    setCopyMenuAnchor(null);
+    Clipboard.setStringAsync(copyableText).then(
+      () => showToast("已复制"),
+      () => showToast("复制失败，请重试"),
+    );
+  }, [copyableText]);
+  const openCopyMenu = useCallback(() => {
+    const measure = () => {
+      bubbleRef.current?.measureInWindow((x, y, width, height) => {
+        setCopyMenuAnchor({ x, y, width, height });
+      });
+    };
+    if (!Keyboard.isVisible()) {
+      measure();
+      return;
+    }
+    // 菜单 Modal 的 Dialog 会抢走输入框焦点让键盘自动收起，窗口高度恢复后旧坐标失效，
+    // 菜单会飘到错误位置；先主动收键盘，等布局恢复再按气泡新位置挂菜单
+    const subscription = Keyboard.addListener("keyboardDidHide", () => {
+      subscription.remove();
+      requestAnimationFrame(measure);
+    });
+    Keyboard.dismiss();
+  }, []);
+  const knownRatio = item.kind === "image" ? item.imageAspectRatio : undefined;
+  const [loadedRatio, setLoadedRatio] = useState<number | null>(null);
+  // 消息自带宽高比优先用于首帧，避免先按 1:1 排版、解码后再回弹（每张图多一次布局和一次解码）
+  const imageRatio = loadedRatio ?? knownRatio ?? 1;
   const targetImageWidth = item.isMine ? 120 : 160;
   const imageWidth = Math.min(targetImageWidth, windowWidth * 0.58);
   const imageHeight = imageWidth / imageRatio;
+  // GIF 不走融云缩略图（静态 JPEG 会丢动画）：本地原文件按魔数识别，远端 URL 是
+  // OSS 上的原图（发送时保留真实扩展名），直接用 imageUrl，图片库按气泡尺寸解码播放
+  const isGifMessage = item.kind === "image" && isGifMessageImage(item.imageUrl);
+  // 缩略图宽度不足以铺满气泡的物理像素时会被放大发虚，这种消息继续用原图（解码尺寸由图片库按气泡缩小）
+  const isThumbnailSharpEnough = item.kind === "image"
+    && !isGifMessage
+    && !!item.thumbnailUri
+    && (item.thumbnailWidth ?? 0) >= imageWidth * PixelRatio.get();
+  const bubbleImageUri = item.kind === "image"
+    ? (isGifMessage ? item.imageUrl : (isThumbnailSharpEnough ? item.thumbnailUri! : item.imageUrl))
+    : "";
+  // 大图/GIF 下载解码完成前显示同尺寸灰底转圈占位，避免空白直接跳变成图；
+  // 图片地址变化时在渲染期重置加载态（React 官方推荐写法，避免 effect 内 setState）
+  const [imageLoading, setImageLoading] = useState(true);
+  const [loadedUri, setLoadedUri] = useState(bubbleImageUri);
+  if (loadedUri !== bubbleImageUri) {
+    setLoadedUri(bubbleImageUri);
+    setImageLoading(true);
+  }
+
+  // 菜单挂在气泡正上方并留出箭头和间距，水平居中对齐气泡；顶部放不下就翻到气泡下方
+  const copyMenuLeft = copyMenuAnchor
+    ? Math.min(
+        Math.max(
+          copyMenuAnchor.x + copyMenuAnchor.width / 2 - COPY_MENU_WIDTH / 2,
+          12,
+        ),
+        windowWidth - COPY_MENU_WIDTH - 12,
+      )
+    : 0;
+  const copyMenuAbove = copyMenuAnchor
+    ? copyMenuAnchor.y - COPY_MENU_HEIGHT - COPY_MENU_ARROW / 2 - COPY_MENU_GAP
+      >= insetsTop + 8
+    : true;
+  const copyMenuTop = copyMenuAnchor
+    ? copyMenuAbove
+      ? copyMenuAnchor.y - COPY_MENU_HEIGHT - COPY_MENU_ARROW / 2 - COPY_MENU_GAP
+      : copyMenuAnchor.y + copyMenuAnchor.height + COPY_MENU_ARROW / 2 + COPY_MENU_GAP
+    : 0;
+  // 箭头对准气泡中心，同时夹在菜单圆角内侧，避免压到边角
+  const copyMenuArrowLeft = copyMenuAnchor
+    ? Math.min(
+        Math.max(
+          copyMenuAnchor.x + copyMenuAnchor.width / 2 - copyMenuLeft - COPY_MENU_ARROW / 2,
+          14,
+        ),
+        COPY_MENU_WIDTH - COPY_MENU_ARROW - 14,
+      )
+    : 0;
+  const copyMenuArrowTop = copyMenuAbove
+    ? copyMenuTop + COPY_MENU_HEIGHT
+    : copyMenuTop - COPY_MENU_ARROW / 2;
 
   return (
     <View
@@ -1243,6 +1473,7 @@ const ChatBubble = memo(function ChatBubble({
         </Pressable>
       )}
       <View
+        ref={bubbleRef}
         style={[
           styles.bubble,
           item.isMine ? styles.mineBubble : styles.theirBubble,
@@ -1262,17 +1493,31 @@ const ChatBubble = memo(function ChatBubble({
           >
             <CachedImage
               contentFit="contain"
-              source={{ uri: item.imageUrl }}
+              // 缩略图够清晰才用，省下原图的解码内存；不够清晰就回退原图，避免气泡发虚
+              source={{ uri: bubbleImageUri }}
               style={[
                 styles.messageImage,
                 { width: imageWidth, height: imageHeight },
               ]}
+              transition={120}
               onLoad={({ source }) => {
-                if (source.width > 0 && source.height > 0) {
-                  setImageRatio(source.width / source.height);
+                if (source.width <= 0 || source.height <= 0) {
+                  return;
                 }
+                const next = source.width / source.height;
+                // 与消息自带比例相差不到 1% 就沿用，避免为亚像素差异再触发一次布局
+                if (knownRatio && Math.abs(next - knownRatio) / knownRatio < 0.01) {
+                  return;
+                }
+                setLoadedRatio(next);
               }}
+              onLoadEnd={() => setImageLoading(false)}
             />
+            {imageLoading ? (
+              <View pointerEvents="none" style={[styles.imageLoadingPlaceholder, { width: imageWidth, height: imageHeight }]}>
+                <ActivityIndicator size="small" color={colors.textMuted} />
+              </View>
+            ) : null}
           </Pressable>
         ) : item.kind === "roomInvite" ? (
           <Pressable
@@ -1335,15 +1580,32 @@ const ChatBubble = memo(function ChatBubble({
         ) : item.kind === "markdown" ? (
           <MarkdownMessage content={item.text} />
         ) : (
-          <Text style={styles.bubbleText}>{item.text}</Text>
+          // 文案消息长按弹操作菜单（复制）；热区铺满整个气泡（用负外边距抵消内边距），
+          // 短按不响应，避免误触挡住列表滚动
+          <Pressable
+            accessibilityHint="长按弹出消息菜单"
+            delayLongPress={350}
+            onLongPress={openCopyMenu}
+            style={styles.bubbleTextPressable}
+          >
+            <Text style={styles.bubbleText}>{item.text}</Text>
+          </Pressable>
         )}
       </View>
       {item.isMine && (
-        <CachedImage
-          contentFit="cover"
-          source={myAvatar}
-          style={styles.messageAvatar}
-        />
+        <Pressable
+          accessibilityLabel="查看我的主页"
+          accessibilityRole="button"
+          disabled={!onOpenMyProfile}
+          hitSlop={6}
+          onPress={onOpenMyProfile}
+        >
+          <CachedImage
+            contentFit="cover"
+            source={myAvatar}
+            style={styles.messageAvatar}
+          />
+        </Pressable>
       )}
       {item.status === "failed" ? (
         <Pressable
@@ -1352,6 +1614,49 @@ const ChatBubble = memo(function ChatBubble({
         >
           <Text style={styles.retryLabel}>重试</Text>
         </Pressable>
+      ) : null}
+      {copyMenuAnchor ? (
+        <Modal
+          animationType="fade"
+          transparent
+          visible
+          onRequestClose={() => setCopyMenuAnchor(null)}
+        >
+          <View style={styles.copyMenuLayer}>
+            <Pressable
+              accessibilityLabel="关闭消息菜单"
+              onPress={() => setCopyMenuAnchor(null)}
+              style={StyleSheet.absoluteFill}
+            />
+            <View
+              style={[
+                styles.copyMenu,
+                {
+                  left: copyMenuLeft,
+                  top: copyMenuTop,
+                  width: COPY_MENU_WIDTH,
+                  height: COPY_MENU_HEIGHT,
+                },
+              ]}
+            >
+              <Pressable
+                accessibilityLabel="复制消息内容"
+                accessibilityRole="button"
+                onPress={copyMessageText}
+                style={styles.copyMenuItem}
+              >
+                <Text style={styles.copyMenuText}>复制</Text>
+              </Pressable>
+            </View>
+            <View
+              style={[
+                styles.copyMenuArrow,
+                copyMenuAbove ? styles.copyMenuArrowDown : styles.copyMenuArrowUp,
+                { left: copyMenuLeft + copyMenuArrowLeft, top: copyMenuArrowTop },
+              ]}
+            />
+          </View>
+        </Modal>
       ) : null}
     </View>
   );
@@ -1483,11 +1788,60 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
   },
+  // 负外边距抵消气泡内边距、再用同值内边距补回，文案位置不变但热区覆盖整个气泡
+  bubbleTextPressable: {
+    marginHorizontal: -12,
+    marginVertical: -8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  copyMenuLayer: { flex: 1 },
+  // 浅色气泡菜单：白色浮层 + 大圆角 + 柔和投影，避免深色菜单压在聊天背景上过重
+  copyMenu: {
+    position: "absolute",
+    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+    overflow: "hidden",
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.16,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 14,
+  },
+  copyMenuItem: { flex: 1, alignItems: "center", justifyContent: "center" },
+  copyMenuText: { color: "#1A1A1A", fontSize: 15, lineHeight: 20 },
+  // 指向被选中气泡的三角箭头，与菜单同色
+  copyMenuArrow: {
+    position: "absolute",
+    width: 0,
+    height: 0,
+    borderLeftWidth: COPY_MENU_ARROW / 2,
+    borderRightWidth: COPY_MENU_ARROW / 2,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+  },
+  // 菜单在气泡上方时箭头朝下，在下方时箭头朝上
+  copyMenuArrowDown: {
+    borderTopWidth: COPY_MENU_ARROW / 2,
+    borderTopColor: "#FFFFFF",
+  },
+  copyMenuArrowUp: {
+    borderBottomWidth: COPY_MENU_ARROW / 2,
+    borderBottomColor: "#FFFFFF",
+  },
   imageBubble: {
     padding: 0,
     overflow: "hidden",
     backgroundColor: "transparent",
     borderWidth: 0,
+  },
+  imageLoadingPlaceholder: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.skeleton,
   },
   roomInviteBubble: {
     maxWidth: "84%",
@@ -1590,6 +1944,8 @@ const styles = StyleSheet.create({
   },
   // 图标与单行文本垂直居中：底部留 10（44 条内 (44-24)/2）
   toolButtonSheet: { marginBottom: 10 },
+  // 弹窗模式发送按钮与图标行底部对齐
+  sendButtonSheet: { marginBottom: 10 },
   emojiPanel: { backgroundColor: "#FFFFFF" },
   // 表情/相册/发送按钮行左右留白 12
   composerActions: {

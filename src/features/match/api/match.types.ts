@@ -30,6 +30,8 @@ export type MatchService = {
   femalePrice: number;
   billingUnitName?: string;
   supportMultiCompanion: boolean;
+  /** 陪玩人数配置：0隐藏、1默认单陪、2默认双陪 */
+  companionPreferenceDisplay: 0 | 1 | 2;
 };
 
 /** 0不限 / 1男 / 2女 */
@@ -174,11 +176,12 @@ export type QuickMatchAuditionRoom = {
   creatorUserId?: string | number;
 };
 
-/** 一陪多单：发布多陪服务时不带单/双陪偏好，详情中该字段为空即视为一陪多单 */
+/** 一陪多单由服务配置决定，不能根据单双陪偏好是否为空判断。 */
 export function isMultiCompanionRequest(
   detail: QuickMatchRequestDetail | null | undefined,
+  service: MatchService | null | undefined,
 ): boolean {
-  return detail != null && detail.companionPreference == null;
+  return Boolean(detail && service && detail.gameServiceId === service.id && service.supportMultiCompanion);
 }
 
 /** 抢单选人上限（与 PC / 后端 @Size(max = 3) 一致） */

@@ -5,7 +5,7 @@ import { useAppConfirm } from "@/shared/ui/app-confirm";
 const mocks = vi.hoisted(() => ({
   authState: {
     accessToken: "token" as string | null,
-    user: { id: "user-1" },
+    user: { id: "user-1", isRealName: 1 },
   },
   detail: null as Record<string, unknown> | null,
   grabResult: null as Record<string, unknown> | null,
@@ -69,7 +69,7 @@ vi.mock("@/features/order/order-query", () => ({
 }));
 
 vi.mock("@/shared/ui/action-notice/action-notice-store", () => ({
-  actionNotice: { dismiss: vi.fn() },
+  actionNotice: { dismiss: vi.fn(), dismissByPrefix: vi.fn() },
 }));
 
 vi.mock("@/features/voice-room/exit-voice-room", () => ({
@@ -128,7 +128,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetGrabQuickMatchPending();
   mocks.authState.accessToken = "token";
-  mocks.authState.user = { id: "user-1" };
+  mocks.authState.user = { id: "user-1", isRealName: 1 };
   mocks.detail = noVoiceDetail();
   mocks.grabResult = noVoiceDetail();
   mocks.grabError = null;
@@ -163,7 +163,7 @@ describe("grabQuickMatchAndEnterAudition", () => {
       status: "failed",
       message: "请先登录",
     });
-    expect(actionNotice.dismiss).not.toHaveBeenCalled();
+    expect(actionNotice.dismissByPrefix).not.toHaveBeenCalled();
     expect(refreshDispatchAfterGrabAttempt).not.toHaveBeenCalled();
   });
 
@@ -177,7 +177,7 @@ describe("grabQuickMatchAndEnterAudition", () => {
     expect(Toast.show).toHaveBeenCalledWith("抢单成功", expect.anything());
     expect(router.push).not.toHaveBeenCalled();
     expect(voiceRoomApi.getDetail).not.toHaveBeenCalled();
-    expect(actionNotice.dismiss).toHaveBeenCalledWith("qm:QM1");
+    expect(actionNotice.dismissByPrefix).toHaveBeenCalledWith("qm:QM1:");
     expect(refreshDispatchAfterGrabAttempt).toHaveBeenCalledTimes(1);
     expect(refreshDispatchDetail).toHaveBeenCalledWith("QM1");
   });
@@ -261,7 +261,7 @@ describe("grabQuickMatchAndEnterAudition", () => {
     await expect(flow).resolves.toEqual({ status: "cancelled" });
     expect(grabDispatchRequest).not.toHaveBeenCalled();
     expect(router.push).not.toHaveBeenCalled();
-    expect(actionNotice.dismiss).not.toHaveBeenCalled();
+    expect(actionNotice.dismissByPrefix).not.toHaveBeenCalled();
     expect(refreshDispatchAfterGrabAttempt).not.toHaveBeenCalled();
     expect(refreshDispatchDetail).not.toHaveBeenCalled();
   });
@@ -274,7 +274,7 @@ describe("grabQuickMatchAndEnterAudition", () => {
       status: "failed",
       message: "人数已满",
     });
-    expect(actionNotice.dismiss).toHaveBeenCalledWith("qm:QM1");
+    expect(actionNotice.dismissByPrefix).toHaveBeenCalledWith("qm:QM1:");
     expect(refreshDispatchAfterGrabAttempt).toHaveBeenCalledTimes(1);
     expect(refreshDispatchDetail).toHaveBeenCalledWith("QM1");
   });

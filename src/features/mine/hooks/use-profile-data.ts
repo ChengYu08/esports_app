@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import {
   fetchProfileDetail,
@@ -20,6 +20,9 @@ export function useProfileGameDetail(params: ProfileGameRouteParams | null, acti
     queryKey: ["profile-game-detail", params?.clubId, params?.userId, params?.gameId],
     queryFn: ({ signal }) => fetchProfileGameDetail(params as ProfileGameRouteParams, signal),
     enabled: active && Boolean(params),
+    // 切换游戏时保留上一个游戏的数据做过渡，避免技能区整块闪空；
+    // 调用方用 isPlaceholderData 识别占位态并降透明度+禁用下单
+    placeholderData: keepPreviousData,
   });
 }
 

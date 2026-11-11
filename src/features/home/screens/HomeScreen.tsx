@@ -17,13 +17,20 @@ import { HomeHighlights } from "@/features/home/components/HomeHighlights";
 import { useHomeHighlights } from "@/features/home/hooks/use-home-highlights";
 import { DEFAULT_RANKING_FILTERS } from "@/features/ranking/ranking.config";
 import type { RankingFilters } from "@/features/ranking/api/ranking.types";
+import { HomePopupModal } from "@/features/home/components/HomePopupModal";
 import {
   useHomeBanners,
   useHomeClubs,
   useHomeGameCategories,
   useHomeGames,
+  useHomePopup,
 } from "@/features/home/hooks/use-home-data";
-import { EmptyState, ErrorState, LoadingState } from "@/shared/ui/AsyncStates";
+import {
+  hasHomePopupShownThisSession,
+  markHomePopupShownThisSession,
+} from "@/features/home/home-popup-session";
+import { ListFallbackState, LoadingState } from "@/shared/ui/AsyncStates";
+import { useIsOffline } from "@/shared/hooks/use-is-offline";
 import { PaginationFooter } from "@/shared/ui/PaginationFooter";
 import { router, useFocusEffect, useIsFocused, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -41,6 +48,7 @@ const RANKING_GRADIENT_BODY = 188;
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const offline = useIsOffline();
   const focused = useIsFocused();
   const { reviewerApplied, ticketSubmitted } = useLocalSearchParams<{
     reviewerApplied?: string;
@@ -86,6 +94,8 @@ export default function HomeScreen() {
       ? game
       : "";
   const banners = useHomeBanners(topTab, focused);
+  const homePopupQuery = useHomePopup(topTab === "home" && focused);
+  const [homePopupVisible, setHomePopupVisible] = useState(false);
   const clubs = useHomeClubs(
     topTab,
     {
@@ -95,6 +105,25 @@ export default function HomeScreen() {
     focused,
   );
   const bannerSlots = useMemo(() => banners.data ?? [], [banners.data]);
+  const homePopup = homePopupQuery.data ?? null;
+
+  useEffect(() => {
+    if (topTab !== "home" || !focused) {
+      return;
+    }
+    if (hasHomePopupShownThisSession()) {
+      return;
+    }
+    if (!homePopup || homePopup.items.length === 0) {
+      return;
+    }
+    setHomePopupVisible(true);
+  }, [focused, homePopup, topTab]);
+
+  const dismissHomePopup = useCallback(() => {
+    markHomePopupShownThisSession();
+    setHomePopupVisible(false);
+  }, []);
 
   // 用拖拽/惯性的起止事件跟踪列表滚动，不在逐帧 onScroll 里做 JS 状态更新。
   const scrollStateRef = useRef(initialClubListScrollState);
@@ -283,6 +312,14 @@ export default function HomeScreen() {
   );
   const isHomeLoading = games.isLoading || categories.isLoading;
 
+  // 列表兜底态：首屏失败或断网未加载出走失败/无网络态，否则走空态
+  const clubsFallbackKind =
+    clubs.isError || (offline && clubs.data === undefined)
+      ? offline
+        ? "offline"
+        : "loadFailed"
+      : "empty";
+
   return (
     <View
       style={[
@@ -340,10 +377,12 @@ export default function HomeScreen() {
                 ListEmptyComponent={
                   clubs.isLoading ? (
                     <LoadingState />
-                  ) : clubs.isError ? (
-                    <ErrorState onRetry={clubs.refetch} />
                   ) : (
-                    <EmptyState message="暂无俱乐部" />
+                    <ListFallbackState
+                      kind={clubsFallbackKind}
+                      message={clubsFallbackKind === "empty" ? "暂无俱乐部" : undefined}
+                      onRetry={clubs.refetch}
+                    />
                   )
                 }
                 ListFooterComponent={
@@ -352,6 +391,8 @@ export default function HomeScreen() {
                       loading={clubs.isFetchingNextPage}
                       hasMore={clubs.hasNextPage}
                       pageCount={clubs.data?.pages.length}
+                      failed={clubs.isFetchNextPageError}
+                      onRetry={clubs.fetchNextPage}
                     />
                   ) : null
                 }
@@ -377,6 +418,14 @@ export default function HomeScreen() {
           />
         )}
       </View>
+      {homePopup ? (
+        <HomePopupModal
+          visible={homePopupVisible}
+          items={homePopup.items}
+          intervalMs={homePopup.intervalMs}
+          onDismiss={dismissHomePopup}
+        />
+      ) : null}
     </View>
   );
 }

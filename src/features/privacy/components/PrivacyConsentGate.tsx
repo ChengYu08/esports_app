@@ -8,6 +8,7 @@ import { APP_LINKS } from "@/core/config/links";
 import { savePrivacyConsent } from "@/features/privacy/privacy-consent";
 import { WEBVIEW_COMPAT_SCRIPT } from "@/shared/navigation/webview-compat-script";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
+import ExpoAppToolkit from "../../../../modules/expo-app-toolkit";
 
 type PrivacyConsentGateProps = {
   onAccepted: () => void;
@@ -29,6 +30,8 @@ export function PrivacyConsentGate({ onAccepted }: PrivacyConsentGateProps) {
     setSaving(true);
     try {
       await savePrivacyConsent();
+      // 同意后才允许初始化融云及厂商推送 SDK
+      ExpoAppToolkit?.markPrivacyConsentAccepted();
       onAccepted();
     } catch {
       // Keep the gate open when consent could not be persisted.
@@ -93,7 +96,7 @@ export function PrivacyConsentGate({ onAccepted }: PrivacyConsentGateProps) {
               ，以下将向你说明：
             </Text>
             <Text style={styles.body}>
-              1.为保障应用安全、稳定运行，我们可能会收集您的设备信息、IP 地址和 MAC 地址。；
+              1.为保障应用安全、稳定运行，我们可能会收集您的设备信息和 IP 地址；
             </Text>
             <Text style={styles.body}>
               2.使用客服功能时，为确保您在应用关闭或处于后台时仍能及时接收消息，本应用可能需要使用自启动或关联启动能力，并通过系统广播唤醒或启动应用。该能力仅用于实现消息推送等必要功能。；

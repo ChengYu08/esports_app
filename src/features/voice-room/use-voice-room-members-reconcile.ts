@@ -8,6 +8,9 @@ import { subscribeVoiceChatConnection } from "./voice-room-rongcloud";
 
 /** 融云重连与回前台可能连续触发，与 join 时的 detail 拉取共用最小间隔 */
 const RECONCILE_MIN_INTERVAL_MS = 5_000;
+// 对齐 PC 端 useRtcRecovery 的 30s watchdog：漏掉的成员事件没有别的推送来源，
+// 周期对账是最终的兜底手段
+const RECONCILE_WATCHDOG_INTERVAL_MS = 30_000;
 
 type ReconcileCurrentUser = {
   id: string;
@@ -15,19 +18,28 @@ type ReconcileCurrentUser = {
   headImage?: string;
 };
 
+type ReconcileRoomRef = {
+  current: {
+    roomVersion?: string | number;
+    creatorUserId?: string | number;
+    serviceUserId?: string | number;
+  } | null;
+};
+
 type VoiceRoomMembersReconcileOptions = {
   roomId?: string;
   accessToken?: string | null;
   currentUser?: ReconcileCurrentUser | null;
-  roomRef: { current: { roomVersion: string | number } | null };
+  roomRef: ReconcileRoomRef;
   kickedRef: { current: boolean };
-  hydrateMemberProfile: (userId: string, token: string) => void;
+  hydrateMemberProfiles: (userIds: string[], token: string) => void;
   setMembers: (updater: (items: VoiceRoomMember[]) => VoiceRoomMember[]) => void;
 };
 
 /**
  * 融云聊天室成员变更事件不存离线：断网/重连期间漏掉的退出事件会让成员永久残留。
- * 回前台和融云重连时重拉 detail，用后端权威名单校准本地列表。
+ * 回前台、融云重连与 30s watchdog 时重拉成员快照，用后端权威名单校准本地列表。
+ * 数据源为专用 members 端点（detail 从不返回成员）；任何失败都跳过本次对账，不清空列表。
  */
 export function useVoiceRoomMembersReconcile({
   roomId,
@@ -35,13 +47,13 @@ export function useVoiceRoomMembersReconcile({
   currentUser,
   roomRef,
   kickedRef,
-  hydrateMemberProfile,
+  hydrateMemberProfiles,
   setMembers,
 }: VoiceRoomMembersReconcileOptions) {
   const lastAttemptAtRef = useRef<number | null>(null);
   const inFlightRef = useRef(false);
 
-  // 进房流程已拉过一次 detail，挂载后先压制 5s 内的重连触发，避免紧跟着 join 的重复请求
+  // 进房流程已对账过一次，挂载后先压制 5s 内的重连触发，避免紧跟着 join 的重复请求
   useEffect(() => {
     lastAttemptAtRef.current = Date.now();
   }, []);
@@ -58,27 +70,40 @@ export function useVoiceRoomMembersReconcile({
     if (inFlightRef.current) {
       return;
     }
+    const roomVersion = roomRef.current?.roomVersion;
+    if (roomVersion == null) {
+      return;
+    }
     lastAttemptAtRef.current = now;
     inFlightRef.current = true;
     const token = accessToken;
     void (async () => {
       try {
-        const detail = await voiceRoomApi.getDetail(roomId, token);
-        const currentVersion = roomRef.current?.roomVersion;
-        // 房间已重建：名单归属新实例，不能用新实例成员覆盖旧聊天室视图
-        if (
-          currentVersion != null &&
-          String(detail.roomVersion ?? "1") !== String(currentVersion)
-        ) {
+        const snapshot = await voiceRoomApi.getRoomMembers(roomId, roomVersion, token);
+        if (kickedRef.current) return;
+        // 请求期间房间已重建：名单归属新实例，不能用新实例成员覆盖旧聊天室视图
+        if (String(roomRef.current?.roomVersion ?? "") !== String(roomVersion)) {
           return;
         }
-        setMembers((items) => reconcileMembers(items, detail, currentUser ?? undefined));
-        (detail.members || []).forEach((member) => {
-          const userId = member.userId == null ? "" : String(member.userId);
-          if (userId && userId !== currentUser?.id) {
-            hydrateMemberProfile(userId, token);
-          }
-        });
+        const room = roomRef.current;
+        setMembers((items) =>
+          reconcileMembers(
+            items,
+            {
+              roomVersion: snapshot.roomVersion,
+              creatorUserId: room?.creatorUserId,
+              serviceUserId: room?.serviceUserId,
+              members: snapshot.members,
+            },
+            currentUser ?? undefined,
+          ),
+        );
+        hydrateMemberProfiles(
+          snapshot.members
+            .map((member) => (member.userId == null ? "" : String(member.userId)))
+            .filter((userId) => userId && userId !== currentUser?.id),
+          token,
+        );
       } catch (cause) {
         console.warn("[voice-room] member reconcile failed", cause);
       } finally {
@@ -88,7 +113,7 @@ export function useVoiceRoomMembersReconcile({
   }, [
     accessToken,
     currentUser,
-    hydrateMemberProfile,
+    hydrateMemberProfiles,
     kickedRef,
     roomId,
     roomRef,
@@ -115,6 +140,16 @@ export function useVoiceRoomMembersReconcile({
     });
     return () => {
       unsubscribe();
+    };
+  }, [reconcile, roomId]);
+
+  useEffect(() => {
+    if (!roomId) {
+      return;
+    }
+    const timer = setInterval(reconcile, RECONCILE_WATCHDOG_INTERVAL_MS);
+    return () => {
+      clearInterval(timer);
     };
   }, [reconcile, roomId]);
 }

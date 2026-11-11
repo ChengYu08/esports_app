@@ -1,15 +1,14 @@
 import { Dismiss16Regular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MatchLinearGradient } from "@/features/match/components/MatchLinearGradient";
-import {
-  fetchStarBalance,
-  payCompanionOrder,
-} from "@/features/mine/api/companion-order.api";
+import { StarNotEnoughError } from "@/features/match/api/match.api";
+import { payCompanionOrder } from "@/features/mine/api/companion-order.api";
+import { useStarBalance } from "@/features/mine/hooks/use-star-balance";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 
@@ -23,6 +22,8 @@ type StarPaymentSheetProps = {
   onClose: () => void | Promise<void>;
   onPaid: () => void;
   onPaymentFailed: (message: string) => void;
+  /** 点「去充值」导航前的钩子（如语聊房宿主标记跳过成员弹窗恢复） */
+  onGoRecharge?: () => void;
 };
 
 export function StarPaymentSheet({
@@ -32,24 +33,33 @@ export function StarPaymentSheet({
   onClose,
   onPaid,
   onPaymentFailed,
+  onGoRecharge,
 }: StarPaymentSheetProps) {
   const insets = useSafeAreaInsets();
-  const [balance, setBalance] = useState<number | null>(null);
   const [paying, setPaying] = useState(false);
   const settledRef = useRef(false);
+  // iOS 同链只能呈现一个原生 Modal：余额不足等提示经 BottomSheet 的 overlay 插槽
+  // 渲染在支付弹窗自己的 Modal 窗口内，不能作为第二个原生 Modal 叠加
   const [prompt, setPrompt] = useState<{
     title?: string;
     message: string;
   } | null>(null);
+  const balance = useStarBalance(token, visible, {
+    onError: (error) => setPrompt({ message: error.message }),
+  });
   const payDisabled = paying || balance === null;
 
-  useEffect(() => {
-    if (!visible || !token) return;
-    setBalance(null);
-    void fetchStarBalance(token)
-      .then(setBalance)
-      .catch((error: Error) => setPrompt({ message: error.message }));
-  }, [token, visible]);
+  async function confirmPrompt() {
+    const goRecharge = prompt?.title === "余额不足";
+    setPrompt(null);
+    if (!goRecharge) {
+      return;
+    }
+    onGoRecharge?.();
+    // 去充值前先关掉支付弹窗，否则原生 Modal 会盖住跳转后的充值页
+    await onClose();
+    router.push("/star-recharge");
+  }
 
   async function pay() {
     if (!token) return setPrompt({ message: "请先登录" });
@@ -64,6 +74,14 @@ export function StarPaymentSheet({
       settledRef.current = true;
       onPaid();
     } catch (error) {
+      if (error instanceof StarNotEnoughError) {
+        // 服务端判定余额不足（本地余额过期）：弹内嵌余额不足提示，保留弹窗可充值后重试
+        setPrompt({
+          title: "余额不足",
+          message: "当前钻石余额不足，请充值后再支付",
+        });
+        return;
+      }
       onPaymentFailed(error instanceof Error ? error.message : "支付失败");
       if (!settledRef.current) {
         settledRef.current = true;
@@ -85,6 +103,20 @@ export function StarPaymentSheet({
           styles.paymentModal,
           { paddingBottom: Math.max(insets.bottom, 12) + 12 },
         ]}
+        overlay={
+          <AppPrompt
+            inline
+            visible={Boolean(prompt)}
+            title={prompt?.title}
+            message={prompt?.message ?? ""}
+            confirmText={prompt?.title === "余额不足" ? "去充值" : "知道了"}
+            cancelText={prompt?.title === "余额不足" ? "取消" : undefined}
+            onCancel={
+              prompt?.title === "余额不足" ? () => setPrompt(null) : undefined
+            }
+            onConfirm={() => void confirmPrompt()}
+          />
+        }
       >
         <View style={styles.paymentModalHeader}>
           <View style={styles.paymentModalHeading}>
@@ -147,21 +179,6 @@ export function StarPaymentSheet({
           </MatchLinearGradient>
         </Pressable>
       </BottomSheet>
-      <AppPrompt
-        visible={Boolean(prompt)}
-        title={prompt?.title}
-        message={prompt?.message ?? ""}
-        confirmText={prompt?.title === "余额不足" ? "去充值" : "知道了"}
-        cancelText={prompt?.title === "余额不足" ? "取消" : undefined}
-        onCancel={
-          prompt?.title === "余额不足" ? () => setPrompt(null) : undefined
-        }
-        onConfirm={() => {
-          const goRecharge = prompt?.title === "余额不足";
-          setPrompt(null);
-          if (goRecharge) router.push("/star-recharge");
-        }}
-      />
     </>
   );
 }
