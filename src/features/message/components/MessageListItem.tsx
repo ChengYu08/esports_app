@@ -124,9 +124,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   // 设计稿 70-41035：昵称右侧「官方客服」标签，0.5px Brand-04 描边、圆角2、10px Brand-07 文字；
-  // 高度按设计 14 在 Android 会裁掉文字底部，与 CompanionCard 陪玩 Tag 一致抬高到 16
+  // 高度按设计 14 在 Android 会裁掉文字底部，与 CompanionCard 陪玩 Tag 一致抬高
   csTag: {
-    height: 16,
+    height: 17,
     paddingHorizontal: 2,
     alignItems: "center",
     justifyContent: "center",

@@ -1,4 +1,5 @@
 import { useAuthStore } from "@esports/auth";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { Stack, router } from "expo-router";
@@ -14,7 +15,7 @@ import {
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { fetchQuickMatchPaymentPreview } from "@/features/match/api/match.api";
+import { fetchClubGameServices, fetchQuickMatchPaymentPreview } from "@/features/match/api/match.api";
 import {
   isMultiCompanionRequest,
   type MatchGame,
@@ -26,7 +27,7 @@ import { MatchPaySheet } from "@/features/match/components/MatchPaySheet";
 import { MatchingGrabListView } from "@/features/match/components/MatchingGrabListView";
 import { MatchingWaitingView } from "@/features/match/components/MatchingWaitingView";
 import { useQuickMatchSession } from "@/features/match/hooks/use-quick-match-session";
-import { afterOrderPaidOpenChat } from "@/features/order/notify-order-paid";
+import { afterOrderPaidOpenChat, afterQuickMatchPaidOpenRoom } from "@/features/order/notify-order-paid";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { showToast } from "@/shared/ui/app-toast";
 
@@ -73,6 +74,15 @@ export default function MatchMatchingScreen({
     expireTime: expireTime || undefined,
     onEnded: handleEnded,
   });
+
+  const levelId = session.detail?.gameLevelId;
+  const serviceId = session.detail?.gameServiceId;
+  const servicesQuery = useQuery({
+    queryKey: ["quick-match", "services", token, levelId],
+    queryFn: ({ signal }) => fetchClubGameServices(levelId as string, token as string, signal),
+    enabled: Boolean(token && levelId && serviceId),
+  });
+  const selectedService = servicesQuery.data?.find((service) => service.id === serviceId);
 
   const hasCandidates = session.candidates.length > 0;
 
@@ -148,6 +158,14 @@ export default function MatchMatchingScreen({
           continue;
         }
         companionUserIds.push(uid);
+      }
+      if (token && session.detail?.needVoice === false) {
+        afterQuickMatchPaidOpenRoom({
+          companionUserIds,
+          token,
+          clubId: session.detail.clubId,
+        });
+        return;
       }
       const firstCompanionId = companionUserIds[0];
       if (!firstCompanionId) {
@@ -235,7 +253,7 @@ export default function MatchMatchingScreen({
             newCandidateIds={session.newCandidateIds}
             selectedGrabIds={session.selectedGrabIds}
             submitting={session.submitting}
-            multiCompanion={isMultiCompanionRequest(session.detail)}
+            multiCompanion={isMultiCompanionRequest(session.detail, selectedService)}
             onSelect={session.toggleGrab}
             onConfirm={() => void handleSelectAndOrder()}
           />

@@ -113,16 +113,18 @@ const styles = StyleSheet.create({
   club: {
     minHeight: 104,
     flexDirection: "row",
-    // 设计稿卡片行 alignItems=center：右侧文案变高时左侧 80×80 封面仍垂直居中
+    // 设计稿卡片行 alignItems=center：右侧文案变高时左侧正方形封面仍垂直居中
     alignItems: "center",
     gap: 12,
     backgroundColor: "#FFFFFF",
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
+  // 设计稿：封面保持正方形；尺寸与两行简介的内容块等高（实测约 96），
+  // 既不会被右侧内容“压小”，也不会被拉成长方形
   cover: {
-    width: 80,
-    height: 80,
+    width: 96,
+    height: 96,
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",

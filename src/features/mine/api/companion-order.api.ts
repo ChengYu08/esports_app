@@ -1,5 +1,6 @@
 import { apiClient } from "@/core/network/api-client";
 import { isUserBlacklisted } from "@/features/mine/blacklist";
+import { StarNotEnoughError } from "@/features/match/api/match.api";
 import { buildCreateOrderAction } from "./companion-order.payload";
 import type { CompanionOrderContext, CompanionServiceOption } from "./companion-order.types";
 
@@ -91,5 +92,8 @@ export async function payCompanionOrder(orderId: number, token: string): Promise
     token,
     body: { action: { orderId } },
   });
+  if (response.code === "STAR_NOT_ENOUGH") {
+    throw new StarNotEnoughError(response.info);
+  }
   requireVoidSuccess(response, "支付失败");
 }

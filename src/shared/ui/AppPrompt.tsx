@@ -1,10 +1,20 @@
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect } from "react";
+import {
+  BackHandler,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const BRAND = "#FE1F4C";
 
 export function AppPrompt({
   visible,
+  inline = false,
   title = "提示",
   message,
   confirmText = "知道了",
@@ -13,6 +23,8 @@ export function AppPrompt({
   onConfirm,
 }: {
   visible: boolean;
+  /** 内嵌模式：不用原生 Modal，作为绝对定位覆盖层渲染在宿主原生 Modal 内（iOS 无法同时呈现两个原生 Modal，弹层内提示必须走此模式） */
+  inline?: boolean;
   title?: string;
   message: string;
   confirmText?: string;
@@ -21,6 +33,68 @@ export function AppPrompt({
   onConfirm: () => void;
 }) {
   const insets = useSafeAreaInsets();
+
+  // 内嵌模式没有原生 Modal 的 onRequestClose，Android 返回键需自行接管
+  useEffect(() => {
+    if (!inline || !visible) return;
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      (onCancel ?? onConfirm)();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [inline, visible, onCancel, onConfirm]);
+
+  const content = (
+    <View
+      style={[
+        styles.backdrop,
+        {
+          paddingTop: insets.top + 24,
+          paddingBottom: insets.bottom + 24,
+          paddingLeft: insets.left + 36,
+          paddingRight: insets.right + 36,
+        },
+      ]}
+    >
+      <View style={styles.dialog}>
+        <ScrollView
+          style={styles.copy}
+          contentContainerStyle={styles.copyContent}
+        >
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.message}>{message}</Text>
+        </ScrollView>
+        <View style={styles.actions}>
+          {cancelText && onCancel && (
+            <Pressable
+              accessibilityRole="button"
+              style={[styles.button, styles.cancelButton]}
+              onPress={onCancel}
+            >
+              <Text style={styles.cancelText}>{cancelText}</Text>
+            </Pressable>
+          )}
+          <Pressable
+            accessibilityRole="button"
+            style={[styles.button, styles.confirmButton]}
+            onPress={onConfirm}
+          >
+            <Text style={styles.buttonText}>{confirmText}</Text>
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  );
+
+  if (inline) {
+    if (!visible) return null;
+    return (
+      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+        {content}
+      </View>
+    );
+  }
+
   return (
     <Modal
       animationType="fade"
@@ -28,45 +102,7 @@ export function AppPrompt({
       visible={visible}
       onRequestClose={onCancel ?? onConfirm}
     >
-      <View
-        style={[
-          styles.backdrop,
-          {
-            paddingTop: insets.top + 24,
-            paddingBottom: insets.bottom + 24,
-            paddingLeft: insets.left + 36,
-            paddingRight: insets.right + 36,
-          },
-        ]}
-      >
-        <View style={styles.dialog}>
-          <ScrollView
-            style={styles.copy}
-            contentContainerStyle={styles.copyContent}
-          >
-            <Text style={styles.title}>{title}</Text>
-            <Text style={styles.message}>{message}</Text>
-          </ScrollView>
-          <View style={styles.actions}>
-            {cancelText && onCancel && (
-              <Pressable
-                accessibilityRole="button"
-                style={[styles.button, styles.cancelButton]}
-                onPress={onCancel}
-              >
-                <Text style={styles.cancelText}>{cancelText}</Text>
-              </Pressable>
-            )}
-            <Pressable
-              accessibilityRole="button"
-              style={[styles.button, styles.confirmButton]}
-              onPress={onConfirm}
-            >
-              <Text style={styles.buttonText}>{confirmText}</Text>
-            </Pressable>
-          </View>
-        </View>
-      </View>
+      {content}
     </Modal>
   );
 }
