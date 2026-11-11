@@ -120,6 +120,14 @@ export async function enterRoomFromInvite(
         showToast("语聊房已关闭");
         return { status: "failed", message: "语聊房已关闭" };
       }
+      // 对齐 PC：链接 v 与当前实例不一致则邀请已失效
+      if (
+        roomVersion &&
+        String(detail.roomVersion) !== String(roomVersion)
+      ) {
+        showToast("该邀请已失效");
+        return { status: "failed", message: "该邀请已失效" };
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "语聊房已关闭";

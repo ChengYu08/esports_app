@@ -246,11 +246,15 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
       try {
         const detail = await voiceRoomApi.getDetail(roomId, accessToken);
         if (!isCurrentJoin()) return;
-        const staleInvite = Boolean(
+        // 对齐 PC：路由携带的邀请 v 与当前实例不一致则拒绝进房（勿静默升版本）
+        if (
           invitedRoomVersion &&
-            String(detail.roomVersion ?? "1") !== invitedRoomVersion,
-        );
-        // 邀请卡片携带的是旧实例版本：房间已重建，按当前版本进入最新实例
+          String(detail.roomVersion ?? "1") !== invitedRoomVersion
+        ) {
+          showToast("该邀请已失效");
+          setError("该邀请已失效");
+          return;
+        }
         const prepared = await voiceRoomApi.prepareJoin(
           roomId,
           detail.roomVersion ?? "1",
@@ -482,9 +486,6 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
         setRtcReadyRoomId(roomId);
         setMicState({ roomId, muted: getVoiceRtcMuted() });
         setError(null);
-        if (staleInvite) {
-          showToast("语聊房已重新开启，已为你进入最新房间");
-        }
       } catch (cause) {
         await cleanupCancelledJoin();
         if (active && !kickedRef.current) {
