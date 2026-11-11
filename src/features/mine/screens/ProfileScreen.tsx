@@ -1,3 +1,4 @@
+import { JoinClubEntry } from "@/features/mine/components/JoinClubEntry";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
@@ -802,7 +803,10 @@ export default function ProfileScreen() {
         ]}
       >
         {isMine ? (
-          editProfileButton
+          <>
+            <JoinClubEntry />
+            {editProfileButton}
+          </>
         ) : (
           <>
             <Pressable
