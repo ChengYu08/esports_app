@@ -36,6 +36,8 @@ const TOAST_AFTER_SHEET_MS = 280;
 type VoiceRoomConversationsSheetProps = {
   visible: boolean;
   onClose: () => void;
+  /** 退场动画结束、Modal 卸载后回调：iOS 上供宿主串行拉起下一个弹窗 */
+  onExited?: () => void;
   /**
    * When set, tapping a conversation sends invite text instead of opening chat.
    * Resolve `true` when invite is sent; sheet shows success toast after close.
@@ -53,6 +55,7 @@ type VoiceRoomConversationsSheetProps = {
 export function VoiceRoomConversationsSheet({
   visible,
   onClose,
+  onExited,
   sendTextTo,
   onOpenConversation,
 }: VoiceRoomConversationsSheetProps) {
@@ -126,6 +129,7 @@ export function VoiceRoomConversationsSheet({
     <BottomSheet
       visible={visible}
       onClose={onClose}
+      onExited={onExited}
       contentStyle={[
         styles.sheet,
         // 设计稿弹层 690/812 ≈ 85% 屏高
