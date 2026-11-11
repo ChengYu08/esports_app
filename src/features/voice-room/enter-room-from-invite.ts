@@ -120,6 +120,25 @@ export async function enterRoomFromInvite(
         showToast("语聊房已关闭");
         return { status: "failed", message: "语聊房已关闭" };
       }
+      // 对齐 PC：链接 v 与当前实例不一致则邀请已失效
+      if (
+        roomVersion &&
+        String(detail.roomVersion) !== String(roomVersion)
+      ) {
+        showToast("该邀请已失效");
+        return { status: "failed", message: "该邀请已失效" };
+      }
+      // 对齐 PC：进房前只读检查踢人封禁
+      const kicked = await voiceRoomApi.isVoiceRoomKicked(
+        roomId,
+        detail.roomVersion ?? roomVersion,
+        accessToken,
+      );
+      if (kicked) {
+        const message = "你已被移出房间，暂不可重新进入";
+        showToast(message);
+        return { status: "failed", message };
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "语聊房已关闭";

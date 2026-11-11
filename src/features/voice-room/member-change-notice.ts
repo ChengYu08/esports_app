@@ -1,3 +1,5 @@
+import { logger } from "@/core/logging/logger";
+
 import type { VoiceRoomMember, VoiceRoomMessage } from "./voice-room.types";
 
 export type MemberChangeAction = "join" | "leave";
@@ -54,8 +56,17 @@ export function buildMemberChangeMessage(options: {
     options.roomVersion,
     options.userId,
   );
+  const messageId = `member-change:${key}:${options.action}:${createdAt}`;
+  logger.info("voice_room.system_message", {
+    userId: options.userId,
+    nickname: options.nickname,
+    action: options.action,
+    roomId: options.roomId,
+    roomVersion: String(options.roomVersion),
+    messageId,
+  });
   return {
-    id: `member-change:${key}:${options.action}:${createdAt}`,
+    id: messageId,
     userId: options.userId,
     nickname: options.nickname,
     kind: "system",
