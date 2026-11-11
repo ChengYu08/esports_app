@@ -383,8 +383,13 @@ export function useVoiceRoomRtc(options: UseVoiceRoomRtcOptions) {
           accessToken,
         );
         if (!isCurrentJoin()) { await cleanupCancelledJoin(); return; }
-        if (rtc.accessStatus && rtc.accessStatus !== "READY")
-          throw new Error("语聊房当前不可加入");
+        if (rtc.accessStatus && rtc.accessStatus !== "READY") {
+          throw new Error(
+            rtc.accessStatus === "KICKED_BANNED"
+              ? "你已被移出房间，暂不可重新进入"
+              : "语聊房当前不可加入",
+          );
+        }
         const token = rtc.token || rtc.rtcToken;
         const channelName =
           rtc.channelName || rtc.rtcChannelName || prepared.rtcChannelName;
