@@ -151,6 +151,6 @@ export type CompanionPage = {
 
 export type PriceListTab = {
   menuTitle: string;
-  imageUrl: string;
+  imageUrls: string[];
   sortNo: number;
 };
