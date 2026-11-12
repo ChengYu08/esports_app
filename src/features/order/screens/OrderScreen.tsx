@@ -100,8 +100,8 @@ export default function OrderScreen() {
   );
   useFocusEffect(
     useCallback(() => {
-      if (requestedScope === "accept" && isCompanion) {
-        setSelectedScope("accept");
+      if (requestedScope === "place" || (requestedScope === "accept" && isCompanion)) {
+        setSelectedScope(requestedScope);
         setFilter("all");
         router.setParams({ scope: undefined });
       }

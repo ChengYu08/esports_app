@@ -7,11 +7,16 @@ import {
 } from "@/features/mine/api/profile.api";
 import type { ProfileGameRouteParams, ProfileRouteParams } from "@/features/mine/api/profile.types";
 
-export function useProfileDetail(params: ProfileRouteParams | null, active = true) {
+export function useProfileDetail(
+  params: ProfileRouteParams | null,
+  active = true,
+  options: { staleTime?: number } = {},
+) {
   return useQuery({
     queryKey: ["profile-detail", params?.clubId, params?.userId],
     queryFn: ({ signal }) => fetchProfileDetail(params as ProfileRouteParams, signal),
     enabled: active && Boolean(params),
+    ...options,
   });
 }
 

@@ -164,6 +164,7 @@ export default function MatchMatchingScreen({
           companionUserIds,
           token,
           clubId: session.detail.clubId,
+          returnToOrders: true,
         });
         return;
       }
