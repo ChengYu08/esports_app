@@ -1,12 +1,15 @@
 import { clientAuthApi } from "@/features/auth/client-auth.api";
 import { uploadClientObject } from "@/features/auth/oss-upload";
+import { isGifImage } from "@/shared/media-picker/image-compat";
 
 /**
  * 聊天图片先上传自家 OSS 再发送：融云私有存储的媒体 URL 直接访问会 401，
  * PC 端同样是自己上传后把公网地址放进 RC:ImgMsg 的 imageUri，这里与 Web 端对齐。
+ * GIF 保留 .gif 后缀和 MIME，否则重进会话后无法从 URL 识别动图、气泡会退回静态缩略图。
  */
 export async function uploadChatImage(token: string, uri: string): Promise<string> {
-  const name = `chat-image-${Date.now()}.jpg`;
+  const isGif = isGifImage(uri);
+  const name = `chat-image-${Date.now()}${isGif ? ".gif" : ".jpg"}`;
   const sts = await clientAuthApi.getOssSts(token, "111", [name]);
   const objectKey = sts.objectList?.[0];
   if (!objectKey) {
@@ -14,6 +17,6 @@ export async function uploadChatImage(token: string, uri: string): Promise<strin
   }
   return uploadClientObject(sts, objectKey, {
     uri,
-    mimeType: "image/jpeg",
+    mimeType: isGif ? "image/gif" : "image/jpeg",
   });
 }

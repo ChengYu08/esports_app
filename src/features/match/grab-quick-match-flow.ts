@@ -15,6 +15,7 @@ import {
 import { refreshDispatchAfterGrabAttempt, refreshDispatchDetail } from "@/features/order/order-query";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { actionNotice } from "@/shared/ui/action-notice/action-notice-store";
+import { ensureRealNameBeforeVoiceRoomEnter, promptSelfRealNameIfNeeded } from "@/features/voice-room/ensure-real-name-before-enter";
 import { exitVoiceRoom } from "@/features/voice-room/exit-voice-room";
 import { navigateToVoiceRoom } from "@/features/voice-room/navigate-voice-room";
 import { resolveVoiceRoomId, voiceRoomApi } from "@/features/voice-room/voice-room.api";
@@ -199,7 +200,7 @@ export function resetGrabQuickMatchPending() {
  * 避免三个抢单入口的状态不一致。取消切房等未发生的抢单不算结算。
  */
 function settleGrab(requestNo: string) {
-  actionNotice.dismiss(`qm:${requestNo}`);
+  actionNotice.dismissByPrefix(`qm:${requestNo}:`);
   void refreshDispatchAfterGrabAttempt();
   void refreshDispatchDetail(requestNo);
 }
@@ -215,6 +216,9 @@ export async function grabQuickMatchAndEnterAudition(
   try {
     const { accessToken } = useAuthStore.getState();
     if (!accessToken) return { status: "failed", message: "请先登录" };
+    if (!(await ensureRealNameBeforeVoiceRoomEnter())) {
+      return { status: "cancelled" };
+    }
 
     const request = await fetchDispatchDetail(requestNo, accessToken);
     let confirmedCurrent: VoiceRoomDetail | null = null;
@@ -259,6 +263,13 @@ export async function grabQuickMatchAndEnterAudition(
     }
     return { status: "entered" };
   } catch (error) {
+    const message = errorMessage(error, "抢单失败，请稍后重试");
+    if (await promptSelfRealNameIfNeeded(message)) {
+      if (!grabbed) settleGrab(requestNo);
+      return grabbed
+        ? { status: "grabbed" }
+        : { status: "failed", message };
+    }
     if (grabbed) {
       showToast(
         error instanceof Error && error.message
@@ -268,7 +279,7 @@ export async function grabQuickMatchAndEnterAudition(
       return { status: "grabbed" };
     }
     settleGrab(requestNo);
-    return { status: "failed", message: errorMessage(error, "抢单失败，请稍后重试") };
+    return { status: "failed", message };
   } finally {
     pendingRequestNos.delete(requestNo);
   }

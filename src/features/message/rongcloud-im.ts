@@ -16,6 +16,7 @@ import { loadConversationSnapshot } from './conversation-loader';
 import { parseRongCommand, type RongCommand } from './rongcloud-command';
 import { KNOWN_RONG_COMMAND_NAMES } from './rongcloud-commands';
 import { fetchRongHistoryMessages } from './rong-history';
+import { isGifImage } from '@/shared/media-picker/image-compat';
 
 export type RongConversation = MessageConversation;
 export type RongTextMessage = ManagedMessage;
@@ -55,8 +56,6 @@ function getRuntimeConfig() {
         rongCloudAppKey: '',
         miPushAppId: '',
         miPushAppKey: '',
-        meizuPushAppId: '',
-        meizuPushAppKey: '',
         oppoPushAppKey: '',
         oppoPushAppSecret: '',
       },
@@ -97,6 +96,70 @@ function getSdkEnums() {
   } : null;
 }
 
+type ProfileSnapshot = {
+  title: string;
+  avatar?: string;
+  isCustomerService?: boolean;
+};
+
+// 用户资料内存缓存：会话快照同步与每条收到的消息都要补拉昵称/头像，
+// 缓存 + 在途去重避免同一用户被反复请求（离线补偿一批同 peer 消息只发一次请求）；
+// TTL 兜底昵称/头像变更的展示时效，登出断开时整体清空
+const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
+const profileCache = new Map<string, { profile: ProfileSnapshot; expiresAt: number }>();
+const profileInFlight = new Map<string, Promise<ProfileSnapshot | null>>();
+
+function peekProfileSnapshot(userId: string): ProfileSnapshot | null {
+  const cached = profileCache.get(userId);
+  if (!cached || cached.expiresAt <= Date.now()) return null;
+  return cached.profile;
+}
+
+async function fetchProfileSnapshot(userId: string): Promise<ProfileSnapshot | null> {
+  const cached = peekProfileSnapshot(userId);
+  if (cached) return cached;
+  let pending = profileInFlight.get(userId);
+  if (!pending) {
+    pending = getClientAuthApi()
+      .getUserProfile(businessToken, userId)
+      .then((profile) => {
+        const snapshot: ProfileSnapshot = {
+          title: profile.nickname || '',
+          avatar: profile.headImage || undefined,
+          // 后端不下发该字段时保持 undefined（mergeConversations 保留本地标记）；
+          // 下发 "0" 时显式置 false，让客服身份始终以服务端为准（客服被移除后标签能退掉）
+          isCustomerService:
+            profile.customerService === undefined
+              ? undefined
+              : profile.customerService === '1',
+        };
+        // 昵称为空时只回退不落缓存：该用户资料可能未完善，落缓存会把
+        // 原始 ID 当标题钉住 5 分钟，完善后再收到消息也拿不到真名
+        if (profile.nickname) {
+          profileCache.set(userId, { profile: snapshot, expiresAt: Date.now() + PROFILE_CACHE_TTL_MS });
+        }
+        return snapshot;
+      })
+      .catch(() => null)
+      .finally(() => {
+        profileInFlight.delete(userId);
+      });
+    profileInFlight.set(userId, pending);
+  }
+  return pending;
+}
+
+function applyProfileSnapshot(conversation: RongConversation, profile: ProfileSnapshot): RongConversation {
+  return {
+    ...conversation,
+    title: profile.title || conversation.title,
+    avatar: profile.avatar || undefined,
+    ...(profile.isCustomerService === undefined
+      ? {}
+      : { isCustomerService: profile.isCustomerService }),
+  };
+}
+
 function mapPreview(message?: RCIMIWMessage) {
   const enums = getSdkEnums();
   const time = message?.sentTime ? new Date(message.sentTime).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '';
@@ -130,21 +193,9 @@ async function hydrateConversation(conversation: RongConversation) {
   if (isSystemConversationId(conversation.id)) {
     return { ...conversation, title: getSystemConversationTitle(conversation.id), avatar: undefined };
   }
-  try {
-    const profile = await getClientAuthApi().getUserProfile(businessToken, conversation.id);
-    return {
-      ...conversation,
-      title: profile.nickname || conversation.title,
-      avatar: profile.headImage || undefined,
-      // 后端不下发该字段时保持 undefined（mergeConversations 保留本地标记）；
-      // 下发 "0" 时显式置 false，让客服身份始终以服务端为准（客服被移除后标签能退掉）
-      ...(profile.customerService === undefined
-        ? {}
-        : { isCustomerService: profile.customerService === "1" }),
-    };
-  } catch {
-    return conversation;
-  }
+  const profile = await fetchProfileSnapshot(conversation.id);
+  if (!profile) return conversation;
+  return applyProfileSnapshot(conversation, profile);
 }
 
 export function isRongCloudAvailable() {
@@ -196,17 +247,31 @@ function toLocalMediaUri(path: string) {
   return `file://${path.startsWith('/') ? '' : '/'}${path}`;
 }
 
+/** 融云私有存储的媒体 URL 直连会 401，只能经 SDK 下载 */
+function isRongHubUrl(url: string) {
+  return /^https?:\/\/[^/]*ronghub\.com\//i.test(url);
+}
+
 export async function downloadRongImageMessage(message: ManagedMessage): Promise<string> {
   if (message.kind !== 'image') throw new Error('消息不是图片');
+  // 发图前已把自家 OSS 公网地址预置进 remote，公网地址直接预览即可。
+  // 不能送融云 SDK 下载：iOS wrapper 的 downloadMediaMessage 只认本地库
+  // messageId，REMOTE 策略拉取的历史消息不在本地库（messageId=0），
+  // SDK 下载必报 34204（RC_INVALID_PARAMETER_MESSAGE_ID）
+  if (/^https?:\/\//i.test(message.imageUrl) && !isRongHubUrl(message.imageUrl)) {
+    return message.imageUrl;
+  }
   if (/^(?:file|content):\/\//i.test(message.imageUrl)) return message.imageUrl;
   const mediaMessage = message.mediaSource as RCIMIWMediaMessage | undefined;
   if (!mediaMessage) {
-    if (/^https?:\/\/[^/]*ronghub\.com\//i.test(message.imageUrl)) {
+    if (isRongHubUrl(message.imageUrl)) {
       throw new Error('缺少融云媒体消息数据，无法通过 SDK 下载图片');
     }
     return message.imageUrl;
   }
-  if (mediaMessage.local) return toLocalMediaUri(mediaMessage.local);
+  // 接收消息里的 local 是对方设备上的文件路径、本机并不存在，只有自己
+  // 发出的消息 local 才指向本机文件
+  if (message.isMine && mediaMessage.local) return toLocalMediaUri(mediaMessage.local);
 
   const currentEngine = requireConnected();
   return new Promise((resolve, reject) => {
@@ -397,12 +462,18 @@ async function emitReceived(message: RCIMIWMessage, offline: boolean) {
   if (offline) {
     mapped.receivedOffline = true;
   }
-  const conversation = await hydrateConversation(mapConversation({
+  const base = mapConversation({
     targetId: getRongConversationTargetId(peerId),
     conversationType: message.conversationType,
     lastMessage: message,
     unreadCount: 1,
-  } as RCIMIWConversation));
+  } as RCIMIWConversation);
+  // 资料已缓存时同步 emit，消息落地/横幅不被资料请求的网络往返拖住；
+  // 未命中（本会话首次收到该用户消息）才等待补拉，行为与旧链路一致
+  const cachedProfile = peekProfileSnapshot(peerId);
+  const conversation = cachedProfile
+    ? applyProfileSnapshot(base, cachedProfile)
+    : await hydrateConversation(base);
   emitConversation(conversation);
   messageListeners.forEach((listener) => listener(peerId, mapped, conversation));
 }
@@ -544,11 +615,15 @@ async function connectRongCloudOnce(accessToken: string, attemptEpoch: number) {
       const { env } = getRuntimeConfig();
       engine = sdk.RCIMIWEngine.create(env.rongCloudAppKey, {
         enablePush: true,
+        // 气泡最宽 160pt，3 倍屏要 480px；默认缩略图只有 240px，放大到气泡会发虚。
+        // 480px 对最宽气泡刚好 1:1（2 倍屏 1.5 倍超采样），解码不放大且比原图更省内存
+        compressOptions: {
+          thumbnailMaxSize: 480,
+          thumbnailQuality: 90,
+        },
         pushOptions: {
           idMI: env.miPushAppId || undefined,
           appKeyMI: env.miPushAppKey || undefined,
-          appIdMeizu: env.meizuPushAppId || undefined,
-          appKeyMeizu: env.meizuPushAppKey || undefined,
           appKeyOPPO: env.oppoPushAppKey || undefined,
           appSecretOPPO: env.oppoPushAppSecret || undefined,
           enableHWPush: true,
@@ -822,6 +897,11 @@ export async function sendRongImage(targetId: string, path: string): Promise<Man
   const imageUrl = await uploadChatImageForIm(businessToken, path);
   const message = await currentEngine.createImageMessage(sdk.RCIMIWConversationType.PRIVATE, getRongConversationTargetId(targetId), '', path);
   message.remote = imageUrl;
+  // 安卓 SDK 对 ImageMessage 一律解码重编码成 JPEG，GIF 会变单帧；original=true 走
+  // isFull 路径按原文件拷贝上传（缩略图仍由 SDK 生成），动图才能保留动画
+  if (isGifImage(path)) {
+    message.original = true;
+  }
   return new Promise((resolve, reject) => {
     let settled = false;
     const finish = (error?: Error, sent?: RCIMIWMessage) => {
@@ -908,6 +988,8 @@ export async function disconnectRongCloud() {
   if (engine) await engine.disconnect(false);
   connected = false;
   businessToken = '';
+  profileCache.clear();
+  profileInFlight.clear();
   conversationListeners.clear();
   conversationSyncListeners.clear();
   conversationReadSyncListeners.clear();

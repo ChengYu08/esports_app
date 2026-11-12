@@ -46,6 +46,12 @@ export type VoiceRoomJoinPrepare = VoiceRoomDetail & {
   rtcChannelName?: string;
 };
 
+/** /voiceRoom/{roomId}/members 返回的成员快照（融云实时成员，作对账校准基线） */
+export type VoiceRoomMembersSnapshot = {
+  roomVersion: string | number;
+  members: VoiceRoomMember[];
+};
+
 export type VoiceRoomRtcToken = {
   accessStatus?: 'READY' | 'ROOM_CLOSED' | 'ROOM_VERSION_CHANGED' | 'NOT_IN_CHATROOM' | 'KICKED_BANNED' | string;
   appId?: string;

@@ -146,6 +146,30 @@ export function createClientAuthContract(requester: AuthRequester) {
         method: 'POST', token,
       }));
     },
+    /**
+     * 批量查询用户资料。后端批量接口未定稿前的占位实现：循环调用单个资料接口，
+     * 并发 5、单用户失败跳过（成功的写缓存，失败的由资料缓存下一轮重试）。
+     * 批量接口定稿后整函数替换为单次调用，签名与语义不变。
+     */
+    async getUserProfiles(token: string, userIds: string[]) {
+      const profiles: ClientUserProfile[] = [];
+      for (let index = 0; index < userIds.length; index += 5) {
+        const slice = userIds.slice(index, index + 5);
+        const settled = await Promise.all(
+          slice.map(async (userId) => {
+            try {
+              return await this.getUserProfile(token, userId);
+            } catch {
+              return null;
+            }
+          }),
+        );
+        for (const profile of settled) {
+          if (profile) profiles.push(profile);
+        }
+      }
+      return profiles;
+    },
     async getUserOnlineStatus(token: string, userIds: string[]) {
       return requireData(await requester<Record<string, number>>('/client/v1/user/profile/online-status', {
         method: 'POST', token, body: userIds,

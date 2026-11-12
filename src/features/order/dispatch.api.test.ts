@@ -143,6 +143,7 @@ describe("派单详情/抢单响应：活动字段透传", () => {
       method: "POST",
       token: "token",
       body: { action: { requestNo: "QM5" } },
+      suppressRealNameRedirect: true,
     });
     expect(grabbed).toMatchObject({
       requestNo: "QM5",

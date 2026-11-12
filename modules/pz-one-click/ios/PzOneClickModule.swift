@@ -265,7 +265,7 @@ public class PzOneClickModule: Module {
       )
     }
 
-    // 自绘控件：「暂不登录，先去逛逛」、底部「验证码」切换入口。
+    // 自绘控件：「暂不登录，先去逛逛」、底部「用其它方式登录」切换入口。
     // frame 在 customViewLayoutBlock 里参照 SDK 给出的 loginFrame/privacyFrame 定位。
     final class CustomViewBox {
       weak var skipBtn: UIControl?
@@ -290,7 +290,7 @@ public class PzOneClickModule: Module {
       config.imagePlacement = .top
       config.imagePadding = 8
       config.baseForegroundColor = gray9
-      var title = AttributedString("验证码")
+      var title = AttributedString("用其它方式登录")
       title.font = .systemFont(ofSize: 12)
       config.attributedTitle = title
       config.contentInsets = .zero
@@ -302,8 +302,9 @@ public class PzOneClickModule: Module {
     }
     model.customViewLayoutBlock = { screenSize, _, _, _, _, _, _, loginFrame, _, privacyFrame in
       box.skipBtn?.frame = CGRect(x: 0, y: loginFrame.maxY + 16, width: screenSize.width, height: 20)
-      // 「验证码」入口：图标 40 + 间距 8 + 文字 18，整组在协议区上方 40pt
-      let otherWaySize = CGSize(width: 64, height: 66)
+      // 「用其它方式登录」入口：图标 40 + 间距 8 + 文字 18，整组在协议区上方 40pt；
+      // 文案 7 个字约 84pt，宽度要留够，否则会被截断
+      let otherWaySize = CGSize(width: 100, height: 66)
       box.otherWay?.frame = CGRect(
         x: (screenSize.width - otherWaySize.width) / 2,
         y: privacyFrame.minY - 40 - otherWaySize.height,
