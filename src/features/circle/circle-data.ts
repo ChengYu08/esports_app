@@ -1,5 +1,7 @@
 // 盼友圈短视频流类型与 mock 数据。接口就绪后由 circle.api.ts 替换数据来源。
 
+import type { CircleContentRef } from "@/features/circle/circle-publish.api";
+
 export type CircleFeedKind = "latest" | "hot" | "follow";
 
 export type CircleVideoPost = {
@@ -19,10 +21,14 @@ export type CircleVideoPost = {
   /** 短文案行，展示为中等字重；与正文同时存在时才渲染。 */
   headline?: string;
   content: string;
+  /** 正文中的 @用户 引用（后端返回带位置优先，字典为 id→昵称）。 */
+  mentions?: CircleContentRef[] | Record<string, string>;
   /** 话题标签，展示为浅蓝色。 */
   tags: string[];
   /** 发布时间描述。 */
   publishedAt: string;
+  /** 自主声明列表（后端 FeedItemVO.declaration，发布时选择；「无需添加自主声明」不展示）。 */
+  declaration?: string[];
   likeCount: number;
   commentCount: number;
   liked?: boolean;

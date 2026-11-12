@@ -172,7 +172,7 @@ export default function CompanionDashboardScreen() {
                 title="订单中心"
                 onPress={() =>
                   router.push({
-                    pathname: "/(tabs)/order",
+                    pathname: "/order/list",
                     params: { scope: "accept" },
                   })
                 }

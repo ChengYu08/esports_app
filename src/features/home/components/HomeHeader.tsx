@@ -11,7 +11,6 @@ import { GameCategoryTabs } from "./GameCategoryTabs";
 import { HomeBannerSections } from "./HomeBannerSections";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { Image } from "expo-image";
-import { Search24Regular } from "@fluentui/react-native-icons";
 import { router } from "expo-router";
 import { memo, useCallback, useMemo, type ReactNode } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
@@ -185,24 +184,17 @@ const HomeGameTab = memo(function HomeGameTab({
 });
 
 export function HomeTopBar({ tab, onTabChange }: Pick<HomeHeaderProps, "tab" | "onTabChange">) {
-  // 盼友圈是沉浸式深色视频流，顶部 tab 需要浅色文字适配。
-  const dark = tab === "circle";
   return (
     <View style={styles.topBar}>
       <View style={styles.topTabs}>
-        <Tab label="首页" court={tab === "court"} dark={dark} selected={tab === "home"} onPress={() => onTabChange("home")} />
-        <Tab label="大神" court={tab === "court"} dark={dark} selected={tab === "god"} onPress={() => onTabChange("god")} />
-        <Tab label="排行榜" court={tab === "court"} dark={dark} selected={tab === "ranking"} onPress={() => onTabChange("ranking")} />
-        <Tab label="小法庭" court={tab === "court"} dark={dark} selected={tab === "court"} onPress={() => onTabChange("court")} />
-        <Tab label="盼友圈" court={tab === "court"} dark={dark} selected={tab === "circle"} onPress={() => onTabChange("circle")} />
+        <Tab label="首页" court={tab === "court"} selected={tab === "home"} onPress={() => onTabChange("home")} />
+        <Tab label="大神" court={tab === "court"} selected={tab === "god"} onPress={() => onTabChange("god")} />
+        <Tab label="排行榜" court={tab === "court"} selected={tab === "ranking"} onPress={() => onTabChange("ranking")} />
+        <Tab label="小法庭" court={tab === "court"} selected={tab === "court"} onPress={() => onTabChange("court")} />
       </View>
       <View style={styles.actions}>
         <Pressable accessibilityLabel="搜索" style={styles.search} onPress={() => router.push({ pathname: "/search", params: { type: "club" } })}>
-          {dark ? (
-            <Search24Regular color="rgba(255, 255, 255, 0.9)" style={styles.searchFluentIcon} />
-          ) : (
-            <Image source={searchIcon} style={styles.searchIcon} />
-          )}
+          <Image source={searchIcon} style={styles.searchIcon} />
         </Pressable>
       </View>
     </View>
@@ -214,13 +206,11 @@ function Tab({
   selected,
   onPress,
   court = false,
-  dark = false,
 }: {
   label: string;
   selected: boolean;
   onPress: () => void;
   court?: boolean;
-  dark?: boolean;
 }) {
   return (
     <Pressable
@@ -233,7 +223,6 @@ function Tab({
         <View
           style={[
             styles.line,
-            dark && styles.lineDark,
             { width: label.length === 2 ? 34 : 51 },
           ]}
         />
@@ -244,8 +233,6 @@ function Tab({
           selected && styles.tabSelected,
           court && styles.courtTabText,
           court && selected && styles.courtTabSelected,
-          dark && !selected && styles.tabTextDark,
-          dark && selected && styles.tabSelectedDark,
         ]}
       >
         {label}
@@ -262,7 +249,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  // 五个频道后 20 间距会溢出 375 宽度，收紧到 16。
+  // 四个频道。
   topTabs: { flexDirection: "row", gap: 16, height: "100%" },
   tab: { justifyContent: "center", minWidth: 42, position: "relative" },
   tabText: {
@@ -281,9 +268,6 @@ const styles = StyleSheet.create({
   },
   courtTabText: { fontFamily: COURT_FONT_FAMILY, color: "#CACACC", fontWeight: "700", lineHeight: 26 },
   courtTabSelected: { color: "#FE1F4C", lineHeight: 28 },
-  tabTextDark: { color: "rgba(255, 255, 255, 0.6)" },
-  // 盼友圈沉浸式深色视频流中，选中频道用白色替代品牌粉。
-  tabSelectedDark: { color: "#FFFFFF" },
   line: {
     position: "absolute",
     bottom: 11,
@@ -292,11 +276,9 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: "#FFC2CE",
   },
-  lineDark: { backgroundColor: "#FFFFFF" },
   actions: { alignItems: "center", flexDirection: "row", gap: 10, height: "100%", paddingRight: 12 },
   search: { alignItems: "center", height: 44, justifyContent: "center", width: 40 },
   searchIcon: { width: 18, height: 18 },
-  searchFluentIcon: { width: 20, height: 20 },
   gameTabs: {
     height: 42,
   },

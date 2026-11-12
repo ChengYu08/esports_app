@@ -6,9 +6,11 @@ import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { useAuthStore } from "@esports/auth";
 import { router, useFocusEffect, useIsFocused, useLocalSearchParams } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
+  Pressable,
   RefreshControl,
   StyleSheet,
   View,
@@ -70,7 +72,7 @@ import type {
   OrderItemModel,
 } from "../order.types";
 
-export default function OrderScreen() {
+export default function OrderScreen({ onBack }: { onBack?: () => void }) {
   const focused = useIsFocused();
   const games = useHomeGames(focused);
   const gameIconsByName = useMemo(() => {
@@ -561,7 +563,20 @@ export default function OrderScreen() {
     <View style={styles.screen}>
       <StatusBar style="dark" />
       <View style={[styles.stickyHeader, { paddingTop: insets.top }]}>
-        {isCompanion ? null : <OrderHeader />}
+        {isCompanion ? (
+          <View style={styles.companionHeader}>
+            <Pressable
+              accessibilityLabel="返回"
+              hitSlop={12}
+              onPress={onBack}
+              style={styles.back}
+            >
+              <ChevronLeft24Regular color="#1A1A1A" width={24} height={24} />
+            </Pressable>
+          </View>
+        ) : (
+          <OrderHeader onBack={onBack} />
+        )}
         {isCompanion ? (
           <OrderScopeTabs
             value={scope}
@@ -804,6 +819,20 @@ function OrderSeparator() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F7F7F7" },
   stickyHeader: { backgroundColor: "#FFFFFF" },
+  companionHeader: {
+    width: "100%",
+    height: 44,
+    paddingHorizontal: 8,
+    backgroundColor: "#FFFFFF",
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  back: {
+    width: 40,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   content: { flexGrow: 1, paddingTop: 8 },
   separator: { height: 8 },
 });

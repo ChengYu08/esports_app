@@ -45,6 +45,7 @@ import { deleteMyCircleVideo } from "@/features/circle/circle.api";
 import type { ProfileCirclePost } from "@/features/circle/circle.api";
 import { formatCircleCount } from "@/features/circle/circle-data";
 import { CircleCommentHeartIcon } from "@/features/circle/components/CircleActionIcons";
+import { useCircleBlockedUserIds } from "@/features/circle/use-circle-blocked-users";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
 
 import {
@@ -164,6 +165,8 @@ export default function ProfileScreen() {
   // 订单/支付弹层的 token：正规 selector 订阅；JSX 里直接写 useAuthStore.getState() 会被 React Compiler
   // 视为「hook 被当普通值引用」而放弃优化整个组件
   const accessToken = useAuthStore((state) => state.accessToken);
+  const blockedUserIds = useCircleBlockedUserIds();
+  const isProfileBlocked = !isMine && blockedUserIds?.has(routeParams?.userId ?? "") === true;
   const [tab, setTab] = useState<ProfileTab>("技能");
   const [coverHeight, setCoverHeight] = useState(0);
   const [compactActive, setCompactActive] = useState(false);
@@ -250,7 +253,7 @@ export default function ProfileScreen() {
   );
   // 盼友圈仅在选中 tab 时拉取，避免无谓请求
   const circleQuery = useProfileCirclePosts(
-    tab === "盼友圈" && routeParams
+    tab === "盼友圈" && routeParams && blockedUserIds !== null && !isProfileBlocked
       ? {
           userId: routeParams.userId,
           isMine,
@@ -269,11 +272,13 @@ export default function ProfileScreen() {
   const reviewItems = reviewQuery.data?.items;
   const refetchReviews = reviewQuery.refetch;
   const circlePosts = useMemo(
-    () => circleQuery.data?.pages.flatMap((page) => page.list) ?? [],
-    [circleQuery.data],
+    () => blockedUserIds === null || isProfileBlocked
+      ? []
+      : circleQuery.data?.pages.flatMap((page) => page.list) ?? [],
+    [circleQuery.data, blockedUserIds, isProfileBlocked],
   );
-  const circleLoading = circleQuery.isLoading;
-  const circleError = circleQuery.isError;
+  const circleLoading = blockedUserIds === null || (!isProfileBlocked && circleQuery.isLoading);
+  const circleError = !isProfileBlocked && circleQuery.isError;
   const circleHasMore = circleQuery.hasNextPage;
   const circleIsFetchingNextPage = circleQuery.isFetchingNextPage;
   const circleFetchNextPage = circleQuery.fetchNextPage;
@@ -788,7 +793,7 @@ export default function ProfileScreen() {
           content: (
             <View style={styles.scrollBody}>
               <EmptyState
-                message="暂时没有作品哦～"
+                message={isProfileBlocked ? "已拉黑该用户" : "暂时没有作品哦～"}
                 {...(isMine && isCompanion
                   ? {
                       actionLabel: "去发布",
@@ -820,6 +825,7 @@ export default function ProfileScreen() {
     circleLoading,
     circleError,
     circlePosts,
+    isProfileBlocked,
     circleHasMore,
     refetchCircle,
     loadMoreCircle,

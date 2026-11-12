@@ -25,6 +25,11 @@ import {
   formatCircleCount,
   type CircleVideoPost,
 } from "@/features/circle/circle-data";
+import { usePooledCirclePlayer } from "@/features/circle/circle-player-pool";
+import {
+  normalizeCircleTopicName,
+  splitCircleTopicText,
+} from "@/features/circle/circle-topic";
 import {
   setCircleAuthorFollowed,
   setCircleVideoLiked,
@@ -32,19 +37,23 @@ import {
 import {
   CircleCommentIcon,
   CircleHeartIcon,
+  CircleMoreIcon,
 } from "@/features/circle/components/CircleActionIcons";
 import { CircleCommentSheet } from "@/features/circle/components/CircleCommentSheet";
-import { CircleTopicLinks, CircleTopicText } from "@/features/circle/components/CircleTopicLinks";
-import { normalizeCircleTopicName, splitCircleTopicText } from "@/features/circle/circle-topic";
-import { usePooledCirclePlayer } from "@/features/circle/circle-player-pool";
+import { CircleContentText } from "@/features/circle/components/CircleContentText";
+import { CircleMoreActionsSheet } from "@/features/circle/components/CircleMoreActionsSheet";
 import { CircleVideoPlayer } from "@/features/circle/components/CircleVideoPlayer";
+import { addToBlacklist } from "@/features/mine/blacklist";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
+import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { showToast } from "@/shared/ui/app-toast";
 
 /** 底部信息区的大致占位高度，右侧操作栏以此为基准向上排布。 */
-const BOTTOM_INFO_HEIGHT = 190;
+const BOTTOM_INFO_HEIGHT = 90;
 /** 与 AppTabBar 一致的内容区高度。 */
 const TAB_CONTENT_HEIGHT = 58;
+/** 自主声明中表示「无声明」的占位项，正文区不展示。 */
+const NO_DECLARATION = "无需添加自主声明";
 
 type CircleVideoCardProps = {
   /** 所属 feed 标识，用于全局播放器池的焦点仲裁。 */
@@ -59,6 +68,7 @@ type CircleVideoCardProps = {
   shouldPreload: boolean;
   /** 上一页卡片保留播放器，把卸载开销从翻页落定瞬间错开。 */
   shouldRetain: boolean;
+  onBlockSuccess?: () => void;
 };
 
 export function CircleVideoCard({
@@ -71,8 +81,10 @@ export function CircleVideoCard({
   onPlaybackChange,
   shouldPreload,
   shouldRetain,
+  onBlockSuccess,
 }: CircleVideoCardProps) {
   const token = useAuthStore((state) => state.accessToken);
+  const currentUserId = useAuthStore((state) => state.user?.id);
   const [liked, setLiked] = useRecyclingState(post.liked ?? false, [
     post.id,
     post.liked,
@@ -87,12 +99,26 @@ export function CircleVideoCard({
     false,
     [post.id],
   );
+  const [moreActionsVisible, setMoreActionsVisible] = useRecyclingState(false, [
+    post.id,
+  ]);
+  const pendingActionRef = useRef<{
+    kind: "report" | "block";
+    authorId?: string;
+    author: string;
+  } | null>(null);
+  const [blockTarget, setBlockTarget] = useRecyclingState<{
+    userId: string;
+    nickname: string;
+  } | null>(null, [post.id]);
+  const blockingRef = useRef(false);
   const [playError, setPlayError] = useRecyclingState(false, [post.id, active]);
   const [playerAttempt, setPlayerAttempt] = useRecyclingState(0, [post.id]);
   const { slot: poolSlot, player: poolPlayer } = usePooledCirclePlayer({
     feedId,
     post,
-    inWindow: Boolean(post.videoUrl) && (active || shouldPreload || shouldRetain),
+    inWindow:
+      Boolean(post.videoUrl) && (active || shouldPreload || shouldRetain),
     preload: shouldPreload,
     forceReload: playerAttempt,
   });
@@ -136,8 +162,17 @@ export function CircleVideoCard({
   });
   const actionBarBottom = TAB_CONTENT_HEIGHT + bottomInset + BOTTOM_INFO_HEIGHT;
   const bottomPadding = TAB_CONTENT_HEIGHT + bottomInset + 12;
-  const contentTopics = new Set(splitCircleTopicText(post.content).flatMap((segment) => segment.topic ? [segment.topic] : []));
-  const extraTags = post.tags.filter((tag) => !contentTopics.has(normalizeCircleTopicName(tag)));
+  const contentTopics = new Set(
+    splitCircleTopicText(post.content).flatMap((segment) =>
+      segment.topic ? [segment.topic] : [],
+    ),
+  );
+  const extraTags = post.tags.filter(
+    (tag) => !contentTopics.has(normalizeCircleTopicName(tag)),
+  );
+  const declarationText = (post.declaration ?? [])
+    .filter((item) => item && item !== NO_DECLARATION)
+    .join("、");
 
   useEffect(() => {
     cancelAnimation(coverOpacity);
@@ -187,7 +222,80 @@ export function CircleVideoCard({
     likeMutation.mutate(!liked);
   };
   const handleComment = () => {
-    setCommentSheetVisible(true);
+    // 弹窗是 Modal 覆盖层，不改变卡片尺寸；跳过父列表重排，避免上滑动画起始帧与整树布局抢主线程导致卡顿
+    setCommentSheetVisible(true, true);
+  };
+  const handleMoreActions = () => {
+    setMoreActionsVisible(true, true);
+  };
+  const handleReport = () => {
+    pendingActionRef.current = {
+      kind: "report",
+      authorId: post.authorId,
+      author: post.author,
+    };
+    setMoreActionsVisible(false, true);
+  };
+  const handleBlock = () => {
+    pendingActionRef.current = {
+      kind: "block",
+      authorId: post.authorId,
+      author: post.author,
+    };
+    setMoreActionsVisible(false, true);
+  };
+  const handleMoreActionsExited = () => {
+    const target = pendingActionRef.current;
+    pendingActionRef.current = null;
+    if (!target) {
+      return;
+    }
+    if (!requireLogin()) {
+      return;
+    }
+    if (!target.authorId) {
+      showToast("缺少操作对象");
+      return;
+    }
+    if (target.kind === "block") {
+      if (String(currentUserId ?? "") === target.authorId) {
+        showToast("不能拉黑自己");
+        return;
+      }
+      setBlockTarget({ userId: target.authorId, nickname: target.author });
+      return;
+    }
+    router.push({
+      pathname: "/report",
+      params: { userId: target.authorId, nickname: target.author },
+    });
+  };
+  const handleConfirmBlock = () => {
+    if (!blockTarget || blockingRef.current) {
+      return;
+    }
+    const target = blockTarget;
+    const currentToken = useAuthStore.getState().accessToken;
+    if (!currentToken) {
+      setBlockTarget(null);
+      requireLogin();
+      return;
+    }
+    blockingRef.current = true;
+    setBlockTarget(null);
+    requestAnimationFrame(() => {
+      addToBlacklist(target, currentToken)
+        .then(() => {
+          onBlockSuccess?.();
+          showToast("已拉黑该用户");
+        })
+        .catch((error: unknown) => {
+          showToast(error instanceof Error ? error.message : "拉黑失败");
+        })
+        .finally(() => {
+          blockingRef.current = false;
+        });
+    });
   };
   /** 测量完整正文行数，超过两行才展示“展开”入口。 */
   const handleContentMeasure = (event: TextLayoutEvent) => {
@@ -229,7 +337,7 @@ export function CircleVideoCard({
         <Image
           source={post.cover}
           style={StyleSheet.absoluteFill}
-          contentFit="cover"
+          contentFit="contain"
         />
       </Animated.View>
       {active ? (
@@ -306,6 +414,14 @@ export function CircleVideoCard({
             {formatCircleCount(post.commentCount)}
           </Text>
         </Pressable>
+        <Pressable
+          accessibilityLabel="更多操作"
+          accessibilityRole="button"
+          style={styles.actionItem}
+          onPress={handleMoreActions}
+        >
+          <CircleMoreIcon color="#FFFFFF" />
+        </Pressable>
       </View>
 
       <LinearGradient
@@ -332,13 +448,21 @@ export function CircleVideoCard({
             <Text style={styles.headline}>{post.headline}</Text>
           ) : null}
           <View style={styles.contentRow}>
-            <Text
-              style={styles.content}
-              numberOfLines={expanded ? undefined : 2}
+            <View
+              style={[
+                styles.contentContainer,
+                needsExpand && !expanded && styles.collapsedContent,
+              ]}
             >
-              <CircleTopicText content={post.content} topicStyle={styles.tags} />
-              <CircleTopicLinks tags={extraTags} prefix=" " style={styles.tags} />
-            </Text>
+              <CircleContentText
+                content={post.content}
+                style={styles.content}
+                linkStyle={styles.tags}
+                mentionStyle={styles.mention}
+                mentions={post.mentions}
+                tags={extraTags}
+              />
+            </View>
             {needsExpand ? (
               <Pressable
                 accessibilityLabel={expanded ? "收起全文" : "展开全文"}
@@ -361,20 +485,44 @@ export function CircleVideoCard({
         </View>
         <View style={styles.metaRow}>
           <Text style={styles.meta}>{post.publishedAt}</Text>
-          {/* <Text style={styles.meta}>作者声明：内容为个人观念或见解</Text> */}
+          {declarationText ? (
+            <Text style={styles.meta}>作者声明：{declarationText}</Text>
+          ) : null}
         </View>
       </View>
 
       <CircleCommentSheet
         visible={commentSheetVisible}
         onClose={() => {
-          setCommentSheetVisible(false);
+          setCommentSheetVisible(false, true);
         }}
         post={post}
         followed={followed}
         onToggleFollow={handleFollow}
         token={token ?? undefined}
       />
+      <CircleMoreActionsSheet
+        visible={moreActionsVisible}
+        onClose={() => {
+          setMoreActionsVisible(false, true);
+        }}
+        onExited={handleMoreActionsExited}
+        onReport={handleReport}
+        onBlock={handleBlock}
+      />
+      {blockTarget ? (
+        <AppPrompt
+          visible
+          title="拉黑提示"
+          message="拉黑后，您将看不到该用户的盼友圈视频，也无法收到对方的私信或互相下单。"
+          cancelText="取消"
+          confirmText="确认拉黑"
+          onCancel={() => {
+            setBlockTarget(null);
+          }}
+          onConfirm={handleConfirmBlock}
+        />
+      ) : null}
     </View>
   );
 }
@@ -482,15 +630,19 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     gap: 8,
   },
+  contentContainer: { flex: 1 },
   content: {
-    flex: 1,
     fontFamily: SYSTEM_FONT,
     color: "#FFFFFF",
     fontSize: 14,
     lineHeight: 22,
     fontWeight: "400",
   },
+  // 收起态用固定两行高度 + overflow 裁剪，替代 numberOfLines（后者会让嵌套话题/用户的 onPress 失效）。
+  collapsedContent: { height: 44, overflow: "hidden" },
   tags: { color: "#99B6FF" },
+  // 深色视频背景上 @用户 用金色高亮（对齐 PC），与浅蓝话题区分且可读。
+  mention: { color: "#FFD04D", fontWeight: "500" },
   contentMeasure: {
     position: "absolute",
     left: 0,

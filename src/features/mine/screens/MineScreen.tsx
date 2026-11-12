@@ -246,7 +246,7 @@ export default function MineScreen() {
           key,
           title: "我的订单",
           icon: menuIcon(menuOrderIcon),
-          onPress: () => router.push("/order"),
+          onPress: () => router.push("/order/list"),
         };
     }
   };

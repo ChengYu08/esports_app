@@ -40,8 +40,8 @@ export default function TabsLayout() {
           name="ranking"
           options={{ title: "排行榜", href: null }}
         />
+        <Tabs.Screen name="circle" />
         <Tabs.Protected guard={isAuthenticated}>
-          <Tabs.Screen name="order" />
           <Tabs.Screen name="message" />
           <Tabs.Screen name="mine" />
         </Tabs.Protected>

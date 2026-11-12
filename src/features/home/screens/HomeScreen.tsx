@@ -1,5 +1,4 @@
 import { CourtHomeScreen } from "@/features/court/screens/CourtHomeScreen";
-import { CircleScreen } from "@/features/circle/screens/CircleScreen";
 import GodListScreen from "@/features/god/screens/GodListScreen";
 import RankingScreen from "@/features/ranking/screens/RankingScreen";
 import { RankingBackground } from "@/features/ranking/components/RankingBackground";
@@ -66,7 +65,6 @@ export default function HomeScreen() {
     god: false,
     ranking: false,
     court: false,
-    circle: false,
   });
   const [courtEntry, setCourtEntry] = useState(0);
   const [courtInitialPage, setCourtInitialPage] = useState<"court" | "ticket">(
@@ -327,8 +325,6 @@ export default function HomeScreen() {
       style={[
         styles.screen,
         { paddingTop: insets.top },
-        // 盼友圈是沉浸式深色视频流，整页背景切黑避免上下露白。
-        topTab === "circle" && styles.screenDark,
       ]}
     >
       {topTab === "ranking" ? (
@@ -421,11 +417,6 @@ export default function HomeScreen() {
             initialPage={courtInitialPage}
           />
         )}
-        {mountedTabs.circle && (
-          <View style={[styles.pane, topTab !== "circle" && styles.paneHidden]}>
-            <CircleScreen active={topTab === "circle" && focused} bottomInset={insets.bottom} />
-          </View>
-        )}
       </View>
       {homePopup ? (
         <HomePopupModal
@@ -441,7 +432,6 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, width: "100%", backgroundColor: "#F5F6F7" },
-  screenDark: { backgroundColor: "#000000" },
   homeHeader: { backgroundColor: "#F5F6F7" },
   clubList: { backgroundColor: "#F5F6F7" },
   paneContainer: { flex: 1 },

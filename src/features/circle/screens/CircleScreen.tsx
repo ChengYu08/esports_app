@@ -6,6 +6,8 @@ import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { FlashListRef, ListRenderItemInfo } from "@shopify/flash-list";
 import { useAuthStore } from "@esports/auth";
 
@@ -13,6 +15,7 @@ import { fetchCircleFeedPage } from "@/features/circle/circle.api";
 import type { CircleFeedKind, CircleVideoPost } from "@/features/circle/circle-data";
 import { CIRCLE_HOME_FEED_ID, circlePlayerPool } from "@/features/circle/circle-player-pool";
 import { CircleVideoCard } from "@/features/circle/components/CircleVideoCard";
+import { useCircleBlockedUserIds } from "@/features/circle/use-circle-blocked-users";
 import { CircleFeedSkeleton } from "@/features/circle/components/CircleFeedSkeleton";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
@@ -25,12 +28,18 @@ const FEED_KINDS: { key: CircleFeedKind; label: string }[] = [
   { key: "follow", label: "关注" },
 ];
 
+/** 顶部渐变遮罩在安全区之外的高度，叠加 insets.top 覆盖状态栏区域。 */
+const TOP_MASK_HEIGHT = 120;
+const TAB_SWIPE_DISTANCE = 60;
+const TAB_SWIPE_VELOCITY = 700;
+
 type CircleScreenProps = {
   active: boolean;
   bottomInset: number;
 };
 
 export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
+  const insets = useSafeAreaInsets();
   const [kind, setKind] = useState<CircleFeedKind>("latest");
   const [activePage, setActivePage] = useState<{ kind: CircleFeedKind; index: number }>({
     kind: "latest",
@@ -45,6 +54,9 @@ export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
   const [appIsActive, setAppIsActive] = useState(AppState.currentState === "active");
   const listRef = useRef<FlashListRef<CircleVideoPost>>(null);
   const accessToken = useAuthStore((state) => state.accessToken);
+  const isCompanion = useAuthStore((state) => state.isCompanion);
+  const blockedUserIds = useCircleBlockedUserIds();
+  const previousBlockedUserIdsRef = useRef(blockedUserIds);
   const activeRoom = useVoiceRoomSessionStore((state) => state.activeRoom);
   const joiningRoom = useVoiceRoomSessionStore((state) => state.joiningRoom);
   const shouldPlay = active && appIsActive && !activeRoom && !joiningRoom;
@@ -65,17 +77,35 @@ export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
 
   const posts = useMemo(
     () => {
+      if (blockedUserIds === null) {
+        return [];
+      }
       const seen = new Set<string>();
       return (feedQuery.data?.pages.flatMap((page) => page.list) ?? []).filter((post) => {
-        if (seen.has(post.id)) {
+        if (seen.has(post.id) || (post.authorId && blockedUserIds.has(post.authorId))) {
           return false;
         }
         seen.add(post.id);
         return true;
       });
     },
-    [feedQuery.data],
+    [feedQuery.data, blockedUserIds],
   );
+  const visibleActiveIndex = Math.min(activeIndex, Math.max(posts.length - 1, 0));
+
+  useEffect(() => {
+    if (blockedUserIds === null || previousBlockedUserIdsRef.current === blockedUserIds) {
+      return;
+    }
+    const frame = requestAnimationFrame(() => {
+      previousBlockedUserIdsRef.current = blockedUserIds;
+      if (visibleActiveIndex !== activeIndex) {
+        setActivePage({ kind: feedKind, index: visibleActiveIndex });
+      }
+      listRef.current?.scrollToOffset({ offset: visibleActiveIndex * feedHeight, animated: false });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeIndex, blockedUserIds, feedHeight, feedKind, visibleActiveIndex]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
@@ -107,6 +137,33 @@ export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
     setManualPlayback(null);
   }, []);
 
+  const tabSwipeGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(active)
+        .maxPointers(1)
+        .activeOffsetX([-20, 20])
+        .failOffsetY([-16, 16])
+        .runOnJS(true)
+        .onEnd((event, success) => {
+          if (!success || Math.abs(event.translationX) <= Math.abs(event.translationY)) {
+            return;
+          }
+          if (
+            Math.abs(event.translationX) < TAB_SWIPE_DISTANCE &&
+            Math.abs(event.velocityX) < TAB_SWIPE_VELOCITY
+          ) {
+            return;
+          }
+          const currentIndex = FEED_KINDS.findIndex((item) => item.key === feedKind);
+          const next = FEED_KINDS[currentIndex + (event.translationX < 0 ? 1 : -1)];
+          if (next) {
+            selectKind(next.key);
+          }
+        }),
+    [active, feedKind, selectKind],
+  );
+
   const renderPost = useCallback(
     ({ item, index }: ListRenderItemInfo<CircleVideoPost>) => {
       const autoPlay = hasSwiped || index > 0;
@@ -119,17 +176,25 @@ export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
           post={item}
           bottomInset={bottomInset}
           height={feedHeight}
-          active={shouldPlay && index === activeIndex}
+          active={shouldPlay && index === visibleActiveIndex}
           playing={isPlaying}
           onPlaybackChange={(nextPlaying) => {
             setManualPlayback({ videoId: item.id, isPlaying: nextPlaying });
           }}
-          shouldPreload={shouldPlay && index === activeIndex + 1}
-          shouldRetain={shouldPlay && index === activeIndex - 1}
+          onBlockSuccess={() => {
+            setHasSwiped(true);
+            setManualPlayback(null);
+          }}
+          shouldPreload={shouldPlay && index === visibleActiveIndex + 1}
+          shouldRetain={shouldPlay && index === visibleActiveIndex - 1}
         />
       );
     },
-    [activeIndex, bottomInset, feedHeight, hasSwiped, manualPlayback, shouldPlay],
+    [visibleActiveIndex, bottomInset, feedHeight, hasSwiped, manualPlayback, shouldPlay],
+  );
+  const listExtraData = useMemo(
+    () => ({ visibleActiveIndex, feedHeight, hasSwiped, manualPlayback, shouldPlay, bottomInset }),
+    [visibleActiveIndex, feedHeight, hasSwiped, manualPlayback, shouldPlay, bottomInset],
   );
 
   const handleEndReached = useCallback(() => {
@@ -138,7 +203,7 @@ export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
     }
   }, [feedQuery]);
 
-  return (
+  const screen = (
     <View
       style={styles.root}
       onLayout={(event) => {
@@ -152,6 +217,7 @@ export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
         <FlashList
           ref={listRef}
           data={posts}
+          extraData={listExtraData}
           keyExtractor={(item) => item.id}
           renderItem={renderPost}
           getItemType={() => "video"}
@@ -165,7 +231,7 @@ export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
               return;
             }
             const index = Math.round(event.nativeEvent.contentOffset.y / feedHeight);
-            if (index !== activeIndex) {
+            if (index !== visibleActiveIndex) {
               setHasSwiped(true);
               setManualPlayback(null);
             }
@@ -181,10 +247,10 @@ export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
         />
       ) : null}
 
-      {feedQuery.isLoading && posts.length === 0 ? (
+      {(feedQuery.isLoading || blockedUserIds === null) && posts.length === 0 ? (
         <CircleFeedSkeleton bottomInset={bottomInset} />
       ) : null}
-      {!feedQuery.isLoading && feedQuery.isError && posts.length === 0 ? (
+      {blockedUserIds !== null && !feedQuery.isLoading && feedQuery.isError && posts.length === 0 ? (
         <Pressable
           style={styles.stateOverlay}
           onPress={() => {
@@ -194,7 +260,7 @@ export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
           <Text style={styles.stateText}>加载失败，点击重试</Text>
         </Pressable>
       ) : null}
-      {!feedQuery.isLoading && !feedQuery.isError && posts.length === 0 ? (
+      {blockedUserIds !== null && feedQuery.isSuccess && posts.length === 0 ? (
         <View style={styles.stateOverlay} pointerEvents="none">
           <EmptyState message="还没有视频，来看看其他内容吧" />
         </View>
@@ -202,21 +268,25 @@ export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
 
       <LinearGradient
         colors={["rgba(0, 0, 0, 0.7)", "rgba(0, 0, 0, 0)"]}
-        style={styles.topMask}
+        style={[styles.topMask, { height: TOP_MASK_HEIGHT + insets.top }]}
         pointerEvents="none"
       />
-      <View style={styles.navBar} pointerEvents="box-none">
-        <Pressable
-          accessibilityLabel="发布视频"
-          onPress={() => {
-            if (requireLogin()) {
-              router.push("/circle/publish");
-            }
-          }}
-          style={styles.navSide}
-        >
-          <Camera24Regular color="#FFFFFF" style={styles.navIcon} />
-        </Pressable>
+      <View style={[styles.navBar, { top: insets.top }]} pointerEvents="box-none">
+        {isCompanion ? (
+          <Pressable
+            accessibilityLabel="发布视频"
+            onPress={() => {
+              if (requireLogin()) {
+                router.push("/circle/publish");
+              }
+            }}
+            style={styles.navSide}
+          >
+            <Camera24Regular color="#FFFFFF" style={styles.navIcon} />
+          </Pressable>
+        ) : (
+          <View style={styles.navSide} />
+        )}
         <View style={styles.navTabs}>
           {FEED_KINDS.map((item) => {
             const selected = feedKind === item.key;
@@ -249,11 +319,13 @@ export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
       {active ? <StatusBar style="light" /> : null}
     </View>
   );
+
+  return <GestureDetector gesture={tabSwipeGesture}>{screen}</GestureDetector>;
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#000000" },
-  topMask: { position: "absolute", top: 0, left: 0, right: 0, height: 120 },
+  topMask: { position: "absolute", top: 0, left: 0, right: 0 },
   navBar: {
     position: "absolute",
     top: 0,
@@ -262,6 +334,7 @@ const styles = StyleSheet.create({
     height: 44,
     flexDirection: "row",
     alignItems: "center",
+    zIndex: 2,
   },
   navSide: { width: 48, height: 44, alignItems: "center", justifyContent: "center" },
   navIcon: { width: 24, height: 24 },

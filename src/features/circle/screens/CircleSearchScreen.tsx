@@ -21,6 +21,7 @@ import { fetchCircleHotTopics, fetchCircleSearchPage, type CircleHotTopic } from
 import type { CircleVideoPost } from "@/features/circle/circle-data";
 import { CircleSearchCard } from "@/features/circle/components/CircleSearchCard";
 import { CircleTopicIcon } from "@/features/circle/components/CircleActionIcons";
+import { useCircleBlockedUserIds } from "@/features/circle/use-circle-blocked-users";
 import { normalizeCircleTopicName } from "@/features/circle/circle-topic";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
@@ -54,6 +55,7 @@ export default function CircleSearchScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
+  const blockedUserIds = useCircleBlockedUserIds();
   const [input, setInput] = useState(initialTopic ? "#" + initialTopic : "");
   const [search, setSearch] = useState<CircleSearchState | null>(
     initialTopic ? { keyword: initialTopic, isTopic: true } : null,
@@ -95,15 +97,18 @@ export default function CircleSearchScreen() {
   });
 
   const posts = useMemo(() => {
+    if (blockedUserIds === null) {
+      return [];
+    }
     const seen = new Set<string>();
     return (resultsQuery.data?.pages.flatMap((page) => page.list) ?? []).filter((post) => {
-      if (seen.has(post.id)) {
+      if (seen.has(post.id) || (post.authorId && blockedUserIds.has(post.authorId))) {
         return false;
       }
       seen.add(post.id);
       return true;
     });
-  }, [resultsQuery.data]);
+  }, [resultsQuery.data, blockedUserIds]);
 
   const history = historyQuery.data ?? [];
   const hotTopics = (hotTopicsQuery.data ?? []).slice(0, HOT_RANK_LIMIT);
@@ -310,7 +315,7 @@ export default function CircleSearchScreen() {
               </View>
             </View>
           ) : null}
-          {resultsQuery.isLoading ? (
+          {resultsQuery.isLoading || blockedUserIds === null ? (
             <View style={styles.resultsFill}>
               <ActivityIndicator color="#979799" />
             </View>

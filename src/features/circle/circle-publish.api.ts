@@ -37,19 +37,23 @@ export async function fetchCircleUploadSign({
 export type CircleTopicOption = {
   topicId: string;
   topicName: string;
+  /** 热度（总播放次数），用于展示「xx人浏览」。 */
+  heat?: number;
 };
 
 /** 空关键词=热榜前 N，非空=模糊匹配前 N（后端约定 mode=default）。 */
 export async function fetchCircleTopicOptions({
   keyword,
+  token,
   signal,
 }: {
   keyword: string;
+  token: string;
   signal?: AbortSignal;
 }): Promise<CircleTopicOption[]> {
-  const response = await apiClient<CircleApiResponse<{ topicId?: number | string; topicName?: string }[]>>(
+  const response = await apiClient<CircleApiResponse<{ topicId?: number | string; topicName?: string; heat?: number }[]>>(
     `/client/v1/moments/topic/list?keyword=${encodeURIComponent(keyword)}&mode=default`,
-    { method: "GET", signal },
+    { method: "GET", token, signal },
   );
   const data = unwrap(response, "话题加载失败");
   return data
@@ -57,14 +61,21 @@ export async function fetchCircleTopicOptions({
     .map((item) => ({
       topicId: String(item.topicId ?? ""),
       topicName: item.topicName ?? "",
+      heat: typeof item.heat === "number" ? item.heat : undefined,
     }));
 }
 
 /** 自主声明选项（Nacos 配置下发，code 即展示文案）。 */
-export async function fetchCircleDeclarations(signal?: AbortSignal): Promise<string[]> {
+export async function fetchCircleDeclarations({
+  token,
+  signal,
+}: {
+  token: string;
+  signal?: AbortSignal;
+}): Promise<string[]> {
   const response = await apiClient<CircleApiResponse<{ code?: string; name?: string }[]>>(
     "/client/v1/moments/video/declaration/list",
-    { method: "GET", signal },
+    { method: "GET", token, signal },
   );
   const data = unwrap(response, "自主声明加载失败");
   return data.map((item) => item.name ?? item.code ?? "").filter(Boolean);

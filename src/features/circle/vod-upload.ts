@@ -32,9 +32,33 @@ type VodAddress = {
   uploadHeader: Record<string, string>;
 };
 
-function resolveSignTime(sign: VodUploadSign): Date {
-  const parsed = Date.parse(sign.currentTime);
-  return Number.isFinite(parsed) ? new Date(parsed) : new Date();
+/** 设备时钟与火山服务器时钟的偏移（毫秒）；收到 100006 时用 RequestId 里的服务器时间校正。 */
+let clockGapMs = 0;
+
+/** 火山 RequestId 前 14 位是北京时间 yyyyMMddHHmmss，解析为服务器 UTC 毫秒。 */
+function parseRequestIdServerMs(requestId: string | undefined): number | null {
+  const match = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/.exec(requestId ?? "");
+  if (!match) {
+    return null;
+  }
+  const [, year, month, day, hour, minute, second] = match;
+  return Date.UTC(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour) - 8,
+    Number(minute),
+    Number(second),
+  );
+}
+
+/**
+ * 火山 V4 签名时间：设备时钟 + 已校正偏移。
+ * 不能用 sign.currentTime —— 那是 STS 凭证签发时刻，后端会缓存复用（最长 55 分钟），
+ * 用它签名会超出火山 15 分钟的时间窗，被报 InvalidTimestamp(100006)。
+ */
+function volcSignTime(): Date {
+  return new Date(Date.now() + clockGapMs);
 }
 
 /** 火山 OpenAPI 请求头（含 V4 签名）；body 存在时补 JSON 头与内容摘要。 */
@@ -50,7 +74,7 @@ function volcApiHeaders({
   body?: string;
 }): Record<string, string> {
   const headers: Record<string, string> = {
-    "X-Date": formatVolcXDate(resolveSignTime(sign)),
+    "X-Date": formatVolcXDate(volcSignTime()),
     "x-security-token": sign.sessionToken,
   };
   if (body !== undefined) {
@@ -85,13 +109,46 @@ function normalizeUploadHeader(header: unknown): Record<string, string> {
   return {};
 }
 
-async function parseVolcResponse<T>(response: Response, fallback: string): Promise<T> {
-  const payload = await response.json().catch(() => null);
-  const meta = payload?.ResponseMetadata;
-  if (!response.ok || meta?.Error) {
-    throw new Error(meta?.Error?.Message || fallback);
+/**
+ * 火山 OpenAPI 请求：100006(签名时间过期) 时用 RequestId 里的服务器时间校正时钟并重试一次。
+ * 与 tt-uploader 的 fail 分支一致（systemTimeGap 校正）。
+ */
+async function volcApiRequest({
+  sign,
+  params,
+  method,
+  body,
+}: {
+  sign: VodUploadSign;
+  params: Record<string, string>;
+  method: "GET" | "POST";
+  body?: Record<string, unknown>;
+}): Promise<Record<string, unknown>> {
+  const bodyText = body !== undefined ? JSON.stringify(body) : undefined;
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const headers = volcApiHeaders({ sign, params, method, body: bodyText });
+    const response = await fetch(`${VOD_API_HOST}/?${canonicalQuery(params)}`, {
+      method,
+      headers,
+      ...(bodyText !== undefined ? { body: bodyText } : {}),
+    });
+    const payload = await response.json().catch(() => null);
+    const meta = payload?.ResponseMetadata;
+    if (response.ok && !meta?.Error) {
+      return (payload?.Result ?? {}) as Record<string, unknown>;
+    }
+    lastError = new Error(meta?.Error?.Message || "请求失败");
+    if (meta?.Error?.CodeN === 100006) {
+      const serverMs = parseRequestIdServerMs(meta.RequestId);
+      if (serverMs !== null) {
+        clockGapMs = serverMs - Date.now();
+        continue;
+      }
+    }
+    break;
   }
-  return (payload?.Result ?? {}) as T;
+  throw lastError;
 }
 
 type ApplyResult = {
@@ -114,11 +171,9 @@ type ApplyResult = {
 async function applyUploadInfo({
   sign,
   fileSize,
-  filename,
 }: {
   sign: VodUploadSign;
   fileSize: number;
-  filename: string;
 }): Promise<VodAddress> {
   const params: Record<string, string> = {
     Action: "ApplyUploadInfo",
@@ -127,13 +182,15 @@ async function applyUploadInfo({
     FileSize: String(fileSize),
     FileType: "video",
     NeedFallback: "true",
-    FileName: filename,
+    // FileName 必须是后端生成的对象 key（sign.filename），不是原始文件名；
+    // 原始文件名（可能含中文）传给火山 ApplyUploadInfo 会被拒绝。
+    FileName: sign.filename,
   };
-  const response = await fetch(`${VOD_API_HOST}/?${canonicalQuery(params)}`, {
-    method: "GET",
-    headers: volcApiHeaders({ sign, params, method: "GET" }),
-  });
-  const result = await parseVolcResponse<ApplyResult>(response, "获取上传地址失败");
+  const result = (await volcApiRequest({ sign, params, method: "GET" })) as unknown as ApplyResult;
+  return buildAddress(result);
+}
+
+function buildAddress(result: ApplyResult): VodAddress {
   const address =
     result.CandidateUploadAddresses?.MainUploadAddresses?.[0] ?? result.UploadAddress;
   const store = address?.StoreInfos?.[0];
@@ -162,22 +219,16 @@ async function commitUploadInfo({
       { Name: "StartWorkflow", Input: { TemplateId: sign.handlerTemplateId } },
     ];
   }
-  const bodyText = JSON.stringify(body);
   const params: Record<string, string> = {
     Action: "CommitUploadInfo",
     Version: "2022-01-01",
     SpaceName: sign.spaceName,
   };
-  const response = await fetch(`${VOD_API_HOST}/?${canonicalQuery(params)}`, {
-    method: "POST",
-    headers: volcApiHeaders({ sign, params, method: "POST", body: bodyText }),
-    body: bodyText,
-  });
-  const result = await parseVolcResponse<{ Vid?: string }>(response, "视频提交失败");
+  const result = await volcApiRequest({ sign, params, method: "POST", body });
   if (!result.Vid) {
     throw new Error("视频提交失败");
   }
-  return result.Vid;
+  return String(result.Vid);
 }
 
 /** TOS 请求走 XHR：需要上传进度与二进制 body（Uint8Array/{uri}/文本）。 */
@@ -392,19 +443,17 @@ function tosRequestText({
 export async function uploadVideoToVod({
   uri,
   fileSize,
-  filename,
   sign,
   onProgress,
   cancelled,
 }: {
   uri: string;
   fileSize: number;
-  filename: string;
   sign: VodUploadSign;
   onProgress?: (percent: number) => void;
   cancelled?: () => boolean;
 }): Promise<string> {
-  const address = await applyUploadInfo({ sign, fileSize, filename });
+  const address = await applyUploadInfo({ sign, fileSize });
   if (fileSize < DIRECT_UPLOAD_THRESHOLD) {
     await directUpload({ address, uri, fileSize, onProgress });
   } else {

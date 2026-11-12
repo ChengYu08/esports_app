@@ -2,16 +2,17 @@ import {
   CaretDown16Regular,
   Dismiss24Regular,
   Checkmark24Regular,
-  Play48Regular,
 } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { File } from "expo-file-system";
 import * as MediaLibrary from "expo-media-library/legacy";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import * as VideoThumbnails from "expo-video-thumbnails";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   Linking,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -50,6 +51,21 @@ async function resolveLocalUri(asset: MediaAsset): Promise<string> {
   return info.localUri ?? asset.uri;
 }
 
+/** 取可用于生成视频缩略图的源 URI：Android 走 content://（走 ContentResolver，兼容分区存储），iOS 先解 ph://。 */
+async function resolveVideoThumbSource(asset: MediaAsset): Promise<string> {
+  if (Platform.OS === "android") {
+    try {
+      return await MediaLibrary.getAssetContentUriAsync(asset);
+    } catch {
+      return asset.uri;
+    }
+  }
+  return resolveLocalUri(asset);
+}
+
+/** 视频缩略图按资产 id 缓存，避免滚动分页时重复解码。 */
+const videoThumbCache = new Map<string, string>();
+
 /** 视频选择前置校验：格式 / 时长 / 大小（与 PC 端文案对齐）。 */
 function validateVideoAsset(asset: MediaAsset): string | null {
   const extension = asset.filename.split(".").pop()?.toLowerCase() ?? "";
@@ -60,6 +76,59 @@ function validateVideoAsset(asset: MediaAsset): string | null {
     return "视频时长不能超过 5 分钟";
   }
   return null;
+}
+
+/** 秒 → 「mm:ss」，超过 1 小时 → 「h:mm:ss」（与设计稿角标一致）。 */
+function formatDuration(seconds: number): string {
+  const total = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const mm = String(m).padStart(2, "0");
+  const ss = String(s).padStart(2, "0");
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+/** 视频缩略图单元格：异步生成第 0 秒帧并缓存；失败/未就绪时保持深色占位底。 */
+function VideoGridThumb({ asset }: { asset: MediaAsset }) {
+  const { id } = asset;
+  const [thumbUri, setThumbUri] = useState<string | null>(
+    () => videoThumbCache.get(id) ?? null,
+  );
+
+  useEffect(() => {
+    if (videoThumbCache.has(id)) {
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const source = await resolveVideoThumbSource(asset);
+        const result = await VideoThumbnails.getThumbnailAsync(source, { time: 0 });
+        if (cancelled) return;
+        videoThumbCache.set(id, result.uri);
+        setThumbUri(result.uri);
+      } catch {
+        // 生成失败保持占位底
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [asset, id]);
+
+  return (
+    <View style={styles.videoThumb}>
+      {thumbUri ? (
+        <Image
+          source={{ uri: thumbUri }}
+          style={styles.videoThumbImage}
+          contentFit="cover"
+          transition={0}
+        />
+      ) : null}
+    </View>
+  );
 }
 
 export default function MediaPickerScreen() {
@@ -101,11 +170,17 @@ export default function MediaPickerScreen() {
   const requestPermission = useCallback(async () => {
     // 权限粒度按媒体类型申请，保持权限最小化（视频模式只申请视频）
     const granularity = videoMode ? (["video"] as const) : (["photo"] as const);
-    const response = await MediaLibrary.requestPermissionsAsync(false, [
-      ...granularity,
-    ]);
-    setPermission(response);
-    return response.granted;
+    try {
+      const response = await MediaLibrary.requestPermissionsAsync(false, [
+        ...granularity,
+      ]);
+      setPermission(response);
+      return response.granted;
+    } catch {
+      // 权限在 AndroidManifest 未声明等场景会被拒绝：兜底为“未授权”，避免 unhandled rejection
+      setPermission({ granted: false, canAskAgain: false } as MediaLibrary.PermissionResponse);
+      return false;
+    }
   }, [videoMode]);
 
   const loadPage = useCallback(async (album: AlbumOption, after?: string) => {
@@ -428,10 +503,7 @@ export default function MediaPickerScreen() {
               style={styles.gridItem}
             >
               {videoMode ? (
-                // 视频帧无法直接解码渲染，占位底 + 播放图标；选中态沿用红色遮罩
-                <View style={[styles.videoThumb, disabled && styles.thumbDisabled]}>
-                  <Play48Regular color="#FFFFFF" width={28} height={28} />
-                </View>
+                <VideoGridThumb asset={item} />
               ) : (
                 <Image
                   source={{ uri: item.uri }}
@@ -441,7 +513,25 @@ export default function MediaPickerScreen() {
                   recyclingKey={item.id}
                 />
               )}
-              {selected ? (
+              {videoMode ? (
+                <>
+                  <View pointerEvents="none" style={styles.durationBadge}>
+                    <Text style={styles.durationText}>{formatDuration(item.duration)}</Text>
+                  </View>
+                  {disabled ? (
+                    <View pointerEvents="none" style={styles.dimMask} />
+                  ) : (
+                    <View
+                      pointerEvents="none"
+                      style={[styles.checkCircle, selected && styles.checkCircleSelected]}
+                    >
+                      {selected ? (
+                        <Checkmark24Regular color="#FFFFFF" width={12} height={12} />
+                      ) : null}
+                    </View>
+                  )}
+                </>
+              ) : selected ? (
                 <View style={styles.checkOverlay}>
                   <Checkmark24Regular color="#FFFFFF" width={18} height={18} />
                 </View>
@@ -457,7 +547,9 @@ export default function MediaPickerScreen() {
         }}
         ListEmptyComponent={
           loading ? null : (
-            <Text style={styles.emptyText}>相册中没有照片</Text>
+            <Text style={styles.emptyText}>
+              {videoMode ? "相册中没有视频" : "相册中没有照片"}
+            </Text>
           )
         }
       />
@@ -559,6 +651,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  videoThumbImage: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   thumbDisabled: { opacity: 0.4 },
   checkOverlay: {
     position: "absolute",
@@ -569,6 +668,43 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(254, 31, 76, 0.35)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  durationBadge: {
+    position: "absolute",
+    bottom: 4,
+    left: 4,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    borderRadius: 999,
+    paddingHorizontal: 4,
+  },
+  durationText: {
+    fontSize: 11,
+    lineHeight: 16,
+    color: "#FFFFFF",
+  },
+  dimMask: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: "rgba(255, 255, 255, 0.6)",
+  },
+  checkCircle: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    borderWidth: 1.5,
+    borderColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkCircleSelected: {
+    backgroundColor: "#FE1F4C",
   },
   emptyText: {
     marginTop: 80,

@@ -14,6 +14,7 @@ import { fetchCircleSearchPage } from "@/features/circle/circle.api";
 import type { CircleVideoPost } from "@/features/circle/circle-data";
 import { circlePlayerPool } from "@/features/circle/circle-player-pool";
 import { CircleVideoCard } from "@/features/circle/components/CircleVideoCard";
+import { useCircleBlockedUserIds } from "@/features/circle/use-circle-blocked-users";
 import { CircleFeedSkeleton } from "@/features/circle/components/CircleFeedSkeleton";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
@@ -35,6 +36,8 @@ export default function CircleSearchResultsScreen() {
   const [appIsActive, setAppIsActive] = useState(AppState.currentState === "active");
   const listRef = useRef<FlashListRef<CircleVideoPost>>(null);
   const accessToken = useAuthStore((state) => state.accessToken);
+  const blockedUserIds = useCircleBlockedUserIds();
+  const previousBlockedUserIdsRef = useRef(blockedUserIds);
   const activeRoom = useVoiceRoomSessionStore((state) => state.activeRoom);
   const joiningRoom = useVoiceRoomSessionStore((state) => state.joiningRoom);
   const shouldPlay = appIsActive && !activeRoom && !joiningRoom;
@@ -73,17 +76,35 @@ export default function CircleSearchResultsScreen() {
 
   const posts = useMemo(
     () => {
+      if (blockedUserIds === null) {
+        return [];
+      }
       const seen = new Set<string>();
       return (searchQuery.data?.pages.flatMap((page) => page.list) ?? []).filter((post) => {
-        if (seen.has(post.id)) {
+        if (seen.has(post.id) || (post.authorId && blockedUserIds.has(post.authorId))) {
           return false;
         }
         seen.add(post.id);
         return true;
       });
     },
-    [searchQuery.data],
+    [searchQuery.data, blockedUserIds],
   );
+  const visibleActiveIndex = Math.min(activeIndex, Math.max(posts.length - 1, 0));
+
+  useEffect(() => {
+    if (blockedUserIds === null || previousBlockedUserIdsRef.current === blockedUserIds) {
+      return;
+    }
+    const frame = requestAnimationFrame(() => {
+      previousBlockedUserIdsRef.current = blockedUserIds;
+      if (visibleActiveIndex !== activeIndex) {
+        setActiveIndex(visibleActiveIndex);
+      }
+      listRef.current?.scrollToOffset({ offset: visibleActiveIndex * feedHeight, animated: false });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeIndex, blockedUserIds, feedHeight, visibleActiveIndex]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
@@ -123,17 +144,25 @@ export default function CircleSearchResultsScreen() {
           post={item}
           bottomInset={0}
           height={feedHeight}
-          active={feedActive && index === activeIndex}
+          active={feedActive && index === visibleActiveIndex}
           playing={isPlaying}
           onPlaybackChange={(nextPlaying) => {
             setManualPlayback({ videoId: item.id, isPlaying: nextPlaying });
           }}
-          shouldPreload={feedActive && index === activeIndex + 1}
-          shouldRetain={feedActive && index === activeIndex - 1}
+          onBlockSuccess={() => {
+            setHasSwiped(true);
+            setManualPlayback(null);
+          }}
+          shouldPreload={feedActive && index === visibleActiveIndex + 1}
+          shouldRetain={feedActive && index === visibleActiveIndex - 1}
         />
       );
     },
-    [activeIndex, feedId, feedHeight, hasSwiped, manualPlayback, feedActive],
+    [visibleActiveIndex, feedId, feedHeight, hasSwiped, manualPlayback, feedActive],
+  );
+  const listExtraData = useMemo(
+    () => ({ visibleActiveIndex, feedId, feedHeight, hasSwiped, manualPlayback, feedActive }),
+    [visibleActiveIndex, feedId, feedHeight, hasSwiped, manualPlayback, feedActive],
   );
 
   const handleEndReached = useCallback(() => {
@@ -158,6 +187,7 @@ export default function CircleSearchResultsScreen() {
         <FlashList
           ref={listRef}
           data={posts}
+          extraData={listExtraData}
           keyExtractor={(item) => item.id}
           renderItem={renderPost}
           getItemType={() => "video"}
@@ -171,7 +201,7 @@ export default function CircleSearchResultsScreen() {
               return;
             }
             const index = Math.round(event.nativeEvent.contentOffset.y / feedHeight);
-            if (index !== activeIndex) {
+            if (index !== visibleActiveIndex) {
               setHasSwiped(true);
               setManualPlayback(null);
             }
@@ -184,10 +214,10 @@ export default function CircleSearchResultsScreen() {
         />
       ) : null}
 
-      {searchQuery.isLoading && posts.length === 0 ? (
+      {(searchQuery.isLoading || blockedUserIds === null) && posts.length === 0 ? (
         <CircleFeedSkeleton bottomInset={0} />
       ) : null}
-      {searchQuery.isLoading || posts.length > 0 || !keyword ? null : searchQuery.isError ? (
+      {searchQuery.isLoading || blockedUserIds === null || posts.length > 0 || !keyword ? null : searchQuery.isError ? (
         <Pressable
           style={styles.stateOverlay}
           onPress={() => {

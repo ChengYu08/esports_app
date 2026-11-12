@@ -18,6 +18,7 @@ import {
 import type { CircleVideoPost } from "@/features/circle/circle-data";
 import { circlePlayerPool } from "@/features/circle/circle-player-pool";
 import { CircleVideoCard } from "@/features/circle/components/CircleVideoCard";
+import { useCircleBlockedUserIds } from "@/features/circle/use-circle-blocked-users";
 import { CircleFeedSkeleton } from "@/features/circle/components/CircleFeedSkeleton";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
@@ -37,6 +38,8 @@ export default function CircleUserVideosScreen() {
   const currentUserId = useAuthStore((state) => state.user?.id);
   const accessToken = useAuthStore((state) => state.accessToken);
   const isMine = Boolean(userId) && String(currentUserId ?? "") === userId;
+  const blockedUserIds = useCircleBlockedUserIds();
+  const isBlocked = !isMine && blockedUserIds?.has(userId ?? "") === true;
   const [activeIndex, setActiveIndex] = useState(0);
   const [manualPlayback, setManualPlayback] = useState<{
     videoId: string;
@@ -45,6 +48,7 @@ export default function CircleUserVideosScreen() {
   const [feedHeight, setFeedHeight] = useState(0);
   const [appIsActive, setAppIsActive] = useState(AppState.currentState === "active");
   const listRef = useRef<FlashListRef<CircleVideoPost>>(null);
+  const previousBlockedUserIdsRef = useRef(blockedUserIds);
   // 仅定位一次；目标视频可能在后面的分页里，加载到为止
   const pendingPostIdRef = useRef(postId && postId !== "" ? postId : null);
   const activeRoom = useVoiceRoomSessionStore((state) => state.activeRoom);
@@ -67,7 +71,7 @@ export default function CircleUserVideosScreen() {
 
   const videoQuery = useInfiniteQuery({
     queryKey: ["circle-user-videos", userId, isMine, accessToken ?? "guest"],
-    enabled: Boolean(userId) && (!isMine || Boolean(accessToken)),
+    enabled: Boolean(userId) && blockedUserIds !== null && !isBlocked && (!isMine || Boolean(accessToken)),
     initialPageParam: 1,
     queryFn: ({ pageParam, signal }) => {
       if (isMine) {
@@ -97,6 +101,9 @@ export default function CircleUserVideosScreen() {
 
   const posts = useMemo(
     () => {
+      if (blockedUserIds === null || isBlocked) {
+        return [];
+      }
       const author = { userId, nickname, avatar };
       const seen = new Set<string>();
       return (videoQuery.data?.pages.flatMap((page) => page.list) ?? [])
@@ -110,8 +117,23 @@ export default function CircleUserVideosScreen() {
           return true;
         });
     },
-    [videoQuery.data, userId, nickname, avatar],
+    [videoQuery.data, userId, nickname, avatar, blockedUserIds, isBlocked],
   );
+  const visibleActiveIndex = Math.min(activeIndex, Math.max(posts.length - 1, 0));
+
+  useEffect(() => {
+    if (blockedUserIds === null || previousBlockedUserIdsRef.current === blockedUserIds) {
+      return;
+    }
+    const frame = requestAnimationFrame(() => {
+      previousBlockedUserIdsRef.current = blockedUserIds;
+      if (visibleActiveIndex !== activeIndex) {
+        setActiveIndex(visibleActiveIndex);
+      }
+      listRef.current?.scrollToOffset({ offset: visibleActiveIndex * feedHeight, animated: false });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeIndex, blockedUserIds, feedHeight, visibleActiveIndex]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
@@ -149,17 +171,21 @@ export default function CircleUserVideosScreen() {
           post={item}
           bottomInset={0}
           height={feedHeight}
-          active={feedActive && index === activeIndex}
+          active={feedActive && index === visibleActiveIndex}
           playing={isPlaying}
           onPlaybackChange={(nextPlaying) => {
             setManualPlayback({ videoId: item.id, isPlaying: nextPlaying });
           }}
-          shouldPreload={feedActive && index === activeIndex + 1}
-          shouldRetain={feedActive && index === activeIndex - 1}
+          shouldPreload={feedActive && index === visibleActiveIndex + 1}
+          shouldRetain={feedActive && index === visibleActiveIndex - 1}
         />
       );
     },
-    [activeIndex, feedId, feedHeight, manualPlayback, feedActive],
+    [visibleActiveIndex, feedId, feedHeight, manualPlayback, feedActive],
+  );
+  const listExtraData = useMemo(
+    () => ({ visibleActiveIndex, feedId, feedHeight, manualPlayback, feedActive }),
+    [visibleActiveIndex, feedId, feedHeight, manualPlayback, feedActive],
   );
 
   const handleEndReached = useCallback(() => {
@@ -184,6 +210,7 @@ export default function CircleUserVideosScreen() {
         <FlashList
           ref={listRef}
           data={posts}
+          extraData={listExtraData}
           keyExtractor={(item) => item.id}
           renderItem={renderPost}
           getItemType={() => "video"}
@@ -197,7 +224,7 @@ export default function CircleUserVideosScreen() {
               return;
             }
             const index = Math.round(event.nativeEvent.contentOffset.y / feedHeight);
-            if (index !== activeIndex) {
+            if (index !== visibleActiveIndex) {
               setManualPlayback(null);
             }
             setActiveIndex(Math.max(0, Math.min(index, posts.length - 1)));
@@ -209,10 +236,10 @@ export default function CircleUserVideosScreen() {
         />
       ) : null}
 
-      {videoQuery.isLoading && posts.length === 0 ? (
+      {((videoQuery.isLoading && !isBlocked) || blockedUserIds === null) && posts.length === 0 ? (
         <CircleFeedSkeleton bottomInset={0} />
       ) : null}
-      {videoQuery.isLoading || posts.length > 0 || !userId ? null : videoQuery.isError ? (
+      {blockedUserIds === null || (videoQuery.isLoading && !isBlocked) || posts.length > 0 || !userId ? null : videoQuery.isError && !isBlocked ? (
         <Pressable
           style={styles.stateOverlay}
           onPress={() => {
@@ -223,7 +250,7 @@ export default function CircleUserVideosScreen() {
         </Pressable>
       ) : (
         <View style={styles.stateOverlay} pointerEvents="none">
-          <EmptyState message="TA还没有发布作品" />
+          <EmptyState message={isBlocked ? "已拉黑该用户" : "TA还没有发布作品"} />
         </View>
       )}
 

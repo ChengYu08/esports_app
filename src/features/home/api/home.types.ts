@@ -1,4 +1,4 @@
-export type HomeTab = "home" | "god" | "ranking" | "court" | "circle";
+export type HomeTab = "home" | "god" | "ranking" | "court";
 export type GameKey = string;
 
 export type Game = {

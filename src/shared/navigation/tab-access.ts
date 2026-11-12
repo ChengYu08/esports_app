@@ -1,7 +1,7 @@
-export type AppTab = "index" | "ranking" | "order" | "message" | "mine";
+export type AppTab = "index" | "ranking" | "circle" | "message" | "mine";
 export type ProtectedDestination = AppTab | "match";
 
-const protectedTabs = new Set<AppTab>(["order", "message", "mine"]);
+const protectedTabs = new Set<AppTab>(["message", "mine"]);
 
 export function isProtectedTab(tab: AppTab): boolean {
   return protectedTabs.has(tab);

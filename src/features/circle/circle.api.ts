@@ -1,6 +1,7 @@
 import { apiClient } from "@/core/network/api-client";
 import { followUser, unfollowUser } from "@/features/mine/api/user-follow.api";
 import { formatRelativeTime } from "@/shared/time/relative-time";
+import type { CircleContentRef } from "@/features/circle/circle-publish.api";
 import type { CircleFeedKind, CircleVideoPost } from "@/features/circle/circle-data";
 
 const FEED_PAGE_SIZE = 10;
@@ -29,6 +30,10 @@ type CircleFeedItem = {
   liked?: boolean;
   followed?: boolean;
   topics?: Record<string, string>;
+  /** 后端 FeedItemVO.mentionUsers：@用户 id→昵称 字典。 */
+  mentionUsers?: Record<string, string>;
+  /** 后端补齐的 @用户 实体（带位置），存在时优先于 mentionUsers。 */
+  mentions?: CircleContentRef[];
 };
 
 export type CircleFeedPage = {
@@ -68,8 +73,10 @@ function toCirclePost(item: CircleFeedItem): CircleVideoPost {
     orderEnabled: false,
     headline: content && title ? title : undefined,
     content: content || title,
+    mentions: item.mentions?.length ? item.mentions : item.mentionUsers,
     tags: topicNames.map((name) => `#${name}`),
     publishedAt: formatRelativeTime(item.publishTime),
+    declaration: item.declaration,
     likeCount: item.likeCount ?? 0,
     commentCount: item.commentCount ?? 0,
     liked: item.liked ?? false,
@@ -236,6 +243,7 @@ type ApiMyVideoItem = {
   coverUrl?: string;
   url?: string;
   content?: string;
+  declaration?: string[];
   status?: CircleVideoStatus;
   violationTypes?: string[];
   extraDesc?: string;
@@ -254,6 +262,7 @@ export type ProfileCirclePost = {
   durationSec?: number;
   title: string;
   content: string;
+  declaration?: string[];
   likeCount: number;
   commentCount: number;
   playCount: number;
@@ -278,6 +287,7 @@ function toProfileCirclePost(item: ApiMyVideoItem): ProfileCirclePost {
     cover: item.coverUrl ? { uri: item.coverUrl } : require("../../../assets/images/bg_publish_dark.webp"),
     title: item.title ?? "",
     content: item.content ?? "",
+    declaration: item.declaration,
     likeCount: item.likeCount ?? 0,
     commentCount: item.commentCount ?? 0,
     playCount: item.playCount ?? 0,
@@ -308,6 +318,7 @@ export function profileCirclePostToFeedPost(
     orderEnabled: false,
     headline: content && title ? title : undefined,
     content: content || title,
+    declaration: post.declaration,
     tags: [],
     publishedAt: post.publishedAt,
     likeCount: post.likeCount,

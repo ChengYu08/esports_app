@@ -39,10 +39,10 @@ const items = [
     selectedIcon: require("../../../assets/svgs/tab-home-selected.svg"),
   },
   {
-    route: "order",
-    label: "订单",
-    icon: require("../../../assets/svgs/tab-order.svg"),
-    selectedIcon: require("../../../assets/svgs/tab-order-selected.svg"),
+    route: "circle",
+    label: "盼友圈",
+    icon: require("../../../assets/svgs/tab-community.svg"),
+    selectedIcon: require("../../../assets/svgs/tab-community-selected.svg"),
   },
   {
     route: "message",
@@ -69,6 +69,7 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
   );
   const unreadLabel = formatUnreadCount(unreadCount);
   const activeRoute = state.routes[state.index]?.name;
+  const isDarkBar = activeRoute === "circle";
   const compensatedCount = useMessageStore((messageState) => messageState.compensatedCount);
   const [diagnosticVisible, setDiagnosticVisible] = useState(false);
   const [diagnosticTaps, setDiagnosticTaps] = useState({ count: 0, windowStartAt: 0 });
@@ -123,7 +124,12 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
               </View>
             ) : null}
           </View>
-          <Text style={[styles.bottomLabel, selected && styles.bottomActive]}>
+          <Text
+            style={[
+              styles.bottomLabel,
+              selected && (isDarkBar ? styles.bottomActiveDark : styles.bottomActive),
+            ]}
+          >
             {item.label}
           </Text>
         </View>
@@ -139,6 +145,8 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
           {
             bottom: 0,
             height: TAB_CONTENT_HEIGHT - BAR_TOP_OFFSET + insets.bottom,
+            backgroundColor: isDarkBar ? "#0D0D0F" : "#FFFFFF",
+            borderTopColor: isDarkBar ? "#0D0D0F" : "#F5F5F5",
           },
         ]}
       />
@@ -227,6 +235,10 @@ const styles = StyleSheet.create({
   },
   bottomActive: {
     color: "#0D0D0F",
+    fontWeight: "600",
+  },
+  bottomActiveDark: {
+    color: "#FFFFFF",
     fontWeight: "600",
   },
 });

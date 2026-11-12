@@ -1,8 +1,8 @@
 import { memo } from "react";
-import Svg, { Path } from "react-native-svg";
+import Svg, { Circle, Path } from "react-native-svg";
 
 const SIZE = 40;
-/** 设计稿中两个操作 icon 均为 0.9 透明度。 */
+/** 右侧操作栏 icon 均为 0.9 透明度。 */
 const OPACITY = 0.9;
 
 type IconProps = {
@@ -54,6 +54,17 @@ export const CircleCommentIcon = memo(function CircleCommentIcon({ color }: Icon
         fillRule="evenodd"
         clipRule="evenodd"
       />
+    </Svg>
+  );
+});
+
+/** 盼友圈更多操作 icon，与点赞、评论保持相同尺寸和透明度。 */
+export const CircleMoreIcon = memo(function CircleMoreIcon({ color }: IconProps) {
+  return (
+    <Svg width={SIZE} height={SIZE} viewBox="0 0 40 40" fill="none" opacity={OPACITY}>
+      <Circle cx={11} cy={20} r={3} fill={color} />
+      <Circle cx={20} cy={20} r={3} fill={color} />
+      <Circle cx={29} cy={20} r={3} fill={color} />
     </Svg>
   );
 });

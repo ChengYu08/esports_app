@@ -44,7 +44,10 @@ import {
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { EmptyState } from "@/shared/ui/AsyncStates";
 import { CircleCommentHeartIcon } from "@/features/circle/components/CircleActionIcons";
-import { CircleTopicLinks, CircleTopicText } from "@/features/circle/components/CircleTopicLinks";
+import { CircleContentText } from "@/features/circle/components/CircleContentText";
+import { CircleTopicLinks } from "@/features/circle/components/CircleTopicLinks";
+import { HighlightedInput } from "@/features/circle/components/HighlightedInput";
+import { buildCircleContentRefs } from "@/features/circle/circle-publish-entities";
 import { normalizeCircleTopicName, splitCircleTopicText } from "@/features/circle/circle-topic";
 import { showToast } from "@/shared/ui/app-toast";
 import { requireLogin } from "@/shared/navigation/require-login";
@@ -91,7 +94,6 @@ export function CircleCommentSheet({
   const blacklistedUserIds = useMessageStore((state) => state.blacklistedUserIds);
   const messageConnectionState = useMessageStore((state) => state.connectionState);
   const refreshConversations = useMessageStore((state) => state.refreshConversations);
-  const [totalCount, setTotalCount] = useState(post.commentCount);
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -145,6 +147,13 @@ export function CircleCommentSheet({
     [commentsQuery.data],
   );
 
+  // 评论总数优先取列表接口返回的 total（MySQL 实时值，发布/删除事务内维护），
+  // 未返回时回退到 feed 快照的 commentCount，避免列表加载前后头部数量跳变。
+  const [localDelta, setLocalDelta] = useState(0);
+  const serverTotal = commentsQuery.data?.pages[0]?.total;
+  const totalCount =
+    (serverTotal ?? post.commentCount) + localDelta;
+
   const mentionUsers = useMemo<CircleMentionUser[]>(
     () =>
       conversations
@@ -164,6 +173,17 @@ export function CircleCommentSheet({
           avatar: conversation.avatar,
         })),
     [blacklistedUserIds, conversations, viewerUserId],
+  );
+
+  /** 输入框高亮用：id→昵称 字典，命中草稿里真实出现的 @昵称。 */
+  const mentionNameDict = useMemo<Record<string, string>>(
+    () =>
+      Object.fromEntries(
+        mentionedUsers
+          .filter((user) => user.nickname)
+          .map((user) => [user.id, user.nickname]),
+      ),
+    [mentionedUsers],
   );
 
   const mutateComments = (updater: (list: CircleComment[]) => CircleComment[]) => {
@@ -201,7 +221,7 @@ export function CircleCommentSheet({
     setMentionOpen(false);
     setMentionedUsers([]);
     setExpandedIds(new Set());
-    setTotalCount(post.commentCount);
+    setLocalDelta(0);
     setReportTarget(null);
     onClose();
   };
@@ -238,13 +258,18 @@ export function CircleCommentSheet({
     if (!requireLogin() || !token) {
       return;
     }
+    // 已聚焦时点 @ 保持焦点与键盘（@ 面板在输入框上方，不与键盘重叠）；
+    // 未聚焦时只展开 @ 面板、不拉起键盘，否则面板首击会被“收起键盘”吞掉。
+    const keepKeyboard = focused && !emojiPickerOpen;
     setEmojiPickerOpen(false);
     setFocused(true);
     setMentionOpen(true);
     setInput((current) => (current.endsWith("@") ? current : `${current}@`));
-    requestAnimationFrame(() => {
-      inputRef.current?.focus();
-    });
+    if (keepKeyboard) {
+      requestAnimationFrame(() => {
+        inputRef.current?.focus();
+      });
+    }
     void refreshConversations(token);
   };
 
@@ -282,9 +307,12 @@ export function CircleCommentSheet({
       });
       return;
     }
+    // 已聚焦时点表情保持焦点与键盘；未聚焦时只展开表情面板、不拉起键盘。
     setFocused(true);
     setEmojiPickerOpen(true);
-    Keyboard.dismiss();
+    if (!focused) {
+      Keyboard.dismiss();
+    }
   };
 
   /** 点击评论者头像跳转主页；先关弹窗收起键盘，避免返回时残留输入态。 */
@@ -318,6 +346,8 @@ export function CircleCommentSheet({
     if (!requireLogin() || !token) {
       return;
     }
+    // 点击发送立即收起键盘，不等发布请求返回（否则键盘要等网络往返结束才关）。
+    Keyboard.dismiss();
     setSending(true);
     try {
       const published = await publishCircleComment({
@@ -326,6 +356,11 @@ export function CircleCommentSheet({
         parentCommentId: replyTarget?.parentCommentId ?? replyTarget?.comment.id,
         replyCommentId: replyTarget?.parentCommentId ? replyTarget.comment.id : undefined,
         mentionUserIds: mentionedUsers.map((user) => user.id),
+        mentions: buildCircleContentRefs(
+          content,
+          mentionedUsers.map((user) => ({ id: user.id, label: user.nickname })),
+          "@",
+        ),
         token,
       });
       mutateComments((current) => {
@@ -344,14 +379,13 @@ export function CircleCommentSheet({
         // 回复展开状态同步，避免新回复被折叠入口藏住。
         setExpandedIds((current) => new Set(current).add(replyTarget.parentCommentId ?? replyTarget.comment.id));
       }
-      setTotalCount((count) => count + 1);
+      setLocalDelta((count) => count + 1);
       setInput("");
       setReplyTarget(null);
       setMentionOpen(false);
       setMentionedUsers([]);
       setEmojiPickerOpen(false);
       setFocused(false);
-      Keyboard.dismiss();
     } catch (error) {
       showToast(error instanceof Error ? error.message : "评论发布失败");
     } finally {
@@ -442,7 +476,14 @@ export function CircleCommentSheet({
             <View style={styles.postBlock}>
               {post.headline ? <Text style={styles.postTitle}>{post.headline}</Text> : null}
               {post.content ? (
-                <CircleTopicText content={post.content} style={styles.postContent} topicStyle={styles.postTags} onBeforeNavigate={handleClose} />
+                <CircleContentText
+                  content={post.content}
+                  style={styles.postContent}
+                  linkStyle={styles.postTags}
+                  mentionStyle={styles.postTags}
+                  mentions={post.mentions}
+                  onBeforeNavigate={handleClose}
+                />
               ) : null}
               {extraTags.length > 0 ? (
                 <CircleTopicLinks
@@ -509,7 +550,7 @@ export function CircleCommentSheet({
         ) : null}
         {/* 聚焦/失焦共用同一个 TextInput，仅切换容器样式，避免重新挂载导致键盘收起 */}
         <View style={inputActive ? styles.inputTextArea : styles.inputPill}>
-          <TextInput
+          <HighlightedInput
             ref={inputRef}
             value={input}
             onChangeText={(value) => {
@@ -524,6 +565,9 @@ export function CircleCommentSheet({
             placeholder={replyTarget ? `回复 ${replyTarget.comment.nickname}` : "友善评论，理性发言"}
             placeholderTextColor="#CACACC"
             style={inputActive ? styles.inputExpanded : styles.input}
+            containerStyle={inputActive ? styles.inputHighlightContainerActive : styles.inputHighlightContainer}
+            highlightStyle={styles.inputHighlight}
+            mentions={mentionNameDict}
             maxLength={500}
             multiline
             blurOnSubmit
@@ -755,14 +799,14 @@ function CommentInputActions({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="提及用户"
-        onPressIn={onMention}
+        onPress={onMention}
       >
         <Image source={atIcon} style={styles.inputIcon} />
       </Pressable>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="表情"
-        onPressIn={onEmoji}
+        onPress={onEmoji}
       >
         <Image source={emojiIcon} style={styles.inputIcon} />
       </Pressable>
@@ -897,7 +941,13 @@ function CommentRow({
           </View>
           <Text style={styles.commentContent}>
             {comment.deleted ? "该评论已删除" : (
-              <CircleTopicText content={comment.content} topicStyle={styles.postTags} onBeforeNavigate={onOpenTopic} />
+              <CircleContentText
+                content={comment.content}
+                linkStyle={styles.postTags}
+                mentionStyle={styles.postTags}
+                mentions={comment.mentions}
+                onBeforeNavigate={onOpenTopic}
+              />
             )}
           </Text>
           <View style={styles.commentMetaRow}>
@@ -1031,7 +1081,13 @@ function ReplyRow({
               回复 {reply.replyNickname}：
             </Text>
           ) : null}
-          <CircleTopicText content={reply.content} topicStyle={styles.postTags} onBeforeNavigate={onOpenTopic} />
+          <CircleContentText
+            content={reply.content}
+            linkStyle={styles.postTags}
+            mentionStyle={styles.postTags}
+            mentions={reply.mentions}
+            onBeforeNavigate={onOpenTopic}
+          />
         </Text>
         <View style={styles.commentMetaRow}>
           <View style={styles.commentMetaLeft}>
@@ -1350,13 +1406,23 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     gap: 12,
   },
-  input: {
+  inputHighlightContainer: {
     flex: 1,
+    justifyContent: "flex-start",
+  },
+  inputHighlightContainerActive: {
+    flex: 1,
+    justifyContent: "flex-start",
+  },
+  input: {
     fontFamily: SYSTEM_FONT,
     color: "#0D0D0F",
     fontSize: 14,
     lineHeight: 22,
     padding: 0,
+  },
+  inputHighlight: {
+    color: "#1540AD",
   },
   inputTextArea: {
     minHeight: 60,

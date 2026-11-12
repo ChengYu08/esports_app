@@ -3,6 +3,7 @@ import {
   unwrap,
   type CircleApiResponse,
 } from "@/features/circle/circle.api";
+import type { CircleContentRef } from "@/features/circle/circle-publish.api";
 import { formatRelativeTime } from "@/shared/time/relative-time";
 
 const COMMENT_PAGE_SIZE = 10;
@@ -28,6 +29,8 @@ export type CircleComment = {
   deleted: boolean;
   /** 回复二级评论时被回复的用户昵称。 */
   replyNickname?: string;
+  /** 正文中的 @用户 引用（带位置优先，字典为 id→昵称）。 */
+  mentions?: CircleContentRef[] | Record<string, string>;
   replies: CircleComment[];
 };
 
@@ -35,6 +38,8 @@ export type CircleCommentPage = {
   list: CircleComment[];
   nextCursor: string | null;
   hasMore: boolean;
+  /** 评论总数（后端游标页 total 字段）；空表示未返回，回退到 feed 的 commentCount。 */
+  total?: number | null;
 };
 
 /** CommentVO 后端字段名未定型，多种候选形状都做映射。 */
@@ -64,6 +69,10 @@ type ApiCircleComment = {
   authorLike?: boolean;
   status?: string;
   replyNickname?: string;
+  /** 后端 CommentVO.mentionRefs：@用户 实体（带位置）。 */
+  mentionRefs?: CircleContentRef[];
+  /** 后端兜底：@用户 id→昵称 字典（无位置时推导）。 */
+  mentionUsers?: Record<string, string>;
   childComments?: ApiCircleComment[];
 };
 
@@ -91,6 +100,7 @@ function toCircleComment(item: ApiCircleComment): CircleComment {
     authorLiked: Boolean(item.authorLiked ?? item.authorLike),
     deleted: (item.status ?? "").toUpperCase() === "DELETED",
     replyNickname: (item.replyNickname ?? item.targetAuthorInfo?.nickname) || undefined,
+    mentions: item.mentionRefs?.length ? item.mentionRefs : item.mentionUsers,
     replies: (item.childComments ?? []).map(toCircleComment),
   };
 }
@@ -99,6 +109,7 @@ type ApiCursorPage<T> = {
   list?: T[];
   nextCursor?: string | null;
   hasMore?: boolean;
+  total?: number | null;
 };
 
 export async function fetchCircleCommentPage({
@@ -126,6 +137,7 @@ export async function fetchCircleCommentPage({
     list: (data.list ?? []).map(toCircleComment),
     nextCursor: data.nextCursor ?? null,
     hasMore: data.hasMore ?? false,
+    total: data.total ?? null,
   };
 }
 
@@ -204,6 +216,7 @@ export async function publishCircleComment({
   parentCommentId,
   replyCommentId,
   mentionUserIds,
+  mentions,
   token,
 }: {
   videoId: string;
@@ -211,6 +224,7 @@ export async function publishCircleComment({
   parentCommentId?: string;
   replyCommentId?: string;
   mentionUserIds?: string[];
+  mentions?: CircleContentRef[];
   token: string;
 }): Promise<CircleComment> {
   const response = await apiClient<CircleApiResponse<ApiCircleComment>>(
@@ -224,6 +238,7 @@ export async function publishCircleComment({
         replyCommentId: replyCommentId ?? "",
         content,
         mentionUserIds: mentionUserIds ?? [],
+        mentions: mentions ?? [],
       },
     },
   );

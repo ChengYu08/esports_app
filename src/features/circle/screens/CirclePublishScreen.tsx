@@ -1,26 +1,12 @@
-import {
-  ChevronRight16Regular,
-  Checkmark16Regular,
-  Dismiss16Regular,
-  Emoji16Regular,
-  Info24Regular,
-  NumberSymbol16Regular,
-  NumberSymbol24Regular,
-  Person16Regular,
-  Play32Regular,
-  Video24Regular,
-} from "@fluentui/react-native-icons";
 import { useAuthStore } from "@esports/auth";
+import { Checkmark16Regular, Dismiss16Regular } from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
-import * as VideoThumbnails from "expo-video-thumbnails";
 import { router } from "expo-router";
+import * as VideoThumbnails from "expo-video-thumbnails";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { EmojiKeyboard, type EmojiType } from "rn-emoji-keyboard";
 import {
   ActivityIndicator,
   Keyboard,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -28,8 +14,16 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { EmojiKeyboard, type EmojiType } from "rn-emoji-keyboard";
 
+import { APP_LINKS } from "@/core/config/links";
+import {
+  activeTriggerDraft,
+  applyTriggerSelection,
+  buildCircleContentRefs,
+} from "@/features/circle/circle-publish-entities";
 import {
   fetchCircleDeclarations,
   fetchCircleTopicOptions,
@@ -37,41 +31,40 @@ import {
   publishCircleVideo,
   type CircleTopicOption,
 } from "@/features/circle/circle-publish.api";
-import {
-  activeTriggerDraft,
-  applyTriggerSelection,
-  buildCircleContentRefs,
-} from "@/features/circle/circle-publish-entities";
 import { uploadVideoToVod } from "@/features/circle/vod-upload";
-import {
-  beginVideoPick,
-  type VideoPickResult,
-} from "@/shared/media-picker/media-picker-session";
 import { useMessageStore } from "@/features/message/message-store";
 import { getConversationDisplayTitle } from "@/features/message/message-title";
 import {
   isSelfConversationId,
   isSystemConversationId,
 } from "@/features/message/system-conversations";
-import { BottomSheet } from "@/shared/ui/BottomSheet";
-import { APP_LINKS } from "@/core/config/links";
+import {
+  beginVideoPick,
+  type VideoPickResult,
+} from "@/shared/media-picker/media-picker-session";
 import { openInAppWebView } from "@/shared/navigation/open-web-view";
 import { requireLogin } from "@/shared/navigation/require-login";
-import { showToast } from "@/shared/ui/app-toast";
-import { ScreenHeader } from "@/shared/ui/ScreenHeader";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
+import { showToast } from "@/shared/ui/app-toast";
+import { BottomSheet } from "@/shared/ui/BottomSheet";
+import { ScreenHeader } from "@/shared/ui/ScreenHeader";
+import { HighlightedInput } from "@/features/circle/components/HighlightedInput";
+import {
+  CirclePublishVideoTile,
+  type UploadState,
+} from "@/features/circle/components/CirclePublishVideoTile";
 
-const atIcon = require("../../../../assets/svgs/circle-comment-at.svg");
-const emojiIcon = require("../../../../assets/svgs/circle-comment-emoji.svg");
+const atIcon = require("../../../../assets/svgs/circle-publish-at.svg");
+const emojiIcon = require("../../../../assets/svgs/circle-publish-emoji.svg");
+const topicIcon = require("../../../../assets/svgs/circle-publish-topic.svg");
+const notifyIcon = require("../../../../assets/svgs/circle-publish-notify.svg");
+const arrowRightIcon = require("../../../../assets/svgs/circle-publish-arrow-right.svg");
+const keyboardTopicIcon = require("../../../../assets/svgs/circle-comment-topic.svg");
+const keyboardEmojiIcon = require("../../../../assets/svgs/circle-comment-emoji.svg");
+const keyboardAtIcon = require("../../../../assets/svgs/circle-comment-at.svg");
 const FALLBACK_AVATAR = require("../../../../assets/images/radar-avatar-1.png");
 
 type PublishPanel = "none" | "topic" | "mention" | "emoji";
-
-type UploadState = {
-  status: "uploading" | "success" | "failed";
-  percent: number;
-  vid?: string;
-};
 
 type MentionUser = {
   id: string;
@@ -82,14 +75,34 @@ type MentionUser = {
 /** 标题/正文的字数按 Unicode 码点计（与后端校验一致）。 */
 const codePointLength = (text: string) => Array.from(text).length;
 
+/** 话题热度格式化：「1.9亿人浏览」「8805.4w人浏览」「2.3w人浏览」。 */
+function formatTopicHeat(heat?: number): string | null {
+  if (typeof heat !== "number" || heat < 0) {
+    return null;
+  }
+  if (heat >= 100000000) {
+    return `${(heat / 100000000).toFixed(1)}亿人浏览`;
+  }
+  if (heat >= 10000) {
+    return `${(heat / 10000).toFixed(1)}w人浏览`;
+  }
+  return `${heat}人浏览`;
+}
+
 export default function CirclePublishScreen() {
   const insets = useSafeAreaInsets();
   const accessToken = useAuthStore((state) => state.accessToken);
   const viewerUserId = useAuthStore((state) => state.user?.id);
   const conversations = useMessageStore((state) => state.conversations);
-  const blacklistedUserIds = useMessageStore((state) => state.blacklistedUserIds);
-  const messageConnectionState = useMessageStore((state) => state.connectionState);
-  const refreshConversations = useMessageStore((state) => state.refreshConversations);
+  const blacklistedUserIds = useMessageStore(
+    (state) => state.blacklistedUserIds,
+  );
+  const messageConnectionState = useMessageStore(
+    (state) => state.connectionState,
+  );
+  const refreshConversations = useMessageStore(
+    (state) => state.refreshConversations,
+  );
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -104,18 +117,47 @@ export default function CirclePublishScreen() {
   const [declarationSheetOpen, setDeclarationSheetOpen] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [panel, setPanel] = useState<PublishPanel>("none");
-  const [focusedField, setFocusedField] = useState<"title" | "content" | null>(null);
+  const [focusedField, setFocusedField] = useState<"title" | "content" | null>(
+    null,
+  );
   const [topicOptions, setTopicOptions] = useState<CircleTopicOption[]>([]);
   const [topicLoading, setTopicLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const uploadCancelledRef = useRef(false);
+  const contentInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
-    fetchCircleDeclarations()
-      .then(setDeclarationOptions)
+    if (!accessToken) {
+      return;
+    }
+    let cancelled = false;
+    fetchCircleDeclarations({ token: accessToken })
+      .then((options) => {
+        if (!cancelled) {
+          setDeclarationOptions(options);
+        }
+      })
       .catch(() => {
-        // 声明选项弱依赖：失败时打开弹层再重试
+        if (!cancelled) {
+          // 声明选项弱依赖：失败时打开弹层再重试
+          setDeclarationOptions([]);
+        }
       });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken]);
+
+  // 键盘被手势/系统收起时，同步让输入框失焦，快捷栏随之消失。
+  useEffect(() => {
+    const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
+      if (contentInputRef.current?.isFocused()) {
+        contentInputRef.current.blur();
+      }
+    });
+    return () => {
+      hideSubscription.remove();
+    };
   }, []);
 
   const mentionUsers = useMemo<MentionUser[]>(
@@ -139,6 +181,17 @@ export default function CirclePublishScreen() {
     [blacklistedUserIds, conversations, viewerUserId],
   );
 
+  /** 输入框高亮用：id→昵称 字典，命中正文里真实出现的 @昵称。 */
+  const mentionNameDict = useMemo<Record<string, string>>(
+    () =>
+      Object.fromEntries(
+        mentionedUsers
+          .filter((user) => user.nickname)
+          .map((user) => [user.id, user.nickname]),
+      ),
+    [mentionedUsers],
+  );
+
   const topicKeyword = useMemo(() => {
     if (panel !== "topic") {
       return "";
@@ -152,12 +205,12 @@ export default function CirclePublishScreen() {
 
   // 话题面板打开/关键词变化时拉取候选（空关键词=热榜前 N）
   useEffect(() => {
-    if (panel !== "topic") {
+    if (panel !== "topic" || !accessToken) {
       return;
     }
     const timer = setTimeout(() => {
       setTopicLoading(true);
-      fetchCircleTopicOptions({ keyword: topicKeyword })
+      fetchCircleTopicOptions({ keyword: topicKeyword, token: accessToken })
         .then(setTopicOptions)
         .catch(() => {
           setTopicOptions([]);
@@ -169,7 +222,7 @@ export default function CirclePublishScreen() {
     return () => {
       clearTimeout(timer);
     };
-  }, [panel, topicKeyword]);
+  }, [panel, topicKeyword, accessToken]);
 
   const startUpload = useCallback(
     async (picked: VideoPickResult) => {
@@ -187,11 +240,12 @@ export default function CirclePublishScreen() {
         const vid = await uploadVideoToVod({
           uri: picked.uri,
           fileSize: picked.fileSize,
-          filename: picked.filename,
           sign,
           onProgress: (percent) => {
             setUpload((current) =>
-              current?.status === "uploading" ? { ...current, percent } : current,
+              current?.status === "uploading"
+                ? { ...current, percent }
+                : current,
             );
           },
           cancelled: () => uploadCancelledRef.current,
@@ -199,7 +253,9 @@ export default function CirclePublishScreen() {
         setUpload({ status: "success", percent: 100, vid });
       } catch (error) {
         setUpload({ status: "failed", percent: 0 });
-        showToast(error instanceof Error ? error.message : "视频上传未完成，请重试");
+        showToast(
+          error instanceof Error ? error.message : "视频上传未完成，请重试",
+        );
       }
     },
     [accessToken],
@@ -209,8 +265,11 @@ export default function CirclePublishScreen() {
     if (!requireLogin()) {
       return;
     }
-    const picked = await beginVideoPick();
+    // 必须先 begin 建立会话、再 push 打开选择页、最后 await 结果；
+    // 若在 push 前 await，Promise 会一直挂起导致首次点击无响应（第二次点击才触发上一次的 push）。
+    const pickPending = beginVideoPick();
     router.push({ pathname: "/media-picker", params: { media: "video" } });
+    const picked = await pickPending;
     if (!picked) {
       return;
     }
@@ -265,13 +324,17 @@ export default function CirclePublishScreen() {
         ? current
         : [...current, option],
     );
-    setContent((current) => applyTriggerSelection(current, "#", option.topicName));
+    setContent((current) =>
+      applyTriggerSelection(current, "#", option.topicName),
+    );
     setPanel("none");
   };
 
   const handleMentionSelect = (user: MentionUser) => {
     setMentionedUsers((current) =>
-      current.some((item) => item.id === user.id) ? current : [...current, user],
+      current.some((item) => item.id === user.id)
+        ? current
+        : [...current, user],
     );
     setContent((current) => applyTriggerSelection(current, "@", user.nickname));
     setPanel("none");
@@ -307,12 +370,14 @@ export default function CirclePublishScreen() {
       return;
     }
     setPanel("emoji");
-    Keyboard.dismiss();
+    // 表情面板顶替键盘高度，先收起键盘并失焦，避免两者同时占位。
+    contentInputRef.current?.blur();
   };
 
   const handleDone = () => {
     setPanel("none");
-    Keyboard.dismiss();
+    // 失焦触发键盘收起，快捷栏随键盘一起消失。
+    contentInputRef.current?.blur();
   };
 
   const handlePublish = async () => {
@@ -372,7 +437,10 @@ export default function CirclePublishScreen() {
         content,
         topics: buildCircleContentRefs(
           content,
-          selectedTopics.map((topic) => ({ id: topic.topicId, label: topic.topicName })),
+          selectedTopics.map((topic) => ({
+            id: topic.topicId,
+            label: topic.topicName,
+          })),
           "#",
         ),
         mentions: buildCircleContentRefs(
@@ -392,7 +460,9 @@ export default function CirclePublishScreen() {
     }
   };
 
-  const inputActive = focusedField === "content" || panel !== "none";
+  // 快捷栏仅在「描述聚焦」时悬浮；面板打开时（话题/提及/表情）也保持显示。
+  const inputActive = focusedField === "content";
+  const showKeyboardArea = inputActive || panel !== "none";
   const publishReady =
     Boolean(video) &&
     title.trim().length > 0 &&
@@ -401,7 +471,8 @@ export default function CirclePublishScreen() {
     declarations.length > 0 &&
     upload?.status === "success";
   const mentionLoading =
-    messageConnectionState === "idle" || messageConnectionState === "connecting";
+    messageConnectionState === "idle" ||
+    messageConnectionState === "connecting";
 
   return (
     <View style={styles.screen}>
@@ -410,7 +481,7 @@ export default function CirclePublishScreen() {
         onBack={() => {
           router.back();
         }}
-        style={{ paddingTop: insets.top }}
+        style={{ paddingTop: insets.top, height: insets.top + 44 }}
       />
 
       <ScrollView
@@ -435,18 +506,25 @@ export default function CirclePublishScreen() {
             }}
           />
           <Text
-            style={[styles.titleCount, title.length > 0 && styles.titleCountFilled]}
+            style={[
+              styles.titleCount,
+              title.length > 0 && styles.titleCountFilled,
+            ]}
           >
             {codePointLength(title)}/20
           </Text>
         </View>
 
-        <TextInput
+        <HighlightedInput
+          ref={contentInputRef}
           value={content}
           onChangeText={handleContentChange}
           placeholder="添加作品描述"
           placeholderTextColor="#CACACC"
           style={styles.contentInput}
+          containerStyle={styles.contentInputContainer}
+          highlightStyle={styles.contentHighlight}
+          mentions={mentionNameDict}
           maxLength={1000}
           multiline
           textAlignVertical="top"
@@ -459,56 +537,16 @@ export default function CirclePublishScreen() {
           }}
         />
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="选择视频"
-          style={styles.uploadTile}
-          onPress={() => {
-            if (upload?.status === "failed") {
-              handleRetryUpload();
-              return;
-            }
-            if (!video) {
-              void handlePickVideo();
-            }
+        <CirclePublishVideoTile
+          video={video}
+          coverUri={coverUri}
+          upload={upload}
+          onPick={() => {
+            void handlePickVideo();
           }}
-        >
-          {video ? (
-            <View style={styles.tileInner}>
-              {coverUri ? (
-                <Image source={{ uri: coverUri }} style={styles.tileCover} contentFit="cover" />
-              ) : (
-                <View style={styles.tileCoverPlaceholder} />
-              )}
-              <View pointerEvents="none" style={styles.tilePlayWrap}>
-                <Play32Regular color="#FFFFFF" width={32} height={32} />
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="移除视频"
-                onPress={handleRemoveVideo}
-                style={styles.tileDelete}
-              >
-                <Dismiss16Regular color="#FFFFFF" width={10} height={10} />
-              </Pressable>
-              {upload?.status === "uploading" ? (
-                <View style={styles.tileProgress}>
-                  <Text style={styles.tileProgressText}>{upload.percent}%</Text>
-                </View>
-              ) : null}
-              {upload?.status === "failed" ? (
-                <View style={styles.tileProgress}>
-                  <Text style={styles.tileProgressText}>点击重试</Text>
-                </View>
-              ) : null}
-            </View>
-          ) : (
-            <View style={styles.tileEmpty}>
-              <Video24Regular color="#979799" width={28} height={28} />
-              <Text style={styles.tileEmptyText}>添加视频</Text>
-            </View>
-          )}
-        </Pressable>
+          onRemove={handleRemoveVideo}
+          onRetry={handleRetryUpload}
+        />
 
         <View style={styles.chipRow}>
           <Pressable
@@ -517,7 +555,7 @@ export default function CirclePublishScreen() {
             style={styles.chip}
             onPress={handleTopicChipPress}
           >
-            <NumberSymbol16Regular color="#0D0D0F" width={16} height={16} />
+            <Image source={topicIcon} style={styles.chipIcon} />
             <Text style={styles.chipText}>话题</Text>
           </Pressable>
           <Pressable
@@ -526,7 +564,7 @@ export default function CirclePublishScreen() {
             style={styles.chip}
             onPress={handleEmojiChipPress}
           >
-            <Emoji16Regular color="#0D0D0F" width={16} height={16} />
+            <Image source={emojiIcon} style={styles.chipIcon} />
             <Text style={styles.chipText}>表情</Text>
           </Pressable>
           <Pressable
@@ -535,7 +573,7 @@ export default function CirclePublishScreen() {
             style={styles.chip}
             onPress={handleMentionChipPress}
           >
-            <Person16Regular color="#0D0D0F" width={16} height={16} />
+            <Image source={atIcon} style={styles.chipIcon} />
             <Text style={styles.chipText}>用户</Text>
           </Pressable>
         </View>
@@ -549,7 +587,7 @@ export default function CirclePublishScreen() {
             setDeclarationSheetOpen(true);
           }}
         >
-          <Info24Regular color="#0D0D0F" width={18} height={18} />
+          <Image source={notifyIcon} style={styles.declarationIcon} />
           <Text style={styles.declarationLabel}>自主声明</Text>
           <Text
             numberOfLines={1}
@@ -558,137 +596,149 @@ export default function CirclePublishScreen() {
               declarations.length > 0 && styles.declarationValueFilled,
             ]}
           >
-            {declarations.length > 0 ? declarations.join("、") : "请选择自主声明"}
+            {declarations.length > 0
+              ? declarations.join("、")
+              : "请选择自主声明"}
           </Text>
-          <ChevronRight16Regular color="#CACACC" width={16} height={16} />
+          <Image source={arrowRightIcon} style={styles.declarationArrow} />
         </Pressable>
         <View style={styles.divider} />
       </ScrollView>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        enabled={inputActive}
-      >
-        {inputActive ? (
-          <View style={styles.keyboardArea}>
-            {panel === "topic" ? (
-              <TopicPanel
-                options={topicOptions}
-                loading={topicLoading}
-                onSelect={handleTopicSelect}
-              />
-            ) : null}
-            {panel === "mention" ? (
-              <MentionPanel
-                users={mentionUsers}
-                loading={mentionLoading}
-                onSelect={handleMentionSelect}
-              />
-            ) : null}
-            <View style={styles.keyboardBar}>
-              <View style={styles.keyboardIcons}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="插入话题"
-                  onPressIn={handleTopicChipPress}
-                  style={styles.keyboardIconButton}
-                >
-                  <NumberSymbol24Regular color="#333333" width={24} height={24} />
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="插入表情"
-                  onPressIn={handleEmojiChipPress}
-                  style={styles.keyboardIconButton}
-                >
-                  <Image source={emojiIcon} style={styles.keyboardIcon} />
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="提及用户"
-                  onPressIn={handleMentionChipPress}
-                  style={styles.keyboardIconButton}
-                >
-                  <Image source={atIcon} style={styles.keyboardIcon} />
-                </Pressable>
-              </View>
+      {showKeyboardArea ? (
+        <KeyboardStickyView style={styles.keyboardArea}>
+          {panel === "topic" ? (
+            <TopicPanel
+              options={topicOptions}
+              loading={topicLoading}
+              onSelect={handleTopicSelect}
+            />
+          ) : null}
+          {panel === "mention" ? (
+            <MentionPanel
+              users={mentionUsers}
+              loading={mentionLoading}
+              onSelect={handleMentionSelect}
+            />
+          ) : null}
+          <View style={styles.keyboardBar}>
+            <View style={styles.keyboardIcons}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="完成"
-                onPress={handleDone}
-                style={styles.doneButton}
+                accessibilityLabel="插入话题"
+                onPress={handleTopicChipPress}
+                style={styles.keyboardIconButton}
               >
-                <Text style={styles.doneText}>完成</Text>
+                <Image source={keyboardTopicIcon} style={styles.keyboardIcon} />
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="插入表情"
+                onPress={handleEmojiChipPress}
+                style={styles.keyboardIconButton}
+              >
+                <Image source={keyboardEmojiIcon} style={styles.keyboardIcon} />
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="提及用户"
+                onPress={handleMentionChipPress}
+                style={styles.keyboardIconButton}
+              >
+                <Image source={keyboardAtIcon} style={styles.keyboardIcon} />
               </Pressable>
             </View>
-            {panel === "emoji" ? (
-              <View style={[styles.emojiPanel, { height: 340 + insets.bottom + 10 }]}>
-                <EmojiKeyboard
-                  categoryPosition="bottom"
-                  disableSafeArea
-                  enableRecentlyUsed
-                  hideHeader
-                  onEmojiSelected={handleEmojiSelect}
-                  styles={{
-                    container: {
-                      paddingBottom: insets.bottom + 10,
-                      borderRadius: 0,
-                      elevation: 0,
-                      shadowOpacity: 0,
-                    },
-                  }}
-                  theme={{
-                    container: "#FFFFFF",
-                    header: "#333333",
-                    category: { icon: "#999999", iconActive: "#FE1F4C" },
-                  }}
-                />
-              </View>
-            ) : null}
-          </View>
-        ) : (
-          <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-            <Pressable
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: agreed }}
-              onPress={() => {
-                setAgreed((current) => !current);
-              }}
-              style={styles.agreeRow}
-            >
-              <View style={[styles.agreeCheck, agreed && styles.agreeChecked]}>
-                {agreed ? (
-                  <Checkmark16Regular color="#FFFFFF" width={10} height={10} />
-                ) : null}
-              </View>
-              <Text style={styles.agreeText}>
-                我已阅读并同意
-                <Text
-                  style={styles.agreeLink}
-                  onPress={() => {
-                    openInAppWebView(APP_LINKS.communityAgreement, "盼之电竞社区公约");
-                  }}
-                >
-                  《盼之电竞社区公约》
-                </Text>
-              </Text>
-            </Pressable>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="发布"
-              disabled={!publishReady || sending}
-              onPress={handlePublish}
-              style={({ pressed }) => [
-                styles.publishButton,
-                !publishReady && styles.publishButtonDisabled,
-                pressed && publishReady && styles.publishButtonPressed,
-              ]}
+              accessibilityLabel="完成"
+              onPress={handleDone}
+              style={styles.doneButton}
             >
-              <Text style={styles.publishText}>{sending ? "发布中" : "发布"}</Text>
+              <Text style={styles.doneText}>完成</Text>
             </Pressable>
           </View>
-        )}
-      </KeyboardAvoidingView>
+          {panel === "emoji" ? (
+            <View
+              style={[
+                styles.emojiPanel,
+                { height: 340 + insets.bottom + 10 },
+              ]}
+            >
+              <EmojiKeyboard
+                categoryPosition="bottom"
+                disableSafeArea
+                enableRecentlyUsed
+                hideHeader
+                onEmojiSelected={handleEmojiSelect}
+                styles={{
+                  container: {
+                    paddingBottom: insets.bottom + 10,
+                    borderRadius: 0,
+                    elevation: 0,
+                    shadowOpacity: 0,
+                  },
+                }}
+                theme={{
+                  container: "#FFFFFF",
+                  header: "#333333",
+                  category: { icon: "#999999", iconActive: "#FE1F4C" },
+                }}
+              />
+            </View>
+          ) : null}
+        </KeyboardStickyView>
+      ) : (
+        <View
+          style={[
+            styles.bottomBar,
+            { paddingBottom: Math.max(insets.bottom, 12) },
+          ]}
+        >
+          <Pressable
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: agreed }}
+            onPress={() => {
+              setAgreed((current) => !current);
+            }}
+            style={styles.agreeRow}
+          >
+            <View style={[styles.agreeCheck, agreed && styles.agreeChecked]}>
+              {agreed ? (
+                <Checkmark16Regular color="#FFFFFF" width={10} height={10} />
+              ) : null}
+            </View>
+            <Text style={styles.agreeText}>
+              我已阅读并同意
+              <Text
+                style={styles.agreeLink}
+                onPress={() => {
+                  openInAppWebView(
+                    APP_LINKS.communityAgreement,
+                    "盼之电竞社区公约",
+                  );
+                }}
+              >
+                《盼之电竞社区公约》
+              </Text>
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="发布"
+            disabled={!publishReady || sending}
+            onPress={handlePublish}
+            style={({ pressed }) => [
+              styles.publishButton,
+              !publishReady && styles.publishButtonDisabled,
+              pressed && publishReady && styles.publishButtonPressed,
+            ]}
+          >
+            <Text style={styles.publishText}>
+              {sending ? "发布中" : "发布"}
+            </Text>
+          </Pressable>
+        </View>
+      )}
 
       <DeclarationSheet
         visible={declarationSheetOpen}
@@ -713,7 +763,7 @@ export default function CirclePublishScreen() {
   );
 }
 
-/** 话题候选面板：行 = 话题名，选中即回写正文。 */
+/** 话题候选面板：行 = 话题名 + 热度，选中即回写正文。 */
 function TopicPanel({
   options,
   loading,
@@ -726,26 +776,38 @@ function TopicPanel({
   return (
     <View style={styles.topicPanel}>
       {loading && options.length === 0 ? (
-        <ActivityIndicator color="#999999" size="small" style={styles.panelLoading} />
+        <ActivityIndicator
+          color="#999999"
+          size="small"
+          style={styles.panelLoading}
+        />
       ) : options.length === 0 ? (
         <Text style={styles.panelEmptyText}>没有找到相关话题</Text>
       ) : (
-        <ScrollView style={styles.panelScroll} bounces={false}>
-          {options.map((option) => (
-            <Pressable
-              key={option.topicId || option.topicName}
-              accessibilityRole="button"
-              accessibilityLabel={`选择话题 ${option.topicName}`}
-              onPress={() => {
-                onSelect(option);
-              }}
-              style={styles.topicRow}
-            >
-              <Text style={styles.topicName} numberOfLines={1}>
-                #{option.topicName}
-              </Text>
-            </Pressable>
-          ))}
+        <ScrollView
+          style={styles.panelScroll}
+          bounces={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {options.map((option) => {
+            const heatText = formatTopicHeat(option.heat);
+            return (
+              <Pressable
+                key={option.topicId || option.topicName}
+                accessibilityRole="button"
+                accessibilityLabel={`选择话题 ${option.topicName}`}
+                onPress={() => {
+                  onSelect(option);
+                }}
+                style={styles.topicRow}
+              >
+                <Text style={styles.topicName} numberOfLines={1}>
+                  #{option.topicName}
+                </Text>
+                {heatText ? <Text style={styles.topicHeat}>{heatText}</Text> : null}
+              </Pressable>
+            );
+          })}
         </ScrollView>
       )}
     </View>
@@ -765,11 +827,19 @@ function MentionPanel({
   return (
     <View style={styles.mentionPanel}>
       {loading && users.length === 0 ? (
-        <ActivityIndicator color="#999999" size="small" style={styles.panelLoading} />
+        <ActivityIndicator
+          color="#999999"
+          size="small"
+          style={styles.panelLoading}
+        />
       ) : users.length === 0 ? (
         <Text style={styles.panelEmptyText}>暂无可@用户</Text>
       ) : (
-        <ScrollView style={styles.panelScroll} bounces={false}>
+        <ScrollView
+          style={styles.panelScroll}
+          bounces={false}
+          keyboardShouldPersistTaps="handled"
+        >
           {users.map((user) => (
             <Pressable
               key={user.id}
@@ -818,8 +888,28 @@ function DeclarationSheet({
       onClose={onClose}
       contentStyle={styles.declarationSheet}
     >
-      <Text style={styles.declarationSheetTitle}>自主声明</Text>
-      <ScrollView style={styles.declarationSheetScroll} bounces={false}>
+      <View style={styles.declarationHeader}>
+        <View style={styles.declarationHeaderText}>
+          <Text style={styles.declarationSheetTitle}>为作品内容添加声明</Text>
+          <Text style={styles.declarationSheetSubtitle}>
+            作品发布前添加自主声明，帮助他人减少困惑
+          </Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="关闭"
+          hitSlop={8}
+          onPress={onClose}
+          style={styles.declarationClose}
+        >
+          <Dismiss16Regular color="#7F7F80" width={16} height={16} />
+        </Pressable>
+      </View>
+      <ScrollView
+        style={styles.declarationSheetScroll}
+        bounces={false}
+        showsVerticalScrollIndicator={false}
+      >
         {options.map((option) => {
           const checked = selected.includes(option);
           return (
@@ -832,7 +922,12 @@ function DeclarationSheet({
               }}
               style={styles.declarationOptionRow}
             >
-              <View style={[styles.declarationCheck, checked && styles.declarationChecked]}>
+              <View
+                style={[
+                  styles.declarationCheck,
+                  checked && styles.declarationChecked,
+                ]}
+              >
                 {checked ? (
                   <Checkmark16Regular color="#FFFFFF" width={10} height={10} />
                 ) : null}
@@ -847,7 +942,7 @@ function DeclarationSheet({
       </ScrollView>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="确定自主声明"
+        accessibilityLabel="提交自主声明"
         disabled={selected.length === 0}
         onPress={onConfirm}
         style={({ pressed }) => [
@@ -856,7 +951,7 @@ function DeclarationSheet({
           pressed && selected.length > 0 && styles.publishButtonPressed,
         ]}
       >
-        <Text style={styles.declarationConfirmText}>确定</Text>
+        <Text style={styles.declarationConfirmText}>提交</Text>
       </Pressable>
     </BottomSheet>
   );
@@ -879,6 +974,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     paddingVertical: 12,
+    marginTop: 12,
   },
   titleInput: {
     flex: 1,
@@ -897,85 +993,22 @@ const styles = StyleSheet.create({
   titleCountFilled: {
     color: "#7F7F80",
   },
-  contentInput: {
+  contentInputContainer: {
     minHeight: 160,
-    padding: 12,
     borderRadius: 8,
-    backgroundColor: "#F5F6F7",
+    marginBottom: 12,
+    justifyContent: "flex-start",
+  },
+  contentInput: {
     fontFamily: SYSTEM_FONT,
     fontSize: 14,
     lineHeight: 24,
     color: "#0D0D0F",
-    marginBottom: 12,
+    padding: 0,
+    textAlignVertical: "top",
   },
-  uploadTile: {
-    width: 96,
-    height: 96,
-    borderRadius: 8,
-    backgroundColor: "#F5F6F7",
-    overflow: "hidden",
-    marginBottom: 12,
-  },
-  tileInner: {
-    width: "100%",
-    height: "100%",
-  },
-  tileCover: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: "#1A1A1A",
-  },
-  tileCoverPlaceholder: {
-    width: "100%",
-    height: "100%",
-    backgroundColor: "#1A1A1A",
-  },
-  tilePlayWrap: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  tileDelete: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    width: 16,
-    height: 16,
-    borderBottomLeftRadius: 8,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  tileProgress: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.45)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  tileProgressText: {
-    fontFamily: SYSTEM_FONT,
-    fontSize: 12,
-    color: "#FFFFFF",
-  },
-  tileEmpty: {
-    width: "100%",
-    height: "100%",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-  },
-  tileEmptyText: {
-    fontFamily: SYSTEM_FONT,
-    fontSize: 11,
-    color: "#7F7F80",
+  contentHighlight: {
+    color: "#1540AD",
   },
   chipRow: {
     flexDirection: "row",
@@ -990,6 +1023,10 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 8,
     backgroundColor: "#F5F6F7",
+  },
+  chipIcon: {
+    width: 16,
+    height: 16,
   },
   chipText: {
     fontFamily: SYSTEM_FONT,
@@ -1009,6 +1046,14 @@ const styles = StyleSheet.create({
     fontFamily: SYSTEM_FONT,
     fontSize: 14,
     color: "#0D0D0F",
+  },
+  declarationIcon: {
+    width: 16,
+    height: 16,
+  },
+  declarationArrow: {
+    width: 18,
+    height: 18,
   },
   declarationValue: {
     flex: 1,
@@ -1089,14 +1134,23 @@ const styles = StyleSheet.create({
     color: "#979799",
   },
   topicRow: {
-    height: 44,
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
     paddingHorizontal: 12,
-    justifyContent: "center",
+    paddingVertical: 12,
   },
   topicName: {
+    flex: 1,
     fontFamily: SYSTEM_FONT,
     fontSize: 12,
     color: "#0D0D0F",
+  },
+  topicHeat: {
+    fontFamily: SYSTEM_FONT,
+    fontSize: 12,
+    color: "#979799",
   },
   mentionRow: {
     flexDirection: "row",
@@ -1153,7 +1207,6 @@ const styles = StyleSheet.create({
   },
   agreeLink: {
     color: "#0D0D0F",
-    textDecorationLine: "underline",
   },
   publishButton: {
     height: 42,
@@ -1179,14 +1232,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 16,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  declarationHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  declarationHeaderText: {
+    flex: 1,
+    gap: 8,
+    paddingRight: 12,
+    paddingBottom: 8,
   },
   declarationSheetTitle: {
     fontFamily: SYSTEM_FONT,
     fontSize: 16,
     fontWeight: "600",
+    lineHeight: 24,
     color: "#0D0D0F",
-    textAlign: "center",
-    marginBottom: 8,
+  },
+  declarationSheetSubtitle: {
+    fontFamily: SYSTEM_FONT,
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#7F7F80",
+  },
+  declarationClose: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
   },
   declarationSheetScroll: {
     maxHeight: 300,
@@ -1195,7 +1271,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    height: 52,
+    height: 54,
   },
   declarationCheck: {
     width: 18,
