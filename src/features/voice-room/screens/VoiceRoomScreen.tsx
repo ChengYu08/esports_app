@@ -226,25 +226,43 @@ export default function VoiceRoomScreen() {
   const activeChatConversationRef = useRef<ChatSheetConversation | null>(null);
   // 跳原生路由（主页/订单/图片预览/选图）时置 true，重新聚焦语聊房后恢复弹窗；切房为 false
   const pendingChatRestoreRef = useRef(false);
+  // iOS：同一呈现链上同时挂两个原生 Modal，后挂的弹窗会因原生第二次 present 失败而卡死，
+  // 列表弹窗↔聊天弹窗改为「先关后开」串行切换
+  const pendingChatConversationRef = useRef<ChatSheetConversation | null>(null);
+  const pendingListReopenRef = useRef(false);
   // 消息列表里点开会话：登记 ref + 拉起聊天弹窗
-  const openChatConversation = useCallback((item: MessageListItemModel) => {
-    const conversation: ChatSheetConversation = {
-      id: item.id,
-      title: item.title,
-      avatar: getConversationAvatarUri(item.avatar),
-      clubId: item.clubId || undefined,
-    };
-    activeChatConversationRef.current = conversation;
-    setActiveChatConversation(conversation);
-  }, []);
+  const openChatConversation = useCallback(
+    (item: MessageListItemModel) => {
+      const conversation: ChatSheetConversation = {
+        id: item.id,
+        title: item.title,
+        avatar: getConversationAvatarUri(item.avatar),
+        clubId: item.clubId || undefined,
+      };
+      activeChatConversationRef.current = conversation;
+      if (Platform.OS === "ios" && conversationsSheetVisible) {
+        pendingChatConversationRef.current = conversation;
+        setConversationsSheetVisible(false);
+        return;
+      }
+      setActiveChatConversation(conversation);
+    },
+    [conversationsSheetVisible],
+  );
   // 聊天弹窗头部返回：只收聊天层，回消息列表弹窗
   const closeChatToRoom = useCallback(() => {
     activeChatConversationRef.current = null;
+    if (Platform.OS === "ios") {
+      // 聊天弹窗退场完成后再串行恢复列表弹窗
+      pendingListReopenRef.current = true;
+    }
     setActiveChatConversation(null);
   }, []);
   // 头部 ×：两层弹窗整体关闭回语聊房
   const closeAllChatLayers = useCallback(() => {
     activeChatConversationRef.current = null;
+    pendingChatConversationRef.current = null;
+    pendingListReopenRef.current = false;
     setActiveChatConversation(null);
     setConversationsSheetVisible(false);
   }, []);
@@ -259,6 +277,12 @@ export default function VoiceRoomScreen() {
     pendingChatRestoreRef.current = false;
     const conversation = activeChatConversationRef.current;
     if (!conversation) return;
+    if (Platform.OS === "ios") {
+      // iOS 只恢复最上层的聊天弹窗，头部返回时再串行恢复列表弹窗
+      pendingListReopenRef.current = true;
+      setActiveChatConversation(conversation);
+      return;
+    }
     setActiveChatConversation(conversation);
     setConversationsSheetVisible(true);
   }, []);
@@ -827,7 +851,7 @@ export default function VoiceRoomScreen() {
                     {
                       id: "activity-match-tip",
                       kind: "notice" as const,
-                      text: "点击下方「匹配中」按钮查看抢单大神，勾选大神下单",
+                      text: "点击下方「选择陪玩」按钮查看抢单大神，勾选大神下单",
                       sentAt: Date.now(),
                     },
                   ].slice(-80),
@@ -1332,6 +1356,13 @@ export default function VoiceRoomScreen() {
       <VoiceRoomConversationsSheet
         visible={conversationsSheetVisible}
         onClose={() => setConversationsSheetVisible(false)}
+        onExited={() => {
+          // iOS：列表弹窗退场完成后串行拉起聊天弹窗
+          const pending = pendingChatConversationRef.current;
+          if (!pending) return;
+          pendingChatConversationRef.current = null;
+          setActiveChatConversation(pending);
+        }}
         sendTextTo={
           conversationsSheetMode === "invite" ? sendInviteLink : undefined
         }
@@ -1345,6 +1376,12 @@ export default function VoiceRoomScreen() {
         onClose={closeAllChatLayers}
         onBeforeNavigate={hideChatLayersForNavigate}
         onAfterPickImages={restoreChatAfterPick}
+        onExited={() => {
+          // iOS：聊天弹窗退场完成后串行恢复列表弹窗
+          if (!pendingListReopenRef.current) return;
+          pendingListReopenRef.current = false;
+          setConversationsSheetVisible(true);
+        }}
       />
       {receptionClub ? (
         <ClubQuickMatchSheet
@@ -1368,7 +1405,7 @@ export default function VoiceRoomScreen() {
         /** 活动需求进行中：MemberSheet「主页」入口替换为提示文案，下单统一走「选择陪玩」选人页 */
         orderEntryBlockedText={
           activityRequest
-            ? "活动需求进行中，请点击「匹配中」按钮选人下单"
+            ? "活动需求进行中，请点击「选择陪玩」按钮选人下单"
             : undefined
         }
         onClose={() => setMemberSheetVisible(false)}

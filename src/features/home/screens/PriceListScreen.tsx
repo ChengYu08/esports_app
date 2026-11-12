@@ -92,8 +92,11 @@ export default function PriceListScreen() {
   );
 }
 
+// 按 uri 缓存已量到的宽高比，tab 切换重挂载时直接用真实比例，避免图片先变小再占满
+const ratioCache = new Map<string, number>();
+
 function PriceImage({ uri, width, onPress }: { uri: string; width: number; onPress: () => void }) {
-  const [ratio, setRatio] = useState(1);
+  const [ratio, setRatio] = useState(() => ratioCache.get(uri) ?? 1);
   return (
     <Pressable accessibilityLabel="预览价目表图片" onPress={onPress} style={{ width }}>
       <CachedImage
@@ -103,7 +106,10 @@ function PriceImage({ uri, width, onPress }: { uri: string; width: number; onPre
         style={[styles.priceImage, { aspectRatio: ratio }]}
         onLoad={(event) => {
           const { width, height } = event.source;
-          if (width > 0 && height > 0) setRatio(width / height);
+          if (width > 0 && height > 0) {
+            ratioCache.set(uri, width / height);
+            setRatio(width / height);
+          }
         }}
       />
     </Pressable>

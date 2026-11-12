@@ -104,6 +104,7 @@ vi.mock("@/shared/audio/use-voice-player", () => ({
 vi.mock("@/shared/audio/VoicePlayButton", () => ({ VoicePlayButton: "VoicePlayButton" }));
 vi.mock("@/shared/navigation/require-login", () => ({ requireLogin: () => true }));
 vi.mock("@/shared/ui/CachedImage", () => ({ CachedImage: "CachedImage" }));
+vi.mock("@/features/mine/components/JoinClubEntry", () => ({ JoinClubEntry: "JoinClubEntry" }));
 vi.mock("@/shared/ui/app-toast", () => ({ showToast: vi.fn() }));
 vi.mock("@/shared/ui/AppPrompt", () => ({ AppPrompt: "AppPrompt" }));
 vi.mock("@/shared/ui/AsyncStates", () => ({ EmptyState: "EmptyState" }));

@@ -114,6 +114,14 @@ export const voiceRoomApi = {
     );
   },
 
+  /** 只读查询当前账号是否被指定房间实例封禁；入房时仍须走服务端准入校验。 */
+  isVoiceRoomKicked(roomId: string, roomVersion: string | number, token: string) {
+    return post<boolean>(
+      `/client/v1/voiceRoom/${encodeURIComponent(roomId)}/join/kicked?roomVersion=${encodeURIComponent(String(roomVersion))}`,
+      token,
+    );
+  },
+
   getRtcToken(roomId: string, roomVersion: string | number, token: string) {
     return post<VoiceRoomRtcToken>(
       `/client/v1/voiceRoom/${encodeURIComponent(roomId)}/rtc/token?roomVersion=${encodeURIComponent(String(roomVersion))}`,

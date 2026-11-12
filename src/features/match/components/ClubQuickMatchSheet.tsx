@@ -492,6 +492,27 @@ export function ClubQuickMatchSheet({
           styles.sheet,
           { paddingBottom: Math.max(insets.bottom, 12) },
         ]}
+        overlay={
+          <AppPrompt
+            inline
+            visible={exitRoomPromptVisible}
+            title="提示"
+            message="您当前正在语音房中，发布试音需求将退出或解散当前房间，是否继续？"
+            confirmText="继续"
+            cancelText="取消"
+            onCancel={() => {
+              setExitRoomPromptVisible(false);
+              pendingPublishRef.current = null;
+              joinedRoomRef.current = null;
+            }}
+            onConfirm={() => {
+              setExitRoomPromptVisible(false);
+              const task = pendingPublishRef.current;
+              pendingPublishRef.current = null;
+              if (task) void task();
+            }}
+          />
+        }
       >
         <View style={[styles.header, isReception && styles.headerTall]}>
           <View style={styles.headerTitles}>
@@ -740,25 +761,6 @@ export function ClubQuickMatchSheet({
           </Pressable>
         </View>
       </BottomSheet>
-
-      <AppPrompt
-        visible={exitRoomPromptVisible}
-        title="提示"
-        message="您当前正在语音房中，发布试音需求将退出或解散当前房间，是否继续？"
-        confirmText="继续"
-        cancelText="取消"
-        onCancel={() => {
-          setExitRoomPromptVisible(false);
-          pendingPublishRef.current = null;
-          joinedRoomRef.current = null;
-        }}
-        onConfirm={() => {
-          setExitRoomPromptVisible(false);
-          const task = pendingPublishRef.current;
-          pendingPublishRef.current = null;
-          if (task) void task();
-        }}
-      />
     </>
   );
 }
