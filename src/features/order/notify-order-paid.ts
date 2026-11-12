@@ -46,10 +46,21 @@ export async function afterQuickMatchPaidOpenRoom(options: {
   companionUserIds: string[];
   token: string;
   clubId?: string;
+  /** 匹配页支付完成后先退出选人流程，确保退房回到订单列表。 */
+  returnToOrders?: boolean;
 }): Promise<void> {
+  if (options.returnToOrders) {
+    router.dismissTo({ pathname: "/(tabs)/order", params: { scope: "place" } });
+  }
   try {
     const user = useAuthStore.getState().user;
     let room = await voiceRoomApi.getJoinedRoom(options.token);
+    // 频道房不能复用为老板的订单房，保留支付通知但不发送频道房邀请。
+    if (room?.roomType === "CHANNEL") {
+      showToast("自动创建语聊房失败，请先退出当前频道语聊房。");
+      await notifyOrderPaidToCompanions(options.companionUserIds, options.token);
+      return;
+    }
     if (!resolveVoiceRoomId(room)) {
       room = await voiceRoomApi.createRoom(
         `${user?.nickname || "我"}的语聊房`,
