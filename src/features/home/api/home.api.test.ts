@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { apiClient } from "@/core/network/api-client";
-import { fetchBanners, fetchClubDetail, fetchClubGameCompanionCounts, fetchClubGameModes, fetchClubOnlineCount, fetchClubPage, fetchCompanionPage, fetchGameCategories, fetchGames, fetchHomePopup } from "./home.api";
+import { fetchBanners, fetchClubDetail, fetchClubGameCompanionCounts, fetchClubGameModes, fetchClubOnlineCount, fetchClubPage, fetchCompanionPage, fetchGameCategories, fetchGames, fetchHomePopup, fetchPriceList } from "./home.api";
 
 vi.mock("@/core/network/api-client", () => ({ apiClient: vi.fn() }));
 
@@ -10,6 +10,19 @@ vi.mock("@/core/network/api-client", () => ({ apiClient: vi.fn() }));
 vi.mock("react-native", () => ({ Platform: { OS: "ios" } }));
 
 afterEach(() => vi.clearAllMocks());
+
+it("价目表优先使用多图并兼容旧单图，过滤空地址和空分类", async () => {
+  vi.mocked(apiClient).mockResolvedValue({ code: "SUCCESS", data: { tabs: [
+    { menuTitle: "旧分类", imageUrls: [" ", null], imageUrl: " old.jpg ", sortNo: 2 },
+    { menuTitle: "多图", imageUrls: [" a.jpg ", "", null, "b.jpg"], imageUrl: "ignored.jpg", sortNo: 1 },
+    { menuTitle: "空分类", imageUrls: [], imageUrl: " " },
+  ] } });
+
+  expect(await fetchPriceList("group")).toEqual([
+    { menuTitle: "多图", imageUrls: ["a.jpg", "b.jpg"], sortNo: 1 },
+    { menuTitle: "旧分类", imageUrls: ["old.jpg"], sortNo: 2 },
+  ]);
+});
 
 it("俱乐部模式筛选只包含当前俱乐部及未指定俱乐部的模式", async () => {
   vi.mocked(apiClient).mockResolvedValue({ code: "SUCCESS", data: [
