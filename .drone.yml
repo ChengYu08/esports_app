@@ -322,7 +322,7 @@ trigger:
 # prod 分支专用流水线：仅 prod 分支（push / custom）触发，
 # 固定使用 .env.production 构建，默认一次构建两个包：
 #   arm64 纯 64 位包 + universal（32+64）全兼容包。
-# 上传到 dev 下载站正式包目录 /android/esportsapp/prod/<版本>/（与测试包隔离），
+# 上传到 dev 下载站正式包目录 /android/esportsapp/<触发分支>/<版本>/（与测试包隔离），
 # 并在流水线末尾打印构建信息与下载地址。
 # =============================================================================
 kind: pipeline
@@ -435,7 +435,7 @@ steps:
         } > ./drone-build-info.env
         echo "构建元数据已生成: ./drone-build-info.env"
 
-  # prod 正式包不进测试包目录，统一放 /android/esportsapp/prod/<版本>/
+  # prod 正式包不进测试包目录，按触发分支放到 /android/esportsapp/<触发分支>/<版本>/
   - name: move-to-dev-servers
     image: nexus.jinliwangluo.com:8082/appleboy/drone-scp-with-tools:latest
     pull: if-not-exists
@@ -455,7 +455,7 @@ steps:
         version=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' ./app.json | head -1)
         if [ -z "$version" ]; then echo "无法从 app.json 解析 version"; exit 1; fi
         echo "使用版本: $version"
-        target="/home/apps/data/baota/wwwroot/dev.jinliwangluo.com/android/esportsapp/prod/$version/"
+        target="/home/apps/data/baota/wwwroot/dev.jinliwangluo.com/android/esportsapp/$DRONE_BRANCH/$version/"
         echo "目标路径: $target"
         /bin/drone-scp --target "$target"
         echo "文件上传成功"
@@ -548,7 +548,7 @@ steps:
           rest2="$${rest%-*}"
           file_version="$${rest2%-*}"
 
-          url="http://dev.jinliwangluo.com/android/esportsapp/prod/$file_version/$filename"
+          url="http://dev.jinliwangluo.com/android/esportsapp/$DRONE_BRANCH/$file_version/$filename"
           printf "  文件名      : %s\n" "$filename"
           printf "  大小        : %s\n" "$size"
           printf "  应用版本号  : %s\n" "$file_version"
