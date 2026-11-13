@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Text,
   View,
+  type GestureResponderEvent,
 } from "react-native";
 
 import type { VideoPickResult } from "@/shared/media-picker/media-picker-session";
@@ -26,6 +27,7 @@ type CirclePublishVideoTileProps = {
   coverUri: string | null;
   upload: UploadState | null;
   onPick: () => void;
+  onPlay: () => void;
   onRemove: () => void;
   onRetry: () => void;
 };
@@ -36,6 +38,7 @@ export function CirclePublishVideoTile({
   coverUri,
   upload,
   onPick,
+  onPlay,
   onRemove,
   onRetry,
 }: CirclePublishVideoTileProps) {
@@ -46,13 +49,29 @@ export function CirclePublishVideoTile({
     }
     if (!video) {
       onPick();
+      return;
+    }
+    if (upload?.status === "success") {
+      onPlay();
     }
   };
+  const handleRemove = (event: GestureResponderEvent) => {
+    event.stopPropagation();
+    onRemove();
+  };
+
+  const accessibilityLabel = !video
+    ? "选择视频"
+    : upload?.status === "success"
+      ? "播放视频"
+      : upload?.status === "failed"
+        ? "重试上传视频"
+        : "视频上传中";
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="选择视频"
+      accessibilityLabel={accessibilityLabel}
       style={styles.tile}
       onPress={handlePress}
     >
@@ -67,9 +86,11 @@ export function CirclePublishVideoTile({
           ) : (
             <View style={styles.coverPlaceholder} />
           )}
-          <View pointerEvents="none" style={styles.playWrap}>
-            <Play32Regular color="#FFFFFF" width={32} height={32} />
-          </View>
+          {upload?.status === "success" ? (
+            <View pointerEvents="none" style={styles.playWrap}>
+              <Play32Regular color="#FFFFFF" width={32} height={32} />
+            </View>
+          ) : null}
           {upload?.status === "uploading" ? (
             <View style={styles.progress}>
               <Text style={styles.progressText}>{upload.percent}%</Text>
@@ -84,7 +105,7 @@ export function CirclePublishVideoTile({
             accessibilityRole="button"
             accessibilityLabel="移除视频"
             hitSlop={12}
-            onPress={onRemove}
+            onPress={handleRemove}
             style={styles.delete}
           >
             <Dismiss16Regular color="#FFFFFF" width={12} height={12} />

@@ -243,6 +243,7 @@ type ApiMyVideoItem = {
   coverUrl?: string;
   url?: string;
   content?: string;
+  mentions?: CircleContentRef[];
   declaration?: string[];
   status?: CircleVideoStatus;
   violationTypes?: string[];
@@ -262,6 +263,7 @@ export type ProfileCirclePost = {
   durationSec?: number;
   title: string;
   content: string;
+  mentions?: CircleContentRef[];
   declaration?: string[];
   likeCount: number;
   commentCount: number;
@@ -287,6 +289,7 @@ function toProfileCirclePost(item: ApiMyVideoItem): ProfileCirclePost {
     cover: item.coverUrl ? { uri: item.coverUrl } : require("../../../assets/images/bg_publish_dark.webp"),
     title: item.title ?? "",
     content: item.content ?? "",
+    mentions: item.mentions,
     declaration: item.declaration,
     likeCount: item.likeCount ?? 0,
     commentCount: item.commentCount ?? 0,
@@ -318,6 +321,7 @@ export function profileCirclePostToFeedPost(
     orderEnabled: false,
     headline: content && title ? title : undefined,
     content: content || title,
+    mentions: post.mentions,
     declaration: post.declaration,
     tags: [],
     publishedAt: post.publishedAt,
@@ -360,7 +364,7 @@ export async function fetchUserCirclePage({
   };
 }
 
-/** 删除自己发布的视频作品（需登录）。 */
+/** 删除自己发布的视频作品（需登录）。后端删除接口无业务数据，成功时 R 包络的 data 为 null（全局 non_null 序列化后字段缺失）。 */
 export async function deleteMyCircleVideo({
   videoId,
   token,
@@ -376,7 +380,9 @@ export async function deleteMyCircleVideo({
       body: { videoId: Number(videoId) },
     },
   );
-  unwrap(response, "删除视频失败");
+  if (response.code !== "SUCCESS") {
+    throw new Error(response.info || "删除视频失败");
+  }
 }
 
 /** 拉取自己主页盼友圈作品列表（需登录，含全部审核状态）。 */

@@ -1,9 +1,12 @@
 import { Image } from "expo-image";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Dimensions, ScrollView, StyleSheet, View } from "react-native";
 import { Skeleton, SkeletonText } from "@/shared/ui/Skeleton";
 import { colors, radius, spacing } from "@/shared/theme/tokens";
 
 const background = require("../../../../assets/mine/profile-bg.webp");
+
+const CIRCLE_GRID_PADDING = 8;
+const CIRCLE_GRID_GAP = 8;
 
 type ProfileSkeletonProps = {
   topInset?: number;
@@ -110,6 +113,52 @@ function ProfileReviewSkeletonList() {
   );
 }
 
+/** 与个人主页盼友圈瀑布流布局对齐的骨架：双列卡片（封面 + 标题 + 点赞/时间）。 */
+export function ProfileCircleSkeleton() {
+  // 与 ProfileScreen 的 CIRCLE_GRID_* 常量一致，保证骨架与实际卡片同宽。
+  const cardWidth =
+    (Dimensions.get("window").width - CIRCLE_GRID_PADDING * 2 - CIRCLE_GRID_GAP) / 2;
+  const covers: number[] = [0.8, 1.2, 1.1, 0.9];
+  const columns: number[][] = [[], []];
+  covers.forEach((aspect, index) => {
+    columns[index % 2].push(aspect);
+  });
+
+  return (
+    <View
+      accessible
+      accessibilityLabel="盼友圈加载中"
+      accessibilityRole="progressbar"
+      accessibilityState={{ busy: true }}
+      style={styles.circleGrid}
+    >
+      {columns.map((col, colIndex) => (
+        <View key={colIndex} style={styles.circleColumn}>
+          {col.map((aspect, index) => (
+            <View key={index} style={styles.circleCard}>
+              <Skeleton
+                width={cardWidth}
+                height={cardWidth * aspect}
+                radius={0}
+                baseColor={colors.skeleton}
+                highlightColor={colors.skeletonHighlight}
+              />
+              <View style={styles.circleCardBody}>
+                <Skeleton width="92%" height={15} radius={8} />
+                <Skeleton width={index === 0 ? "60%" : "74%"} height={13} radius={7} />
+                <View style={styles.circleCardMeta}>
+                  <Skeleton width={40} height={11} radius={6} />
+                  <Skeleton width={32} height={10} radius={5} />
+                </View>
+              </View>
+            </View>
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface },
   cover: { height: 185, overflow: "hidden", backgroundColor: "#617181" },
@@ -169,6 +218,30 @@ const styles = StyleSheet.create({
   reviewList: { marginTop: spacing.lg, gap: spacing.lg },
   reviewCard: { flexDirection: "row", gap: spacing.md },
   reviewBody: { flex: 1, gap: spacing.sm },
+  circleGrid: {
+    flexDirection: "row",
+    paddingHorizontal: CIRCLE_GRID_PADDING,
+    gap: CIRCLE_GRID_GAP,
+  },
+  circleColumn: {
+    flex: 1,
+    gap: CIRCLE_GRID_GAP,
+  },
+  circleCard: {
+    width: "100%",
+    borderRadius: 8,
+    backgroundColor: "#FFFFFF",
+    overflow: "hidden",
+  },
+  circleCardBody: {
+    padding: 8,
+    gap: 8,
+  },
+  circleCardMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   editButton: { marginHorizontal: spacing.md, marginTop: "auto" },
   actionBar: {
     minHeight: 64,

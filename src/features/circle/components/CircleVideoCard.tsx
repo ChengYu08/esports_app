@@ -6,7 +6,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -43,6 +43,7 @@ import { CircleCommentSheet } from "@/features/circle/components/CircleCommentSh
 import { CircleContentText } from "@/features/circle/components/CircleContentText";
 import { CircleMoreActionsSheet } from "@/features/circle/components/CircleMoreActionsSheet";
 import { CircleVideoPlayer } from "@/features/circle/components/CircleVideoPlayer";
+import { CircleVideoProgressBar } from "@/features/circle/components/CircleVideoProgressBar";
 import { addToBlacklist } from "@/features/mine/blacklist";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
@@ -85,6 +86,8 @@ export function CircleVideoCard({
 }: CircleVideoCardProps) {
   const token = useAuthStore((state) => state.accessToken);
   const currentUserId = useAuthStore((state) => state.user?.id);
+  // 自己的作品：不展示关注按钮与更多操作（举报/拉黑对自己无意义）
+  const isOwnPost = Boolean(post.authorId) && String(currentUserId ?? "") === post.authorId;
   const [liked, setLiked] = useRecyclingState(post.liked ?? false, [
     post.id,
     post.liked,
@@ -114,6 +117,7 @@ export function CircleVideoCard({
   const blockingRef = useRef(false);
   const [playError, setPlayError] = useRecyclingState(false, [post.id, active]);
   const [playerAttempt, setPlayerAttempt] = useRecyclingState(0, [post.id]);
+  const [scrubbing, setScrubbing] = useRecyclingState(false, [post.id, active]);
   const { slot: poolSlot, player: poolPlayer } = usePooledCirclePlayer({
     feedId,
     post,
@@ -162,6 +166,7 @@ export function CircleVideoCard({
   });
   const actionBarBottom = TAB_CONTENT_HEIGHT + bottomInset + BOTTOM_INFO_HEIGHT;
   const bottomPadding = TAB_CONTENT_HEIGHT + bottomInset + 12;
+  const progressBottom = TAB_CONTENT_HEIGHT + bottomInset - 8;
   const contentTopics = new Set(
     splitCircleTopicText(post.content).flatMap((segment) =>
       segment.topic ? [segment.topic] : [],
@@ -174,14 +179,20 @@ export function CircleVideoCard({
     .filter((item) => item && item !== NO_DECLARATION)
     .join("、");
 
-  useEffect(() => {
+  // 仅换视频或换播放器时恢复封面，等待当前视频首帧确认后再淡出。
+  useLayoutEffect(() => {
+    frameReadyRef.current = false;
     cancelAnimation(coverOpacity);
     coverOpacity.set(1);
-    if (active && frameReadyRef.current) {
-      coverOpacity.set(withTiming(0, { duration: 180 }));
-    }
+  }, [coverOpacity, playerAttempt, poolSlot, post.id]);
+
+  useEffect(() => {
     if (!active && !shouldPreload && !shouldRetain) {
       frameReadyRef.current = false;
+      cancelAnimation(coverOpacity);
+      coverOpacity.set(1);
+    } else if (active && frameReadyRef.current) {
+      coverOpacity.set(withTiming(0, { duration: 180 }));
     }
   }, [
     active,
@@ -200,6 +211,7 @@ export function CircleVideoCard({
     }
   }, [active, coverOpacity, setPlayError]);
   const handlePlayerError = useCallback(() => {
+    frameReadyRef.current = false;
     setPlayError(true);
     onPlaybackChange(false);
     cancelAnimation(coverOpacity);
@@ -343,12 +355,13 @@ export function CircleVideoCard({
       {active ? (
         <Pressable
           accessibilityLabel={playing ? "暂停视频" : "播放视频"}
+          disabled={scrubbing}
           onPress={handlePlay}
           style={styles.playButton}
         >
           {playError ? (
             <Text style={styles.retryText}>播放失败，点击重试</Text>
-          ) : !playing ? (
+          ) : !playing || scrubbing ? (
             <Image
               source={require("../../../../assets/svgs/circle-play.svg")}
               style={styles.playIcon}
@@ -357,7 +370,7 @@ export function CircleVideoCard({
         </Pressable>
       ) : null}
 
-      <View style={[styles.actionBar, { bottom: actionBarBottom }]}>
+      {!scrubbing ? <View style={[styles.actionBar, { bottom: actionBarBottom }]}>
         <View style={styles.avatarItem}>
           <Pressable
             accessibilityRole="button"
@@ -380,7 +393,7 @@ export function CircleVideoCard({
               contentFit="cover"
             />
           </Pressable>
-          {!followed ? (
+          {!followed && !isOwnPost ? (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`关注${post.author}`}
@@ -414,22 +427,25 @@ export function CircleVideoCard({
             {formatCircleCount(post.commentCount)}
           </Text>
         </Pressable>
-        <Pressable
-          accessibilityLabel="更多操作"
-          accessibilityRole="button"
-          style={styles.actionItem}
-          onPress={handleMoreActions}
-        >
-          <CircleMoreIcon color="#FFFFFF" />
-        </Pressable>
-      </View>
+        {!isOwnPost ? (
+          <Pressable
+            accessibilityLabel="更多操作"
+            accessibilityRole="button"
+            style={styles.actionItem}
+            onPress={handleMoreActions}
+          >
+            <CircleMoreIcon color="#FFFFFF" />
+            <Text style={styles.actionCount}>更多</Text>
+          </Pressable>
+        ) : null}
+      </View> : null}
 
       <LinearGradient
         colors={["rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0.7)"]}
         style={[styles.bottomGradient, { paddingBottom: bottomPadding }]}
         pointerEvents="none"
       />
-      <View style={[styles.bottomInfo, { paddingBottom: bottomPadding }]}>
+      {!scrubbing ? <View style={[styles.bottomInfo, { paddingBottom: bottomPadding }]}>
         <View style={styles.contentGroup}>
           {post.orderEnabled ? (
             <Pressable accessibilityLabel="去下单" onPress={handleOrder}>
@@ -473,14 +489,12 @@ export function CircleVideoCard({
                 <Text style={styles.expand}>{expanded ? "收起" : "展开"}</Text>
               </Pressable>
             ) : null}
-            <Text
-              onTextLayout={handleContentMeasure}
-              pointerEvents="none"
-              style={[styles.content, styles.contentMeasure]}
-            >
-              {post.content}
-              <Text style={styles.tags}> {extraTags.join(" ")}</Text>
-            </Text>
+            <View pointerEvents="none" style={styles.contentMeasure}>
+              <Text onTextLayout={handleContentMeasure} style={styles.content}>
+                {post.content}
+                <Text style={styles.tags}> {extraTags.join(" ")}</Text>
+              </Text>
+            </View>
           </View>
         </View>
         <View style={styles.metaRow}>
@@ -489,7 +503,21 @@ export function CircleVideoCard({
             <Text style={styles.meta}>作者声明：{declarationText}</Text>
           ) : null}
         </View>
-      </View>
+      </View> : null}
+
+      {active && !playing && poolPlayer && poolSlot !== null && post.videoUrl ? (
+        <CircleVideoProgressBar
+          key={`${post.id}:${poolSlot}`}
+          player={poolPlayer}
+          slot={poolSlot}
+          postId={post.id}
+          videoUrl={post.videoUrl}
+          active={active}
+          playing={playing}
+          bottom={progressBottom}
+          onScrubbingChange={setScrubbing}
+        />
+      ) : null}
 
       <CircleCommentSheet
         visible={commentSheetVisible}

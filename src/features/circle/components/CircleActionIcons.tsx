@@ -62,9 +62,9 @@ export const CircleCommentIcon = memo(function CircleCommentIcon({ color }: Icon
 export const CircleMoreIcon = memo(function CircleMoreIcon({ color }: IconProps) {
   return (
     <Svg width={SIZE} height={SIZE} viewBox="0 0 40 40" fill="none" opacity={OPACITY}>
-      <Circle cx={11} cy={20} r={3} fill={color} />
-      <Circle cx={20} cy={20} r={3} fill={color} />
-      <Circle cx={29} cy={20} r={3} fill={color} />
+      <Circle cx={10} cy={20} r={2.5} fill={color} />
+      <Circle cx={20} cy={20} r={2.5} fill={color} />
+      <Circle cx={30} cy={20} r={2.5} fill={color} />
     </Svg>
   );
 });

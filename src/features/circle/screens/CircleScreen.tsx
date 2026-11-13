@@ -1,6 +1,6 @@
 import { Camera24Regular, Search24Regular } from "@fluentui/react-native-icons";
 import { FlashList } from "@shopify/flash-list";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { infiniteQueryOptions, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
@@ -33,6 +33,19 @@ const TOP_MASK_HEIGHT = 120;
 const TAB_SWIPE_DISTANCE = 60;
 const TAB_SWIPE_VELOCITY = 700;
 
+function circleFeedQueryOptions(kind: CircleFeedKind, accessToken: string | null | undefined) {
+  return infiniteQueryOptions({
+    queryKey: ["circle-feed", kind, accessToken ?? "guest"],
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam, signal }) =>
+      fetchCircleFeedPage({ kind, cursor: pageParam, token: accessToken ?? undefined, signal }),
+    getNextPageParam: (lastPage) =>
+      lastPage.hasMore && lastPage.nextCursor ? lastPage.nextCursor : undefined,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+  });
+}
+
 type CircleScreenProps = {
   active: boolean;
   bottomInset: number;
@@ -41,6 +54,8 @@ type CircleScreenProps = {
 export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
   const insets = useSafeAreaInsets();
   const [kind, setKind] = useState<CircleFeedKind>("latest");
+  const [pendingKind, setPendingKind] = useState<CircleFeedKind | null>(null);
+  const selectionRequestRef = useRef(0);
   const [activePage, setActivePage] = useState<{ kind: CircleFeedKind; index: number }>({
     kind: "latest",
     index: 0,
@@ -53,6 +68,7 @@ export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
   const [feedHeight, setFeedHeight] = useState(0);
   const [appIsActive, setAppIsActive] = useState(AppState.currentState === "active");
   const listRef = useRef<FlashListRef<CircleVideoPost>>(null);
+  const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
   const isCompanion = useAuthStore((state) => state.isCompanion);
   const blockedUserIds = useCircleBlockedUserIds();
@@ -64,15 +80,8 @@ export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
   const activeIndex = activePage.kind === feedKind ? activePage.index : 0;
 
   const feedQuery = useInfiniteQuery({
-    queryKey: ["circle-feed", feedKind, accessToken ?? "guest"],
+    ...circleFeedQueryOptions(feedKind, accessToken),
     enabled: active,
-    initialPageParam: null as string | null,
-    queryFn: ({ pageParam, signal }) =>
-      fetchCircleFeedPage({ kind: feedKind, cursor: pageParam, token: accessToken ?? undefined, signal }),
-    getNextPageParam: (lastPage) =>
-      lastPage.hasMore && lastPage.nextCursor ? lastPage.nextCursor : undefined,
-    staleTime: 30_000,
-    gcTime: 5 * 60_000,
   });
 
   const posts = useMemo(
@@ -114,6 +123,10 @@ export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
     return () => subscription.remove();
   }, []);
 
+  useEffect(() => () => {
+    selectionRequestRef.current += 1;
+  }, []);
+
   // 路由焦点仲裁：active 含 HomeScreen 的 topTab 与路由 focus，push 话题页/作品页时让出播放权
   useEffect(() => {
     if (active) {
@@ -123,19 +136,34 @@ export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
     }
   }, [active]);
 
-  useEffect(() => {
-    listRef.current?.scrollToOffset({ offset: 0, animated: false });
-  }, [feedKind]);
-
   const selectKind = useCallback((next: CircleFeedKind) => {
     if (next === "follow" && !requireLogin()) {
       return;
     }
-    setKind(next);
-    setActivePage({ kind: next, index: 0 });
-    setHasSwiped(false);
-    setManualPlayback(null);
-  }, []);
+    const request = ++selectionRequestRef.current;
+    if (next === feedKind) {
+      setPendingKind(null);
+      return;
+    }
+    const commit = () => {
+      if (selectionRequestRef.current !== request) {
+        return;
+      }
+      setKind(next);
+      setActivePage({ kind: next, index: 0 });
+      setHasSwiped(false);
+      setManualPlayback(null);
+      setPendingKind(null);
+    };
+    const options = circleFeedQueryOptions(next, accessToken);
+    if (queryClient.getQueryData(options.queryKey)) {
+      commit();
+      return;
+    }
+    // 数据到位后才选中目标 tab，加载期间保持当前视频与 tab 一致。
+    setPendingKind(next);
+    void queryClient.fetchInfiniteQuery(options).then(commit, commit);
+  }, [accessToken, feedKind, queryClient]);
 
   const tabSwipeGesture = useMemo(
     () =>
@@ -145,6 +173,8 @@ export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
         .activeOffsetX([-20, 20])
         .failOffsetY([-16, 16])
         .runOnJS(true)
+        // 手势回调仅在滑动结束时执行，请求序号不会在渲染期间读取。
+        // eslint-disable-next-line react-hooks/refs
         .onEnd((event, success) => {
           if (!success || Math.abs(event.translationX) <= Math.abs(event.translationY)) {
             return;
@@ -215,6 +245,7 @@ export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
     >
       {feedHeight > 0 ? (
         <FlashList
+          key={feedKind}
           ref={listRef}
           data={posts}
           extraData={listExtraData}
@@ -294,14 +325,16 @@ export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
               <Pressable
                 key={item.key}
                 accessibilityRole="tab"
-                accessibilityState={{ selected }}
+                accessibilityState={{ selected, busy: pendingKind === item.key }}
                 onPress={() => selectKind(item.key)}
                 style={styles.navTab}
               >
                 <Text style={[styles.navTabText, selected && styles.navTabTextSelected]}>
                   {item.label}
                 </Text>
-                {selected ? <View style={styles.navTabIndicator} /> : null}
+                {selected || pendingKind === item.key ? (
+                  <View style={[styles.navTabIndicator, !selected && styles.navTabPendingIndicator]} />
+                ) : null}
               </Pressable>
             );
           })}
@@ -368,6 +401,7 @@ const styles = StyleSheet.create({
     borderRadius: 1,
     backgroundColor: "#FFFFFF",
   },
+  navTabPendingIndicator: { backgroundColor: "rgba(255, 255, 255, 0.4)" },
   stateOverlay: {
     position: "absolute",
     top: 0,

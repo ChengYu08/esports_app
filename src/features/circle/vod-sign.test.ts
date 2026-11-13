@@ -62,6 +62,20 @@ describe("buildVolcAuthorization", () => {
     );
   });
 
+  it("按实际请求头值生成 ApplyUploadInfo 签名", () => {
+    const auth = buildVolcAuthorization({
+      method: "GET",
+      params: { Action: "ApplyUploadInfo", Version: "2022-01-01" },
+      headers,
+      accessKeyId: "ak-test",
+      secretAccessKey: "sk-test",
+    });
+    // 固定向量由独立的 Node crypto HMAC-SHA256 计算，规范头包含 X-Date 与 STS Token 的真实值。
+    expect(auth.split("Signature=")[1]).toBe(
+      "a2463c1f2230684d480e403f6d7d51fdccb862c650d6a126e0d820e670bca2bd",
+    );
+  });
+
   it("同输入产生确定性签名（本地幂等）", () => {
     const args = {
       method: "POST" as const,

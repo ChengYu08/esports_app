@@ -61,7 +61,7 @@ function volcSignTime(): Date {
   return new Date(Date.now() + clockGapMs);
 }
 
-/** 火山 OpenAPI 请求头（含 V4 签名）；body 存在时补 JSON 头与内容摘要。 */
+/** 火山 OpenAPI 请求头（含 V4 签名）；提交请求使用与 PC SDK 一致的表单正文。 */
 function volcApiHeaders({
   sign,
   params,
@@ -78,7 +78,7 @@ function volcApiHeaders({
     "x-security-token": sign.sessionToken,
   };
   if (body !== undefined) {
-    headers["Content-Type"] = "application/json";
+    headers["Content-Type"] = "application/x-www-form-urlencoded";
     headers["X-Content-Sha256"] = SHA256(body).toString();
   }
   headers.Authorization = buildVolcAuthorization({
@@ -124,7 +124,13 @@ async function volcApiRequest({
   method: "GET" | "POST";
   body?: Record<string, unknown>;
 }): Promise<Record<string, unknown>> {
-  const bodyText = body !== undefined ? JSON.stringify(body) : undefined;
+  const bodyText = body !== undefined
+    ? Object.entries(body)
+        .map(([key, value]) =>
+          `${key}=${encodeURIComponent(typeof value === "string" ? value : JSON.stringify(value))}`,
+        )
+        .join("&")
+    : undefined;
   let lastError: Error | null = null;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const headers = volcApiHeaders({ sign, params, method, body: bodyText });
@@ -136,7 +142,7 @@ async function volcApiRequest({
     const payload = await response.json().catch(() => null);
     const meta = payload?.ResponseMetadata;
     if (response.ok && !meta?.Error) {
-      return (payload?.Result ?? {}) as Record<string, unknown>;
+      return (payload?.Result?.Data ?? payload?.Result ?? {}) as Record<string, unknown>;
     }
     lastError = new Error(meta?.Error?.Message || "请求失败");
     if (meta?.Error?.CodeN === 100006) {

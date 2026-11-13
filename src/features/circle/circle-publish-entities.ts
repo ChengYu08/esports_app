@@ -89,3 +89,60 @@ export function applyTriggerSelection(content: string, trigger: "#" | "@", label
   const prefix = content.endsWith(trigger) ? content : `${content}${trigger}`;
   return `${prefix}${label} `;
 }
+
+/** 记录面板选中的实体位置；同名用户也保留各自的 ID。 */
+export function applyCircleRefSelection(
+  content: string,
+  trigger: "#" | "@",
+  selected: { id: string; label: string },
+): { content: string; ref: CircleContentRef } {
+  const nextContent = applyTriggerSelection(content, trigger, selected.label);
+  const length = toCodePoints(`${trigger}${selected.label}`).length;
+  return {
+    content: nextContent,
+    ref: {
+      id: selected.id,
+      label: selected.label,
+      offset: toCodePoints(nextContent).length - length - 1,
+      length,
+    },
+  };
+}
+
+/** 输入框改变文字时移动未受影响的实体；改到实体内部则取消关联。 */
+export function shiftCircleContentRefs(
+  before: string,
+  after: string,
+  refs: CircleContentRef[],
+  trigger: "#" | "@",
+): CircleContentRef[] {
+  const oldPoints = toCodePoints(before);
+  const newPoints = toCodePoints(after);
+  let prefix = 0;
+  while (prefix < Math.min(oldPoints.length, newPoints.length)
+    && oldPoints[prefix] === newPoints[prefix]) {
+    prefix += 1;
+  }
+  let suffix = 0;
+  while (suffix < Math.min(oldPoints.length, newPoints.length) - prefix
+    && oldPoints[oldPoints.length - suffix - 1] === newPoints[newPoints.length - suffix - 1]) {
+    suffix += 1;
+  }
+  const oldChangedEnd = oldPoints.length - suffix;
+  const delta = newPoints.length - oldPoints.length;
+
+  return refs.flatMap((ref) => {
+    let offset = ref.offset;
+    if (ref.offset + ref.length <= prefix) {
+      // 实体在修改位置之前。
+    } else if (ref.offset >= oldChangedEnd) {
+      offset += delta;
+    } else {
+      return [];
+    }
+    const nextRef = { ...ref, offset };
+    return sliceByCodePoints(after, offset, ref.length) === `${trigger}${ref.label}`
+      ? [nextRef]
+      : [];
+  });
+}

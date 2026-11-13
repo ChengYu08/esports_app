@@ -1,5 +1,8 @@
 import { useAuthStore } from "@esports/auth";
-import { Checkmark16Regular, Dismiss16Regular } from "@fluentui/react-native-icons";
+import {
+  Checkmark16Regular,
+  Dismiss16Regular,
+} from "@fluentui/react-native-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import * as VideoThumbnails from "expo-video-thumbnails";
@@ -21,16 +24,24 @@ import { EmojiKeyboard, type EmojiType } from "rn-emoji-keyboard";
 import { APP_LINKS } from "@/core/config/links";
 import {
   activeTriggerDraft,
+  applyCircleRefSelection,
   applyTriggerSelection,
   buildCircleContentRefs,
+  shiftCircleContentRefs,
 } from "@/features/circle/circle-publish-entities";
 import {
   fetchCircleDeclarations,
   fetchCircleTopicOptions,
   fetchCircleUploadSign,
   publishCircleVideo,
+  type CircleContentRef,
   type CircleTopicOption,
 } from "@/features/circle/circle-publish.api";
+import {
+  CirclePublishVideoTile,
+  type UploadState,
+} from "@/features/circle/components/CirclePublishVideoTile";
+import { HighlightedInput } from "@/features/circle/components/HighlightedInput";
 import { uploadVideoToVod } from "@/features/circle/vod-upload";
 import { useMessageStore } from "@/features/message/message-store";
 import { getConversationDisplayTitle } from "@/features/message/message-title";
@@ -48,11 +59,6 @@ import { SYSTEM_FONT } from "@/shared/theme/typography";
 import { showToast } from "@/shared/ui/app-toast";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
-import { HighlightedInput } from "@/features/circle/components/HighlightedInput";
-import {
-  CirclePublishVideoTile,
-  type UploadState,
-} from "@/features/circle/components/CirclePublishVideoTile";
 
 const atIcon = require("../../../../assets/svgs/circle-publish-at.svg");
 const emojiIcon = require("../../../../assets/svgs/circle-publish-emoji.svg");
@@ -110,7 +116,7 @@ export default function CirclePublishScreen() {
   const [coverUri, setCoverUri] = useState<string | null>(null);
   const [upload, setUpload] = useState<UploadState | null>(null);
   const [selectedTopics, setSelectedTopics] = useState<CircleTopicOption[]>([]);
-  const [mentionedUsers, setMentionedUsers] = useState<MentionUser[]>([]);
+  const [mentionRefs, setMentionRefs] = useState<CircleContentRef[]>([]);
   const [declarations, setDeclarations] = useState<string[]>([]);
   const [declarationDraft, setDeclarationDraft] = useState<string[]>([]);
   const [declarationOptions, setDeclarationOptions] = useState<string[]>([]);
@@ -179,17 +185,6 @@ export default function CirclePublishScreen() {
           avatar: conversation.avatar,
         })),
     [blacklistedUserIds, conversations, viewerUserId],
-  );
-
-  /** 输入框高亮用：id→昵称 字典，命中正文里真实出现的 @昵称。 */
-  const mentionNameDict = useMemo<Record<string, string>>(
-    () =>
-      Object.fromEntries(
-        mentionedUsers
-          .filter((user) => user.nickname)
-          .map((user) => [user.id, user.nickname]),
-      ),
-    [mentionedUsers],
   );
 
   const topicKeyword = useMemo(() => {
@@ -301,6 +296,17 @@ export default function CirclePublishScreen() {
     void startUpload(video);
   };
 
+  const handlePlayVideo = () => {
+    if (!video || upload?.status !== "success") {
+      return;
+    }
+    Keyboard.dismiss();
+    router.push({
+      pathname: "/circle/video-preview",
+      params: { uri: video.uri },
+    });
+  };
+
   const handleContentChange = (value: string) => {
     setContent(value);
     const draft = activeTriggerDraft(value);
@@ -313,8 +319,8 @@ export default function CirclePublishScreen() {
     setSelectedTopics((current) =>
       current.filter((topic) => value.includes(`#${topic.topicName}`)),
     );
-    setMentionedUsers((current) =>
-      current.filter((user) => value.includes(`@${user.nickname}`)),
+    setMentionRefs((current) =>
+      shiftCircleContentRefs(content, value, current, "@"),
     );
   };
 
@@ -331,12 +337,15 @@ export default function CirclePublishScreen() {
   };
 
   const handleMentionSelect = (user: MentionUser) => {
-    setMentionedUsers((current) =>
-      current.some((item) => item.id === user.id)
-        ? current
-        : [...current, user],
-    );
-    setContent((current) => applyTriggerSelection(current, "@", user.nickname));
+    const selection = applyCircleRefSelection(content, "@", {
+      id: user.id,
+      label: user.nickname,
+    });
+    setContent(selection.content);
+    setMentionRefs((current) => [
+      ...shiftCircleContentRefs(content, selection.content, current, "@"),
+      selection.ref,
+    ]);
     setPanel("none");
   };
 
@@ -443,11 +452,7 @@ export default function CirclePublishScreen() {
           })),
           "#",
         ),
-        mentions: buildCircleContentRefs(
-          content,
-          mentionedUsers.map((user) => ({ id: user.id, label: user.nickname })),
-          "@",
-        ),
+        mentions: mentionRefs,
         declarations,
         token,
       });
@@ -524,7 +529,7 @@ export default function CirclePublishScreen() {
           style={styles.contentInput}
           containerStyle={styles.contentInputContainer}
           highlightStyle={styles.contentHighlight}
-          mentions={mentionNameDict}
+          mentions={mentionRefs}
           maxLength={1000}
           multiline
           textAlignVertical="top"
@@ -546,6 +551,7 @@ export default function CirclePublishScreen() {
           }}
           onRemove={handleRemoveVideo}
           onRetry={handleRetryUpload}
+          onPlay={handlePlayVideo}
         />
 
         <View style={styles.chipRow}>
@@ -659,10 +665,7 @@ export default function CirclePublishScreen() {
           </View>
           {panel === "emoji" ? (
             <View
-              style={[
-                styles.emojiPanel,
-                { height: 340 + insets.bottom + 10 },
-              ]}
+              style={[styles.emojiPanel, { height: 340 + insets.bottom + 10 }]}
             >
               <EmojiKeyboard
                 categoryPosition="bottom"
@@ -804,7 +807,9 @@ function TopicPanel({
                 <Text style={styles.topicName} numberOfLines={1}>
                   #{option.topicName}
                 </Text>
-                {heatText ? <Text style={styles.topicHeat}>{heatText}</Text> : null}
+                {heatText ? (
+                  <Text style={styles.topicHeat}>{heatText}</Text>
+                ) : null}
               </Pressable>
             );
           })}
@@ -984,6 +989,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#0D0D0F",
     paddingVertical: 0,
+    paddingLeft: 0,
   },
   titleCount: {
     fontFamily: SYSTEM_FONT,

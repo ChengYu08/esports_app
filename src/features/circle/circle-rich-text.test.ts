@@ -64,4 +64,18 @@ describe("splitCircleRichText", () => {
       { text: "@张三", userId: "1001" },
     ]);
   });
+
+  it("输入草稿高亮未选中的 @用户，但展示正文不把它当成链接", () => {
+    const content = "找 @张三 和 #五杀";
+    expect(splitCircleRichText(content)).toEqual([
+      { text: "找 @张三 和 " },
+      { text: "#五杀", topic: "五杀" },
+    ]);
+    expect(splitCircleRichText(content, undefined, true)).toEqual([
+      { text: "找 " },
+      { text: "@张三", unresolvedMention: true },
+      { text: " 和 " },
+      { text: "#五杀", topic: "五杀" },
+    ]);
+  });
 });

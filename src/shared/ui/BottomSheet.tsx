@@ -61,6 +61,7 @@ export function BottomSheet({
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const [mounted, setMounted] = useState(visible);
+  const modalShownRef = useRef(false);
   // 经 ref 读最新回调：退场完成时机在动画回调里，避免闭包拿到旧 props
   const onExitedRef = useRef(onExited);
   useEffect(() => {
@@ -70,6 +71,26 @@ export function BottomSheet({
   const exitSeqRef = useRef(0);
   const [backdropOpacity] = useState(() => new Animated.Value(0));
   const [sheetTranslateY] = useState(() => new Animated.Value(windowHeight));
+  const startEntrance = useCallback(() => {
+    backdropOpacity.stopAnimation();
+    sheetTranslateY.stopAnimation();
+    backdropOpacity.setValue(0);
+    sheetTranslateY.setValue(windowHeight);
+    Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        toValue: 1,
+        duration: 180,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(sheetTranslateY, {
+        toValue: 0,
+        duration: 260,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [backdropOpacity, sheetTranslateY, windowHeight]);
   // Android 的 Modal 是独立 Dialog 窗口，键盘避让没有可靠的静态公式：
   // 键盘弹出后系统把 Dialog 窗口原生缩小（底边上移），但 JS 布局树的 onLayout /
   // Dimensions 全部停留在旧值，任何用「布局高度」推 pad 的公式都会失真。
@@ -163,27 +184,12 @@ export function BottomSheet({
     if (visible) {
       // 重新拉起使尚未派发的 onExited 失效
       exitSeqRef.current += 1;
-      // Keep the native Modal mounted while the entrance animation starts.
+      // 等原生 Modal 显示后再启动入场，避免复杂弹窗跳过前半段动画。
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setMounted(true);
-      backdropOpacity.stopAnimation();
-      sheetTranslateY.stopAnimation();
-      backdropOpacity.setValue(0);
-      sheetTranslateY.setValue(windowHeight);
-      Animated.parallel([
-        Animated.timing(backdropOpacity, {
-          toValue: 1,
-          duration: 180,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(sheetTranslateY, {
-          toValue: 0,
-          duration: 260,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]).start();
+      if (modalShownRef.current) {
+        startEntrance();
+      }
       return;
     }
 
@@ -203,6 +209,7 @@ export function BottomSheet({
       }),
     ]).start(({ finished }) => {
       if (finished) {
+        modalShownRef.current = false;
         setMounted(false);
         onClosed?.();
         // Modal 卸载提交后的下一帧再派发：调用方接着挂载下一个弹窗，
@@ -216,7 +223,7 @@ export function BottomSheet({
     });
   // `mounted` must not restart the entrance animation after it is set.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [backdropOpacity, onClosed, sheetTranslateY, visible, windowHeight]);
+  }, [backdropOpacity, onClosed, sheetTranslateY, startEntrance, visible, windowHeight]);
 
   if (!mounted) return null;
 
@@ -274,6 +281,12 @@ export function BottomSheet({
       animationType="none"
       statusBarTranslucent
       visible
+      onShow={() => {
+        modalShownRef.current = true;
+        if (visible) {
+          startEntrance();
+        }
+      }}
       onRequestClose={onRequestClose ?? onClose}
     >
       {/* Toast 需挂到 Modal 窗口内，否则会被原生 Modal 挡住 */}

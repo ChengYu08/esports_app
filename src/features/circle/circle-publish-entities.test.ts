@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   activeTriggerDraft,
+  applyCircleRefSelection,
   applyTriggerSelection,
   buildCircleContentRefs,
+  shiftCircleContentRefs,
   sliceByCodePoints,
 } from "@/features/circle/circle-publish-entities";
 
@@ -65,5 +67,48 @@ describe("applyTriggerSelection", () => {
 
   it("结尾已有触发符时不重复", () => {
     expect(applyTriggerSelection("正文#", "#", "话题")).toBe("正文#话题 ");
+  });
+
+  it("评论中的 @ 草稿选中用户后不会留下旧关键词", () => {
+    expect(applyTriggerSelection("找 @张", "@", "张三")).toBe("找 @张三 ");
+  });
+});
+
+describe("选中的 @用户 引用", () => {
+  it("同名用户保留各自 ID，手打的重复昵称不增加引用", () => {
+    const first = applyCircleRefSelection("", "@", { id: "1", label: "张三" });
+    const second = applyCircleRefSelection(first.content, "@", { id: "2", label: "张三" });
+    expect([first.ref, second.ref]).toEqual([
+      { id: "1", label: "张三", offset: 0, length: 3 },
+      { id: "2", label: "张三", offset: 4, length: 3 },
+    ]);
+    expect(shiftCircleContentRefs(second.content, `${second.content}@张三`, [first.ref, second.ref], "@"))
+      .toEqual([first.ref, second.ref]);
+  });
+
+  it("前方编辑会移动引用，编辑引用本身会取消关联", () => {
+    const selected = applyCircleRefSelection("😀", "@", { id: "1", label: "张三" });
+    const shifted = shiftCircleContentRefs(selected.content, `你好${selected.content}`, [selected.ref], "@");
+    expect(shifted).toEqual([{ ...selected.ref, offset: 3 }]);
+    expect(shiftCircleContentRefs(`你好${selected.content}`, "你好😀@李四 ", shifted, "@"))
+      .toEqual([]);
+  });
+
+  it("同一位置重新选择用户时旧引用失效", () => {
+    const first = applyCircleRefSelection("", "@", { id: "1", label: "张三" });
+    const withoutSpace = first.content.trimEnd();
+    const kept = shiftCircleContentRefs(first.content, withoutSpace, [first.ref], "@");
+    const second = applyCircleRefSelection(withoutSpace, "@", { id: "2", label: "李四" });
+    expect(shiftCircleContentRefs(withoutSpace, second.content, kept, "@"))
+      .toEqual([]);
+    expect(second.ref.id).toBe("2");
+  });
+
+  it("评论提交时去掉前后空格仍保持码点位置", () => {
+    const selected = applyCircleRefSelection("  ", "@", { id: "1", label: "张三" });
+    const withoutLeading = selected.content.trimStart();
+    const leadingAdjusted = shiftCircleContentRefs(selected.content, withoutLeading, [selected.ref], "@");
+    expect(shiftCircleContentRefs(withoutLeading, withoutLeading.trim(), leadingAdjusted, "@"))
+      .toEqual([{ ...selected.ref, offset: 0 }]);
   });
 });

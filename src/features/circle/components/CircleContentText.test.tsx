@@ -57,4 +57,59 @@ describe("CircleContentText topic links", () => {
       params: { topic: "电竞赛事" },
     });
   });
+
+  it("带位置的 @用户 使用独立样式并跳转对应用户", async () => {
+    const linkStyle = { color: "#1540AD" };
+    const mentionStyle = { color: "#FFD04D" };
+    await act(async () => {
+      renderer = create(
+        <CircleContentText
+          content="@张三 #五杀"
+          mentions={[{ id: "42", label: "张三", offset: 0, length: 3 }]}
+          linkStyle={linkStyle}
+          mentionStyle={mentionStyle}
+        />,
+      );
+    });
+
+    const links = renderer?.root.findAll(
+      (node) => node.type === TextHost && node.props.accessibilityRole === "link",
+    );
+    expect(links?.map((node) => node.props.style)).toEqual([mentionStyle, linkStyle]);
+
+    await act(async () => {
+      links?.[0].props.onPress();
+      links?.[1].props.onPress();
+    });
+
+    expect(router.push).toHaveBeenNthCalledWith(1, {
+      pathname: "/profile",
+      params: { userId: "42" },
+    });
+    expect(router.push).toHaveBeenNthCalledWith(2, {
+      pathname: "/circle/search",
+      params: { topic: "五杀" },
+    });
+  });
+
+  it("未绑定用户 ID 的 @xx 在评论和视频描述里仍有样式", async () => {
+    const linkStyle = { color: "#1540AD" };
+    const mentionStyle = { color: "#FFD04D" };
+    await act(async () => {
+      renderer = create(
+        <CircleContentText
+          content="提到 @xx 和 #五杀"
+          linkStyle={linkStyle}
+          mentionStyle={mentionStyle}
+        />,
+      );
+    });
+
+    const styled = renderer?.root.findAll(
+      (node) => node.type === TextHost && (node.props.style === mentionStyle || node.props.style === linkStyle),
+    );
+    expect(styled?.map((node) => node.props.children)).toEqual(["@xx", "#五杀"]);
+    expect(styled?.[0].props.accessibilityRole).toBeUndefined();
+    expect(styled?.[1].props.accessibilityRole).toBe("link");
+  });
 });

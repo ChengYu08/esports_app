@@ -107,7 +107,7 @@ export default function CircleUserVideosScreen() {
       const author = { userId, nickname, avatar };
       const seen = new Set<string>();
       return (videoQuery.data?.pages.flatMap((page) => page.list) ?? [])
-        .filter((post) => post.status === "APPROVED" && post.videoUrl !== "")
+        .filter((post) => post.videoUrl !== "")
         .map((post) => profileCirclePostToFeedPost(post, author))
         .filter((post) => {
           if (seen.has(post.id)) {

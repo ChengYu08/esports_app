@@ -47,7 +47,12 @@ import { CircleCommentHeartIcon } from "@/features/circle/components/CircleActio
 import { CircleContentText } from "@/features/circle/components/CircleContentText";
 import { CircleTopicLinks } from "@/features/circle/components/CircleTopicLinks";
 import { HighlightedInput } from "@/features/circle/components/HighlightedInput";
-import { buildCircleContentRefs } from "@/features/circle/circle-publish-entities";
+import {
+  activeTriggerDraft,
+  applyCircleRefSelection,
+  shiftCircleContentRefs,
+} from "@/features/circle/circle-publish-entities";
+import type { CircleContentRef } from "@/features/circle/circle-publish.api";
 import { normalizeCircleTopicName, splitCircleTopicText } from "@/features/circle/circle-topic";
 import { showToast } from "@/shared/ui/app-toast";
 import { requireLogin } from "@/shared/navigation/require-login";
@@ -90,6 +95,8 @@ export function CircleCommentSheet({
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const viewerUserId = useAuthStore((state) => state.user?.id);
+  const isOwnPost =
+    Boolean(post.authorId) && String(viewerUserId ?? "") === post.authorId;
   const conversations = useMessageStore((state) => state.conversations);
   const blacklistedUserIds = useMessageStore((state) => state.blacklistedUserIds);
   const messageConnectionState = useMessageStore((state) => state.connectionState);
@@ -102,7 +109,7 @@ export function CircleCommentSheet({
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [mentionOpen, setMentionOpen] = useState(false);
-  const [mentionedUsers, setMentionedUsers] = useState<CircleMentionUser[]>([]);
+  const [mentionRefs, setMentionRefs] = useState<CircleContentRef[]>([]);
   /** 当前正在举报的评论；非空时展示举报弹层。 */
   const [reportTarget, setReportTarget] = useState<CircleComment | null>(null);
   const inputRef = useRef<TextInput>(null);
@@ -175,17 +182,6 @@ export function CircleCommentSheet({
     [blacklistedUserIds, conversations, viewerUserId],
   );
 
-  /** 输入框高亮用：id→昵称 字典，命中草稿里真实出现的 @昵称。 */
-  const mentionNameDict = useMemo<Record<string, string>>(
-    () =>
-      Object.fromEntries(
-        mentionedUsers
-          .filter((user) => user.nickname)
-          .map((user) => [user.id, user.nickname]),
-      ),
-    [mentionedUsers],
-  );
-
   const mutateComments = (updater: (list: CircleComment[]) => CircleComment[]) => {
     queryClient.setQueryData<InfiniteData<CircleCommentPage>>(
       ["circle-comments", post.id, token ?? "guest"],
@@ -219,7 +215,7 @@ export function CircleCommentSheet({
     setKeyboardVisible(false);
     setEmojiPickerOpen(false);
     setMentionOpen(false);
-    setMentionedUsers([]);
+    setMentionRefs([]);
     setExpandedIds(new Set());
     setLocalDelta(0);
     setReportTarget(null);
@@ -264,7 +260,9 @@ export function CircleCommentSheet({
     setEmojiPickerOpen(false);
     setFocused(true);
     setMentionOpen(true);
-    setInput((current) => (current.endsWith("@") ? current : `${current}@`));
+    setInput((current) =>
+      activeTriggerDraft(current)?.trigger === "@" ? current : `${current}@`,
+    );
     if (keepKeyboard) {
       requestAnimationFrame(() => {
         inputRef.current?.focus();
@@ -274,16 +272,15 @@ export function CircleCommentSheet({
   };
 
   const handleMentionSelect = (user: CircleMentionUser) => {
-    setMentionedUsers((current) => {
-      if (current.some((item) => item.id === user.id)) {
-        return current;
-      }
-      return [...current, user];
+    const selection = applyCircleRefSelection(input, "@", {
+      id: user.id,
+      label: user.nickname,
     });
-    setInput((current) => {
-      const prefix = current.endsWith("@") ? current : `${current}@`;
-      return `${prefix}${user.nickname} `;
-    });
+    setInput(selection.content);
+    setMentionRefs((current) => [
+      ...shiftCircleContentRefs(input, selection.content, current, "@"),
+      selection.ref,
+    ]);
     setMentionOpen(false);
     inputRef.current?.focus();
   };
@@ -346,6 +343,9 @@ export function CircleCommentSheet({
     if (!requireLogin() || !token) {
       return;
     }
+    const withoutLeading = input.trimStart();
+    const leadingAdjusted = shiftCircleContentRefs(input, withoutLeading, mentionRefs, "@");
+    const submittedRefs = shiftCircleContentRefs(withoutLeading, content, leadingAdjusted, "@");
     // 点击发送立即收起键盘，不等发布请求返回（否则键盘要等网络往返结束才关）。
     Keyboard.dismiss();
     setSending(true);
@@ -355,22 +355,20 @@ export function CircleCommentSheet({
         content,
         parentCommentId: replyTarget?.parentCommentId ?? replyTarget?.comment.id,
         replyCommentId: replyTarget?.parentCommentId ? replyTarget.comment.id : undefined,
-        mentionUserIds: mentionedUsers.map((user) => user.id),
-        mentions: buildCircleContentRefs(
-          content,
-          mentionedUsers.map((user) => ({ id: user.id, label: user.nickname })),
-          "@",
-        ),
+        mentionUserIds: [...new Set(submittedRefs.map((ref) => ref.id))],
+        mentions: submittedRefs,
         token,
       });
+      // 作者本人发布/回复时，发布响应可能不回传 isAuthor，本地补上“作者”标签。
+      const authored = isOwnPost ? { ...published, isAuthor: true } : published;
       mutateComments((current) => {
         if (!replyTarget) {
-          return [published, ...current];
+          return [authored, ...current];
         }
         const attach = (list: CircleComment[]): CircleComment[] =>
           list.map((comment) =>
             comment.id === (replyTarget.parentCommentId ?? replyTarget.comment.id)
-              ? { ...comment, replies: [...comment.replies, published] }
+              ? { ...comment, replies: [...comment.replies, authored] }
               : { ...comment, replies: attach(comment.replies) },
           );
         return attach(current);
@@ -383,7 +381,7 @@ export function CircleCommentSheet({
       setInput("");
       setReplyTarget(null);
       setMentionOpen(false);
-      setMentionedUsers([]);
+      setMentionRefs([]);
       setEmojiPickerOpen(false);
       setFocused(false);
     } catch (error) {
@@ -413,6 +411,7 @@ export function CircleCommentSheet({
   const renderItem = ({ item }: { item: CircleComment }) => (
     <CommentRow
       comment={item}
+      postAuthorId={post.authorId}
       expanded={expandedIds.has(item.id)}
       onToggleExpanded={toggleExpanded}
       onLike={handleLike}
@@ -444,15 +443,17 @@ export function CircleCommentSheet({
           <Text style={styles.headerNickname} numberOfLines={1}>
             {nickname}
           </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={followed ? "取消关注" : "关注作者"}
-            onPress={onToggleFollow}
-          >
-            <Text style={[styles.followText, followed && styles.followedText]}>
-              {followed ? "已关注" : "关注"}
-            </Text>
-          </Pressable>
+          {!isOwnPost ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={followed ? "取消关注" : "关注作者"}
+              onPress={onToggleFollow}
+            >
+              <Text style={[styles.followText, followed && styles.followedText]}>
+                {followed ? "已关注" : "关注"}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
         <Pressable
           accessibilityRole="button"
@@ -555,19 +556,19 @@ export function CircleCommentSheet({
             value={input}
             onChangeText={(value) => {
               setInput(value);
-              setMentionedUsers((current) =>
-                current.filter((user) => value.includes(`@${user.nickname}`)),
-              );
-              if (!value.includes("@")) {
-                setMentionOpen(false);
+              setMentionRefs((current) => shiftCircleContentRefs(input, value, current, "@"));
+              const mentionDraft = activeTriggerDraft(value)?.trigger === "@";
+              if (mentionDraft && !mentionOpen && token) {
+                void refreshConversations(token);
               }
+              setMentionOpen(mentionDraft);
             }}
             placeholder={replyTarget ? `回复 ${replyTarget.comment.nickname}` : "友善评论，理性发言"}
             placeholderTextColor="#CACACC"
             style={inputActive ? styles.inputExpanded : styles.input}
             containerStyle={inputActive ? styles.inputHighlightContainerActive : styles.inputHighlightContainer}
             highlightStyle={styles.inputHighlight}
-            mentions={mentionNameDict}
+            mentions={mentionRefs}
             maxLength={500}
             multiline
             blurOnSubmit
@@ -592,6 +593,7 @@ export function CircleCommentSheet({
               style={styles.inputToolbarIcons}
               onMention={handleMentionPress}
               onEmoji={handleEmojiPress}
+              triggerOnPressIn
             />
             <Pressable
               accessibilityRole="button"
@@ -789,24 +791,31 @@ function CommentInputActions({
   style,
   onMention,
   onEmoji,
+  triggerOnPressIn = false,
 }: {
   style?: StyleProp<ViewStyle>;
   onMention: () => void;
   onEmoji: () => void;
+  triggerOnPressIn?: boolean;
 }) {
+  // 键盘工具按钮不抢输入焦点，按下即响应，避免松手前布局变化吞掉操作。
   return (
     <View style={style}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="提及用户"
-        onPress={onMention}
+        focusable={false}
+        onPress={triggerOnPressIn ? undefined : onMention}
+        onPressIn={triggerOnPressIn ? onMention : undefined}
       >
         <Image source={atIcon} style={styles.inputIcon} />
       </Pressable>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="表情"
-        onPress={onEmoji}
+        focusable={false}
+        onPress={triggerOnPressIn ? undefined : onEmoji}
+        onPressIn={triggerOnPressIn ? onEmoji : undefined}
       >
         <Image source={emojiIcon} style={styles.inputIcon} />
       </Pressable>
@@ -841,6 +850,7 @@ function MentionUserList({
               key={user.id}
               accessibilityRole="button"
               accessibilityLabel={`@${user.nickname}`}
+              focusable={false}
               onPress={() => {
                 onSelect(user);
               }}
@@ -892,6 +902,7 @@ function CommentMoreButton({
 
 function CommentRow({
   comment,
+  postAuthorId,
   expanded,
   onToggleExpanded,
   onLike,
@@ -901,6 +912,7 @@ function CommentRow({
   onOpenTopic,
 }: {
   comment: CircleComment;
+  postAuthorId?: string;
   expanded: boolean;
   onToggleExpanded: (id: string) => void;
   onLike: (comment: CircleComment) => void;
@@ -932,7 +944,7 @@ function CommentRow({
             <Text style={styles.commentNickname} numberOfLines={1}>
               {comment.nickname}
             </Text>
-            {comment.isAuthor ? (
+            {comment.isAuthor || (Boolean(postAuthorId) && comment.userId === postAuthorId) ? (
               <View style={styles.authorTag}>
                 <Text style={styles.authorTagText}>作者</Text>
               </View>
@@ -995,6 +1007,7 @@ function CommentRow({
         <ReplyRow
           key={reply.id}
           reply={reply}
+          postAuthorId={postAuthorId}
           parent={comment}
           onLike={onLike}
           onReply={onReply}
@@ -1036,6 +1049,7 @@ function CommentRow({
 
 function ReplyRow({
   reply,
+  postAuthorId,
   parent,
   onLike,
   onReply,
@@ -1044,6 +1058,7 @@ function ReplyRow({
   onOpenTopic,
 }: {
   reply: CircleComment;
+  postAuthorId?: string;
   parent: CircleComment;
   onLike: (comment: CircleComment) => void;
   onReply: (comment: CircleComment, parentCommentId?: string) => void;
@@ -1068,7 +1083,7 @@ function ReplyRow({
           <Text style={styles.commentNickname} numberOfLines={1}>
             {reply.nickname}
           </Text>
-          {reply.isAuthor ? (
+          {reply.isAuthor || (Boolean(postAuthorId) && reply.userId === postAuthorId) ? (
             <View style={styles.authorTag}>
               <Text style={styles.authorTagText}>作者</Text>
             </View>

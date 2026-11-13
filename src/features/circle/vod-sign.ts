@@ -90,12 +90,14 @@ export function buildVolcAuthorization({
   const xDate = headers["X-Date"];
   const date8 = xDate.slice(0, 8);
 
-  const signableNames = Object.keys(headers)
-    .map((name) => name.toLowerCase())
+  const normalizedHeaders = Object.fromEntries(
+    Object.entries(headers).map(([name, value]) => [name.toLowerCase(), value]),
+  );
+  const signableNames = Object.keys(normalizedHeaders)
     .filter((name) => !UNSIGNED_HEADERS.has(name))
     .sort();
   const canonicalHeaders = signableNames
-    .map((name) => `${name}:${canonicalHeaderValue(headers[name] ?? "")}`)
+    .map((name) => `${name}:${canonicalHeaderValue(normalizedHeaders[name])}`)
     .join("\n");
   const signedHeaders = signableNames.join(";");
 

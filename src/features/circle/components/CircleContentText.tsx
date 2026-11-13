@@ -23,7 +23,7 @@ type CircleContentTextProps = {
   onBeforeNavigate?: () => void;
 };
 
-/** 正文及评论中的 #话题、@用户 保持行内排版并可单独点击。 */
+/** 正文及评论中的 #话题、@用户 保持行内排版；只有绑定 ID 的 @用户可跳转。 */
 export function CircleContentText({
   content,
   style,
@@ -45,7 +45,7 @@ export function CircleContentText({
 
   return (
     <Text style={style}>
-      {splitCircleRichText(content, mentions ?? undefined).map((segment, index) => {
+      {splitCircleRichText(content, mentions ?? undefined, true).map((segment, index) => {
         if ("userId" in segment) {
           return (
             <Text
@@ -73,6 +73,13 @@ export function CircleContentText({
                 openTopic(segment.topic);
               }}
             >
+              {segment.text}
+            </Text>
+          );
+        }
+        if ("unresolvedMention" in segment) {
+          return (
+            <Text key={index} style={mentionStyle ?? linkStyle}>
               {segment.text}
             </Text>
           );

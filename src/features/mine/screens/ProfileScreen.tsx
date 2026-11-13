@@ -68,6 +68,7 @@ import {
 import { CompanionOrderSheet } from "@/features/mine/components/CompanionOrderSheet";
 import { ProfileActionsSheet } from "@/features/mine/components/ProfileActionsSheet";
 import {
+  ProfileCircleSkeleton,
   ProfileGameSkeleton,
   ProfileSkeleton,
 } from "@/features/mine/components/ProfileSkeleton";
@@ -292,9 +293,6 @@ export default function ProfileScreen() {
   const circleTargetUserId = routeParams?.userId ?? String(user?.id ?? "");
   const handleCircleCardPress = useCallback(
     (post: ProfileCirclePost) => {
-      if (isMine && post.status !== "APPROVED") {
-        return;
-      }
       router.push({
         pathname: "/circle/user-videos",
         params: {
@@ -305,7 +303,7 @@ export default function ProfileScreen() {
         },
       });
     },
-    [isMine, circleTargetUserId, detail?.nickname, detail?.headImage],
+    [circleTargetUserId, detail?.nickname, detail?.headImage],
   );
   const handleCircleCardLongPress = useCallback(
     (
@@ -762,11 +760,7 @@ export default function ProfileScreen() {
       return [
         {
           key: "circle-loading",
-          content: (
-            <View style={styles.scrollBody}>
-              <ProfileGameSkeleton />
-            </View>
-          ),
+          content: <ProfileCircleSkeleton />,
         },
       ];
     }
@@ -797,7 +791,7 @@ export default function ProfileScreen() {
                 {...(isMine && isCompanion
                   ? {
                       actionLabel: "去发布",
-                      onAction: () => router.push("/circle/search"),
+                      onAction: () => router.push("/circle/publish"),
                     }
                   : {})}
               />
@@ -1904,8 +1898,6 @@ const ProfileCircleCard = memo(function ProfileCircleCard({
   const [coverAspect, setCoverAspect] = useState(DEFAULT_COVER_ASPECT);
   const duration = formatDuration(post.likeCount > 0 ? undefined : undefined);
   const statusBadge = isMine ? getStatusBadge(post.status) : null;
-  // 自己主页里审核中/审核不通过的作品不进播放页
-  const pressDisabled = isMine && post.status !== "APPROVED";
   const cardRef = useRef<View>(null);
   const handleLongPress = useCallback(() => {
     if (!onLongPress) {
@@ -1920,10 +1912,8 @@ const ProfileCircleCard = memo(function ProfileCircleCard({
     <Pressable
       ref={cardRef}
       accessibilityRole="button"
-      // disabled 会同时屏蔽 onLongPress，未过审卡片仍需支持长按删除，故只断开 onPress
-      disabled={pressDisabled && !onLongPress}
       onLongPress={onLongPress ? handleLongPress : undefined}
-      onPress={pressDisabled ? undefined : () => {
+      onPress={() => {
         onPress(post);
       }}
       style={circleStyles.card}

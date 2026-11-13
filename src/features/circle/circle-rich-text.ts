@@ -11,7 +11,8 @@ import { splitCircleTopicText } from "@/features/circle/circle-topic";
 export type CircleRichTextSegment =
   | { text: string }
   | { text: string; topic: string }
-  | { text: string; userId: string };
+  | { text: string; userId: string }
+  | { text: string; unresolvedMention: true };
 
 type MentionSource = CircleContentRef[] | Record<string, string> | undefined | null;
 
@@ -107,11 +108,16 @@ function resolveByName(content: string, dict: Record<string, string>): CircleCon
 }
 
 /**
- * 把正文切成渲染片段：@用户 与 #话题 标记为可点击，其余为纯文本。
+ * 把正文切成渲染片段：已绑定 ID 的 @用户 和 #话题 可点击；未绑定的 @文本可单独着色。
  *
  * @param mentions 后端 @用户 引用；RefVO 数组（带位置）优先，字典（id→昵称）回退推导。
+ * @param highlightUnresolvedMentions 是否标记未绑定用户 ID 的 @文本。
  */
-export function splitCircleRichText(content: string, mentions?: MentionSource): CircleRichTextSegment[] {
+export function splitCircleRichText(
+  content: string,
+  mentions?: MentionSource,
+  highlightUnresolvedMentions = false,
+): CircleRichTextSegment[] {
   if (!content) {
     return [];
   }
@@ -168,5 +174,26 @@ export function splitCircleRichText(content: string, mentions?: MentionSource): 
   if (offset < points.length) {
     segments.push({ text: points.slice(offset).join("") });
   }
-  return segments;
+  if (!highlightUnresolvedMentions) {
+    return segments;
+  }
+  return segments.flatMap((segment) => {
+    if ("topic" in segment || "userId" in segment) {
+      return [segment];
+    }
+    const parts: CircleRichTextSegment[] = [];
+    const pattern = /@[\p{L}\p{N}_-]+/gu;
+    let previousEnd = 0;
+    for (const match of segment.text.matchAll(pattern)) {
+      if (match.index > previousEnd) {
+        parts.push({ text: segment.text.slice(previousEnd, match.index) });
+      }
+      parts.push({ text: match[0], unresolvedMention: true });
+      previousEnd = match.index + match[0].length;
+    }
+    if (previousEnd < segment.text.length) {
+      parts.push({ text: segment.text.slice(previousEnd) });
+    }
+    return parts;
+  });
 }

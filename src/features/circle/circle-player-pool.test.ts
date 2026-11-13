@@ -46,8 +46,9 @@ function setup() {
 const post = (id: string) => ({ id, videoUrl: `https://cdn/${id}.m3u8` });
 
 async function flush() {
-  await Promise.resolve();
-  await Promise.resolve();
+  for (let index = 0; index < 8; index += 1) {
+    await Promise.resolve();
+  }
 }
 
 describe("CirclePlayerPool", () => {
@@ -188,5 +189,57 @@ describe("CirclePlayerPool", () => {
     expect(slot4).toBe(slot1);
     expect(slot2).not.toBe(slot4);
     expect(slot3).not.toBe(slot4);
+  });
+
+  it("快速复用同一 slot 时旧换源完成不能覆盖最新视频", async () => {
+    const store = create<{
+      activeFeedId: string | null;
+      holders: ({ feedId: string; postId: string } | null)[];
+    }>(() => ({ activeFeedId: null, holders: [null, null, null] }));
+    const replacements: { uri: string; finish: () => void }[] = [];
+    class DeferredPlayer extends FakePlayer {
+      currentUri = "";
+
+      override replaceSourceAsync(source: { uri: string } | null): Promise<void> {
+        const uri = source?.uri ?? "";
+        return new Promise((resolve) => {
+          replacements.push({
+            uri,
+            finish: () => {
+              this.currentUri = uri;
+              resolve();
+            },
+          });
+        });
+      }
+    }
+    const pool = new CirclePlayerPool((source) => {
+      const player = new DeferredPlayer();
+      player.currentUri = source.uri;
+      return player;
+    }, store);
+    pool.activateFeed("feed-a");
+    const slot = pool.claim("feed-a", post("a"));
+    pool.claim("feed-a", post("b"));
+    pool.claim("feed-a", post("c"));
+    pool.claim("feed-a", post("d"));
+    await flush();
+    pool.claim("feed-a", post("e"));
+    pool.claim("feed-a", post("f"));
+    const latestSlot = pool.claim("feed-a", post("g"));
+    expect(latestSlot).toBe(slot);
+
+    const older = replacements.find((item) => item.uri === post("d").videoUrl);
+    expect(older).toBeDefined();
+    expect(replacements.find((item) => item.uri === post("g").videoUrl)).toBeUndefined();
+    older?.finish();
+    await flush();
+    const latest = replacements.find((item) => item.uri === post("g").videoUrl);
+    expect(latest).toBeDefined();
+    latest?.finish();
+    await flush();
+
+    expect((pool.getPlayer(slot!) as DeferredPlayer).currentUri).toBe(post("g").videoUrl);
+    expect(pool.holdsSource(slot!, "g")).toBe(true);
   });
 });

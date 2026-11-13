@@ -37,6 +37,8 @@ export class CirclePlayerPool<Player extends PoolableVideoPlayer> {
   private players: (Player | null)[] = [null, null, null];
   /** 播放器当前源对应的 postId；仅在创建时或换源完成后更新，换源进行中为 null。 */
   private sourcePostIds: (string | null)[] = [null, null, null];
+  private sourceVersions = [0, 0, 0];
+  private sourceTasks: Promise<void>[] = [Promise.resolve(), Promise.resolve(), Promise.resolve()];
   /** FIFO 驱逐依据，只含当前被持有的 slot。 */
   private claimOrder: CirclePoolSlot[] = [];
 
@@ -80,7 +82,7 @@ export class CirclePlayerPool<Player extends PoolableVideoPlayer> {
     );
     if (existing >= 0) {
       if (opts?.force) {
-        void this.reload(existing as CirclePoolSlot, post);
+        this.reload(existing as CirclePoolSlot, post);
       }
       return existing as CirclePoolSlot;
     }
@@ -90,7 +92,7 @@ export class CirclePlayerPool<Player extends PoolableVideoPlayer> {
       this.players[slot]?.pause();
     }
     this.setHolder(slot, { feedId, postId: post.id });
-    void this.load(slot, post);
+    this.load(slot, post);
     return slot;
   }
 
@@ -156,27 +158,39 @@ export class CirclePlayerPool<Player extends PoolableVideoPlayer> {
     return this.claimOrder[0] ?? 0;
   }
 
-  private async load(slot: CirclePoolSlot, post: CirclePoolSource) {
+  private load(slot: CirclePoolSlot, post: CirclePoolSource) {
     const player = this.players[slot] ?? this.createPlayerWithSource(slot, post);
     this.applyPlaybackConfig(player);
     if (this.sourcePostIds[slot] !== post.id) {
-      // 先清标记：换源期间 holdsSource 为 false，旧源事件被卡片层过滤
-      this.sourcePostIds[slot] = null;
-      await player.replaceSourceAsync({ uri: post.videoUrl });
-      this.sourcePostIds[slot] = post.id;
-      this.applyPlaybackConfig(player);
+      this.scheduleSource(slot, post, player);
     }
   }
 
-  private async reload(slot: CirclePoolSlot, post: CirclePoolSource) {
+  private reload(slot: CirclePoolSlot, post: CirclePoolSource) {
     const player = this.players[slot];
     if (!player) {
       return;
     }
+    this.scheduleSource(slot, post, player);
+  }
+
+  private scheduleSource(slot: CirclePoolSlot, post: CirclePoolSource, player: Player) {
+    const version = ++this.sourceVersions[slot];
+    // 同一播放器的原生换源必须串行，过期任务不得覆盖最新卡片。
     this.sourcePostIds[slot] = null;
-    await player.replaceSourceAsync({ uri: post.videoUrl });
-    this.sourcePostIds[slot] = post.id;
-    this.applyPlaybackConfig(player);
+    this.sourceTasks[slot] = this.sourceTasks[slot]
+      .catch(() => undefined)
+      .then(async () => {
+        if (version !== this.sourceVersions[slot]) {
+          return;
+        }
+        await player.replaceSourceAsync({ uri: post.videoUrl });
+        if (version === this.sourceVersions[slot]) {
+          this.sourcePostIds[slot] = post.id;
+          this.applyPlaybackConfig(player);
+        }
+      });
+    void this.sourceTasks[slot].catch(() => undefined);
   }
 
   private createPlayerWithSource(slot: CirclePoolSlot, post: CirclePoolSource) {

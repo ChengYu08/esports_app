@@ -11,10 +11,11 @@ import {
 } from "react-native";
 
 import { splitCircleRichText } from "@/features/circle/circle-rich-text";
+import type { CircleContentRef } from "@/features/circle/circle-publish.api";
 
 type HighlightedInputProps = TextInputProps & {
-  /** @用户 引用字典（id→昵称），用于高亮输入中真实出现的 @昵称。 */
-  mentions?: Record<string, string>;
+  /** 已选择的 @用户 引用；输入中的普通 @草稿也会高亮，但不会成为用户链接。 */
+  mentions?: CircleContentRef[] | Record<string, string>;
   /** @xxx / #xxx 高亮样式。 */
   highlightStyle?: StyleProp<TextStyle>;
   /** 布局样式（flex/minHeight/backgroundColor 等），作用在外层容器。 */
@@ -33,7 +34,7 @@ export const HighlightedInput = forwardRef<TextInput, HighlightedInputProps>(
     { value, mentions, highlightStyle, style, containerStyle, multiline, scrollEnabled, ...rest },
     ref,
   ) {
-    const segments = splitCircleRichText(value ?? "", mentions);
+    const segments = splitCircleRichText(value ?? "", mentions, true);
     // 多层输入默认不滚动、随内容增高，保证底层高亮 Text 与输入光标始终对齐。
     const resolvedScroll = scrollEnabled ?? !multiline;
     return (
@@ -44,7 +45,7 @@ export const HighlightedInput = forwardRef<TextInput, HighlightedInputProps>(
           style={[style, styles.overlay]}
         >
           {segments.map((segment, index) => {
-            if ("userId" in segment || "topic" in segment) {
+            if ("userId" in segment || "topic" in segment || "unresolvedMention" in segment) {
               return (
                 <Text key={index} style={highlightStyle}>
                   {segment.text}
