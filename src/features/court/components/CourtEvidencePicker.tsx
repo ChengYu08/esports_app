@@ -60,10 +60,21 @@ export function useEvidenceImages(
       const { accepted, warnings } = selectCompanionImages(
         assets.map((asset) => ({ ...asset, fileSize: asset.fileSize ?? new File(asset.uri).size })),
       );
-      setImages((current) => [
-        ...current,
-        ...accepted.map((asset) => ({ uri: asset.uri, name: asset.fileName || "image.jpg", mimeType: asset.mimeType })),
-      ].slice(0, MAX_IMAGES));
+      setImages((current) => {
+        // 相册可分批选到同一资源，按 URI 去重，避免重复占位及上传状态互相覆盖。
+        const selectedUris = new Set(current.map((image) => image.uri));
+        const additions = accepted.filter((asset) => {
+          if (selectedUris.has(asset.uri)) {
+            return false;
+          }
+          selectedUris.add(asset.uri);
+          return true;
+        });
+        return [
+          ...current,
+          ...additions.map((asset) => ({ uri: asset.uri, name: asset.fileName || "image.jpg", mimeType: asset.mimeType })),
+        ].slice(0, MAX_IMAGES);
+      });
       if (warnings.length) {
         showToast(warnings.join("\n"), { duration: toastDurations.LONG });
       }
@@ -89,20 +100,27 @@ export function useEvidenceImages(
 
   const uploadAll = useCallback(
     async (uploadOne: (image: UploadItem) => Promise<string>) => {
-      const uploaded: UploadItem[] = [];
+      // 兼容已存在的重复选图；同一资源在本次上传及失败重试时均复用成功凭证。
+      const keysByUri = new Map<string, string>();
+      for (const image of images) {
+        if (image.key?.trim()) {
+          keysByUri.set(image.uri, image.key);
+        }
+      }
+      const uploadedKeys = new Set<string>();
       for (const image of images) {
         onAccountChanged();
-        if (image.key) {
-          uploaded.push(image);
-          continue;
+        const key = keysByUri.get(image.uri) ?? await uploadOne(image);
+        if (!key?.trim()) {
+          throw new Error("图片上传未返回有效凭证，请重试");
         }
-        const key = await uploadOne(image);
-        uploaded.push({ ...image, key });
-        markUploaded(image.uri, key);
+        keysByUri.set(image.uri, key);
+        uploadedKeys.add(key);
+        if (image.key !== key) {
+          markUploaded(image.uri, key);
+        }
       }
-      return uploaded
-        .map((image) => image.key)
-        .filter((key): key is string => Boolean(key));
+      return [...uploadedKeys];
     },
     // images 变化时重建，提交时读取最新值
     [images, onAccountChanged],

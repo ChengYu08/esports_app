@@ -1,5 +1,5 @@
 import { useFocusEffect } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { fetchStarBalance } from "@/features/mine/api/companion-order.api";
 
@@ -7,6 +7,8 @@ type UseStarBalanceOptions = {
   /** 打开弹窗时的初始余额（如支付预览快照），可被焦点刷新覆盖 */
   initialBalance?: number | null;
   onError?: (error: Error) => void;
+  /** 查询失败后由支付弹窗触发重试。 */
+  refreshKey?: number;
 };
 
 /**
@@ -17,14 +19,18 @@ export function useStarBalance(
   enabled: boolean,
   options: UseStarBalanceOptions = {},
 ): number | null {
-  const { initialBalance = null, onError } = options;
+  const { initialBalance = null, onError, refreshKey = 0 } = options;
   const [balance, setBalance] = useState<number | null>(initialBalance);
   const onErrorRef = useRef(onError);
-  onErrorRef.current = onError;
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
 
   useFocusEffect(
     useCallback(() => {
-      if (!enabled || !token) return;
+      if (!enabled || !token) {
+        return;
+      }
       let cancelled = false;
       void fetchStarBalance(token)
         .then((next) => {
@@ -39,7 +45,9 @@ export function useStarBalance(
       return () => {
         cancelled = true;
       };
-    }, [enabled, token]),
+    // refreshKey 是用户手动重试信号，变化时重新执行焦点请求。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [enabled, token, refreshKey]),
   );
 
   return balance;

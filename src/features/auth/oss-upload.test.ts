@@ -39,10 +39,26 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
 describe("OSS 图片请求体与签名", () => {
+  it.each(["连接不返回", "错误响应体不返回"])("%s 时上传超时退出，不会一直占用加载状态", async (scenario) => {
+    vi.useFakeTimers();
+    const pending = new Promise(() => {});
+    fetchMock.mockReturnValue(scenario === "连接不返回"
+      ? pending : Promise.resolve({ ok: false, status: 500, text: () => pending }));
+    let failure: unknown;
+    const result = uploadClientObject(sts, "image.png", { uri: "file:///image" })
+      .catch((error) => { failure = error; });
+    await vi.advanceTimersByTimeAsync(60_001);
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error).message).toContain("上传超时");
+    expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
+    await result;
+    expect(vi.getTimerCount()).toBe(0);
+  });
   it.each([null, "", "image/jpeg", "image/png"])(
     "文件类型为 %s 时仍使用签名中的类型和原始字节",
     async (fileType) => {

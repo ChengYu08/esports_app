@@ -897,7 +897,10 @@ export default function VoiceRoomScreen() {
     const stopMessages = subscribeVoiceChatMessages((targetId, message) => {
       if (targetId !== chatroomId) return;
       setMessages((items) =>
-        [...items, { ...message, kind: "chat" as const }].slice(-80),
+        [
+          ...items.filter((item) => item.id !== message.id && item.id !== message.localId),
+          { ...message, kind: "chat" as const },
+        ].sort((left, right) => left.sentAt - right.sentAt).slice(-80),
       );
     });
     const stopMembers = subscribeVoiceChatMembers((targetId, actions) => {
@@ -1042,7 +1045,9 @@ export default function VoiceRoomScreen() {
 
   const sendMessage = async (text: string) => {
     const value = text.trim();
-    if (!value) return;
+    if (!value) {
+      return;
+    }
     followLatestMessage();
     const local = {
       id: `local-${Date.now()}`,
@@ -1053,8 +1058,8 @@ export default function VoiceRoomScreen() {
       kind: "chat" as const,
     };
     setMessages((items) => [...items, local].slice(-80));
-    if (chatroomId)
-      await sendVoiceChatMessage(chatroomId, value, buildChatSender()).catch(
+    if (chatroomId) {
+      await sendVoiceChatMessage(chatroomId, value, buildChatSender(), local.id).catch(
         () => {
           void useAppConfirm.getState().confirm({
             title: "发送失败",
@@ -1062,6 +1067,7 @@ export default function VoiceRoomScreen() {
           });
         },
       );
+    }
   };
 
   const sendImage = async (imageUri: string) => {
@@ -1080,7 +1086,7 @@ export default function VoiceRoomScreen() {
       // 先上传自家 OSS 拿公网地址，再预置到消息 remote 发送：
       // 融云私有存储的 URL 对方直接访问会 401
       await uploadChatImage(accessToken, imageUri)
-        .then((imageUrl) => sendVoiceChatImage(chatroomId, imageUri, imageUrl, buildChatSender()))
+        .then((imageUrl) => sendVoiceChatImage(chatroomId, imageUri, imageUrl, buildChatSender(), local.id))
         .catch(() => {
           void useAppConfirm.getState().confirm({
             title: "发送失败",

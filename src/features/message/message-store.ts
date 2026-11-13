@@ -940,8 +940,19 @@ export function createMessageStore(adapter: MessageAdapter): StoreApi<MessageSto
         stopConnectionStatusSubscription = undefined;
         stopConversationSyncSubscription = undefined;
         stopReadSyncSubscription = undefined;
-        await adapter.disconnect();
+        // 先清本地态；断网或 SDK 异常不能阻塞退出，也不能在迟到回调中清掉新会话。
         set({ connectionState: 'idle', conversationError: null, conversations: [], blacklistedUserIds: [], messagesByPeerId: {}, historyByPeerId: {}, openPeerIds: [], activePeerId: null, chatForeground: false, peerOnlineById: {}, compensatedCount: 0, lastError: null });
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          await Promise.race([
+            adapter.disconnect(),
+            new Promise<void>((resolve) => { timer = setTimeout(resolve, 5_000); }),
+          ]);
+        } catch {
+          logger.warn('message.disconnect_failed');
+        } finally {
+          clearTimeout(timer);
+        }
       },
     };
   });

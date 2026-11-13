@@ -377,16 +377,12 @@ export default function OrderScreen() {
       await selectMultiCompanions(target.id, userIds, token);
       await startOrderService(target.id, token);
       setMultiSelectTarget(null);
-      if (currentUser?.id) {
-        await refreshOrderAfterAction(target.id, token, currentUser.id);
-      } else {
-        await invalidateOrderQueries(target.id);
-      }
       showToast("操作成功");
-    } catch (error) {
-      setPrompt({
-        title: "订单操作失败",
-        message: error instanceof Error ? error.message : "请稍后重试",
+      const refresh = currentUser?.id
+        ? refreshOrderAfterAction(target.id, token, currentUser.id)
+        : invalidateOrderQueries(target.id);
+      refresh.catch(() => {
+        showToast("操作已成功，列表刷新失败，请稍后刷新");
       });
     } finally {
       setMultiSelectSubmitting(false);
@@ -459,17 +455,13 @@ export default function OrderScreen() {
     try {
       await completeOrderRequest(target.id, token);
       setCompletePromptVisible(false);
-      if (currentUser?.id) {
-        // 列表接口此时可能仍返回旧状态，以详情为准就地替换该单卡片。
-        await refreshOrderAfterAction(target.id, token, currentUser.id);
-      } else {
-        await invalidateOrderQueries(target.id);
-      }
       showToast("订单已完成");
-    } catch (error) {
-      setPrompt({
-        title: "完成订单失败",
-        message: error instanceof Error ? error.message : "请稍后重试",
+      // 缓存刷新不占用提交状态；提交失败由确认抽屉在内部展示。
+      const refresh = currentUser?.id
+        ? refreshOrderAfterAction(target.id, token, currentUser.id)
+        : invalidateOrderQueries(target.id);
+      refresh.catch(() => {
+        showToast("订单已完成，列表刷新失败，请稍后刷新");
       });
     } finally {
       setCompleting(false);
@@ -499,17 +491,12 @@ export default function OrderScreen() {
     try {
       await freeOrderService(target.id, freeAmount, token);
       setFreeTarget(null);
-      if (currentUser?.id) {
-        // 全额免单与部分免单的状态不同，以详情为准就地刷新缓存中的该单。
-        await refreshOrderAfterAction(target.id, token, currentUser.id);
-      } else {
-        await invalidateOrderQueries(target.id);
-      }
       showToast("免单成功");
-    } catch (error) {
-      setPrompt({
-        title: "免单失败",
-        message: error instanceof Error ? error.message : "请稍后重试",
+      const refresh = currentUser?.id
+        ? refreshOrderAfterAction(target.id, token, currentUser.id)
+        : invalidateOrderQueries(target.id);
+      refresh.catch(() => {
+        showToast("操作已成功，列表刷新失败，请稍后刷新");
       });
     } finally {
       setFreeSubmitting(false);
@@ -788,7 +775,6 @@ export default function OrderScreen() {
         key={payTarget?.id ?? "none"}
         item={payTarget}
         token={token}
-        onPaymentFailed={(message) => setPrompt({ title: "支付失败", message })}
         onClose={() => {
           const target = payTarget;
           // 关闭支付弹窗只结束本次支付，取消订单由订单卡片的独立操作处理。

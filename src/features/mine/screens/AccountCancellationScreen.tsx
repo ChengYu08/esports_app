@@ -1,7 +1,7 @@
 import { useAuthStore } from "@esports/auth";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { showToast } from "@/shared/ui/app-toast";
+import { showGlobalToast, showToast } from "@/shared/ui/app-toast";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -161,11 +161,11 @@ export default function AccountCancellationScreen() {
       await clearAuthSession().catch(() => undefined);
       clearSession();
       clearActionCommandAccountState();
-      showToast(
-        `已进入${coolingDays}天冷静期，账号将于 ${formatCoolEndTime(record.coolEndTime)} 完成注销`,
+      router.replace("/");
+      showGlobalToast(
+        `注销申请成功，已进入${coolingDays}天冷静期，账号将于 ${formatCoolEndTime(record.coolEndTime)} 完成注销`,
         { duration: 5000 },
       );
-      router.replace("/");
     } catch (error) {
       setVerifyError(
         error instanceof Error && error.message ? error.message : "验证码错误",

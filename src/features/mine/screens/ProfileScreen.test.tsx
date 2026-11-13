@@ -53,6 +53,16 @@ vi.mock("@fluentui/react-native-icons", () => ({
   Star16Regular: "Star16Regular",
 }));
 vi.mock("expo-image", () => ({ Image: "Image" }));
+// 此处验证页面入口，动画由原生运行时负责；Node 环境只保留静态渲染契约。
+vi.mock("react-native-reanimated", () => ({
+  default: { View: "AnimatedView", FlatList: "FlatList" },
+  Extrapolation: { CLAMP: "clamp" },
+  interpolate: () => 0,
+  runOnJS: <T,>(callback: T) => callback,
+  useAnimatedScrollHandler: () => vi.fn(),
+  useAnimatedStyle: (factory: () => unknown) => factory(),
+  useSharedValue: (value: unknown) => ({ value }),
+}));
 vi.mock("expo-linear-gradient", () => ({ LinearGradient: "LinearGradient" }));
 vi.mock("expo-router", () => ({
   router: { back: vi.fn(), dismissTo: vi.fn(), push: vi.fn() },
@@ -124,6 +134,7 @@ vi.mock("@/features/mine/components/StarPaymentSheet", () => ({
 vi.mock("@/features/order/order-query", () => ({
   invalidateOrderQueries: vi.fn(),
 }));
+vi.mock("@/features/order/notify-order-paid", () => ({ afterOrderPaidOpenChat: vi.fn() }));
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 

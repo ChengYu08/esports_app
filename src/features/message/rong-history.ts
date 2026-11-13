@@ -31,9 +31,12 @@ function pullByPolicy(engine: RongHistoryEngine, request: RongHistoryRequest, po
     const finish = (messages: RCIMIWMessage[] | null) => {
       if (!settled) {
         settled = true;
+        clearTimeout(timer);
         resolve(messages);
       }
     };
+    // SDK 受理后可能不再回调，限时回落本地查询，避免聊天页永久加载。
+    const timer = setTimeout(() => finish(null), 15_000);
     const callback: IRCIMIWGetMessagesCallback = {
       onSuccess: (messages) => finish(messages || []),
       onError: (code) => {
@@ -41,7 +44,7 @@ function pullByPolicy(engine: RongHistoryEngine, request: RongHistoryRequest, po
         finish(null);
       },
     };
-    engine.getMessages(
+    Promise.resolve().then(() => engine.getMessages(
       request.conversationType,
       request.targetId,
       '',
@@ -50,7 +53,7 @@ function pullByPolicy(engine: RongHistoryEngine, request: RongHistoryRequest, po
       policy,
       request.count,
       callback,
-    ).then((code) => {
+    )).then((code) => {
       if (code !== 0) {
         logger.warn('RongCloud history pull submit failed', { policy: policy as number, errorCode: code });
         finish(null);

@@ -47,17 +47,33 @@ export class SsoClient {
 
   /** 与服务器时间对齐：只同步一次并缓存偏移，失败时回退本地时间（对齐 PC apiClient 的 getTimestamp） */
   private async getTimestamp(): Promise<number> {
-    if (this.timeDiffMs !== null) return Date.now() + this.timeDiffMs;
+    if (this.timeDiffMs !== null) {
+      return Date.now() + this.timeDiffMs;
+    }
     if (!this.timeDiffPromise) {
-      this.timeDiffPromise = fetch(`${this.config.baseUrl}/api/server/time`)
-        .then(async (res) => {
-          const data = await res.json();
+      const controller = new AbortController();
+      let timer: ReturnType<typeof setTimeout>;
+      // 时间同步发生在业务请求超时计时之前，必须独立限时，且覆盖响应体读取。
+      const deadline = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error("服务器时间同步超时"));
+          controller.abort();
+        }, Math.min(this.config.timeoutMs ?? 5_000, 5_000));
+      });
+      const response = fetch(`${this.config.baseUrl}/api/server/time`, {
+        signal: controller.signal,
+      }).then((res) => res.json());
+      this.timeDiffPromise = Promise.race([response, deadline])
+        .then((data) => {
           const serverTime = data?.data;
           this.timeDiffMs =
             typeof serverTime === "number" ? serverTime - Date.now() : 0;
         })
         .catch(() => {
           this.timeDiffMs = 0;
+        })
+        .finally(() => {
+          clearTimeout(timer);
         });
     }
     await this.timeDiffPromise;

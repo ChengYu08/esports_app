@@ -56,14 +56,31 @@ export async function uploadClientObject(sts: ClientOssSts, objectKey: string, i
   // Expo fetch 会用 File.type 覆盖 Content-Type；Android 上该值可能为空，
   // 也可能与 OSS 签名类型不一致。传原始字节，保留签名使用的请求头。
   const body = await localFile.bytes();
-  const response = await fetch(uploadUrl, {
-    method: "PUT",
-    headers: { ...headers, Authorization: `OSS ${sts.accessKeyId}:${signature}` },
-    body,
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  // 上传和错误响应体都限时；即使原生取消回调未返回，也能释放页面提交状态。
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error("上传超时，请检查网络后重试"));
+      controller.abort();
+    }, 60_000);
   });
-  if (!response.ok) {
-    const detail = (await response.text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-    throw new Error(`OSS 上传失败（${response.status}${detail ? `：${detail.slice(0, 160)}` : ""}）`);
+  const upload = async () => {
+    const response = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: { ...headers, Authorization: `OSS ${sts.accessKeyId}:${signature}` },
+      body,
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      const detail = (await response.text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      throw new Error(`OSS 上传失败（${response.status}${detail ? `：${detail.slice(0, 160)}` : ""}）`);
+    }
+    return `${sts.domain.replace(/\/$/, "")}/${objectKey}`;
+  };
+  try {
+    return await Promise.race([upload(), deadline]);
+  } finally {
+    clearTimeout(timer);
   }
-  return `${sts.domain.replace(/\/$/, "")}/${objectKey}`;
 }

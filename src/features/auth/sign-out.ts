@@ -39,16 +39,25 @@ export async function signOut(): Promise<void> {
       useVoiceRoomSessionStore.getState();
     clearActiveRoom();
     if (activeRoom || joiningRoom) {
-      await leaveVoiceRtc().catch(() => undefined);
       const chatroomIds = new Set([
         activeRoom?.rongChatroomId,
         joiningRoom?.rongChatroomId,
       ]);
-      await Promise.allSettled(
-        [...chatroomIds]
-          .filter((id): id is string => Boolean(id))
-          .map((id) => leaveVoiceChatRoom(id)),
-      );
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        // 网络异常时原生退房可能不返回；本地登出不能一直等实时资源清理。
+        await Promise.race([
+          Promise.allSettled([
+            leaveVoiceRtc(),
+            ...[...chatroomIds]
+              .filter((id): id is string => Boolean(id))
+              .map((id) => leaveVoiceChatRoom(id)),
+          ]),
+          new Promise<void>((resolve) => { timer = setTimeout(resolve, 5_000); }),
+        ]);
+      } finally {
+        clearTimeout(timer);
+      }
     }
     await messageStore
       .getState()

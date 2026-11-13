@@ -48,6 +48,7 @@ import { leaveVoiceRtc } from "@/features/voice-room/voice-room-rtc";
 import { useVoiceRoomSessionStore } from "@/features/voice-room/voice-room-session";
 import { ActionNoticeHost } from "@/shared/ui/action-notice";
 import { AppConfirmHost } from "@/shared/ui/AppConfirmHost";
+import { AppToastHost } from "@/shared/ui/AppToastHost";
 
 import { StartupSplash } from "@/shared/ui/StartupSplash";
 
@@ -261,6 +262,7 @@ export default function RootLayout() {
         <GestureHandlerRootView style={{ flex: 1 }}>
           <KeyboardProvider>
             <RootSiblingParent>
+              <AppToastHost />
               <StatusBar style="dark" />
               {privacyAccepted ? (
                 <PushyUpdateHost>
@@ -282,6 +284,7 @@ export default function RootLayout() {
                     />
                     <Stack.Screen
                       name="image-preview"
+                      dangerouslySingular
                       options={{ headerShown: false }}
                     />
                     <Stack.Screen name="basic-settings" />

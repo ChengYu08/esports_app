@@ -60,6 +60,24 @@ function createRequest(overrides: Partial<RongHistoryRequest> = {}): RongHistory
 }
 
 describe("fetchRongHistoryMessages", () => {
+  it.each([false, true])("云端不返回时能回落本地，本地也卡住=%s 时能结束加载", async (localStalls) => {
+    vi.useFakeTimers();
+    try {
+      const local = [createMessage("cached", 1)];
+      const engine = { getMessages: vi.fn((_type, _id, _channel, _time, _order, policy, _count, callback) => {
+        if (policy === LOCAL_REMOTE_POLICY && !localStalls) { callback?.onSuccess?.(local); }
+        return Promise.resolve(0);
+      }) } satisfies Pick<RCIMIWEngine, "getMessages">;
+      let result: RCIMIWMessage[] | undefined;
+      const pending = fetchRongHistoryMessages(engine, createRequest()).then((value) => { result = value; });
+      await vi.advanceTimersByTimeAsync(30_001);
+      expect(result).toEqual(localStalls ? [] : local);
+      await pending;
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it("远端有消息时直接返回远端结果，不再查本地", async () => {
     const remoteMessages = [createMessage("m1", 200), createMessage("m2", 100)];
     const { engine, calls } = createEngine({ [REMOTE_POLICY]: { messages: remoteMessages } });

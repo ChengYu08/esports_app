@@ -28,6 +28,28 @@ export function appendCachedVoiceChatMessage(chatroomId: string, message: VoiceR
   setCachedVoiceChatMessages(chatroomId, [...current, message]);
 }
 
+/** 发送回执可能在页面卸载后到达，直接替换会话缓存中的临时消息。 */
+export function confirmCachedVoiceChatMessage(
+  chatroomId: string,
+  localId: string,
+  sent: { id: string; sentAt?: number },
+) {
+  const current = getCachedVoiceChatMessages(chatroomId);
+  const local = current.find((item) => item.id === localId);
+  if (!local) {
+    return undefined;
+  }
+  const confirmed = { ...local, id: sent.id, sentAt: sent.sentAt || local.sentAt };
+  // 历史记录可能先于发送回执到达，同时移除同一条正式消息。
+  setCachedVoiceChatMessages(chatroomId, current.flatMap((item) => {
+    if (item.id === localId) {
+      return [confirmed];
+    }
+    return item.id === sent.id ? [] : [item];
+  }));
+  return confirmed;
+}
+
 export function clearVoiceChatMessageCache(chatroomId: string) {
   chatroomMessages.delete(chatroomId);
 }

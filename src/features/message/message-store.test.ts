@@ -56,6 +56,34 @@ function makeAdapter(overrides: Partial<MessageAdapter> = {}) {
 }
 
 describe('message store', () => {
+  it('IM 断开请求失败后仍清空本地会话，不把退出流程卡在 SDK 上', async () => {
+    const store = createMessageStore(makeAdapter({ disconnect: vi.fn().mockRejectedValue(new Error('网络异常')) }));
+    store.setState({ conversations: [conversation], messagesByPeerId: { '42': [sentMessage] } });
+    await expect(store.getState().reset()).resolves.toBeUndefined();
+    expect(store.getState().conversations).toEqual([]);
+    expect(store.getState().messagesByPeerId).toEqual({});
+  });
+
+  it('IM 断开无回调时限时返回，迟到结果不清掉新会话', async () => {
+    vi.useFakeTimers();
+    try {
+      let finish!: () => void;
+      const store = createMessageStore(makeAdapter({ disconnect: () => new Promise<void>((resolve) => { finish = resolve; }) }));
+      store.setState({ conversations: [conversation] });
+      let done = false;
+      const resetting = store.getState().reset().then(() => { done = true; });
+      await vi.advanceTimersByTimeAsync(5_001);
+      expect(done).toBe(true);
+      expect(store.getState().conversations).toEqual([]);
+      store.setState({ conversations: [conversation] });
+      finish();
+      await resetting;
+      expect(store.getState().conversations).toEqual([conversation]);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('keeps customer service identity through history refresh and incoming replies', async () => {
     let receiveMessage: Parameters<MessageAdapter['subscribeMessages']>[0] | undefined;
     const adapter = makeAdapter({

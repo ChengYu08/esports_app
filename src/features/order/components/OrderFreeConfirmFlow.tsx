@@ -8,7 +8,7 @@ type Props = {
   companionAvatar?: OrderItemModel["receiverAvatar"];
   loading: boolean;
   onClose: () => void;
-  onConfirm: (freeHours: number) => void;
+  onConfirm: (freeHours: number) => void | Promise<void>;
 };
 
 /** 列表与详情共用免单流程：直接在确认抽屉内输入免单时长，实时预览后确认提交。 */

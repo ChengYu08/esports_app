@@ -177,7 +177,6 @@ export default function ProfileScreen() {
   const [orderCard, setOrderCard] = useState<ProfileSkillCard | null>(null);
   const [reorderActive, setReorderActive] = useState(false);
   const reorderHandled = useRef(false);
-  const [paymentError, setPaymentError] = useState<string | null>(null);
   const [paymentOrder, setPaymentOrder] = useState<{
     orderId: number;
     total: number;
@@ -963,7 +962,6 @@ export default function ProfileScreen() {
           onOrderCreated={(order) => {
             setOrderCard(null);
             setReorderActive(false);
-            setPaymentError(null);
             setPaymentOrder(order);
             setPaymentSheetVisible(true);
           }}
@@ -992,7 +990,6 @@ export default function ProfileScreen() {
             const accessToken = useAuthStore.getState().accessToken;
             setPaymentSheetVisible(false);
             setPaymentOrder(null);
-            setPaymentError(null);
             void invalidateOrderQueries(paidOrderId);
             void afterOrderPaidOpenChat({
               companionUserIds: [companionUserId],
@@ -1006,15 +1003,8 @@ export default function ProfileScreen() {
               },
             });
           }}
-          onPaymentFailed={(message) => setPaymentError(message)}
         />
       ) : null}
-      <AppPrompt
-        visible={Boolean(paymentError)}
-        title="支付失败"
-        message={paymentError ?? ""}
-        onConfirm={() => setPaymentError(null)}
-      />
     </View>
   );
 }
