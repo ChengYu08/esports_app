@@ -1,5 +1,6 @@
 import { forwardRef } from "react";
 import {
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -23,38 +24,43 @@ type HighlightedInputProps = TextInputProps & {
 };
 
 /**
- * 透明输入框叠加高亮层的轻量方案：底层 Text 渲染 @xxx/#xxx 着色，上层 TextInput
- * 文字透明、仅保留光标与选区，输入/粘贴/删除仍走原生 TextInput，提交逻辑不变。
+ * iOS 使用透明输入框叠加高亮层；Android 多行输入时两层文字会错位重影，
+ * 因此直接显示原生输入文字，@引用与提交逻辑仍由父组件维护。
  *
  * style 只放文字度量（fontSize/lineHeight/fontFamily/padding/textAlignVertical），
- * 两层共用同一份 style 才能保证换行与光标对齐；布局交给 containerStyle。
+ * iOS 两层共用同一份 style；布局交给 containerStyle。
  */
 export const HighlightedInput = forwardRef<TextInput, HighlightedInputProps>(
   function HighlightedInput(
     { value, mentions, highlightStyle, style, containerStyle, multiline, scrollEnabled, ...rest },
     ref,
   ) {
-    const segments = splitCircleRichText(value ?? "", mentions, true);
-    // 多层输入默认不滚动、随内容增高，保证底层高亮 Text 与输入光标始终对齐。
+    const showHighlightOverlay = Platform.OS !== "android";
+    const segments = showHighlightOverlay
+      ? splitCircleRichText(value ?? "", mentions, true)
+      : [];
+    // 输入框不滚动、随内容增高，保持长评论的光标位置与布局稳定。
     const resolvedScroll = scrollEnabled ?? !multiline;
     return (
       <View style={[styles.container, containerStyle]}>
-        <Text
-          pointerEvents="none"
-          numberOfLines={multiline ? undefined : 1}
-          style={[style, styles.overlay]}
-        >
-          {segments.map((segment, index) => {
-            if ("userId" in segment || "topic" in segment || "unresolvedMention" in segment) {
-              return (
-                <Text key={index} style={highlightStyle}>
-                  {segment.text}
-                </Text>
-              );
-            }
-            return segment.text;
-          })}
-        </Text>
+        {showHighlightOverlay ? (
+          <Text
+            pointerEvents="none"
+            numberOfLines={multiline ? undefined : 1}
+            style={[style, styles.overlay]}
+          >
+            {segments.map((segment, index) => {
+              if ("userId" in segment || "topic" in segment || "unresolvedMention" in segment) {
+                return (
+                  <Text key={index} style={highlightStyle}>
+                    {segment.text}
+                  </Text>
+                );
+              }
+              return segment.text;
+            })}
+          </Text>
+        ) : null}
         <TextInput
           ref={ref}
           value={value}
@@ -62,7 +68,7 @@ export const HighlightedInput = forwardRef<TextInput, HighlightedInputProps>(
           scrollEnabled={resolvedScroll}
           selectionColor="#0D0D0F"
           cursorColor="#0D0D0F"
-          style={[style, styles.input]}
+          style={[styles.input, style, showHighlightOverlay && styles.transparentInput]}
           {...rest}
         />
       </View>
@@ -78,10 +84,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
   },
-  // 文字透明、光标与选区可见：iOS 走 selectionColor，Android 走 cursorColor（均以 prop 传入）。
   input: {
     width: "100%",
-    color: "transparent",
     backgroundColor: "transparent",
   },
+  transparentInput: { color: "transparent" },
 });

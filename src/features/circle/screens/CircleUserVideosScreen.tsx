@@ -208,6 +208,8 @@ export default function CircleUserVideosScreen() {
     >
       {feedHeight > 0 ? (
         <FlashList
+          // 放行评论弹窗内的按钮点击，保留评论输入焦点。
+          keyboardShouldPersistTaps="handled"
           ref={listRef}
           data={posts}
           extraData={listExtraData}

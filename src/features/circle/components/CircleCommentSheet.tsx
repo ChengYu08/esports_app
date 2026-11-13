@@ -955,8 +955,8 @@ function CommentRow({
             {comment.deleted ? "该评论已删除" : (
               <CircleContentText
                 content={comment.content}
-                linkStyle={styles.postTags}
-                mentionStyle={styles.postTags}
+                linkStyle={styles.commentLink}
+                mentionStyle={styles.commentLink}
                 mentions={comment.mentions}
                 onBeforeNavigate={onOpenTopic}
               />
@@ -1098,8 +1098,8 @@ function ReplyRow({
           ) : null}
           <CircleContentText
             content={reply.content}
-            linkStyle={styles.postTags}
-            mentionStyle={styles.postTags}
+            linkStyle={styles.commentLink}
+            mentionStyle={styles.commentLink}
             mentions={reply.mentions}
             onBeforeNavigate={onOpenTopic}
           />
@@ -1271,6 +1271,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     fontWeight: "400",
   },
+  commentLink: { color: "#1540AD" },
   commentMetaRow: {
     flexDirection: "row",
     alignItems: "flex-end",

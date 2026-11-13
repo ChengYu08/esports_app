@@ -245,6 +245,8 @@ export function CircleScreen({ active, bottomInset }: CircleScreenProps) {
     >
       {feedHeight > 0 ? (
         <FlashList
+          // 评论弹窗属于列表项的 React 子树，外层也要放行点击，避免先吞掉点击并收起键盘。
+          keyboardShouldPersistTaps="handled"
           key={feedKind}
           ref={listRef}
           data={posts}
