@@ -13,6 +13,7 @@ import {
 import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
 import { submitRealNameVerification } from "@/features/mine/real-name-session";
 import { ScreenHeader } from "@/shared/ui/ScreenHeader";
+import { showGlobalToast } from "@/shared/ui/app-toast";
 import { colors } from "@/shared/theme/tokens";
 
 const backIcon = require("../../../../assets/svgs/icon-back.svg");
@@ -63,6 +64,7 @@ export function RealNameVerificationScreen() {
         phone: user?.phone,
       });
       setPhase("success");
+      showGlobalToast("实名认证成功");
     } catch (error) {
       setFailureMessage(realNameFailureMessage(error));
       setPhase("failure");

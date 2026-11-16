@@ -50,6 +50,7 @@ type ApiService = {
   femalePrice?: number | string;
   billingUnitName?: string;
   supportMultiCompanion?: boolean;
+  companionPreferenceDisplay?: number | null;
 };
 
 type ApiGrab = {
@@ -360,6 +361,9 @@ export async function fetchClubGameServices(
     femalePrice: toNumber(item.femalePrice),
     billingUnitName: item.billingUnitName,
     supportMultiCompanion: Boolean(item.supportMultiCompanion),
+    companionPreferenceDisplay: item.companionPreferenceDisplay === 1 || item.companionPreferenceDisplay === 2
+      ? item.companionPreferenceDisplay
+      : 0,
   }));
 }
 

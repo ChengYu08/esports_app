@@ -4,7 +4,7 @@ import {
   Search24Regular,
 } from "@fluentui/react-native-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   FlatList,
   Pressable,
@@ -17,6 +17,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SYSTEM_FONT } from "@/shared/theme/typography";
+import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import type { MultiCompanionCandidate } from "../order.api";
@@ -31,7 +32,7 @@ type OrderMultiCompanionSheetProps = {
   loading?: boolean;
   submitting?: boolean;
   onClose: () => void;
-  onConfirm: (userIds: number[]) => void;
+  onConfirm: (userIds: number[]) => void | Promise<void>;
 };
 
 const DEFAULT_AVATAR = { uri: "" };
@@ -51,12 +52,15 @@ export function OrderMultiCompanionSheet({
   const [keyword, setKeyword] = useState("");
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [lastVisible, setLastVisible] = useState(visible);
+  const [error, setError] = useState("");
+  const submittingRef = useRef(false);
   // 打开时重置搜索与已选，对齐 Web 弹窗 watch(visible) 行为
   if (visible !== lastVisible) {
     setLastVisible(visible);
     if (visible) {
       setKeyword("");
       setSelectedIds([]);
+      setError("");
     }
   }
 
@@ -86,11 +90,31 @@ export function OrderMultiCompanionSheet({
   };
 
   const confirmDisabled = submitting || selectedIds.length !== needSelect;
+  const handleConfirm = async () => {
+    if (confirmDisabled || submittingRef.current) {
+      return;
+    }
+    submittingRef.current = true;
+    try {
+      await onConfirm(selectedIds);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "请稍后重试");
+    } finally {
+      submittingRef.current = false;
+    }
+  };
 
   return (
     <BottomSheet
       visible={visible}
-      onClose={submitting ? () => undefined : onClose}
+      onClose={() => {
+        if (error) {
+          setError("");
+        } else if (!submitting && !submittingRef.current) {
+          onClose();
+        }
+      }}
+      overlay={<AppPrompt inline visible={Boolean(error)} title="订单操作失败" message={error} onConfirm={() => setError("")} />}
       keyboardAvoiding
       contentStyle={[styles.sheet, { maxHeight: height * 0.78 }]}
     >
@@ -206,7 +230,7 @@ export function OrderMultiCompanionSheet({
               accessibilityRole="button"
               accessibilityLabel="确认并开始服务"
               disabled={confirmDisabled}
-              onPress={() => onConfirm(selectedIds)}
+              onPress={handleConfirm}
               style={[
                 styles.confirmButton,
                 confirmDisabled && styles.confirmDisabled,

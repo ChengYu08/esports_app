@@ -34,12 +34,14 @@ function Harness({
   token,
   enabled,
   initialBalance = null,
+  refreshKey = 0,
 }: {
   token: string | null;
   enabled: boolean;
   initialBalance?: number | null;
+  refreshKey?: number;
 }) {
-  const balance = useStarBalance(token, enabled, { initialBalance });
+  const balance = useStarBalance(token, enabled, { initialBalance, refreshKey });
   return <>{balance === null ? "null" : String(balance)}</>;
 }
 
@@ -72,6 +74,15 @@ describe("useStarBalance", () => {
 
     expect(fetchStarBalanceMock).toHaveBeenCalledWith("tok");
     expect(String(renderer!.toJSON())).toBe("10");
+  });
+
+  it("查询失败后手动重试可恢复余额", async () => {
+    fetchStarBalanceMock.mockRejectedValueOnce(new Error("离线")).mockResolvedValueOnce(200);
+    await act(async () => { renderer = create(<Harness token="tok" enabled />); });
+    expect(String(renderer!.toJSON())).toBe("null");
+    await act(async () => { renderer!.update(<Harness token="tok" enabled refreshKey={1} />); });
+    expect(String(renderer!.toJSON())).toBe("200");
+    expect(fetchStarBalanceMock).toHaveBeenCalledTimes(2);
   });
 
   it("充值返回再次获得焦点时重新拉取并更新余额", async () => {

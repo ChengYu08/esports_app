@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { QuickMatchGrabItem } from "@/features/match/api/match.types";
 import { MatchLinearGradient } from "@/features/match/components/MatchLinearGradient";
 import { MatchingCountdownText } from "@/features/match/components/MatchingCountdownText";
-import { useProfileDetail } from "@/features/mine/hooks/use-profile-data";
+import { useMatchCandidateProfile } from "@/features/match/hooks/use-match-candidate-profile";
 import { calculateAge } from "@/features/mine/profile-utils";
 
 const PUBLISH_GRADIENT = ["#FF1F2E", "#FF1F69"] as const;
@@ -95,11 +95,7 @@ function AnimatedGrabCard({
   onSelect: (grabId: string) => void;
 }) {
   // 抢单备注描述的是订单状态，签名和年龄应使用陪玩的公开个人资料。
-  const { data: profile } = useProfileDetail(
-    item.companionUserId
-      ? { userId: item.companionUserId, clubId: item.clubId }
-      : null,
-  );
+  const { data: profile } = useMatchCandidateProfile(item);
   const age = profile?.birth ? calculateAge(profile.birth) : "";
   const signature = profile?.signature.trim() || "暂无个性签名";
   const reducedMotion = useReducedMotion();

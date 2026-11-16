@@ -21,7 +21,6 @@ type StarPaymentSheetProps = {
   token: string | null;
   onClose: () => void | Promise<void>;
   onPaid: () => void;
-  onPaymentFailed: (message: string) => void;
   /** 点「去充值」导航前的钩子（如语聊房宿主标记跳过成员弹窗恢复） */
   onGoRecharge?: () => void;
 };
@@ -32,12 +31,13 @@ export function StarPaymentSheet({
   token,
   onClose,
   onPaid,
-  onPaymentFailed,
   onGoRecharge,
 }: StarPaymentSheetProps) {
   const insets = useSafeAreaInsets();
   const [paying, setPaying] = useState(false);
-  const settledRef = useRef(false);
+  const payingRef = useRef(false);
+  const [balanceAttempt, setBalanceAttempt] = useState(0);
+  const [balanceFailed, setBalanceFailed] = useState(false);
   // iOS 同链只能呈现一个原生 Modal：余额不足等提示经 BottomSheet 的 overlay 插槽
   // 渲染在支付弹窗自己的 Modal 窗口内，不能作为第二个原生 Modal 叠加
   const [prompt, setPrompt] = useState<{
@@ -45,13 +45,23 @@ export function StarPaymentSheet({
     message: string;
   } | null>(null);
   const balance = useStarBalance(token, visible, {
-    onError: (error) => setPrompt({ message: error.message }),
+    refreshKey: balanceAttempt,
+    onError: (error) => {
+      setBalanceFailed(true);
+      setPrompt({ title: "余额加载失败", message: error.message });
+    },
   });
   const payDisabled = paying || balance === null;
 
   async function confirmPrompt() {
     const goRecharge = prompt?.title === "余额不足";
+    const retryBalance = prompt?.title === "余额加载失败";
     setPrompt(null);
+    if (retryBalance) {
+      setBalanceFailed(false);
+      setBalanceAttempt((value) => value + 1);
+      return;
+    }
     if (!goRecharge) {
       return;
     }
@@ -62,16 +72,19 @@ export function StarPaymentSheet({
   }
 
   async function pay() {
+    if (payingRef.current) {
+      return;
+    }
     if (!token) return setPrompt({ message: "请先登录" });
     if ((balance ?? 0) < order.total)
       return setPrompt({
         title: "余额不足",
         message: "当前钻石余额不足，请充值后再支付",
       });
+    payingRef.current = true;
     setPaying(true);
     try {
       await payCompanionOrder(order.orderId, token);
-      settledRef.current = true;
       onPaid();
     } catch (error) {
       if (error instanceof StarNotEnoughError) {
@@ -82,12 +95,9 @@ export function StarPaymentSheet({
         });
         return;
       }
-      onPaymentFailed(error instanceof Error ? error.message : "支付失败");
-      if (!settledRef.current) {
-        settledRef.current = true;
-        await onClose();
-      }
+      setPrompt({ title: "支付失败", message: error instanceof Error ? error.message : "支付失败" });
     } finally {
+      payingRef.current = false;
       setPaying(false);
     }
   }
@@ -96,7 +106,13 @@ export function StarPaymentSheet({
     <>
       <BottomSheet
         visible={visible}
-        onClose={() => void onClose()}
+        onClose={() => {
+          if (prompt) {
+            setPrompt(null);
+          } else if (!payingRef.current) {
+            onClose();
+          }
+        }}
         dismissOnBackdropPress={!paying}
         scrollable
         contentStyle={[
@@ -109,10 +125,10 @@ export function StarPaymentSheet({
             visible={Boolean(prompt)}
             title={prompt?.title}
             message={prompt?.message ?? ""}
-            confirmText={prompt?.title === "余额不足" ? "去充值" : "知道了"}
-            cancelText={prompt?.title === "余额不足" ? "取消" : undefined}
+            confirmText={prompt?.title === "余额不足" ? "去充值" : prompt?.title === "余额加载失败" ? "重试" : "知道了"}
+            cancelText={prompt?.title === "余额不足" || prompt?.title === "余额加载失败" ? "取消" : undefined}
             onCancel={
-              prompt?.title === "余额不足" ? () => setPrompt(null) : undefined
+              prompt?.title === "余额不足" || prompt?.title === "余额加载失败" ? () => setPrompt(null) : undefined
             }
             onConfirm={() => void confirmPrompt()}
           />
@@ -149,7 +165,7 @@ export function StarPaymentSheet({
             <Text style={styles.paymentRowLabel}>我的余额</Text>
             <View style={styles.paymentRowValue}>
               <Text style={styles.paymentBalanceValue}>
-                {balance === null ? "..." : balance}
+                {balance === null ? (balanceFailed ? "加载失败" : "...") : balance}
               </Text>
               <Image source={starDiamondIcon} style={styles.paymentDiamond} />
             </View>
@@ -160,7 +176,7 @@ export function StarPaymentSheet({
           accessibilityLabel="确认支付"
           accessibilityState={{ disabled: payDisabled }}
           disabled={payDisabled}
-          onPress={() => void pay()}
+          onPress={pay}
           style={({ pressed }) => [
             styles.paySubmitWrap,
             pressed && !payDisabled && styles.payPressed,

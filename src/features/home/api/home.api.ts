@@ -169,7 +169,7 @@ type ApiCompanion = {
   companionServiceId?: number;
 };
 type ApiCompanionPage = { page?: number; totalPages?: number; total?: number; records?: ApiCompanion[] };
-type ApiPriceConfig = { linkName?: string; groupId?: string; tabs?: { menuTitle?: string; imageUrl?: string; sortNo?: number }[] };
+type ApiPriceConfig = { linkName?: string; groupId?: string; tabs?: { menuTitle?: string; imageUrl?: string | null; imageUrls?: (string | null)[] | null; sortNo?: number }[] };
 type ApiResponse<T> = ApiEnvelope<T>;
 
 function requireSuccess<T>(response: ApiResponse<T>, fallback: string): T {
@@ -201,9 +201,14 @@ export async function fetchPriceList(groupId: string, signal?: AbortSignal): Pro
   // 页面配置被删除/停用时接口返回 FAILED「页面不存在或未开放」，按空价目表降级（与 PC 端一致），不当成加载失败
   if (response.code !== "SUCCESS" || !response.data) return [];
   return (response.data.tabs ?? [])
-    .filter((tab) => Boolean(tab.imageUrl))
     .sort((a, b) => (a.sortNo ?? 0) - (b.sortNo ?? 0))
-    .map((tab, index) => ({ menuTitle: tab.menuTitle || `分类${index + 1}`, imageUrl: tab.imageUrl as string, sortNo: tab.sortNo ?? index }));
+    .map((tab) => {
+      const imageUrls = (tab.imageUrls ?? []).map((url) => (url ?? "").trim()).filter(Boolean);
+      const singleImage = tab.imageUrl?.trim();
+      return { ...tab, imageUrls: imageUrls.length ? imageUrls : singleImage ? [singleImage] : [] };
+    })
+    .filter((tab) => tab.imageUrls.length > 0)
+    .map((tab, index) => ({ menuTitle: tab.menuTitle || `分类${index + 1}`, imageUrls: tab.imageUrls, sortNo: tab.sortNo ?? index }));
 }
 
 export async function fetchCompanionPage(filters: CompanionFilters, page = 1, pageSize = 50, signal?: AbortSignal): Promise<CompanionPage> {

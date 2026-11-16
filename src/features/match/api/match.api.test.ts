@@ -4,6 +4,7 @@ import { apiClient } from "@/core/network/api-client";
 
 import {
   batchPayQuickMatch,
+  fetchClubGameServices,
   fetchQuickMatchDetail,
   fetchQuickMatchPaymentPreview,
   selectAndCreateOrder,
@@ -13,6 +14,26 @@ import {
 vi.mock("@/core/network/api-client", () => ({ apiClient: vi.fn() }));
 
 afterEach(() => vi.clearAllMocks());
+
+describe("快速发单服务单双陪配置", () => {
+  it("保留单双陪默认值，将空值和未知值作为隐藏配置", async () => {
+    vi.mocked(apiClient).mockResolvedValue({
+      code: "SUCCESS",
+      data: [
+        { id: 1, companionPreferenceDisplay: 0, supportMultiCompanion: true },
+        { id: 2, companionPreferenceDisplay: 1, supportMultiCompanion: false },
+        { id: 3, companionPreferenceDisplay: 2, supportMultiCompanion: true },
+        { id: 4, companionPreferenceDisplay: null },
+        { id: 5, companionPreferenceDisplay: 7 },
+      ],
+    });
+
+    const services = await fetchClubGameServices("10", "token");
+
+    expect(services.map((service) => service.companionPreferenceDisplay)).toEqual([0, 1, 2, 0, 0]);
+    expect(services.map((service) => service.supportMultiCompanion)).toEqual([true, false, true, false, false]);
+  });
+});
 
 describe("快速匹配详情：活动字段透传", () => {
   it("活动需求映射活动字段（activityId 转字符串、activityCode/文案 trim、金额转数字）", async () => {

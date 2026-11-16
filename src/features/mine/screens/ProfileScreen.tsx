@@ -1,3 +1,4 @@
+import { JoinClubEntry } from "@/features/mine/components/JoinClubEntry";
 import { CachedImage } from "@/shared/ui/CachedImage";
 import { useAuthStore } from "@esports/auth";
 import {
@@ -83,9 +84,7 @@ import {
   useToggleUserFollow,
   useUserFollowState,
 } from "@/features/mine/hooks/use-user-follow";
-import {
-  createImagePreviewParams,
-} from "@/features/mine/image-preview.params";
+import { createImagePreviewParams } from "@/features/mine/image-preview.params";
 import { createProfileAvatarPreviewParams } from "@/features/mine/profile-avatar-preview";
 import { createProfileChatParams } from "@/features/mine/profile-chat";
 import { calculateAge } from "@/features/mine/profile-utils";
@@ -123,22 +122,19 @@ function useHeaderFade(
   topInset: number,
   inverse: boolean,
 ) {
-  return useAnimatedStyle(
-    () => {
-      if (coverHeight === 0) {
-        return { opacity: inverse ? 1 : 0 };
-      }
-      const fadeStart = coverHeight - topInset - NAV_BAR_CONTENT_HEIGHT;
-      const progress = interpolate(
-        scrollY.value,
-        [fadeStart - 1, fadeStart],
-        [0, 1],
-        Extrapolation.CLAMP,
-      );
-      return { opacity: inverse ? 1 - progress : progress };
-    },
-    [coverHeight, inverse, scrollY, topInset],
-  );
+  return useAnimatedStyle(() => {
+    if (coverHeight === 0) {
+      return { opacity: inverse ? 1 : 0 };
+    }
+    const fadeStart = coverHeight - topInset - NAV_BAR_CONTENT_HEIGHT;
+    const progress = interpolate(
+      scrollY.value,
+      [fadeStart - 1, fadeStart],
+      [0, 1],
+      Extrapolation.CLAMP,
+    );
+    return { opacity: inverse ? 1 - progress : progress };
+  }, [coverHeight, inverse, scrollY, topInset]);
 }
 
 export default function ProfileScreen() {
@@ -202,7 +198,6 @@ export default function ProfileScreen() {
   const [orderCard, setOrderCard] = useState<ProfileSkillCard | null>(null);
   const [reorderActive, setReorderActive] = useState(false);
   const reorderHandled = useRef(false);
-  const [paymentError, setPaymentError] = useState<string | null>(null);
   const [paymentOrder, setPaymentOrder] = useState<{
     orderId: number;
     total: number;
@@ -233,7 +228,10 @@ export default function ProfileScreen() {
     (game) => String(game.gameId) === selectedGameId,
   )
     ? selectedGameId
-    : String(detail?.games.find((game) => game.gameName === route.reorderGame)?.gameId ?? firstGameId);
+    : String(
+        detail?.games.find((game) => game.gameName === route.reorderGame)
+          ?.gameId ?? firstGameId,
+      );
 
   const gameDetailQuery = useProfileGameDetail(
     routeParams && (detail?.clubId || routeParams.clubId) && activeGameId
@@ -492,7 +490,9 @@ export default function ProfileScreen() {
     if (!route.reorderGame || reorderHandled.current || !detail) {
       return;
     }
-    const matchingGames = detail.games.filter((game) => game.gameName === route.reorderGame);
+    const matchingGames = detail.games.filter(
+      (game) => game.gameName === route.reorderGame,
+    );
     if (matchingGames.length !== 1) {
       reorderHandled.current = true;
       showToast("原订单游戏已变更，请重新选择服务");
@@ -510,8 +510,10 @@ export default function ProfileScreen() {
     if (!gameDetail || String(gameDetail.gameId) !== gameId) {
       return;
     }
-    const cards = gameDetail.skillCards.filter((card) =>
-      card.modeName === route.reorderMode && card.levelName === route.reorderLevel,
+    const cards = gameDetail.skillCards.filter(
+      (card) =>
+        card.modeName === route.reorderMode &&
+        card.levelName === route.reorderLevel,
     );
     const levelIds = new Set(cards.map((card) => card.gameLevelId));
     if (levelIds.size !== 1 || !route.reorderService) {
@@ -524,12 +526,42 @@ export default function ProfileScreen() {
       setReorderActive(true);
       openOrder(cards[0]);
     });
-  }, [activeGameId, detail, gameDetail, gameDetailQuery.isError, openOrder, route.reorderGame, route.reorderLevel, route.reorderMode, route.reorderService]);
-  const navbarBgFadeStyle = useHeaderFade(scrollY, coverHeight, insets.top, false);
-  const compactIdentityFadeStyle = useHeaderFade(scrollY, coverHeight, insets.top, false);
-  const navTabsFadeStyle = useHeaderFade(scrollY, coverHeight, insets.top, false);
+  }, [
+    activeGameId,
+    detail,
+    gameDetail,
+    gameDetailQuery.isError,
+    openOrder,
+    route.reorderGame,
+    route.reorderLevel,
+    route.reorderMode,
+    route.reorderService,
+  ]);
+  const navbarBgFadeStyle = useHeaderFade(
+    scrollY,
+    coverHeight,
+    insets.top,
+    false,
+  );
+  const compactIdentityFadeStyle = useHeaderFade(
+    scrollY,
+    coverHeight,
+    insets.top,
+    false,
+  );
+  const navTabsFadeStyle = useHeaderFade(
+    scrollY,
+    coverHeight,
+    insets.top,
+    false,
+  );
   // 默认头部中的标签栏:紧凑头部淡入时反向淡出
-  const listTabsInverseFadeStyle = useHeaderFade(scrollY, coverHeight, insets.top, true);
+  const listTabsInverseFadeStyle = useHeaderFade(
+    scrollY,
+    coverHeight,
+    insets.top,
+    true,
+  );
 
   // 列表项拆成独立 memo：item 对象引用跨无关 state 变化保持稳定，FlatList cell 才能整体 bail out。
   // 旧写法一整个 useMemo，compactActive/playingVoiceUrl/blacklistStatus 任一变化都会整份重建所有 item。
@@ -671,6 +703,7 @@ export default function ProfileScreen() {
             <View style={[styles.scrollBody, dimStyle]}>
               <ServiceCard
                 card={card}
+                iconUrl={gameDetail.iconUrl ?? null}
                 first={index === 0}
                 orderDisabled={gameDetailStale}
                 onOrder={openOrder}
@@ -739,10 +772,7 @@ export default function ProfileScreen() {
           key: "reviews-empty",
           content: (
             <View style={styles.scrollBody}>
-              <EmptyState
-                message="暂无评价"
-                hint="完成订单后会显示评价内容"
-              />
+              <EmptyState message="暂无评价" hint="完成订单后会显示评价内容" />
             </View>
           ),
         },
@@ -985,7 +1015,10 @@ export default function ProfileScreen() {
         ]}
       >
         {isMine ? (
-          editProfileButton
+          <>
+            <JoinClubEntry />
+            {editProfileButton}
+          </>
         ) : (
           <>
             <Pressable
@@ -1068,7 +1101,9 @@ export default function ProfileScreen() {
                   showToast("已取消拉黑");
                 })
                 .catch((error: unknown) => {
-                  showToast(error instanceof Error ? error.message : "操作失败");
+                  showToast(
+                    error instanceof Error ? error.message : "操作失败",
+                  );
                 });
             } else {
               setBlacklistPromptVisible(true);
@@ -1120,7 +1155,9 @@ export default function ProfileScreen() {
           }}
           token={accessToken}
           initialServiceName={reorderActive ? route.reorderService : undefined}
-          initialQuantity={reorderActive ? Number(route.reorderQuantity) : undefined}
+          initialQuantity={
+            reorderActive ? Number(route.reorderQuantity) : undefined
+          }
           onClose={() => {
             setOrderCard(null);
             setReorderActive(false);
@@ -1131,7 +1168,6 @@ export default function ProfileScreen() {
           onOrderCreated={(order) => {
             setOrderCard(null);
             setReorderActive(false);
-            setPaymentError(null);
             setPaymentOrder(order);
             setPaymentSheetVisible(true);
           }}
@@ -1160,7 +1196,6 @@ export default function ProfileScreen() {
             const accessToken = useAuthStore.getState().accessToken;
             setPaymentSheetVisible(false);
             setPaymentOrder(null);
-            setPaymentError(null);
             void invalidateOrderQueries(paidOrderId);
             void afterOrderPaidOpenChat({
               companionUserIds: [companionUserId],
@@ -1174,15 +1209,8 @@ export default function ProfileScreen() {
               },
             });
           }}
-          onPaymentFailed={(message) => setPaymentError(message)}
         />
       ) : null}
-      <AppPrompt
-        visible={Boolean(paymentError)}
-        title="支付失败"
-        message={paymentError ?? ""}
-        onConfirm={() => setPaymentError(null)}
-      />
     </View>
   );
 }
@@ -1297,7 +1325,9 @@ const ProfileCover = memo(function ProfileCover({
             // 收起态下可见行数达到 2 行说明被截断，此时才展示展开/收起按钮
             if (introExpanded) return;
             const overflows = event.nativeEvent.lines.length >= 2;
-            setIntroOverflows((prev) => (prev === overflows ? prev : overflows));
+            setIntroOverflows((prev) =>
+              prev === overflows ? prev : overflows,
+            );
           }}
         >
           {profile.signature || "暂无个人简介"}
@@ -1598,11 +1628,13 @@ function ImageGallery({ images }: { images: string[] }) {
 
 const ServiceCard = memo(function ServiceCard({
   card,
+  iconUrl,
   first,
   orderDisabled,
   onOrder,
 }: {
   card: ProfileSkillCard;
+  iconUrl: string | null;
   first: boolean;
   orderDisabled: boolean;
   onOrder: (card: ProfileSkillCard) => void;
@@ -1610,13 +1642,21 @@ const ServiceCard = memo(function ServiceCard({
   return (
     <View style={[styles.serviceCard, first ? styles.serviceCardFirst : null]}>
       <View style={styles.serviceCopy}>
-        <Text numberOfLines={1} style={styles.serviceName}>
-          {card.modeName}-{card.levelName}
-        </Text>
+        <View style={styles.serviceRow}>
+          {iconUrl ? (
+            <CachedImage source={{ uri: iconUrl }} style={styles.gameLogo} />
+          ) : (
+            <Image source={diamondIcon} style={styles.gameLogo} />
+          )}
+          <Text numberOfLines={1} style={styles.serviceName}>
+            {card.modeName}-{card.levelName}
+          </Text>
+        </View>
+
         <View style={styles.serviceMeta}>
           <Text style={styles.price}>{card.price}</Text>
           {/* <Text style={styles.diamond}>◇</Text> */}
-          <Image source={diamondIcon} style={styles.gameLogo} />
+          <Image source={diamondIcon} style={styles.gameUnit} />
           <Text style={styles.metaText}>销量 {card.orderCount}</Text>
           {card.goodRate !== null && card.goodRate !== undefined ? (
             <Text style={styles.metaText}>{card.goodRate}%好评</Text>
@@ -2561,7 +2601,13 @@ const styles = StyleSheet.create({
   },
   // paddingBottom 1：部分 Android 屏幕密度下 32dp 取整后最后 1px 物理行落在
   // 横向滚动裁剪区外，选中态的圆角边框底部会被裁掉，留 1px 余量兼容
-  gameTags: { flexDirection: "row", gap: 10, marginTop: 12, paddingRight: 16, paddingBottom: 1 },
+  gameTags: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 12,
+    paddingRight: 16,
+    paddingBottom: 1,
+  },
   gameTag: {
     height: 32,
     paddingHorizontal: 6,
@@ -2576,7 +2622,8 @@ const styles = StyleSheet.create({
     borderColor: "#FE4267",
     backgroundColor: "#FFF5F7",
   },
-  gameLogo: { width: 15, height: 12.8, borderRadius: 4 },
+  gameLogo: { width: 20, height: 20, borderRadius: 2 },
+  gameUnit: { width: 15, height: 12.8, borderRadius: 4 },
   gameTagIcon: { width: 20, height: 20, borderRadius: 4 },
   gameText: {
     color: "#656566",
@@ -2682,6 +2729,13 @@ const styles = StyleSheet.create({
   },
   serviceCardFirst: { marginTop: 12 },
   serviceCopy: { flex: 1, minWidth: 0, gap: 6 },
+  serviceRow: {
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginRight: 12,
+  },
   serviceName: {
     color: "#0A0A0A",
     fontSize: 14,

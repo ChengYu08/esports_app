@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, usePathname } from 'expo-router';
+import { router, usePathname, useRootNavigationState } from 'expo-router';
 import { useCallback, useMemo } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -40,6 +40,7 @@ const NAVY_GRADIENT = {
 
 export function VoiceRoomMiniPlayer() {
   const pathname = usePathname();
+  const navigationState = useRootNavigationState();
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const room = useVoiceRoomSessionStore((state) => state.activeRoom);
@@ -61,7 +62,7 @@ export function VoiceRoomMiniPlayer() {
       router.back();
       return;
     }
-    // 单实例导航：房内切房原地换 params，其他页面进入 push 保留中间路由
+    // 图片预览先收起或替换，再进入房间，避免返回时反复出现旧预览。
     navigateToVoiceRoom({
       id: room.roomId,
       v: room.roomVersion,
@@ -84,8 +85,8 @@ export function VoiceRoomMiniPlayer() {
               : {}),
           }
         : {}),
-    });
-  }, [pathname, room]);
+    }, navigationState);
+  }, [navigationState, pathname, room]);
 
   const gesture = useMemo(() => {
     const pan = Gesture.Pan()

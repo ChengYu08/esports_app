@@ -1,10 +1,14 @@
-import { StarPaymentPrompt } from "../components/StarPaymentPrompt";
 import { queryClient } from "@/core/query/query-client";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
 import { showToast } from "@/shared/ui/app-toast";
 import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { useAuthStore } from "@esports/auth";
-import { router, useFocusEffect, useIsFocused, useLocalSearchParams } from "expo-router";
+import {
+  router,
+  useFocusEffect,
+  useIsFocused,
+  useLocalSearchParams,
+} from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ChevronLeft24Regular } from "@fluentui/react-native-icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -16,31 +20,40 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StarPaymentPrompt } from "../components/StarPaymentPrompt";
 
+import { useHomeGames } from "@/features/home/hooks/use-home-data";
 import { grabQuickMatchAndEnterAudition } from "@/features/match/grab-quick-match-flow";
 import { useCustomerServiceEntry } from "@/features/mine/hooks/use-customer-service-entry";
-import { useHomeGames } from "@/features/home/hooks/use-home-data";
 import { ListFallbackState, LoadingState } from "@/shared/ui/AsyncStates";
 import { useIsOffline } from "@/shared/hooks/use-is-offline";
 import { PaginationFooter } from "@/shared/ui/PaginationFooter";
 import { buildAfterSalePayload } from "../after-sale-card";
 import { OrderAfterSaleSheet } from "../components/OrderAfterSaleSheet";
-import { OrderMultiCompanionSheet } from "../components/OrderMultiCompanionSheet";
 import { OrderCard } from "../components/OrderCard";
 import { OrderCompleteConfirmSheet } from "../components/OrderCompleteConfirmSheet";
 import { OrderFreeConfirmFlow } from "../components/OrderFreeConfirmFlow";
 import { OrderHeader } from "../components/OrderHeader";
+import { OrderMultiCompanionSheet } from "../components/OrderMultiCompanionSheet";
 import { OrderReviewSheet } from "../components/OrderReviewSheet";
 import { OrderScopeTabs } from "../components/OrderScopeTabs";
 import { OrderTabs } from "../components/OrderTabs";
+import { fetchDispatchDetail } from "../dispatch.api";
 import {
   computeFreeStarAmount,
   computeFreeSubmitAmount,
   computeOrderPayableStars,
 } from "../free-amount";
-import { useOrderPage } from "../hooks/use-order-page";
 import { useOrderClubNames } from "../hooks/use-order-club-names";
-import { afterOrderPaidOpenChat } from "../notify-order-paid";
+import { useOrderPage } from "../hooks/use-order-page";
+import {
+  multiCompanionNeedSelect,
+  needsMultiCompanionSelect,
+} from "../multi-companion";
+import {
+  afterOrderPaidOpenChat,
+  afterQuickMatchPaidOpenRoom,
+} from "../notify-order-paid";
 import {
   invalidateOrderQueries,
   refreshOrderAfterAction,
@@ -61,16 +74,12 @@ import {
   type MultiCompanionCandidate,
   type OrderReview,
 } from "../order.api";
-import {
-  multiCompanionNeedSelect,
-  needsMultiCompanionSelect,
-} from "../multi-companion";
-import { getPaymentDeadline } from "../payment-countdown";
 import type {
   OrderActionKey,
   OrderFilter,
   OrderItemModel,
 } from "../order.types";
+import { getPaymentDeadline } from "../payment-countdown";
 
 export default function OrderScreen({ onBack }: { onBack?: () => void }) {
   const focused = useIsFocused();
@@ -98,8 +107,8 @@ export default function OrderScreen({ onBack }: { onBack?: () => void }) {
   );
   useFocusEffect(
     useCallback(() => {
-      if (requestedScope === "accept" && isCompanion) {
-        setSelectedScope("accept");
+      if (requestedScope === "place" || (requestedScope === "accept" && isCompanion)) {
+        setSelectedScope(requestedScope);
         setFilter("all");
         router.setParams({ scope: undefined });
       }
@@ -129,13 +138,19 @@ export default function OrderScreen({ onBack }: { onBack?: () => void }) {
     expiryRefetchScheduled.current = false;
   }, []);
   useFocusEffect(
-    useCallback(() => () => {
-      // 离开订单页后取消补拉，避免回到首页时继续请求旧列表。
-      clearExpiryRefetch();
-    }, [clearExpiryRefetch]),
+    useCallback(
+      () => () => {
+        // 离开订单页后取消补拉，避免回到首页时继续请求旧列表。
+        clearExpiryRefetch();
+      },
+      [clearExpiryRefetch],
+    ),
   );
   // 切换订单范围时，旧范围的延迟补拉不再占用新范围的刷新窗口。
-  useEffect(() => clearExpiryRefetch, [clearExpiryRefetch, scope, visibleFilter, currentUserId]);
+  useEffect(
+    () => clearExpiryRefetch,
+    [clearExpiryRefetch, scope, visibleFilter, currentUserId],
+  );
   useFocusEffect(
     useCallback(() => {
       if (token && currentUserId)
@@ -174,8 +189,11 @@ export default function OrderScreen({ onBack }: { onBack?: () => void }) {
   const [payTarget, setPayTarget] = useState<OrderItemModel | null>(null);
   const [freeTarget, setFreeTarget] = useState<OrderItemModel | null>(null);
   const [freeSubmitting, setFreeSubmitting] = useState(false);
-  const [multiSelectTarget, setMultiSelectTarget] = useState<OrderItemModel | null>(null);
-  const [multiSelectCandidates, setMultiSelectCandidates] = useState<MultiCompanionCandidate[]>([]);
+  const [multiSelectTarget, setMultiSelectTarget] =
+    useState<OrderItemModel | null>(null);
+  const [multiSelectCandidates, setMultiSelectCandidates] = useState<
+    MultiCompanionCandidate[]
+  >([]);
   const [multiSelectLoading, setMultiSelectLoading] = useState(false);
   const [multiSelectSubmitting, setMultiSelectSubmitting] = useState(false);
   const [prompt, setPrompt] = useState<{
@@ -236,124 +254,121 @@ export default function OrderScreen({ onBack }: { onBack?: () => void }) {
   // 用 useCallback 固定回调引用，保证 OrderCard 的 memo 不被每次渲染的新闭包击穿
   const handleOrderAction = useCallback(
     async (item: OrderItemModel, action: OrderActionKey) => {
-    if (action === "pay") {
-      const deadline = getPaymentDeadline(item);
-      if (deadline !== null && Date.now() >= deadline) {
-        // 已过支付截止时间：服务端自动关单有秒级延迟，刷新列表取已取消状态
-        showToast("订单支付已超时");
-        handlePaymentExpired();
-        return;
-      }
-      setPayTarget(item);
-      return;
-    }
-    if (action === "cancel") setCancelTarget(item);
-    if (action === "complete") {
-      setCompleteTarget(item);
-      setCompletePromptVisible(true);
-    }
-    if (action === "free") setFreeTarget(item);
-    if (action === "reject") {
-      setRejectTarget(item);
-      return;
-    }
-    if (action === "grab" && item.requestNo && token) {
-      if (pendingOrderRef.current) return;
-      pendingOrderRef.current = item.id;
-      setPendingOrderId(item.id);
-      try {
-        // 与抢单条同一条流程：需要试音的订单抢单成功后直接进试音房
-        const result = await grabQuickMatchAndEnterAudition(item.requestNo);
-        if (result.status === "failed") showToast(result.message);
-      } finally {
-        pendingOrderRef.current = null;
-        setPendingOrderId(null);
-      }
-    }
-    // 一单多陪且参与陪玩未选满：先弹选人弹窗，确认后再开始服务
-    if (action === "start" && needsMultiCompanionSelect(item) && token) {
-      setMultiSelectTarget(item);
-      setMultiSelectCandidates([]);
-      setMultiSelectLoading(true);
-      void fetchMultiCompanionCandidates(item.id, token)
-        .then(setMultiSelectCandidates)
-        .catch(() => {
-          setMultiSelectCandidates([]);
-          showToast("获取可选陪玩失败，请稍后重试");
-        })
-        .finally(() => setMultiSelectLoading(false));
-      return;
-    }
-    if (
-      (action === "accept" || action === "start") &&
-      token
-    ) {
-      if (pendingOrderRef.current) return;
-      pendingOrderRef.current = item.id;
-      setPendingOrderId(item.id);
-      let actionSucceeded = false;
-      try {
-        if (action === "accept") await acceptOrder(item.id, token);
-        if (action === "start") await startOrderService(item.id, token);
-        actionSucceeded = true;
-        if (currentUser?.id) {
-          // 列表接口此时可能仍返回旧状态，以详情为准就地替换该单卡片。
-          await refreshOrderAfterAction(item.id, token, currentUser.id);
-        } else {
-          await invalidateOrderQueries(item.id);
+      if (action === "pay") {
+        const deadline = getPaymentDeadline(item);
+        if (deadline !== null && Date.now() >= deadline) {
+          // 已过支付截止时间：服务端自动关单有秒级延迟，刷新列表取已取消状态
+          showToast("订单支付已超时");
+          handlePaymentExpired();
+          return;
         }
-      } catch (error) {
-        setPrompt({
-          title: actionSucceeded ? "订单已更新" : "订单操作失败",
-          message: actionSucceeded
-            ? "状态刷新失败，请下拉刷新订单列表"
-            : error instanceof Error
-              ? error.message
-              : "请稍后重试",
-        });
-      } finally {
-        pendingOrderRef.current = null;
-        setPendingOrderId(null);
-      }
-    }
-    if (action === "afterSales") {
-      if (item.clubId == null) {
-        void useAppConfirm.getState().confirm({
-          title: "暂无法申请售后",
-          message: "缺少俱乐部信息，无法申请售后",
-        });
+        setPayTarget(item);
         return;
       }
-      setAfterSaleTarget(item);
-      if (token && item.clubId) {
-        setAfterSaleLoading(true);
-        void fetchAfterSaleMembers(item.clubId, token)
-          .then(setAfterSaleMembers)
-          .catch(() => setAfterSaleMembers([]))
-          .finally(() => setAfterSaleLoading(false));
-      } else setAfterSaleMembers([]);
-    }
-    if (action === "review") {
-      setReviewTarget(item);
-      setReviewDetail(null);
-      if (item.reviewId && token)
-        void fetchOrderReview(item.reviewId, token)
-          .then(setReviewDetail)
-          .catch(() => undefined);
-    }
-    if (action === "reorder")
-      router.push({
-        pathname: "/profile",
-        params: {
-          clubId: String(item.clubId || ""),
-          userId: String(item.receiverUserId || ""),
-          reorderGame: item.gameName,
-          reorderMode: item.gameModeName ?? "",
-          reorderLevel: item.gameLevelName ?? "",
-          reorderService: item.orderServiceName ?? "",
-          reorderQuantity: String(item.quantity),
-        },
-      });
+      if (action === "cancel") setCancelTarget(item);
+      if (action === "complete") {
+        setCompleteTarget(item);
+        setCompletePromptVisible(true);
+      }
+      if (action === "free") setFreeTarget(item);
+      if (action === "reject") {
+        setRejectTarget(item);
+        return;
+      }
+      if (action === "grab" && item.requestNo && token) {
+        if (pendingOrderRef.current) return;
+        pendingOrderRef.current = item.id;
+        setPendingOrderId(item.id);
+        try {
+          // 与抢单条同一条流程：需要试音的订单抢单成功后直接进试音房
+          const result = await grabQuickMatchAndEnterAudition(item.requestNo);
+          if (result.status === "failed") showToast(result.message);
+        } finally {
+          pendingOrderRef.current = null;
+          setPendingOrderId(null);
+        }
+      }
+      // 一单多陪且参与陪玩未选满：先弹选人弹窗，确认后再开始服务
+      if (action === "start" && needsMultiCompanionSelect(item) && token) {
+        setMultiSelectTarget(item);
+        setMultiSelectCandidates([]);
+        setMultiSelectLoading(true);
+        void fetchMultiCompanionCandidates(item.id, token)
+          .then(setMultiSelectCandidates)
+          .catch(() => {
+            setMultiSelectCandidates([]);
+            showToast("获取可选陪玩失败，请稍后重试");
+          })
+          .finally(() => setMultiSelectLoading(false));
+        return;
+      }
+      if ((action === "accept" || action === "start") && token) {
+        if (pendingOrderRef.current) return;
+        pendingOrderRef.current = item.id;
+        setPendingOrderId(item.id);
+        let actionSucceeded = false;
+        try {
+          if (action === "accept") await acceptOrder(item.id, token);
+          if (action === "start") await startOrderService(item.id, token);
+          actionSucceeded = true;
+          if (currentUser?.id) {
+            // 列表接口此时可能仍返回旧状态，以详情为准就地替换该单卡片。
+            await refreshOrderAfterAction(item.id, token, currentUser.id);
+          } else {
+            await invalidateOrderQueries(item.id);
+          }
+        } catch (error) {
+          setPrompt({
+            title: actionSucceeded ? "订单已更新" : "订单操作失败",
+            message: actionSucceeded
+              ? "状态刷新失败，请下拉刷新订单列表"
+              : error instanceof Error
+                ? error.message
+                : "请稍后重试",
+          });
+        } finally {
+          pendingOrderRef.current = null;
+          setPendingOrderId(null);
+        }
+      }
+      if (action === "afterSales") {
+        if (item.clubId == null) {
+          void useAppConfirm.getState().confirm({
+            title: "暂无法申请售后",
+            message: "缺少俱乐部信息，无法申请售后",
+          });
+          return;
+        }
+        setAfterSaleTarget(item);
+        if (token && item.clubId) {
+          setAfterSaleLoading(true);
+          void fetchAfterSaleMembers(item.clubId, token)
+            .then(setAfterSaleMembers)
+            .catch(() => setAfterSaleMembers([]))
+            .finally(() => setAfterSaleLoading(false));
+        } else setAfterSaleMembers([]);
+      }
+      if (action === "review") {
+        setReviewTarget(item);
+        setReviewDetail(null);
+        if (item.reviewId && token)
+          void fetchOrderReview(item.reviewId, token)
+            .then(setReviewDetail)
+            .catch(() => undefined);
+      }
+      if (action === "reorder")
+        router.push({
+          pathname: "/profile",
+          params: {
+            clubId: String(item.clubId || ""),
+            userId: String(item.receiverUserId || ""),
+            reorderGame: item.gameName,
+            reorderMode: item.gameModeName ?? "",
+            reorderLevel: item.gameLevelName ?? "",
+            reorderService: item.orderServiceName ?? "",
+            reorderQuantity: String(item.quantity),
+          },
+        });
     },
     [token, currentUser, handlePaymentExpired],
   );
@@ -369,16 +384,12 @@ export default function OrderScreen({ onBack }: { onBack?: () => void }) {
       await selectMultiCompanions(target.id, userIds, token);
       await startOrderService(target.id, token);
       setMultiSelectTarget(null);
-      if (currentUser?.id) {
-        await refreshOrderAfterAction(target.id, token, currentUser.id);
-      } else {
-        await invalidateOrderQueries(target.id);
-      }
       showToast("操作成功");
-    } catch (error) {
-      setPrompt({
-        title: "订单操作失败",
-        message: error instanceof Error ? error.message : "请稍后重试",
+      const refresh = currentUser?.id
+        ? refreshOrderAfterAction(target.id, token, currentUser.id)
+        : invalidateOrderQueries(target.id);
+      refresh.catch(() => {
+        showToast("操作已成功，列表刷新失败，请稍后刷新");
       });
     } finally {
       setMultiSelectSubmitting(false);
@@ -410,7 +421,11 @@ export default function OrderScreen({ onBack }: { onBack?: () => void }) {
     } catch (error) {
       setPrompt({
         title: rejected ? "订单已更新" : "拒绝订单失败",
-        message: rejected ? "状态刷新失败，请下拉刷新订单列表" : error instanceof Error ? error.message : "请稍后重试",
+        message: rejected
+          ? "状态刷新失败，请下拉刷新订单列表"
+          : error instanceof Error
+            ? error.message
+            : "请稍后重试",
       });
     } finally {
       pendingOrderRef.current = null;
@@ -447,17 +462,13 @@ export default function OrderScreen({ onBack }: { onBack?: () => void }) {
     try {
       await completeOrderRequest(target.id, token);
       setCompletePromptVisible(false);
-      if (currentUser?.id) {
-        // 列表接口此时可能仍返回旧状态，以详情为准就地替换该单卡片。
-        await refreshOrderAfterAction(target.id, token, currentUser.id);
-      } else {
-        await invalidateOrderQueries(target.id);
-      }
       showToast("订单已完成");
-    } catch (error) {
-      setPrompt({
-        title: "完成订单失败",
-        message: error instanceof Error ? error.message : "请稍后重试",
+      // 缓存刷新不占用提交状态；提交失败由确认抽屉在内部展示。
+      const refresh = currentUser?.id
+        ? refreshOrderAfterAction(target.id, token, currentUser.id)
+        : invalidateOrderQueries(target.id);
+      refresh.catch(() => {
+        showToast("订单已完成，列表刷新失败，请稍后刷新");
       });
     } finally {
       setCompleting(false);
@@ -487,17 +498,12 @@ export default function OrderScreen({ onBack }: { onBack?: () => void }) {
     try {
       await freeOrderService(target.id, freeAmount, token);
       setFreeTarget(null);
-      if (currentUser?.id) {
-        // 全额免单与部分免单的状态不同，以详情为准就地刷新缓存中的该单。
-        await refreshOrderAfterAction(target.id, token, currentUser.id);
-      } else {
-        await invalidateOrderQueries(target.id);
-      }
       showToast("免单成功");
-    } catch (error) {
-      setPrompt({
-        title: "免单失败",
-        message: error instanceof Error ? error.message : "请稍后重试",
+      const refresh = currentUser?.id
+        ? refreshOrderAfterAction(target.id, token, currentUser.id)
+        : invalidateOrderQueries(target.id);
+      refresh.catch(() => {
+        showToast("操作已成功，列表刷新失败，请稍后刷新");
       });
     } finally {
       setFreeSubmitting(false);
@@ -508,9 +514,7 @@ export default function OrderScreen({ onBack }: { onBack?: () => void }) {
   const handleOrderPress = useCallback(
     (order: OrderItemModel) => {
       if (order.requestNo)
-        router.push(
-          `/order/dispatch/${encodeURIComponent(order.requestNo)}`,
-        );
+        router.push(`/order/dispatch/${encodeURIComponent(order.requestNo)}`);
       else router.push(`/order/${order.id}?scope=${scope}`);
     },
     [scope],
@@ -523,7 +527,11 @@ export default function OrderScreen({ onBack }: { onBack?: () => void }) {
         item={item}
         active={focused}
         scope={scope}
-        gameIcon={gameIconsByName.get(item.gameName) ? { uri: gameIconsByName.get(item.gameName)! } : undefined}
+        gameIcon={
+          gameIconsByName.get(item.gameName)
+            ? { uri: gameIconsByName.get(item.gameName)! }
+            : undefined
+        }
         clubName={
           item.clubName ??
           (item.clubId != null ? clubNameById[item.clubId] : undefined)
@@ -534,7 +542,16 @@ export default function OrderScreen({ onBack }: { onBack?: () => void }) {
         onPaymentExpired={handlePaymentExpired}
       />
     ),
-    [clubNameById, pendingOrderId, handleOrderAction, handleOrderPress, handlePaymentExpired, scope, gameIconsByName, focused],
+    [
+      clubNameById,
+      pendingOrderId,
+      handleOrderAction,
+      handleOrderPress,
+      handlePaymentExpired,
+      scope,
+      gameIconsByName,
+      focused,
+    ],
   );
 
   // refetch 在 react-query 中是稳定引用，解构后作为依赖可让 memo 长效命中
@@ -666,7 +683,9 @@ export default function OrderScreen({ onBack }: { onBack?: () => void }) {
       />
       <OrderMultiCompanionSheet
         visible={Boolean(multiSelectTarget)}
-        needSelect={multiSelectTarget ? multiCompanionNeedSelect(multiSelectTarget) : 1}
+        needSelect={
+          multiSelectTarget ? multiCompanionNeedSelect(multiSelectTarget) : 1
+        }
         candidates={multiSelectCandidates}
         loading={multiSelectLoading}
         submitting={multiSelectSubmitting}
@@ -711,9 +730,23 @@ export default function OrderScreen({ onBack }: { onBack?: () => void }) {
         <OrderCompleteConfirmSheet
           visible={completePromptVisible}
           order={completeTarget}
-          buyerName={scope === "place" ? currentUser?.nickname || "老板" : undefined}
-          buyerAvatar={scope === "place" ? (currentUser?.headImage ? { uri: currentUser.headImage } : require("../../../../assets/images/avatar_default.webp")) : undefined}
-          companionName={completeTarget.receiverName || (scope === "place" ? completeTarget.sellerName : currentUser?.nickname) || "陪玩师"}
+          buyerName={
+            scope === "place" ? currentUser?.nickname || "老板" : undefined
+          }
+          buyerAvatar={
+            scope === "place"
+              ? currentUser?.headImage
+                ? { uri: currentUser.headImage }
+                : require("../../../../assets/images/avatar_default.webp")
+              : undefined
+          }
+          companionName={
+            completeTarget.receiverName ||
+            (scope === "place"
+              ? completeTarget.sellerName
+              : currentUser?.nickname) ||
+            "陪玩师"
+          }
           companionAvatar={
             completeTarget.receiverAvatar ??
             (scope === "accept" && currentUser?.headImage
@@ -762,7 +795,6 @@ export default function OrderScreen({ onBack }: { onBack?: () => void }) {
         key={payTarget?.id ?? "none"}
         item={payTarget}
         token={token}
-        onPaymentFailed={(message) => setPrompt({ title: "支付失败", message })}
         onClose={() => {
           const target = payTarget;
           // 关闭支付弹窗只结束本次支付，取消订单由订单卡片的独立操作处理。
@@ -782,6 +814,31 @@ export default function OrderScreen({ onBack }: { onBack?: () => void }) {
           }
           if (paid?.receiverUserId) {
             const companionUserId = String(paid.receiverUserId);
+            if (paid.requestNo && token) {
+              fetchDispatchDetail(paid.requestNo, token)
+                .then((detail) => {
+                  if (detail.needVoice === false) {
+                    return afterQuickMatchPaidOpenRoom({
+                      companionUserIds: [companionUserId],
+                      token,
+                    });
+                  }
+                  return afterOrderPaidOpenChat({
+                    companionUserIds: [companionUserId],
+                    token,
+                    chat: {
+                      id: companionUserId,
+                      title: paid.receiverName || "用户聊天",
+                    },
+                  });
+                })
+                .catch(() => {
+                  showToast(
+                    "支付成功，但派单信息查询失败，请手动进入语聊房邀请陪玩",
+                  );
+                });
+              return;
+            }
             void afterOrderPaidOpenChat({
               companionUserIds: [companionUserId],
               token,

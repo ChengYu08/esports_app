@@ -146,7 +146,7 @@ class PzOneClickModule : Module() {
 
       sendEvent("onStateChange", mapOf("state" to "authorizing"))
       ensureActivityTracking(activity.applicationContext)
-      // 自绘入口（暂不登录/验证码）与 SDK 回调共享同一个 fired 标记，保证 promise 只结算一次
+      // 自绘入口（暂不登录/用其它方式登录）与 SDK 回调共享同一个 fired 标记，保证 promise 只结算一次
       val fired = AtomicBoolean(false)
       val finishCancelled: (Boolean) -> Unit = { switched ->
         if (fired.compareAndSet(false, true)) {
@@ -191,7 +191,7 @@ class PzOneClickModule : Module() {
           val message = resultMessage(result)
           Log.i(TAG, "[DEBUG-QUICK-LOGIN] onTokenFailed: code=$code, message=$message")
           // 取消路径分两类，JS 侧要据此决定露出什么：
-          // 700001 点「验证码」自绘入口 → 关掉授权页，露出下面的密码/验证码表单；
+          // 700001 点「用其它方式登录」自绘入口 → 关掉授权页，露出下面的密码/验证码表单；
           // 700000/700010/700011 点返回按钮/返回键 → 退出登录页回首页。
           val cancelledBySwitch = code == ResultCode.CODE_ERROR_USER_SWITCH
           val cancelledByBack =
@@ -216,7 +216,7 @@ class PzOneClickModule : Module() {
       })
       helper.setAuthSDKInfo(authSDKKey)
       helper.setAuthUIConfig(authUIConfig(activity))
-      // 自绘「暂不登录，先去逛逛」与底部「验证码」入口
+      // 自绘「暂不登录，先去逛逛」与底部「用其它方式登录」入口
       registerAuthPageCustomViews(
         onUserExit = { finishCancelled(false) },
         onUserSwitch = { finishCancelled(true) },
@@ -332,7 +332,7 @@ class PzOneClickModule : Module() {
       .setLogBtnMarginLeftAndRight(32)
       .setLogBtnBackgroundDrawable(loginButton)
       .setLogBtnOffsetY(loginBtnScreenTopDp - bodyTopDp)
-      // 「验证码或密码登录」切换按钮隐藏，入口改用自绘底部「验证码」圆形图标
+      // 「验证码或密码登录」切换按钮隐藏，入口改用自绘底部「用其它方式登录」圆形图标
       .setSwitchAccHidden(true)
       // 协议：默认未勾选（合规要求用户主动同意）
       .setPrivacyState(false)
@@ -366,7 +366,7 @@ class PzOneClickModule : Module() {
       .create()
   }
 
-  // 注册自绘控件：一键登录按钮下方的「暂不登录，先去逛逛」和底部的「验证码」圆形入口
+  // 注册自绘控件：一键登录按钮下方的「暂不登录，先去逛逛」和底部的「用其它方式登录」圆形入口
   private fun registerAuthPageCustomViews(onUserExit: () -> Unit, onUserSwitch: () -> Unit) {
     val context = appContext.reactContext ?: return
     // 重复进入授权页时先清理旧的自绘控件，避免 SDK 叠加注册
@@ -387,7 +387,7 @@ class PzOneClickModule : Module() {
       topMargin = dp(context, (skipEntryScreenTopDp - bodyTopDp).toFloat())
     }
 
-    // 底部「验证码」入口：40dp 圆形底图 + 12dp #808080 文字，点击切换到验证码登录
+    // 底部「用其它方式登录」入口：40dp 圆形底图 + 12dp #808080 文字，点击切换到验证码登录
     val otherWay = LinearLayout(context).apply {
       orientation = LinearLayout.VERTICAL
       gravity = Gravity.CENTER
@@ -395,7 +395,7 @@ class PzOneClickModule : Module() {
         setImageResource(R.drawable.pz_login_other_way)
       }
       val label = TextView(context).apply {
-        text = "验证码"
+        text = "用其它方式登录"
         textSize = 12f
         setTextColor(Color.rgb(128, 128, 128)) // #808080
         gravity = Gravity.CENTER

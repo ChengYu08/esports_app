@@ -20,6 +20,8 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -135,13 +137,19 @@ export default function CourtTicketDetailScreen() {
         </View>
       ) : (
         <>
-          <ScrollView
-            contentContainerStyle={[
-              styles.content,
-              { paddingBottom: Math.max(insets.bottom, 24) },
-            ]}
-            keyboardShouldPersistTaps="handled"
+          <KeyboardAvoidingView
+            style={styles.flex}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            keyboardVerticalOffset={insets.top + 44}
           >
+            <ScrollView
+              style={styles.flex}
+              contentContainerStyle={[
+                styles.content,
+                { paddingBottom: Math.max(insets.bottom, 24) },
+              ]}
+              keyboardShouldPersistTaps="handled"
+            >
             {ticket && (
               <>
                 <View style={styles.summary}>
@@ -263,7 +271,8 @@ export default function CourtTicketDetailScreen() {
                 )}
               </>
             )}
-          </ScrollView>
+            </ScrollView>
+          </KeyboardAvoidingView>
           {canReply && (
             <View
               style={[
@@ -301,6 +310,7 @@ export default function CourtTicketDetailScreen() {
 
 const styles = StyleSheet.create({
   screen: { backgroundColor: "#F5F6F7", flex: 1 },
+  flex: { flex: 1 },
   header: {
     alignItems: "center",
     backgroundColor: "#fff",

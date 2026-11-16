@@ -27,6 +27,7 @@ import {
 } from "@/features/order/free-amount";
 import type { OrderItemModel } from "@/features/order/order.types";
 import { SYSTEM_FONT } from "@/shared/theme/typography";
+import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { CachedImage } from "@/shared/ui/CachedImage";
 
@@ -43,10 +44,11 @@ type Props = {
   serviceTime: string;
   loading: boolean;
   onClose: () => void;
-  onConfirm?: () => void;
+  /** 提交失败需抛出错误，由抽屉在同一个原生弹层内展示。 */
+  onConfirm?: () => void | Promise<void>;
   /** 免单模式：抽屉内直接输入免单时长，实时预览，确认提交免单 */
   freeOrder?: boolean;
-  onConfirmFree?: (freeHours: number) => void;
+  onConfirmFree?: (freeHours: number) => void | Promise<void>;
 };
 
 /** 完成订单确认抽屉：固定标题与操作区，长内容在中间滚动 */
@@ -68,6 +70,8 @@ export function OrderCompleteConfirmSheet({
   const { height: windowHeight } = useWindowDimensions();
   const inputRef = useRef<TextInput>(null);
   const [freeHoursText, setFreeHoursText] = useState("");
+  const [completeError, setCompleteError] = useState("");
+  const submittingRef = useRef(false);
   const freeHours = freeOrder ? parseHoursLive(freeHoursText) : null;
   const freeStars = freeOrder ? computeFreeStarAmount(order, freeHours ?? 0) : null;
   const basePayableStars = computeOrderPayableStars(order);
@@ -86,16 +90,40 @@ export function OrderCompleteConfirmSheet({
     : basePayableStars;
   const hasFreeAmount = Number(order.freeAmount) > 0 || previewFreeStars > 0;
   const handleClose = () => {
+    if (completeError) {
+      setCompleteError("");
+      return;
+    }
     if (!loading) {
       onClose();
     }
   };
-  const handleConfirmFree = () => {
-    if (loading || !freeValid || freeHours == null || !onConfirmFree) {
+  const handleConfirm = async () => {
+    if (loading || submittingRef.current || !onConfirm) {
+      return;
+    }
+    submittingRef.current = true;
+    try {
+      await onConfirm();
+    } catch (error) {
+      setCompleteError(error instanceof Error ? error.message : "请稍后重试");
+    } finally {
+      submittingRef.current = false;
+    }
+  };
+  const handleConfirmFree = async () => {
+    if (loading || submittingRef.current || !freeValid || freeHours == null || !onConfirmFree) {
       return;
     }
     Keyboard.dismiss();
-    onConfirmFree(freeHours);
+    submittingRef.current = true;
+    try {
+      await onConfirmFree(freeHours);
+    } catch (error) {
+      setCompleteError(error instanceof Error ? error.message : "请稍后重试");
+    } finally {
+      submittingRef.current = false;
+    }
   };
   const handleClearFree = () => {
     setFreeHoursText("");
@@ -107,6 +135,16 @@ export function OrderCompleteConfirmSheet({
     <BottomSheet
       visible={visible}
       onClose={handleClose}
+      onRequestClose={handleClose}
+      overlay={
+        <AppPrompt
+          inline
+          visible={Boolean(completeError)}
+          title={freeOrder ? "免单失败" : "完成订单失败"}
+          message={completeError}
+          onConfirm={() => setCompleteError("")}
+        />
+      }
       dismissOnBackdropPress={!loading}
       keyboardAvoiding={freeOrder}
       backdropStyle={styles.backdrop}
@@ -250,7 +288,7 @@ export function OrderCompleteConfirmSheet({
             accessibilityRole="button"
             accessibilityState={{ disabled: handleConfirmDisabled }}
             disabled={handleConfirmDisabled}
-            onPress={freeOrder ? handleConfirmFree : onConfirm}
+            onPress={freeOrder ? handleConfirmFree : handleConfirm}
             style={[
               styles.confirmButton,
               handleConfirmDisabled && styles.confirmButtonDisabled,

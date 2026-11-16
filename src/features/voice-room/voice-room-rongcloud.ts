@@ -1,3 +1,4 @@
+import { sendRongMessage } from '@/features/message/send-rong-message';
 import type { RCIMIWEngine, RCIMIWMessage, RCIMIWTextMessage } from '@rongcloud/react-native-im-wrapper';
 import { logger } from '@/core/logging/logger';
 import { pickRongImageUrl, type RongSdkMessage } from '@/features/message/chat-message';
@@ -11,7 +12,7 @@ import {
   subscribeRongConnectionStatus,
 } from '@/features/message/rongcloud-im';
 
-import { appendCachedVoiceChatMessage, clearVoiceChatMessageCache } from './voice-room-message-cache';
+import { appendCachedVoiceChatMessage, clearVoiceChatMessageCache, confirmCachedVoiceChatMessage } from './voice-room-message-cache';
 
 /** 进房不拉本地历史（对齐 PC count:-1）；历史统一走 getChatRoomMessages 云端接口 */
 const JOIN_CHATROOM_MESSAGE_COUNT = -1;
@@ -21,6 +22,7 @@ const CHATROOM_HISTORY_PAGE_SIZE = 50;
 type RongSdk = typeof import('@rongcloud/react-native-im-wrapper');
 type RoomMessage = {
   id: string;
+  localId?: string;
   userId?: string;
   nickname?: string;
   avatar?: string;
@@ -125,11 +127,27 @@ export async function joinVoiceChatRoom(accessToken: string, chatroomId: string)
   installRoomListeners();
   const sdk = loadSdk();
   const code = await new Promise<number>((resolve, reject) => {
-    void engine.joinChatRoom(chatroomId, JOIN_CHATROOM_MESSAGE_COUNT, false, {
-      onChatRoomJoined: (result) => result === 0 ? resolve(result) : reject(new Error(`加入语聊房失败（${result}）`)),
-    }).then((result) => {
-      if (result !== 0) reject(new Error(`加入语聊房失败（${result}）`));
-    }).catch(reject);
+    let settled = false;
+    const finish = (error?: Error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      if (error) {
+        reject(error);
+      } else {
+        resolve(0);
+      }
+    };
+    const timer = setTimeout(() => finish(new Error('加入语聊房超时，请检查网络后重试')), 15_000);
+    Promise.resolve().then(() => engine.joinChatRoom(chatroomId, JOIN_CHATROOM_MESSAGE_COUNT, false, {
+      onChatRoomJoined: (result) => finish(result === 0 ? undefined : new Error(`加入语聊房失败（${result}）`)),
+    })).then((result) => {
+      if (result !== 0) {
+        finish(new Error(`加入语聊房失败（${result}）`));
+      }
+    }).catch((error: unknown) => finish(error instanceof Error ? error : new Error('加入语聊房失败')));
   });
   if (code !== 0) throw new Error(`加入语聊房失败（${code}）`);
   joinedChatroomIds.add(chatroomId);
@@ -159,19 +177,30 @@ export async function getVoiceChatHistory(chatroomId: string) {
     });
     return [];
   }
+  return fetchVoiceChatHistory(engine, chatroomId, sdk.RCIMIWTimeOrder.BEFORE);
+}
+
+/** 限时读取 SDK 历史；引擎参数也允许离线回归验证原生回调缺失。 */
+export function fetchVoiceChatHistory(
+  engine: Pick<RCIMIWEngine, 'getChatRoomMessages'>,
+  chatroomId: string,
+  timeOrder: Parameters<RCIMIWEngine['getChatRoomMessages']>[2],
+) {
   logger.info('voice_room.history_fetch_start', { chatroomId, count: CHATROOM_HISTORY_PAGE_SIZE });
   return new Promise<RoomMessage[]>((resolve, reject) => {
     let settled = false;
     const finish = (messages: RoomMessage[] | Error) => {
       if (settled) return;
       settled = true;
+      clearTimeout(timer);
       if (messages instanceof Error) reject(messages);
       else resolve(messages);
     };
-    void engine.getChatRoomMessages(
+    const timer = setTimeout(() => finish(new Error('聊天室历史消息加载超时，请稍后重试')), 15_000);
+    Promise.resolve().then(() => engine.getChatRoomMessages(
       chatroomId,
       0,
-      sdk.RCIMIWTimeOrder.BEFORE,
+      timeOrder,
       CHATROOM_HISTORY_PAGE_SIZE,
       {
         onSuccess: (messages) => {
@@ -192,7 +221,7 @@ export async function getVoiceChatHistory(chatroomId: string) {
           finish(new Error(`聊天室历史消息拉取失败（${code}）`));
         },
       },
-    ).then((code) => {
+    )).then((code) => {
       if (code !== 0) {
         logger.warn('voice_room.history_fetch_invoke_failed', { chatroomId, code });
         finish(new Error(`聊天室历史消息拉取失败（${code}）`));
@@ -207,10 +236,33 @@ export async function getVoiceChatHistory(chatroomId: string) {
   });
 }
 
+/** SDK 返回 0 仅代表调用成功，正式消息 ID 必须等发送回执后才能获得。 */
+export async function sendVoiceChatRoomMessage(
+  engine: Pick<RCIMIWEngine, 'sendMessage'>,
+  message: RCIMIWMessage,
+  localId?: string,
+  errorTitle = '发送消息失败',
+) {
+  const sent = await sendRongMessage(engine, message, errorTitle);
+  const chatroomId = message.targetId;
+  if (localId && chatroomId) {
+    const id = String(sent.messageUId || sent.messageId || sent.sentTime);
+    const confirmed = confirmCachedVoiceChatMessage(chatroomId, localId, {
+      id,
+      sentAt: sent.sentTime,
+    });
+    if (confirmed) {
+      roomMessageListeners.forEach((listener) => listener(chatroomId, { ...confirmed, localId }));
+    }
+  }
+  return sent;
+}
+
 export async function sendVoiceChatMessage(
   chatroomId: string,
   text: string,
   sender?: VoiceChatSender,
+  localId?: string,
 ) {
   const engine = getRongCloudEngine();
   const sdk = loadSdk();
@@ -223,10 +275,7 @@ export async function sendVoiceChatMessage(
       portrait: sender.headImage || '',
     };
   }
-  let sent: RCIMIWMessage | undefined;
-  const code = await engine.sendMessage(message, { onMessageSent: (result: number, item?: RCIMIWMessage) => { if (result === 0) sent = item; } });
-  if (code !== 0) throw new Error(`发送消息失败（${code}）`);
-  return sent;
+  return sendVoiceChatRoomMessage(engine, message, localId);
 }
 
 /**
@@ -242,6 +291,7 @@ export async function sendVoiceChatImageMessage(
   imagePath: string,
   imageUrl: string,
   sender?: VoiceChatSender,
+  localId?: string,
 ) {
   const message = await engine.createImageMessage(conversationType, targetId, '', imagePath);
   if (sender) {
@@ -252,8 +302,7 @@ export async function sendVoiceChatImageMessage(
     };
   }
   message.remote = imageUrl;
-  const code = await engine.sendMessage(message, {});
-  if (code !== 0) throw new Error(`发送图片失败（${code}）`);
+  return sendVoiceChatRoomMessage(engine, message, localId, '发送图片失败');
 }
 
 export async function sendVoiceChatImage(
@@ -261,11 +310,12 @@ export async function sendVoiceChatImage(
   imagePath: string,
   imageUrl: string,
   sender?: VoiceChatSender,
+  localId?: string,
 ) {
   const engine = getRongCloudEngine();
   const sdk = loadSdk();
   if (!engine || !sdk) throw new Error('融云 SDK 不可用');
-  return sendVoiceChatImageMessage(engine, sdk.RCIMIWConversationType.CHATROOM, chatroomId, imagePath, imageUrl, sender);
+  return sendVoiceChatImageMessage(engine, sdk.RCIMIWConversationType.CHATROOM, chatroomId, imagePath, imageUrl, sender, localId);
 }
 
 export function subscribeVoiceChatMessages(listener: (chatroomId: string, message: RoomMessage) => void) {

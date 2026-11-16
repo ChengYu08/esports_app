@@ -88,10 +88,14 @@ describe("applyGrabSelection", () => {
   });
 });
 
-describe("isMultiCompanionRequest（普通模式既有判定回归）", () => {
-  it("companionPreference 缺失仍视为一陪多单", () => {
-    expect(isMultiCompanionRequest(detail())).toBe(true);
-    expect(isMultiCompanionRequest(detail({ companionPreference: 1 }))).toBe(false);
+describe("isMultiCompanionRequest", () => {
+  const service = { id: "1", name: "服务", malePrice: 0, femalePrice: 0, supportMultiCompanion: true, companionPreferenceDisplay: 1 as const };
+
+  it("根据服务配置而不是单双陪偏好判断", () => {
+    expect(isMultiCompanionRequest(detail({ gameServiceId: "1", companionPreference: 1 }), service)).toBe(true);
+    expect(isMultiCompanionRequest(detail({ gameServiceId: "1" }), { ...service, supportMultiCompanion: false })).toBe(false);
+    expect(isMultiCompanionRequest(detail({ gameServiceId: "2" }), service)).toBe(false);
+    expect(isMultiCompanionRequest(detail({ gameServiceId: "1" }), undefined)).toBe(false);
   });
 });
 

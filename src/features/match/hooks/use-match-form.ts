@@ -90,7 +90,7 @@ export function useMatchForm(options: UseMatchFormOptions = {}) {
   const [serviceId, setServiceId] = useState<string | null>(null);
   const [gender, setGender] = useState<MatchGenderRequirement>(0);
   const [companionPreference, setCompanionPreference] =
-    useState<MatchCompanionPreference | null>(1);
+    useState<MatchCompanionPreference | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [voice, setVoice] = useState<MatchVoiceOption>("不试音");
   const [remark, setRemark] = useState("");
@@ -104,7 +104,7 @@ export function useMatchForm(options: UseMatchFormOptions = {}) {
     setLevelId(null);
     setServiceId(null);
     setGender(0);
-    setCompanionPreference(1);
+    setCompanionPreference(null);
     setQuantity(1);
     setVoice("不试音");
     setRemark("");
@@ -156,7 +156,7 @@ export function useMatchForm(options: UseMatchFormOptions = {}) {
   );
 
   const showCompanionPreference = Boolean(
-    selectedService && !selectedService.supportMultiCompanion,
+    selectedService && selectedService.companionPreferenceDisplay !== 0,
   );
 
   // 游戏列表加载后默认选中第一项
@@ -177,7 +177,7 @@ export function useMatchForm(options: UseMatchFormOptions = {}) {
       setModeId(null);
       setLevelId(null);
       setServiceId(null);
-      setCompanionPreference(1);
+      setCompanionPreference(null);
     }
   }, [clubLockedMode, club, clubs, clubsQuery.isFetching]);
 
@@ -188,7 +188,7 @@ export function useMatchForm(options: UseMatchFormOptions = {}) {
       setModeId(null);
       setLevelId(null);
       setServiceId(null);
-      setCompanionPreference(1);
+      setCompanionPreference(null);
     }
   }, [modeId, modes, modesQuery.isFetching]);
 
@@ -198,7 +198,7 @@ export function useMatchForm(options: UseMatchFormOptions = {}) {
     if (!levels.some((item) => item.id === levelId)) {
       setLevelId(null);
       setServiceId(null);
-      setCompanionPreference(1);
+      setCompanionPreference(null);
     }
   }, [levelId, levels, levelsQuery.isFetching]);
 
@@ -207,15 +207,15 @@ export function useMatchForm(options: UseMatchFormOptions = {}) {
     if (servicesQuery.isFetching) return;
     if (!services.some((item) => item.id === serviceId)) {
       setServiceId(null);
-      setCompanionPreference(1);
+      setCompanionPreference(null);
       return;
     }
     const svc = services.find((item) => item.id === serviceId);
     if (!svc) return;
-    if (svc.supportMultiCompanion) {
+    if (svc.companionPreferenceDisplay === 0) {
       setCompanionPreference(null);
     } else if (companionPreference === null) {
-      setCompanionPreference(1);
+      setCompanionPreference(svc.companionPreferenceDisplay);
     }
   }, [companionPreference, serviceId, services, servicesQuery.isFetching]);
 
@@ -228,7 +228,7 @@ export function useMatchForm(options: UseMatchFormOptions = {}) {
     setLevelId(null);
     setServiceId(null);
     setGender(0);
-    setCompanionPreference(1);
+    setCompanionPreference(null);
   }, [clubLockedMode]);
 
   const selectClub = useCallback((nextClub: MatchClub) => {
@@ -237,7 +237,7 @@ export function useMatchForm(options: UseMatchFormOptions = {}) {
     setLevelId(null);
     setServiceId(null);
     setGender(0);
-    setCompanionPreference(1);
+    setCompanionPreference(null);
   }, []);
 
   const selectMode = useCallback((nextModeId: string) => {
@@ -245,14 +245,14 @@ export function useMatchForm(options: UseMatchFormOptions = {}) {
     setLevelId(null);
     setServiceId(null);
     setGender(0);
-    setCompanionPreference(1);
+    setCompanionPreference(null);
   }, []);
 
   const selectLevel = useCallback((nextLevelId: string) => {
     setLevelId(nextLevelId);
     setServiceId(null);
     setGender(0);
-    setCompanionPreference(1);
+    setCompanionPreference(null);
   }, []);
 
   const selectService = useCallback(
@@ -260,23 +260,22 @@ export function useMatchForm(options: UseMatchFormOptions = {}) {
       const svc = services.find((item) => item.id === nextServiceId);
       setServiceId(nextServiceId);
       setGender(0);
-      if (svc?.supportMultiCompanion) {
-        setCompanionPreference(null);
-      } else {
-        setCompanionPreference(1);
+      if (nextServiceId !== serviceId) {
+        setCompanionPreference(svc?.companionPreferenceDisplay || null);
       }
     },
-    [services],
+    [serviceId, services],
   );
 
   const estimatedPriceText = useMemo(() => {
     if (!selectedService) return "--";
-    const maleTotal = selectedService.malePrice * quantity;
-    const femaleTotal = selectedService.femalePrice * quantity;
+    const companionCount = showCompanionPreference && companionPreference === 2 ? 2 : 1;
+    const maleTotal = selectedService.malePrice * quantity * companionCount;
+    const femaleTotal = selectedService.femalePrice * quantity * companionCount;
     if (gender === 1) return formatPrice(maleTotal);
     if (gender === 2) return formatPrice(femaleTotal);
     return formatPriceRange(maleTotal, femaleTotal);
-  }, [gender, quantity, selectedService]);
+  }, [companionPreference, gender, quantity, selectedService, showCompanionPreference]);
 
   const remarkOverLimit = remark.length > MATCH_REMARK_MAX;
 

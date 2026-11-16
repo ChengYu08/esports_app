@@ -16,6 +16,7 @@ import { loadConversationSnapshot } from './conversation-loader';
 import { parseRongCommand, type RongCommand } from './rongcloud-command';
 import { KNOWN_RONG_COMMAND_NAMES } from './rongcloud-commands';
 import { fetchRongHistoryMessages } from './rong-history';
+import { sendRongMessage } from './send-rong-message';
 import { isGifImage } from '@/shared/media-picker/image-compat';
 
 export type RongConversation = MessageConversation;
@@ -874,18 +875,12 @@ export async function sendRongText(targetId: string, text: string): Promise<Mana
   if (!sdk) throw new Error('当前版本暂不支持即时消息');
   const currentEngine = requireConnected();
   const message = await currentEngine.createTextMessage(sdk.RCIMIWConversationType.PRIVATE, getRongConversationTargetId(targetId), '', text);
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const finish = (error?: Error, sent?: RCIMIWMessage) => {
-      if (settled) return;
-      settled = true;
-      if (error) { reject(error); return; }
-      const managed = sent ? toManagedMessage(sent) : null;
-      if (managed) resolve({ ...managed, isMine: true });
-      else reject(new Error('发送消息失败'));
-    };
-    void currentEngine.sendMessage(message, { onMessageSent: (code, sent) => code === 0 ? finish(undefined, sent) : finish(new Error(`发送消息失败（${code}）`)) }).then((code) => { if (code !== 0) finish(new Error(`发送消息失败（${code}）`)); }).catch((error) => finish(error instanceof Error ? error : new Error('发送消息失败')));
-  });
+  const sent = await sendRongMessage(currentEngine, message);
+  const managed = toManagedMessage(sent);
+  if (!managed) {
+    throw new Error('发送消息失败');
+  }
+  return { ...managed, isMine: true };
 }
 
 export async function sendRongImage(targetId: string, path: string): Promise<ManagedMessage> {
@@ -902,18 +897,12 @@ export async function sendRongImage(targetId: string, path: string): Promise<Man
   if (isGifImage(path)) {
     message.original = true;
   }
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const finish = (error?: Error, sent?: RCIMIWMessage) => {
-      if (settled) return;
-      settled = true;
-      if (error) { reject(error); return; }
-      const managed = sent ? toManagedMessage(sent) : null;
-      if (managed) resolve({ ...managed, isMine: true });
-      else reject(new Error('发送图片失败'));
-    };
-    void currentEngine.sendMessage(message, { onMessageSent: (code, sent) => code === 0 ? finish(undefined, sent) : finish(new Error(`发送图片失败（${code}）`)) }).then((code) => { if (code !== 0) finish(new Error(`发送图片失败（${code}）`)); }).catch((error) => finish(error instanceof Error ? error : new Error('发送图片失败')));
-  });
+  const sent = await sendRongMessage(currentEngine, message);
+  const managed = toManagedMessage(sent);
+  if (!managed) {
+    throw new Error('发送消息失败');
+  }
+  return { ...managed, isMine: true };
 }
 
 export async function sendRongAfterSaleCard(targetId: string, payload: AfterSaleCardPayload): Promise<ManagedMessage> {
@@ -924,17 +913,12 @@ export async function sendRongAfterSaleCard(targetId: string, payload: AfterSale
   // 原生自定义消息：线上标识为 PZAfterSaleApply 本身，与 PC 端 registerMessageType 对齐；
   // createCustomMessage 会包装成 RC:CustomMsg，PC 端无法按卡片解析
   const message = await currentEngine.createNativeCustomMessage(sdk.RCIMIWConversationType.PRIVATE, getRongConversationTargetId(targetId), '', 'PZAfterSaleApply', fields);
-  return new Promise((resolve, reject) => {
-    void currentEngine.sendMessage(message, { onMessageSent: (code, sent) => {
-      if (code !== 0) return reject(new Error(`售后卡片发送失败（${code}）`));
-      const managed = sent ? toManagedMessage(sent) : null;
-      if (managed) {
-        resolve({ ...managed, isMine: true });
-        return;
-      }
-      reject(new Error('发送消息失败'));
-    } });
-  });
+  const sent = await sendRongMessage(currentEngine, message);
+  const managed = toManagedMessage(sent);
+  if (!managed) {
+    throw new Error('发送消息失败');
+  }
+  return { ...managed, isMine: true };
 }
 
 export async function markRongConversationRead(targetId: string) {
@@ -985,7 +969,6 @@ export async function disconnectRongCloud() {
   connectionAttempt = null;
   hasStartedConnection = false;
   logger.info('rong_connection.disconnect_invoked');
-  if (engine) await engine.disconnect(false);
   connected = false;
   businessToken = '';
   profileCache.clear();
@@ -995,4 +978,7 @@ export async function disconnectRongCloud() {
   conversationReadSyncListeners.clear();
   messageListeners.clear();
   connectionStatusListeners.clear();
+  if (engine) {
+    await engine.disconnect(false);
+  }
 }

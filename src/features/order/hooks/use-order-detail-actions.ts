@@ -167,12 +167,9 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
       await selectMultiCompanions(order.id, userIds, token);
       await startOrderService(order.id, token);
       setMultiSelectVisible(false);
-      await syncAfterMutation();
       showToast("操作成功");
-    } catch (error) {
-      setPrompt({
-        title: "订单操作失败",
-        message: error instanceof Error ? error.message : "请稍后重试",
+      syncAfterMutation().catch(() => {
+        showToast("操作已成功，列表刷新失败，请稍后刷新");
       });
     } finally {
       setActionPending(false);
@@ -201,12 +198,9 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
     try {
       await freeOrderService(order.id, freeAmount, token);
       setActionPrompt(null);
-      await syncAfterMutation();
       showToast("免单成功");
-    } catch (error) {
-      setPrompt({
-        title: "免单失败",
-        message: error instanceof Error ? error.message : "请稍后重试",
+      syncAfterMutation().catch(() => {
+        showToast("操作已成功，列表刷新失败，请稍后刷新");
       });
     } finally {
       setActionPending(false);
@@ -290,19 +284,19 @@ export function useOrderDetailActions({ order, scope, refetch }: Args) {
       );
   };
 
-  /** 陪玩方视角的完成服务：确认弹窗提交中不可关闭，成功后就地刷新列表 */
+  /** 双方共用的完成服务：提交错误交给抽屉内提示，避免 iOS 原生弹窗叠加。 */
   const confirmCompleteAccept = async () => {
-    if (!order || !token || actionPending) return;
+    if (!order || !token || actionPending) {
+      return;
+    }
     setActionPending(true);
     try {
       await completeOrder(order.id, token);
       setCompletePromptVisible(false);
-      await syncAfterMutation();
       showToast("订单已完成");
-    } catch (error) {
-      setPrompt({
-        title: "完成订单失败",
-        message: error instanceof Error ? error.message : "请稍后重试",
+      // 完成已成功，刷新失败不能再误报提交失败或阻塞抽屉关闭。
+      syncAfterMutation().catch(() => {
+        showToast("订单已完成，列表刷新失败，请稍后刷新");
       });
     } finally {
       setActionPending(false);

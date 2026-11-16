@@ -3,7 +3,7 @@ import {
   useQueryClient,
   type QueryClient,
 } from "@tanstack/react-query";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { showToast } from "@/shared/ui/app-toast";
 
@@ -391,15 +391,17 @@ export function useQuickMatchSession(
     return () => clearInterval(timer);
   }, [endMatching, orderPending, requestNo]);
 
-  // 抢单轮询
-  useEffect(() => {
-    if (!requestNo || !token || orderPending) return;
-    void pollGrabList();
+  // 返回选人页立即更新名单，离开页面停止轮询。
+  useFocusEffect(useCallback(() => {
+    if (!requestNo || !token || orderPending) {
+      return;
+    }
+    pollGrabList();
     const timer = setInterval(() => {
-      void pollGrabList();
+      pollGrabList();
     }, POLL_INTERVAL_MS);
     return () => clearInterval(timer);
-  }, [orderPending, pollGrabList, requestNo, token]);
+  }, [orderPending, pollGrabList, requestNo, token]));
 
   // 服务端超时/取消信令（QUICK_MATCH_EXPIRED / QUICK_MATCH_CANCELLED）
   useEffect(() => {

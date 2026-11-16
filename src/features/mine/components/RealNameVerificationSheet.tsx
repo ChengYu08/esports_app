@@ -10,7 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { showToast, toastDurations } from "@/shared/ui/app-toast";
+import { showGlobalToast, showToast } from "@/shared/ui/app-toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -77,7 +77,7 @@ export function RealNameVerificationSheet({
       setIdCard("");
       onClose();
       onVerified?.();
-      showToast("实名认证成功", { duration: toastDurations.LONG });
+      showGlobalToast("实名认证成功");
     } catch (error) {
       showToast(
         `认证失败，${realNameFailureMessage(error)}`,

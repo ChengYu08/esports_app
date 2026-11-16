@@ -96,7 +96,6 @@ export function OrderDetailScreen({
     retry: 1,
   });
   const [paymentVisible, setPaymentVisible] = useState(false);
-  const [paymentError, setPaymentError] = useState("");
   const companionIds = scope === "place"
     ? [...new Set((detail.data?.companions ?? []).map((companion) => companion.userId).filter((userId) => /^\d+$/.test(userId) && userId !== "0"))]
     : [];
@@ -292,9 +291,7 @@ export function OrderDetailScreen({
           setPaymentVisible(false);
           detail.refetch();
         }}
-        onPaymentFailed={setPaymentError}
       />
-      <AppPrompt visible={!!paymentError} title="支付失败" message={paymentError} onConfirm={() => setPaymentError("")} />
       <OrderCompleteConfirmSheet
         visible={actions.completePromptVisible}
         order={order}

@@ -29,6 +29,7 @@ export type VoiceRoomDetail = {
   result?: VoiceRoomDetail;
   data?: VoiceRoomDetail | null;
   roomVersion: string | number;
+  roomType?: 'PERSONAL' | 'CHANNEL';
   roomName?: string;
   roomStatus?: number;
   rongChatroomId?: string;

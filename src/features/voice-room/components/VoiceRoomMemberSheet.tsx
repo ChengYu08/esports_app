@@ -1,5 +1,5 @@
-import { Dismiss16Regular } from "@fluentui/react-native-icons";
 import { useAuthStore } from "@esports/auth";
+import { Dismiss16Regular } from "@fluentui/react-native-icons";
 import { useMutation, useQueries } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -29,9 +29,9 @@ import {
 } from "@/features/mine/hooks/use-user-follow";
 import { afterOrderPaidOpenChat } from "@/features/order/notify-order-paid";
 import { invalidateOrderQueries } from "@/features/order/order-query";
+import { CachedImage } from "@/shared/ui/CachedImage";
 import { requireLogin } from "@/shared/navigation/require-login";
 import { useAppConfirm } from "@/shared/ui/app-confirm";
-import { AppPrompt } from "@/shared/ui/AppPrompt";
 import { showToast } from "@/shared/ui/app-toast";
 import { BottomSheet } from "@/shared/ui/BottomSheet";
 import { canKickVoiceRoomMember, getMemberAge } from "../member-profile";
@@ -48,6 +48,7 @@ type OrderTarget = {
   card: ProfileSkillCard;
   gameName: string;
   gameId: number;
+  gameIconUrl?: string;
 };
 
 type ServiceListItem = OrderTarget;
@@ -105,10 +106,7 @@ export function VoiceRoomMemberSheet({
           signal,
         ),
       enabled:
-        visible &&
-        Boolean(clubId) &&
-        Boolean(memberUserId) &&
-        games.length > 0,
+        visible && Boolean(clubId) && Boolean(memberUserId) && games.length > 0,
     })),
   });
 
@@ -117,7 +115,6 @@ export function VoiceRoomMemberSheet({
   // 下单/支付期间先收起成员弹窗（suspended），各自退场后再串行恢复
   const [suspended, setSuspended] = useState(false);
   const pendingOrderTargetRef = useRef<OrderTarget | null>(null);
-  const promptPendingRef = useRef(false);
   // 去充值导航离开当前屏：跳过 iOS 成员弹窗恢复，避免恢复后盖住充值页
   const rechargeRestoreSkipRef = useRef(false);
   useEffect(() => {
@@ -126,10 +123,8 @@ export function VoiceRoomMemberSheet({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSuspended(false);
     pendingOrderTargetRef.current = null;
-    promptPendingRef.current = false;
     rechargeRestoreSkipRef.current = false;
   }, [visible]);
-  const [paymentError, setPaymentError] = useState<string | null>(null);
   const [paymentOrder, setPaymentOrder] = useState<{
     orderId: number;
     total: number;
@@ -172,6 +167,7 @@ export function VoiceRoomMemberSheet({
         card,
         gameName: detail.gameName,
         gameId: detail.gameId,
+        gameIconUrl: detail.iconUrl,
       });
     }
   }
@@ -259,10 +255,7 @@ export function VoiceRoomMemberSheet({
   const actionsBlockHeight = actionsTopGap + 44 + insets.bottom + 16;
   const scrollMaxHeight = Math.max(
     80,
-    sheetMaxHeight -
-      profileBlockHeight -
-      serviceListGap -
-      actionsBlockHeight,
+    sheetMaxHeight - profileBlockHeight - serviceListGap - actionsBlockHeight,
   );
 
   return (
@@ -434,7 +427,7 @@ export function VoiceRoomMemberSheet({
               }}
               style={[styles.button, busy && styles.disabled]}
             >
-              <Text style={styles.buttonText}>主页</Text>
+              <Text style={styles.buttonText}>主页2</Text>
             </Pressable>
             {!isSelf ? (
               <Pressable
@@ -492,15 +485,15 @@ export function VoiceRoomMemberSheet({
             if (Platform.OS === "ios") {
               // 下单弹窗卸载后的下一轮再恢复成员弹窗，避免与退场同帧竞争
               InteractionManager.runAfterInteractions(() => {
-                if (promptPendingRef.current) return;
                 setSuspended(false);
               });
             }
           }}
-          onRealNameVerificationRequired={() => router.push("/account-settings")}
+          onRealNameVerificationRequired={() =>
+            router.push("/account-settings")
+          }
           onOrderCreated={(order) => {
             setOrderTarget(null);
-            setPaymentError(null);
             setPaymentOrder(order);
             if (Platform.OS === "ios") {
               // 先卸载下单 Modal，下一轮再挂支付弹窗
@@ -524,10 +517,9 @@ export function VoiceRoomMemberSheet({
             setPaymentOrder(null);
             invalidateOrderQueries(orderId);
             if (Platform.OS === "ios") {
-              // 支付弹窗卸载后的下一轮再恢复成员弹窗；有错误提示待弹时先提示、确认后再恢复；
+              // 支付弹窗卸载后的下一轮再恢复成员弹窗；
               // 去充值导航离开当前屏时跳过恢复，避免成员弹窗盖住充值页
               InteractionManager.runAfterInteractions(() => {
-                if (promptPendingRef.current) return;
                 if (rechargeRestoreSkipRef.current) return;
                 setSuspended(false);
               });
@@ -548,7 +540,6 @@ export function VoiceRoomMemberSheet({
             pendingOrderTargetRef.current = null;
             setPaymentSheetVisible(false);
             setPaymentOrder(null);
-            setPaymentError(null);
             void invalidateOrderQueries(paidOrderId);
             void afterOrderPaidOpenChat({
               companionUserIds: [companionUserId],
@@ -562,36 +553,8 @@ export function VoiceRoomMemberSheet({
               beforeNavigate: onClose,
             });
           }}
-          onPaymentFailed={(message) => {
-            if (Platform.OS === "ios") {
-              // 先收支付弹窗，卸载后的下一轮单独弹错误提示，确认后再恢复成员弹窗
-              promptPendingRef.current = true;
-              setPaymentSheetVisible(false);
-              setPaymentOrder(null);
-              InteractionManager.runAfterInteractions(() => {
-                setPaymentError(message);
-              });
-              return;
-            }
-            setPaymentError(message);
-          }}
         />
       ) : null}
-      <AppPrompt
-        visible={Boolean(paymentError)}
-        title="支付失败"
-        message={paymentError ?? ""}
-        onConfirm={() => {
-          setPaymentError(null);
-          if (Platform.OS === "ios") {
-            promptPendingRef.current = false;
-            // 提示弹窗收起后的下一轮再恢复成员弹窗
-            InteractionManager.runAfterInteractions(() => {
-              setSuspended(false);
-            });
-          }
-        }}
-      />
     </>
   );
 }
@@ -603,13 +566,23 @@ function MemberServiceCard({
   item: ServiceListItem;
   onOrder: (item: ServiceListItem) => void;
 }) {
-  const { card, gameName } = item;
+  const { card, gameName, gameIconUrl } = item;
   return (
     <View style={styles.serviceCard}>
       <View style={styles.serviceCopy}>
-        <Text numberOfLines={1} style={styles.serviceName}>
-          {`${gameName}-${card.modeName}-${card.levelName}`}
-        </Text>
+        <View style={styles.serviceNameRow}>
+          {gameIconUrl ? (
+            <CachedImage
+              source={{ uri: gameIconUrl }}
+              style={styles.gameLogo}
+            />
+          ) : (
+            <Image source={diamondIcon} style={styles.gameLogo} />
+          )}
+          <Text numberOfLines={1} style={styles.serviceName}>
+            {`${gameName}-${card.modeName}-${card.levelName}`}
+          </Text>
+        </View>
         <View style={styles.serviceMeta}>
           <Text style={styles.price}>{card.price}</Text>
           <Image source={diamondIcon} style={styles.diamond} />
@@ -739,10 +712,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   serviceCopy: { flex: 1, minWidth: 0, gap: 6 },
+  serviceNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  gameLogo: { width: 20, height: 20, borderRadius: 2 },
   serviceName: {
     color: "#0A0A0A",
     fontSize: 14,
     fontWeight: "400",
+    flexShrink: 1,
   },
   serviceMeta: { flexDirection: "row", alignItems: "center", gap: 7 },
   price: {
