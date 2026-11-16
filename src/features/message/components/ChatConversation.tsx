@@ -55,6 +55,7 @@ import { getConversationDisplayTitle } from "../message-title";
 import {
   getSystemConversationTitle,
   isOrderAssistantConversationId,
+  isPlatformNotificationConversationId,
   isSelfConversationId,
   isSystemConversationId,
   normalizeSystemConversationId,
@@ -207,6 +208,7 @@ export function ChatConversation({
   const isNearBottom = useRef(true);
   const scrollFrame = useRef<number | null>(null);
   const conversationId = normalizeSystemConversationId(String(rawConversationId || ""));
+  const isPlatformNotification = isPlatformNotificationConversationId(conversationId);
   const isSelfConversation = isSelfConversationId(conversationId, userId);
   const canViewProfile = !isSystemConversationId(conversationId);
   const conversation = useMessageStore((state) =>
@@ -492,6 +494,7 @@ export function ChatConversation({
       ) : (
         <ChatBubble
           item={item.message}
+          isPlatformNotification={isPlatformNotification}
           peerAvatar={conversationAvatar}
           myAvatar={myAvatar}
           peerName={conversation?.title || title || "用户"}
@@ -514,6 +517,7 @@ export function ChatConversation({
       handleRetryMessage,
       insets.top,
       isOrderAssistant,
+      isPlatformNotification,
       myAvatar,
       myNickname,
       openImagePreview,
@@ -1324,6 +1328,7 @@ const ChatComposer = memo(function ChatComposer({
 
 const ChatBubble = memo(function ChatBubble({
   item,
+  isPlatformNotification,
   peerAvatar,
   myAvatar,
   peerName,
@@ -1338,6 +1343,7 @@ const ChatBubble = memo(function ChatBubble({
   onPreviewImage,
 }: {
   item: ManagedMessage;
+  isPlatformNotification: boolean;
   peerAvatar: string | number;
   myAvatar: { uri: string } | number;
   peerName: string;
@@ -1455,6 +1461,7 @@ const ChatBubble = memo(function ChatBubble({
         (item.kind === "orderNotify" || item.kind === "csInvite") &&
           !item.isMine &&
           styles.orderNotifyMessageRow,
+        isPlatformNotification && styles.platformNotificationRow,
       ]}
     >
       {!item.isMine && (
@@ -1484,6 +1491,7 @@ const ChatBubble = memo(function ChatBubble({
           item.kind === "csInvite" && {
             maxWidth: Math.round(windowWidth * 0.68),
           },
+          isPlatformNotification && item.kind !== "image" && styles.platformNotificationBubble,
         ]}
       >
         {item.kind === "image" ? (
@@ -1752,6 +1760,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   orderNotifyMessageRow: { paddingRight: 36 },
+  platformNotificationRow: { paddingHorizontal: 16 },
   mineRow: { justifyContent: "flex-end", paddingLeft: 36, paddingRight: 16 },
   messageAvatar: {
     width: 36,
@@ -1767,6 +1776,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   theirBubble: { backgroundColor: "#FFFFFF" },
+  // 统一采用快速匹配取消通知长文气泡的宽度，短通知也保持一致。
+  platformNotificationBubble: { flex: 0, width: "74%", maxWidth: "74%" },
   mineBubble: { backgroundColor: "#FFF2F5" },
   retryLabel: {
     color: "#FE1F4C",
